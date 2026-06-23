@@ -250,9 +250,13 @@ Update project.
 
 ```json
 {
-  "name": "Updated Project"
+  "name": "Updated Project",
+  "description": "Optional description",
+  "is_default": true
 }
 ```
+
+All fields are optional. When is_default is true, the previous default project is unmarked.
 
 ---
 

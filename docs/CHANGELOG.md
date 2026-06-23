@@ -24,6 +24,28 @@ MVP en construcción.
 
 ---
 
+# [0.5.0] - 2026-06-24
+
+## TASK-004: Projects Module
+
+### Added
+
+* POST /api/projects — create project (first project auto-set as default)
+* PATCH /api/projects/[id] — update project name, description, or set as default
+* DELETE /api/projects/[id] — delete project with confirmation dialog
+* Projects list page with table (name, date, actions)
+* New project page with form
+* Edit project page with pre-filled form
+* Zod validation schemas (create + update) in lib/validations/project.ts
+* ProjectForm reusable component (create + edit modes)
+* ProjectActions dropdown (edit, set default, delete)
+* DeleteProjectDialog confirmation modal
+* EmptyState reusable component
+* Badge for default project indicator
+* Toast notifications via Sonner for all CRUD actions
+
+---
+
 # [0.4.0] - 2026-06-24
 
 ## TASK-003: Dashboard Layout

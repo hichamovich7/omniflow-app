@@ -133,6 +133,8 @@ Navegación funcional. ✅
 
 ## [TASK-004] Projects Module
 
+### Status: COMPLETED
+
 ### Goal
 
 Crear CRUD completo de proyectos.
@@ -140,15 +142,16 @@ Crear CRUD completo de proyectos.
 ### Features
 
 ```txt id="0s4fvl"
-Create Project
-Update Project
-Delete Project
-List Projects
+Create Project ✅
+Update Project ✅
+Delete Project ✅
+List Projects ✅
+Set Default Project ✅
 ```
 
 ### Success Criteria
 
-Usuario puede organizar su trabajo por proyectos.
+Usuario puede organizar su trabajo por proyectos. ✅
 
 ---
 
@@ -418,6 +421,19 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-004] Projects Module — 2026-06-24
+
+* Projects CRUD: create, list, edit, delete
+* Set default project (only one default per user)
+* First project auto-set as default
+* API routes: POST /api/projects, PATCH/DELETE /api/projects/[id]
+* Server-side data fetching with Supabase Server Client (no GET API route)
+* Zod validation client + server side
+* EmptyState, ProjectForm, ProjectActions, DeleteProjectDialog components
+* Toast notifications for all actions
+
+---
 
 ## [TASK-003] Dashboard Layout — 2026-06-24
 

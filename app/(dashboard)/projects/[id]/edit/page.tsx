@@ -1,0 +1,36 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { PageHeader } from '@/components/layout/page-header';
+import { ProjectForm } from '@/components/projects/project-form';
+
+export default async function EditProjectPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: project } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!project) {
+    redirect('/projects');
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Edit Project" description="Update project details" />
+      <ProjectForm
+        mode="edit"
+        projectId={project.id}
+        defaultValues={{
+          name: project.name,
+          description: project.description,
+        }}
+      />
+    </div>
+  );
+}
