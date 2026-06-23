@@ -8,6 +8,8 @@
 
 ## [TASK-001] Project Foundation Setup
 
+### Status: COMPLETED
+
 ### Objective
 
 Crear la base técnica completa del proyecto OmniFlow.
@@ -22,9 +24,6 @@ Configurar:
 * Shadcn UI
 * Supabase
 * Supabase Auth
-* OpenRouter
-* Inngest
-* Stripe SDK
 * ESLint
 * Prettier
 
@@ -41,11 +40,11 @@ types/*
 
 Debe ser posible:
 
-* Registrarse
-* Iniciar sesión
-* Cerrar sesión
-* Acceder a rutas protegidas
-* Conectarse correctamente a Supabase
+* Registrarse ✅
+* Iniciar sesión ✅
+* Cerrar sesión ✅
+* Acceder a rutas protegidas ✅
+* Conectarse correctamente a Supabase ✅
 
 ### Do Not Touch
 
@@ -55,6 +54,9 @@ Credits
 Billing
 History
 CSV Export
+OpenRouter
+Stripe
+Inngest
 ```
 
 ---
@@ -407,9 +409,13 @@ Stripe Working
 
 # ✅ COMPLETED TASKS
 
-Ninguna.
+## [TASK-001] Project Foundation Setup — 2026-06-23
 
-Proyecto en fase inicial.
+* Next.js 15 + TypeScript + Tailwind CSS + Shadcn UI
+* Supabase Auth (login, register, logout)
+* Protected routes with middleware
+* Dashboard placeholder
+* ESLint + Prettier configured
 
 ---
 

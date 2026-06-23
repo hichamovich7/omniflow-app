@@ -1,31 +1,69 @@
 # OmniFlow
-test clone
-OmniFlow is an AI-powered Organic Traffic Operating System designed for publishers, affiliate marketers, content creators and SEO agencies.
 
-The platform automates the complete workflow from keyword discovery to content creation and distribution, enabling users to generate SEO articles, optimized images, WordPress-ready content packages, Pinterest campaigns and scalable organic traffic from a single workspace.
+AI-powered Pinterest content generation platform. Generate optimized titles, descriptions, keywords, board suggestions, and image prompts — then export as a Pinterest-compatible CSV for bulk upload.
 
-## Core Vision
+## Tech Stack
 
-Keyword → Content → Distribution → Traffic
+- **Framework:** Next.js 15 (App Router)
+- **Language:** TypeScript (strict mode)
+- **Styling:** Tailwind CSS + Shadcn UI
+- **Database:** Supabase (PostgreSQL)
+- **Authentication:** Supabase Auth
+- **Hosting:** Vercel
 
-## MVP Features
+## Requirements
 
-- Keyword Management
-- CSV Import
-- SEO Article Generation
-- AI Image Generation
-- WordPress Package Export
-- Pinterest Content Generation
-- Pinterest Scheduling
-- Pinterest CSV Export
+- Node.js 18+
+- npm
+- Supabase account with a project created
 
-## Future Roadmap
+## Installation
 
-- Direct WordPress Publishing
-- Direct Pinterest Publishing
-- Facebook Workspace
-- X Workspace
-- Prompt Studio
-- Bring Your Own AI API
-- Spy Engine
-- Autonomous Growth Agents
+```bash
+git clone <repository-url>
+cd omniflow-app
+npm install
+```
+
+## Environment Variables
+
+Copy the example file and fill in your Supabase credentials:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | App URL (default: `http://localhost:3000`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
+
+## Running Locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+## Documentation
+
+See the [docs/](docs/) directory:
+
+- [PROJECT.md](docs/PROJECT.md) — Product vision and MVP scope
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — Technical architecture
+- [DATABASE.md](docs/DATABASE.md) — Database schema
+- [API.md](docs/API.md) — API endpoints
+- [UI_UX.md](docs/UI_UX.md) — UI/UX specification
+- [RULES.md](docs/RULES.md) — Development rules
+- [TASKS.md](docs/TASKS.md) — Task tracker

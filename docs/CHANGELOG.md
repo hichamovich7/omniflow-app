@@ -24,6 +24,27 @@ MVP en construcción.
 
 ---
 
+# [0.2.0] - 2026-06-23
+
+## TASK-001: Project Foundation Setup
+
+### Added
+
+* Next.js 15 with App Router and TypeScript (strict mode)
+* Tailwind CSS v4 + Shadcn UI components (button, input, card, label)
+* Supabase Auth integration (login, register, logout)
+* Auth middleware for route protection
+* Auth callback route for PKCE flow
+* Login page with email/password and Zod validation
+* Register page with email/password/confirm and Zod validation
+* Dashboard placeholder (protected route)
+* ApiResponse type definition
+* ESLint + Prettier configuration
+* .env.example with Supabase variables
+* README.md with setup instructions
+
+---
+
 # [0.1.0] - 2026-06-23
 
 ## Project Initialization
