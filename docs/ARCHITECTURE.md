@@ -20,7 +20,8 @@ La arquitectura está diseñada para minimizar costes, reducir complejidad y per
 | Storage          | Supabase Storage        |
 | Authentication   | Supabase Auth           |
 | Text & Vision AI | OpenRouter              |
-| Image Generation | FAL.ai                  |
+| Image Generation | OpenRouter                |
+| AI Gateway       | OpenRouter
 | Payments         | Stripe                  |
 | Async Jobs       | Inngest                 |
 | Hosting          | Vercel                  |
@@ -42,6 +43,7 @@ Responsabilidades:
 * Image analysis
 * Image prompt generation
 * Structured JSON outputs
+* Generación de imágenes
 
 Modelo por defecto:
 
@@ -59,17 +61,7 @@ deepseek-chat
 
 ---
 
-## FAL.ai Responsibilities
 
-FAL será el proveedor de generación de imágenes.
-
-Modelos previstos:
-
-```txt
-Flux Pro
-Ideogram
-Recraft
-```
 
 En MVP inicial:
 
@@ -83,8 +75,7 @@ En futuras versiones:
 
 ```txt
 Generate Image Prompt
-↓
-FAL API
+
 ↓
 Generated Image
 ↓
@@ -144,12 +135,6 @@ generateImagePrompt.ts
 ```
 
 /openrouter
-
-```
-client.ts
-```
-
-/fal
 
 ```
 client.ts
@@ -253,7 +238,7 @@ Return Response
 
 ---
 
-# Image Analysis Flow
+# Image Analysis 
 
 Reference Image
 
@@ -317,13 +302,14 @@ Supported Columns:
 
 # Storage Strategy
 
+
 Supabase Storage será utilizado para:
 
-* Uploaded Reference Images
-* Future Generated Images
-* CSV Exports
+- Uploaded Reference Images
+- Generated Images
+- CSV Exports
 
-La arquitectura debe estar preparada para almacenar URLs públicas de imágenes para futuras integraciones con FAL.
+Todas las imágenes generadas deberán almacenarse en Supabase Storage y disponer de una URL pública reutilizable para exportaciones, historial y futuras automatizaciones.
 
 ---
 
@@ -353,9 +339,9 @@ Todas las API Routes deben seguir este flujo:
 * useState para estado local simple.
 * Supabase RLS obligatorio.
 * OpenRouter como único gateway para texto y visión.
-* FAL como único proveedor de generación de imágenes.
+
 * Todas las respuestas IA deben devolver JSON estructurado.
-* Ningún componente puede llamar directamente a OpenRouter o FAL.
+* Ningún componente puede llamar directamente a OpenRouter .
 
 Flujo obligatorio:
 

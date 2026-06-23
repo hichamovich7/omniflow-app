@@ -184,17 +184,21 @@ desde otras partes del proyecto.
 
 ---
 
-# Rule #11 — FAL Is The Only Image Provider
+# Rule #11 
+Rule #11
 
-Toda generación de imágenes debe pasar por:
+OpenRouter Is The Only AI Provider
 
-```txt
-/lib/fal
-```
+Toda IA debe pasar por OpenRouter.
 
-No llamar proveedores de imagen desde componentes o páginas.
+Incluye:
 
----
+- Text Generation
+- Vision Analysis
+- Image Generation
+
+
+
 
 # Rule #12 — Strong Typing Required
 

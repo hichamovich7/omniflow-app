@@ -131,15 +131,35 @@ Ventajas:
 
 ### Decision
 
-FAL As Image Provider
+Decision
+
+OpenRouter As Unified AI Gateway
+
+Context
+
+Reducir complejidad y proveedores externos.
+
+Decision Taken
+
+OpenRouter gestionará:
+
+- Text Generation
+- Vision Analysis
+- Image Generation
+
+Consequences
+
+Arquitectura más simple.
+Menos integraciones.
+Menor mantenimiento.
 
 ### Context
 
 Necesidad futura de generación de imágenes Pinterest.
 
-### Decision Taken
 
-FAL será el proveedor estándar para imágenes.
+
+
 
 ### Consequences
 
