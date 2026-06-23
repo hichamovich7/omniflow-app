@@ -316,3 +316,31 @@ Necesario para:
 * History
 * Projects
 * Stripe
+
+---
+
+## 2026-06-24
+
+### Decision
+
+User Role System
+
+### Context
+
+Necesidad de diferenciar niveles de acceso. El fundador necesita acceso ilimitado sin restricciones de créditos ni planes de Stripe.
+
+### Decision Taken
+
+Añadir columna role a profiles con tres niveles:
+
+* user — usuario estándar con créditos limitados
+* admin — acceso administrativo
+* superadmin — créditos ilimitados, acceso completo, exento de restricciones de Stripe y planes
+
+### Consequences
+
+* Toda validación de créditos debe verificar role antes de bloquear
+* Toda restricción de plan debe verificar role antes de aplicar
+* superadmin nunca es bloqueado por falta de créditos
+* superadmin nunca es restringido por plan o suscripción Stripe
+* La asignación de roles se gestiona directamente en base de datos, no desde la UI

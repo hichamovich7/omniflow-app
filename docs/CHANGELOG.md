@@ -24,6 +24,37 @@ MVP en construcción.
 
 ---
 
+# [0.3.0] - 2026-06-24
+
+## TASK-002: Database Schema & RLS
+
+### Added
+
+* Migration 001_initial_schema.sql
+* Table: profiles (extends auth.users with name, credits_balance, plan)
+* Table: projects (with is_default flag)
+* Table: generations (Pinterest generation requests)
+* Table: pins (generated Pinterest content)
+* Foreign Keys with ON DELETE CASCADE on all relationships
+* RLS policies on all tables
+* Trigger: auto-create profile on user signup
+* Trigger: auto-update updated_at on all tables
+* Indexes on user_id, project_id, generation_id, status, language, created_at
+* TypeScript types for all database entities (types/database.ts)
+* Insert types with optional defaults
+
+### Deferred
+
+* credit_transactions table (to TASK-011)
+* subscriptions table (to TASK-012)
+
+### Changed
+
+* DATABASE.md updated with new columns (profiles.name, projects.is_default)
+* Validation strategy: language, model, pins_requested validated in application layer (Zod), not in PostgreSQL
+
+---
+
 # [0.2.0] - 2026-06-23
 
 ## TASK-001: Project Foundation Setup

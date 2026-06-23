@@ -183,6 +183,20 @@ Cada generación conservará:
 
 ---
 
+# User Roles
+
+OmniFlow utiliza un sistema de roles.
+
+| Role       | Credits    | Access     | Stripe Restrictions |
+| ---------- | ---------- | ---------- | ------------------- |
+| user       | Limited    | Standard   | Subject to plan     |
+| admin      | Limited    | Extended   | Subject to plan     |
+| superadmin | Unlimited  | Full       | Exempt              |
+
+Los usuarios con role superadmin tienen créditos ilimitados, acceso completo a todas las funcionalidades y están exentos de restricciones de Stripe y planes.
+
+---
+
 # Credits System
 
 OmniFlow utilizará un sistema de créditos.
@@ -190,6 +204,8 @@ OmniFlow utilizará un sistema de créditos.
 Cada generación consumirá créditos según la cantidad de contenido generado.
 
 Si el usuario no dispone de créditos suficientes, la generación será bloqueada.
+
+Excepción: los usuarios con role superadmin no están sujetos a esta restricción.
 
 La lógica exacta de consumo será definida en una fase posterior.
 

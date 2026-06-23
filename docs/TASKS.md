@@ -65,27 +65,35 @@ Inngest
 
 ## [TASK-002] Database Schema & RLS
 
+### Status: COMPLETED
+
 ### Goal
 
-Crear todas las tablas definidas en DATABASE.md.
+Crear las tablas core definidas en DATABASE.md.
 
-### Tables
+### Tables Created
 
 ```txt id="m4v5oi"
-profiles
-projects
-generations
-pins
-credit_transactions
-subscriptions
+profiles ✅
+projects ✅
+generations ✅
+pins ✅
+```
+
+### Deferred
+
+```txt
+credit_transactions → TASK-011
+subscriptions → TASK-012
 ```
 
 ### Success Criteria
 
-* Migraciones creadas
-* Foreign Keys configuradas
-* RLS activado
-* Policies funcionando
+* Migraciones creadas ✅
+* Foreign Keys configuradas ✅
+* RLS activado ✅
+* Policies funcionando ✅
+* Triggers created (updated_at, handle_new_user) ✅
 
 ---
 
@@ -408,6 +416,18 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-002] Database Schema & RLS — 2026-06-24
+
+* Core tables: profiles, projects, generations, pins
+* Foreign Keys with ON DELETE CASCADE
+* RLS policies on all tables
+* Triggers: auto-create profile on signup, auto-update updated_at
+* Indexes on all query-critical columns
+* TypeScript types for all tables
+* credit_transactions and subscriptions deferred
+
+---
 
 ## [TASK-001] Project Foundation Setup — 2026-06-23
 

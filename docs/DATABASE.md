@@ -43,14 +43,16 @@ Extends Supabase auth.users.
 
 ## Columns
 
-| Column          | Type        | Description              |
-| --------------- | ----------- | ------------------------ |
-| id              | uuid PK     | References auth.users.id |
-| email           | text        | User email               |
-| credits_balance | integer     | Available credits        |
-| plan            | text        | free / starter / pro     |
-| created_at      | timestamptz | Creation date            |
-| updated_at      | timestamptz | Last update              |
+| Column          | Type          | Description                   |
+| --------------- | ------------- | ----------------------------- |
+| id              | uuid PK       | References auth.users.id      |
+| email           | text          | User email                    |
+| name            | text nullable | Display name                  |
+| role            | text          | user / admin / superadmin     |
+| credits_balance | integer       | Available credits             |
+| plan            | text          | free / starter / pro          |
+| created_at      | timestamptz   | Creation date                 |
+| updated_at      | timestamptz   | Last update                   |
 
 ## Purpose
 
@@ -60,7 +62,16 @@ Examples:
 
 * Credit balance
 * Subscription plan
+* User role
 * Future Stripe metadata
+
+## Roles
+
+| Role       | Description                                                  |
+| ---------- | ------------------------------------------------------------ |
+| user       | Default. Standard user with credit-based access.             |
+| admin      | Administrative access.                                       |
+| superadmin | Unlimited credits, full access, exempt from Stripe/plan restrictions. |
 
 ## RLS
 
@@ -80,6 +91,7 @@ Logical container for generations.
 | user_id     | uuid FK → profiles.id | Owner                |
 | name        | text                  | Project name         |
 | description | text nullable         | Optional description |
+| is_default  | boolean               | Default false        |
 | created_at  | timestamptz           |                      |
 | updated_at  | timestamptz           |                      |
 
@@ -117,12 +129,12 @@ Represents one Pinterest generation request.
 | project_id          | uuid FK → projects.id |                                           |
 | user_id             | uuid FK → profiles.id |                                           |
 | keyword             | text                  | Main keyword                              |
-| language            | text                  | en / de / es / fr                         |
-| pins_requested      | integer               | 1, 5, 10, 20, 30                          |
+| language            | text                  | Validated in application layer             |
+| pins_requested      | integer               | CHECK > 0. Validated in application layer  |
 | website_url         | text nullable         |                                           |
 | pinterest_url       | text nullable         |                                           |
 | reference_image_url | text nullable         | Supabase Storage URL                      |
-| model_used          | text                  | OpenRouter model                          |
+| model_used          | text                  | Validated in application layer            |
 | credits_used        | integer               | Credits consumed                          |
 | status              | text                  | pending / processing / completed / failed |
 | created_at          | timestamptz           |                                           |
@@ -198,7 +210,33 @@ Inherited through generation ownership.
 
 ---
 
+# Triggers
+
+## update_updated_at_column()
+
+Automatically sets updated_at to now() before every UPDATE.
+
+Applied to: profiles, projects, generations, pins.
+
+## handle_new_user()
+
+Fires after INSERT on auth.users.
+
+Creates a profiles record with default values (credits_balance = 0, plan = 'free').
+
+---
+
+# Deferred Tables
+
+The following tables are documented but NOT created yet.
+
+They will be created in their respective tasks.
+
+---
+
 # credit_transactions
+
+Status: Deferred to TASK-011.
 
 Credit audit log.
 
@@ -242,6 +280,8 @@ user_id = auth.uid()
 ---
 
 # subscriptions
+
+Status: Deferred to TASK-012.
 
 Stripe subscription information.
 

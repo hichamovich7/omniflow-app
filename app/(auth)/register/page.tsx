@@ -50,7 +50,8 @@ export default function RegisterPage() {
     });
 
     if (authError) {
-      setError(authError.message);
+      console.error(authError);
+      setError(typeof authError.message === 'string' ? authError.message : 'Failed to create account');
       setLoading(false);
       return;
     }
