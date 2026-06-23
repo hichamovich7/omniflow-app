@@ -24,6 +24,24 @@ MVP en construcción.
 
 ---
 
+# [0.4.0] - 2026-06-24
+
+## TASK-003: Dashboard Layout
+
+### Added
+
+* Sidebar component with active link highlighting and disabled links
+* Topbar component with user email and Sign Out button
+* PageHeader reusable component (title, description, actions slot)
+* Dashboard page with static summary cards (Total Generations, Total Pins, Available Credits)
+* Placeholder pages: /projects, /pinterest, /history, /credits, /settings
+
+### Changed
+
+* Dashboard layout refactored from header-only to full AppShell (Sidebar + Topbar + content area)
+
+---
+
 # [0.3.0] - 2026-06-24
 
 ## TASK-002: Database Schema & RLS

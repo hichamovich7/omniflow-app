@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { LogoutButton } from './logout-button';
+import { Sidebar } from '@/components/layout/sidebar';
+import { Topbar } from '@/components/layout/topbar';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -13,17 +14,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="flex h-14 items-center justify-between px-6">
-          <h1 className="text-lg font-semibold">OmniFlow</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user.email}</span>
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
-      <main className="p-6">{children}</main>
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+      <div className="flex flex-1 flex-col">
+        <Topbar email={user.email ?? ''} />
+        <main className="flex-1 p-6">{children}</main>
+      </div>
     </div>
   );
 }

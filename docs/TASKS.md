@@ -99,6 +99,8 @@ subscriptions → TASK-012
 
 ## [TASK-003] Dashboard Layout
 
+### Status: COMPLETED
+
 ### Goal
 
 Construir estructura visual principal.
@@ -106,26 +108,26 @@ Construir estructura visual principal.
 ### Components
 
 ```txt id="0d3dfj"
-AppShell
-Sidebar
-Topbar
-PageHeader
+AppShell ✅
+Sidebar ✅
+Topbar ✅
+PageHeader ✅
 ```
 
 ### Pages
 
 ```txt id="0udn1x"
-/dashboard
-/projects
-/pinterest
-/history
-/credits
-/settings
+/dashboard ✅
+/projects ✅ (placeholder)
+/pinterest ✅ (placeholder)
+/history ✅ (placeholder)
+/credits ✅ (placeholder)
+/settings ✅ (placeholder)
 ```
 
 ### Success Criteria
 
-Navegación funcional.
+Navegación funcional. ✅
 
 ---
 
@@ -416,6 +418,17 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-003] Dashboard Layout — 2026-06-24
+
+* AppShell: Sidebar + Topbar + content area
+* Sidebar with navigation (Dashboard, Projects, Pinterest active; History, Credits, Settings disabled)
+* Topbar with user email from Supabase server client + Sign Out
+* PageHeader reusable component
+* Dashboard page with static summary cards (Total Generations, Total Pins, Available Credits)
+* Placeholder pages for /projects, /pinterest, /history, /credits, /settings
+
+---
 
 ## [TASK-002] Database Schema & RLS — 2026-06-24
 
