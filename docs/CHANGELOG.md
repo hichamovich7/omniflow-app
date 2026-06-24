@@ -24,6 +24,48 @@ MVP en construcción.
 
 ---
 
+# [0.9.1] - 2026-06-24
+
+## TASK-015 Enhancement: Spread by Hours scheduling mode
+
+### Added
+
+* Scheduling Mode selector: "Spread by Days" or "Spread by Hours"
+* Hour interval options: 30 minutes, 1 hour, 2 hours, 4 hours
+* calculateHourSchedule() for intraday pin distribution
+* Zod discriminated union schema for days vs hours modes
+
+### Changed
+
+* Schedule dialog now shows mode selector before frequency/interval
+* API route handles both modes via discriminated union validation
+* Renamed internal types: Frequency → DayFrequency, added HourInterval
+
+---
+
+# [0.9.0] - 2026-06-24
+
+## TASK-015: Content Scheduling & Pinterest CSV Compliance
+
+### Added
+
+* PATCH /api/pinterest/schedule — apply auto-schedule or clear all dates
+* ScheduleDialog component: date picker, time picker, frequency selector, real-time preview
+* Frequency options: Daily, Every 2 Days, Every 3 Days, Weekly, Every Weekday (Mon-Fri)
+* Schedule preview shows first 5 pins + "N more" count
+* Clear Schedule action to remove all publish dates
+* formatPinterestPublishDate() in lib/csv/pinterest.ts — ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
+* Zod validation for schedule input with past-date rejection
+* calculateScheduleDates() with weekday-aware scheduling
+
+### Changed
+
+* PinTable shows "Publish Date" column conditionally when any pin has a date
+* CSV export now formats publish_date in ISO 8601 (was raw timestamp)
+* Results page includes "Schedule Pins" button when generation is completed
+
+---
+
 # [0.8.1] - 2026-06-24
 
 ## TASK-014 Fix: Switch image generation from OpenRouter to OpenAI

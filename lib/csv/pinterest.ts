@@ -7,6 +7,19 @@ function escapeCsvField(field: string): string {
   return field;
 }
 
+export function formatPinterestPublishDate(dateString: string | null): string {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
+}
+
 export function generatePinterestCsv(pins: Pin[]): string {
   const headers = [
     'Title',
@@ -24,7 +37,7 @@ export function generatePinterestCsv(pins: Pin[]): string {
     escapeCsvField(pin.board),
     escapeCsvField(pin.description),
     pin.link_url ?? '',
-    pin.publish_date ?? '',
+    formatPinterestPublishDate(pin.publish_date),
     escapeCsvField(pin.keywords),
   ]);
 

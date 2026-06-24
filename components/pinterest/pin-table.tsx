@@ -17,8 +17,22 @@ function hasAnyImages(pins: Pin[]): boolean {
   return pins.some((pin) => pin.media_url);
 }
 
+function hasAnyDates(pins: Pin[]): boolean {
+  return pins.some((pin) => pin.publish_date);
+}
+
+function formatDate(dateString: string): string {
+  const d = new Date(dateString);
+  return (
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+    ' ' +
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  );
+}
+
 export function PinTable({ pins }: PinTableProps) {
   const showImages = hasAnyImages(pins);
+  const showDates = hasAnyDates(pins);
 
   return (
     <div className="rounded-md border">
@@ -29,6 +43,7 @@ export function PinTable({ pins }: PinTableProps) {
             {showImages && <TableHead className="w-20">Image</TableHead>}
             <TableHead>Title</TableHead>
             <TableHead>Board</TableHead>
+            {showDates && <TableHead>Publish Date</TableHead>}
             <TableHead className="hidden lg:table-cell">Keywords</TableHead>
           </TableRow>
         </TableHeader>
@@ -63,6 +78,11 @@ export function PinTable({ pins }: PinTableProps) {
                 </div>
               </TableCell>
               <TableCell className="whitespace-nowrap">{pin.board}</TableCell>
+              {showDates && (
+                <TableCell className="whitespace-nowrap text-sm">
+                  {pin.publish_date ? formatDate(pin.publish_date) : '—'}
+                </TableCell>
+              )}
               <TableCell className="hidden max-w-xs truncate lg:table-cell">
                 <span className="text-sm text-muted-foreground">{pin.keywords}</span>
               </TableCell>

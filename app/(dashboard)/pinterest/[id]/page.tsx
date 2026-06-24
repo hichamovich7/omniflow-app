@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PinTable } from '@/components/pinterest/pin-table';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
 import { GenerateImagesButton } from '@/components/pinterest/generate-images-button';
+import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
@@ -28,6 +29,7 @@ export default async function GenerationResultsPage({
   const langLabel = LANGUAGE_LABELS[generation.language as SupportedLanguage] ?? generation.language;
   const imageStatus = (generation.image_status ?? 'none') as ImageStatus;
   const pinsWithoutImages = pins.filter((p) => !p.media_url).length;
+  const hasSchedule = pins.some((p) => p.publish_date);
 
   return (
     <div className="space-y-6">
@@ -38,6 +40,13 @@ export default async function GenerationResultsPage({
               generationId={generation.id}
               imageStatus={imageStatus}
               pinsWithoutImages={pinsWithoutImages}
+            />
+          )}
+          {generation.status === 'completed' && pins.length > 0 && (
+            <ScheduleDialog
+              generationId={generation.id}
+              pinCount={pins.length}
+              hasSchedule={hasSchedule}
             />
           )}
           <ExportCsvButton pins={pins} keyword={generation.keyword} />

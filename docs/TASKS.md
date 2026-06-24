@@ -392,6 +392,8 @@ Pin generado con imagen lista para exportar. ✅
 
 ## [TASK-015] Schedule Management
 
+### Status: COMPLETED
+
 ### Goal
 
 Permitir configurar fechas de publicación.
@@ -399,14 +401,17 @@ Permitir configurar fechas de publicación.
 ### Features
 
 ```txt id="onq7cn"
-Date Picker
-Time Picker
-Timezone Support
+Date Picker ✅
+Time Picker ✅
+Frequency (Daily, Every 2/3 Days, Weekly, Weekday) ✅
+Auto Schedule with preview ✅
+Clear Schedule ✅
+Pinterest CSV date format (ISO 8601) ✅
 ```
 
 ### Success Criteria
 
-Publish Date exportada correctamente al CSV.
+Publish Date exportada correctamente al CSV. ✅
 
 ---
 
@@ -427,6 +432,21 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-015] Schedule Management — 2026-06-24
+
+* Auto Scheduler: Start Date + Time + Frequency → publish_date for all pins
+* Frequencies: Daily, Every 2 Days, Every 3 Days, Weekly, Every Weekday (Mon-Fri)
+* Schedule preview showing first 5 pins + "N more" in modal
+* Clear Schedule to remove all dates
+* PATCH /api/pinterest/schedule — apply or clear schedule
+* PinTable shows Publish Date column when dates exist
+* CSV exports publish_date in ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
+* formatPinterestPublishDate() centralized in lib/csv/pinterest.ts
+* ScheduleDialog component with real-time preview
+* Zod validation with past-date rejection
+
+---
 
 ## [TASK-014] AI Image Generation — 2026-06-24
 
