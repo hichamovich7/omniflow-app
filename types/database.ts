@@ -22,6 +22,7 @@ export interface Project {
 }
 
 export type GenerationStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ImageStatus = 'none' | 'processing' | 'completed' | 'partial' | 'failed';
 
 export interface Generation {
   id: string;
@@ -36,6 +37,7 @@ export interface Generation {
   model_used: string;
   credits_used: number;
   status: GenerationStatus;
+  image_status: ImageStatus;
   created_at: string;
   updated_at: string;
 }

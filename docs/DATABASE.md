@@ -137,6 +137,7 @@ Represents one Pinterest generation request.
 | model_used          | text                  | Validated in application layer            |
 | credits_used        | integer               | Credits consumed                          |
 | status              | text                  | pending / processing / completed / failed |
+| image_status        | text                  | none / processing / completed / partial / failed |
 | created_at          | timestamptz           |                                           |
 | updated_at          | timestamptz           |                                           |
 

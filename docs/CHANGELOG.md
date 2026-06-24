@@ -24,6 +24,51 @@ MVP en construcción.
 
 ---
 
+# [0.8.1] - 2026-06-24
+
+## TASK-014 Fix: Switch image generation from OpenRouter to OpenAI
+
+### Fixed
+
+* OpenRouter does not have /api/v1/images/generations endpoint (returned 404)
+* Replaced OpenRouter image client with OpenAI direct API (api.openai.com/v1/images/generations)
+
+### Added
+
+* lib/openai/image-client.ts — OpenAI Images API client with 120s timeout
+* OPENAI_API_KEY and OPENAI_IMAGE_MODEL environment variables
+
+### Changed
+
+* API route now imports from lib/openai/image-client instead of lib/openrouter/image-client
+* Model defaults to gpt-image-1 via OPENAI_IMAGE_MODEL env var
+* .env.example updated with OpenAI variables (replacing OPENROUTER_IMAGE_MODEL)
+
+---
+
+# [0.8.0] - 2026-06-24
+
+## TASK-014: AI Image Generation
+
+### Added
+
+* OpenRouter image client (lib/openrouter/image-client.ts) — generates images via /api/v1/images/generations with 120s timeout
+* POST /api/pinterest/generate-images — batch image generation for all pins in a generation
+* Promise pool utility (lib/utils/promise-pool.ts) — concurrency-limited parallel processing
+* Image prompt config (lib/prompts/image-generator.ts) — pinterest-image-v1, 1024x1536 vertical
+* GenerateImagesButton component — state-aware (none/processing/completed/partial/failed) with retry support
+* PinTable now shows image thumbnails when media_url exists (using next/image with unoptimized for external URLs)
+* Migration 004: image_status column on generations + Supabase Storage bucket generated-images + storage policies
+* .env.example updated with OPENROUTER_IMAGE_MODEL
+
+### Changed
+
+* Results page includes Generate Images button when generation is completed
+* DATABASE.md updated with image_status column
+* types/database.ts updated with ImageStatus type
+
+---
+
 # [0.7.2] - 2026-06-24
 
 ## TASK-010B: Prompt Architecture & Partial Completion

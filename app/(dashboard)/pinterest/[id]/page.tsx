@@ -5,10 +5,12 @@ import { getGenerationWithPins } from '@/lib/queries/generations';
 import { PageHeader } from '@/components/layout/page-header';
 import { PinTable } from '@/components/pinterest/pin-table';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
+import { GenerateImagesButton } from '@/components/pinterest/generate-images-button';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
+import type { ImageStatus } from '@/types/database';
 
 export default async function GenerationResultsPage({
   params,
@@ -24,11 +26,20 @@ export default async function GenerationResultsPage({
   }
 
   const langLabel = LANGUAGE_LABELS[generation.language as SupportedLanguage] ?? generation.language;
+  const imageStatus = (generation.image_status ?? 'none') as ImageStatus;
+  const pinsWithoutImages = pins.filter((p) => !p.media_url).length;
 
   return (
     <div className="space-y-6">
       <PageHeader title="Generation Results" description={generation.keyword}>
         <div className="flex items-center gap-2">
+          {generation.status === 'completed' && pins.length > 0 && (
+            <GenerateImagesButton
+              generationId={generation.id}
+              imageStatus={imageStatus}
+              pinsWithoutImages={pinsWithoutImages}
+            />
+          )}
           <ExportCsvButton pins={pins} keyword={generation.keyword} />
           <Link href="/pinterest" className={buttonVariants({ variant: 'outline' })}>
             New Generation

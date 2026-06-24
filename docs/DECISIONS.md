@@ -392,3 +392,28 @@ Prompts were hardcoded in the API route. Needed a versioned, extractable structu
 * Partial completions no longer fail the generation — better UX for the user
 * Warning logs enable monitoring partial results without blocking the user
 * PROMPT_ID can be stored in generations table in the future for full traceability
+
+---
+
+## 2026-06-24
+
+### Decision
+
+OpenAI Direct API for Image Generation
+
+### Context
+
+OpenRouter does not expose a /v1/images/generations endpoint. Calling it returns 404. OpenRouter is a chat completions proxy and does not support the OpenAI Images API format. Image generation requires a direct provider call.
+
+### Decision Taken
+
+Use OpenAI API directly (api.openai.com/v1/images/generations) for image generation with gpt-image-1. This is an exception to Rule #10/11 (OpenRouter as only AI gateway). OpenRouter remains the exclusive gateway for text and vision. Image generation uses OpenAI directly because no viable alternative exists through OpenRouter.
+
+### Consequences
+
+* Text generation: OpenRouter (unchanged)
+* Image generation: OpenAI direct (exception)
+* New env vars: OPENAI_API_KEY, OPENAI_IMAGE_MODEL
+* lib/openai/image-client.ts handles image generation
+* lib/openrouter/client.ts continues handling text generation
+* If OpenRouter adds image support in the future, migration is straightforward

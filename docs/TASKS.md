@@ -369,6 +369,8 @@ Generación consistente de prompts Pinterest.
 
 ## [TASK-014] AI Image Generation
 
+### Status: COMPLETED
+
 ### Goal
 
 Generar imágenes Pinterest automáticamente mediante OpenRouter.
@@ -376,15 +378,15 @@ Generar imágenes Pinterest automáticamente mediante OpenRouter.
 ### Features
 
 ```txt id="h8g7c3"
-Generate Image
-Store In Supabase Storage
-Create Public URL
-Attach To Pin
+Generate Image ✅
+Store In Supabase Storage ✅
+Create Public URL ✅
+Attach To Pin ✅
 ```
 
 ### Success Criteria
 
-Pin generado con imagen lista para exportar.
+Pin generado con imagen lista para exportar. ✅
 
 ---
 
@@ -425,6 +427,20 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-014] AI Image Generation — 2026-06-24
+
+* OpenRouter image client (lib/openrouter/image-client.ts) with 120s timeout
+* Image generation API route: POST /api/pinterest/generate-images
+* Supabase Storage bucket: generated-images (public read, authenticated write)
+* Concurrency-limited processing: max 3 simultaneous, max 10 per batch
+* GenerateImagesButton with state awareness (none/processing/completed/partial/failed)
+* PinTable shows thumbnails when images exist
+* Migration 004: image_status column on generations + storage bucket + policies
+* Promise pool utility for controlled concurrency
+* Image prompt config (lib/prompts/image-generator.ts)
+
+---
 
 ## [TASK-010] History Module — 2026-06-24
 
