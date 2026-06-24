@@ -1,10 +1,17 @@
 import { PageHeader } from '@/components/layout/page-header';
+import { PageContainer } from '@/components/ui/page-container';
+import { EmptyState } from '@/components/empty-state';
+import { Settings } from 'lucide-react';
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader title="Settings" description="Application preferences" />
-      <p className="text-sm text-muted-foreground">Coming soon.</p>
-    </div>
+      <EmptyState
+        title="Coming soon"
+        description="Settings will be available in a future update."
+        icon={Settings}
+      />
+    </PageContainer>
   );
 }

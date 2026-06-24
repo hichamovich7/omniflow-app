@@ -163,9 +163,49 @@ Columnas soportadas:
 
 # Scheduling Support
 
-El usuario podrá definir una fecha y hora de publicación.
+El usuario puede configurar fechas de publicación para todos los pines de una generación.
 
-La fecha seleccionada será incluida en el CSV exportado para permitir la programación de contenido dentro de Pinterest.
+Modos de programación:
+
+* Spread by Days — distribuye pines por días según frecuencia
+* Spread by Hours — distribuye pines a lo largo del día por intervalos
+
+Frecuencias disponibles (modo días):
+
+* Daily
+* Every 2 Days
+* Every 3 Days
+* Weekly
+* Every Weekday (Mon-Fri)
+
+Intervalos disponibles (modo horas):
+
+* 30 minutes
+* 1 hour
+* 2 hours
+* 4 hours
+
+La fecha se incluye en el CSV en formato ISO 8601 (YYYY-MM-DDTHH:mm:ss).
+
+---
+
+# AI Image Generation
+
+El sistema genera imágenes Pinterest automáticamente.
+
+Flujo:
+
+* El usuario genera contenido (títulos, descripciones, prompts)
+* Tras la generación, puede generar imágenes con un clic
+* Las imágenes se almacenan en Supabase Storage (bucket: generated-images)
+* Las URLs públicas se adjuntan a cada pin
+* Las URLs se incluyen automáticamente en la columna Media URL del CSV
+
+Proveedor:
+
+* OpenAI gpt-image-1
+* Formato: 1024x1536 (vertical Pinterest)
+* Concurrencia limitada: máximo 3 simultáneas, máximo 10 por lote
 
 ---
 

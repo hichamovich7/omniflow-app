@@ -51,14 +51,14 @@ export default function LoginPage() {
   }
 
   return (
-    <Card>
+    <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">OmniFlow</CardTitle>
+        <CardTitle className="text-xl font-semibold">OmniFlow</CardTitle>
         <CardDescription>Sign in to your account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -70,7 +70,7 @@ export default function LoginPage() {
               disabled={loading}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"

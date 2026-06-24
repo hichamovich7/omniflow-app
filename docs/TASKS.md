@@ -6,62 +6,41 @@
 
 # ⚡ ACTIVE TASK
 
-## [TASK-001] Project Foundation Setup
-
-### Status: COMPLETED
-
-### Objective
-
-Crear la base técnica completa del proyecto OmniFlow.
-
-### Scope
-
-Configurar:
-
-* Next.js 15
-* TypeScript
-* Tailwind CSS
-* Shadcn UI
-* Supabase
-* Supabase Auth
-* ESLint
-* Prettier
-
-### Files Allowed
-
-```txt id="3rrz4d"
-app/*
-components/*
-lib/*
-types/*
-```
-
-### Success Criteria
-
-Debe ser posible:
-
-* Registrarse ✅
-* Iniciar sesión ✅
-* Cerrar sesión ✅
-* Acceder a rutas protegidas ✅
-* Conectarse correctamente a Supabase ✅
-
-### Do Not Touch
-
-```txt id="pl4yvw"
-Pinterest Generator
-Credits
-Billing
-History
-CSV Export
-OpenRouter
-Stripe
-Inngest
-```
+No active task. All tasks through TASK-016 are completed.
 
 ---
 
 # ⏳ NEXT TASKS
+
+## [TASK-016] UI/UX Design System & Professional Redesign
+
+### Status: COMPLETED
+
+### Goal
+
+Transformar OmniFlow en un SaaS con aspecto profesional mediante un Design System completo y rediseño visual de todas las pantallas.
+
+### Constraints
+
+No modificar:
+
+* Lógica de negocio
+* APIs
+* Base de datos
+* Prompts
+* Generación de imágenes
+* Scheduling
+* CSV Export
+
+### Success Criteria
+
+* Design System implementado con tokens consistentes
+* Todas las pantallas rediseñadas
+* Responsive strategy implementada
+* Loading states, skeletons, empty states profesionales
+* Aspecto visual de SaaS comercial moderno
+
+---
 
 ## [TASK-002] Database Schema & RLS
 
@@ -232,6 +211,8 @@ Generación funcional con persistencia y export. ✅
 
 ## [TASK-008] Results Screen
 
+### Status: COMPLETED (absorbed into TASK-007)
+
 ### Goal
 
 Visualizar resultados generados.
@@ -239,20 +220,22 @@ Visualizar resultados generados.
 ### Features
 
 ```txt id="l39t5t"
-Generation Summary
-Pins Table
-Card View
-Copy Buttons
-Character Counters
+Generation Summary ✅
+Pins Table ✅
+Card View ✅
+Copy Buttons ✅
+Character Counters ✅
 ```
 
 ### Success Criteria
 
-Todos los resultados son editables.
+Todos los resultados son editables. ✅
 
 ---
 
 ## [TASK-009] CSV Export
+
+### Status: COMPLETED (absorbed into TASK-007)
 
 ### Goal
 
@@ -261,18 +244,18 @@ Exportar CSV compatible con Pinterest Bulk Upload.
 ### Columns
 
 ```txt id="3bnq9v"
-Title
-Media URL
-Pinterest board
-Description
-Link
-Publish date
-Keywords or tags
+Title ✅
+Media URL ✅
+Pinterest board ✅
+Description ✅
+Link ✅
+Publish date ✅
+Keywords or tags ✅
 ```
 
 ### Success Criteria
 
-CSV descargable e importable en Pinterest.
+CSV descargable e importable en Pinterest. ✅
 
 ---
 
@@ -342,9 +325,15 @@ Compra real funcionando.
 
 ## [TASK-013] Image Analysis
 
+### Status: DEFERRED
+
 ### Goal
 
-Analizar imágenes de referencia.
+Analizar imágenes de referencia subidas por el usuario para generar prompts más precisos.
+
+### Note
+
+La generación de image prompts se implementó en TASK-014 (AI Image Generation). El análisis de imágenes de referencia mediante vision models queda pendiente para una futura iteración.
 
 ### Input
 
@@ -363,7 +352,7 @@ Image Prompt
 
 ### Success Criteria
 
-Generación consistente de prompts Pinterest.
+Generación consistente de prompts Pinterest basados en imagen de referencia.
 
 ---
 
@@ -433,6 +422,28 @@ Stripe Working
 
 # ✅ COMPLETED TASKS
 
+## [TASK-016] UI/UX Design System & Professional Redesign — 2026-06-25
+
+* Design System: brand blue accent color (oklch hue 250), success/warning tokens, shadow scale, 4px spacing grid
+* Sidebar redesign: navigation groups (Workspace/Content/Account), active state with left accent border, mobile drawer via Sheet
+* Topbar redesign: hamburger for mobile, user dropdown menu with avatar initials, credits badge
+* Dashboard: real metrics from database (generations count, pins count, credits), recent activity list with status dots
+* Projects UI: description column, relative dates, consistent table headers
+* Pinterest Generator: centered card layout, keyword emphasis, side-by-side language/pins selects
+* Results screen: summary metadata card with icons, ActionBar component, semantic status badges
+* History UI: status dots replacing text badges, relative dates, responsive column hiding
+* PinTable: improved density, rounded-lg borders, uppercase tracking headers
+* Empty states: icon support, improved typography hierarchy, contextual messages per screen
+* Skeleton components: DashboardSkeleton, TableSkeleton for loading states
+* New components: StatusDot, MetricCard, PageContainer, ActionBar, RelativeDate, MobileNav, UserMenu
+* Badge: added success and warning variants
+* Auth pages: consistent card sizing and spacing
+* All pages use PageContainer for uniform padding
+* Platform-agnostic navigation structure (ready for future content types beyond Pinterest)
+* Zero changes to APIs, database, prompts, or business logic
+
+---
+
 ## [TASK-015] Schedule Management — 2026-06-24
 
 * Auto Scheduler: Start Date + Time + Frequency → publish_date for all pins
@@ -459,6 +470,26 @@ Stripe Working
 * Migration 004: image_status column on generations + storage bucket + policies
 * Promise pool utility for controlled concurrency
 * Image prompt config (lib/prompts/image-generator.ts)
+
+---
+
+## [TASK-009] CSV Export — 2026-06-24
+
+* Absorbed into TASK-007
+* Pinterest Bulk Upload format with UTF-8 BOM
+* Columns: Title, Media URL, Pinterest board, Description, Link, Publish date, Keywords
+* Client-side CSV generation via ExportCsvButton
+* Shared CSV utility: lib/csv/pinterest.ts
+
+---
+
+## [TASK-008] Results Screen — 2026-06-24
+
+* Absorbed into TASK-007
+* Generation summary with metadata badges (keyword, language, pins, model, status)
+* Pins table with all generated fields
+* Copy buttons for title, description, prompt
+* Character counters (title 0/100, description 0/500)
 
 ---
 

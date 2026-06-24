@@ -662,6 +662,81 @@ Insufficient credits.
 
 ---
 
+# Image Generation
+
+Available on results page when generation status is "completed".
+
+## Generate Images Button
+
+States:
+
+```txt
+none — "Generate Images" enabled
+processing — "Generating..." disabled with spinner
+completed — "Images Generated" success state
+partial — "Retry Failed" warning state
+failed — "Retry" error state
+```
+
+## Image Thumbnails
+
+PinTable displays image thumbnails when media_url exists.
+
+Thumbnail size:
+
+```txt
+64x96px (vertical Pinterest ratio)
+```
+
+---
+
+# Scheduling
+
+Available on results page when generation status is "completed".
+
+## Schedule Dialog
+
+Triggered by "Schedule Pins" button.
+
+### Mode Selector
+
+```txt
+Spread by Days
+Spread by Hours
+```
+
+### Fields (Days Mode)
+
+* Start Date (date picker, no past dates)
+* Start Time (time picker)
+* Frequency: Daily, Every 2 Days, Every 3 Days, Weekly, Every Weekday (Mon-Fri)
+
+### Fields (Hours Mode)
+
+* Start Date (date picker, no past dates)
+* Start Time (time picker)
+* Interval: 30 minutes, 1 hour, 2 hours, 4 hours
+
+### Preview
+
+Shows first 5 pins with calculated dates + "N more" count.
+
+### Actions
+
+* Apply Schedule — sets publish_date on all pins
+* Clear Schedule — removes all publish_date values
+* Cancel — closes dialog
+
+### PinTable Integration
+
+Publish Date column shown conditionally when any pin has a date.
+
+### CSV Integration
+
+publish_date exported in ISO 8601 format: YYYY-MM-DDTHH:mm:ss
+
+---
+
 # Responsive Rules
 
 Desktop First.

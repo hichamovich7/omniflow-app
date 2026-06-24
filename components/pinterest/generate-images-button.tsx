@@ -23,8 +23,8 @@ export function GenerateImagesButton({
 
   if (imageStatus === 'completed') {
     return (
-      <Button variant="outline" disabled>
-        <CheckCircle className="mr-2 h-4 w-4" />
+      <Button variant="outline" size="sm" disabled>
+        <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
         Images Ready
       </Button>
     );
@@ -61,21 +61,21 @@ export function GenerateImagesButton({
   }
 
   return (
-    <Button onClick={handleGenerate} disabled={loading || pinsWithoutImages === 0}>
+    <Button size="sm" onClick={handleGenerate} disabled={loading || pinsWithoutImages === 0}>
       {loading ? (
         <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Generating images...
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          Generating...
         </>
       ) : imageStatus === 'partial' || imageStatus === 'failed' ? (
         <>
-          <AlertTriangle className="mr-2 h-4 w-4" />
-          Retry Images ({pinsWithoutImages})
+          <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
+          Retry ({pinsWithoutImages})
         </>
       ) : (
         <>
-          <ImageIcon className="mr-2 h-4 w-4" />
-          Generate Images ({pinsWithoutImages})
+          <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
+          Images ({pinsWithoutImages})
         </>
       )}
     </Button>

@@ -164,6 +164,131 @@ unauthorized
 
 ---
 
+# POST /api/pinterest/generate-images
+
+Generate images for all pins in a generation.
+
+## Description
+
+Batch generates Pinterest-optimized images using OpenAI (gpt-image-1). Processes up to 10 pins per batch with max 3 concurrent requests.
+
+## Request
+
+```json
+{
+  "generationId": "uuid"
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "generationId": "uuid",
+    "imagesGenerated": 10,
+    "imagesFailed": 0,
+    "status": "completed"
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+not_found
+generation_not_completed
+image_generation_failed
+```
+
+---
+
+# PATCH /api/pinterest/schedule
+
+Apply or clear schedule dates for pins in a generation.
+
+## Description
+
+Sets publish_date on all pins in a generation based on start date, time, and frequency. Supports "Spread by Days" and "Spread by Hours" modes.
+
+## Request (Apply Schedule — Days Mode)
+
+```json
+{
+  "generationId": "uuid",
+  "action": "apply",
+  "mode": "days",
+  "startDate": "2026-07-01",
+  "startTime": "09:00",
+  "frequency": "daily"
+}
+```
+
+## Request (Apply Schedule — Hours Mode)
+
+```json
+{
+  "generationId": "uuid",
+  "action": "apply",
+  "mode": "hours",
+  "startDate": "2026-07-01",
+  "startTime": "09:00",
+  "interval": "2h"
+}
+```
+
+## Request (Clear Schedule)
+
+```json
+{
+  "generationId": "uuid",
+  "action": "clear"
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "updatedPins": 10
+  },
+  "error": null
+}
+```
+
+## Frequencies (Days Mode)
+
+```txt
+daily
+every_2_days
+every_3_days
+weekly
+weekday
+```
+
+## Intervals (Hours Mode)
+
+```txt
+30m
+1h
+2h
+4h
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+not_found
+invalid_schedule
+past_date
+```
+
+---
+
 # POST /api/pinterest/export-csv
 
 Creates Pinterest-compatible CSV.
@@ -350,6 +475,62 @@ Updates:
 * profiles
 * subscriptions
 * credit_transactions
+
+---
+
+# GET /api/generations/[id]
+
+Returns one generation with all generated pins.
+
+## Response
+
+```json
+{
+  "data": {
+    "generation": {
+      "id": "uuid",
+      "keyword": "bathroom storage",
+      "language": "en",
+      "pinsRequested": 10,
+      "status": "completed",
+      "imageStatus": "completed"
+    },
+    "pins": []
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+not_found
+unauthorized
+```
+
+---
+
+# DELETE /api/generations/[id]
+
+Delete a generation and all associated pins (CASCADE).
+
+## Response
+
+```json
+{
+  "data": {
+    "deleted": true
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+not_found
+unauthorized
+```
 
 ---
 

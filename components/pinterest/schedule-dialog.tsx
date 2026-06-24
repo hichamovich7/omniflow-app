@@ -131,9 +131,9 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule }: Schedule
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>
-        <CalendarClock className="mr-2 h-4 w-4" />
-        Schedule Pins
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+        Schedule
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

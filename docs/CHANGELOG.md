@@ -18,9 +18,52 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
-## Planned
+No planned changes.
 
-MVP en construcción.
+---
+
+# [1.0.0] - 2026-06-25
+
+## TASK-016: UI/UX Design System & Professional Redesign
+
+### Added
+
+* Design System: brand blue accent (oklch hue 250), success/warning semantic tokens, 4-level shadow scale
+* StatusDot component: colored indicator for generation status (success/warning/error/processing)
+* MetricCard component: dashboard metric with icon, value, and subtitle
+* PageContainer component: standardized page wrapper with responsive padding
+* ActionBar component: consistent button bar for page-level actions
+* RelativeDate component: "2h ago" / "3d ago" from timestamps
+* MobileNav component: slide-in drawer via Sheet for mobile sidebar
+* UserMenu component: dropdown with avatar initials, email, settings link, sign out
+* DashboardSkeleton and TableSkeleton loading placeholders
+* Badge variants: success (green) and warning (amber)
+* Dashboard: real metrics from database + recent activity with clickable rows
+* Credits badge in topbar showing current balance
+
+### Changed
+
+* Sidebar: platform-agnostic navigation groups (Workspace/Content/Account), active state with left border accent, reduced width to w-60
+* Topbar: hamburger menu for mobile, user dropdown replaces plain email+logout, height reduced to h-12
+* Dashboard: replaced static hardcoded cards with real Supabase queries (generations count, pins count, credits)
+* Projects page: added description column, relative dates, improved table headers
+* Pinterest Generator: centered card layout, side-by-side language/pins selects, Sparkles icon on button
+* Results screen: metadata summary card with icons, ActionBar for actions, semantic status badges
+* History table: status dots instead of text badges, relative dates, responsive column hiding, project name as pill badge
+* History filters: responsive stacked layout on mobile
+* PinTable: rounded-lg borders, uppercase tracking headers, improved text density
+* Empty states: icon prop support, increased padding, contextual messages per screen
+* Auth pages: consistent card sizing (max-w-sm), font-semibold titles, 1.5 label spacing
+* All page-level action buttons: size="sm" with 3.5px icons for visual consistency
+* Color system: replaced grayscale-only palette with cool-toned blues (oklch), added --success and --warning tokens
+* Border radius: reduced base from 0.625rem to 0.5rem (8px)
+* Body: added antialiased rendering
+* Layout: h-screen with overflow-hidden shell, overflow-y-auto on main content
+* Toast: limited to 3 visible, text-sm class applied
+
+### Removed
+
+* LogoutButton standalone component (replaced by UserMenu dropdown)
 
 ---
 

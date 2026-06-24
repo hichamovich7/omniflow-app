@@ -1,10 +1,17 @@
 import { PageHeader } from '@/components/layout/page-header';
+import { PageContainer } from '@/components/ui/page-container';
+import { EmptyState } from '@/components/empty-state';
+import { Coins } from 'lucide-react';
 
 export default function CreditsPage() {
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader title="Credits" description="Monitor your credit usage" />
-      <p className="text-sm text-muted-foreground">Coming soon.</p>
-    </div>
+      <EmptyState
+        title="Coming soon"
+        description="Credit management will be available in a future update."
+        icon={Coins}
+      />
+    </PageContainer>
   );
 }

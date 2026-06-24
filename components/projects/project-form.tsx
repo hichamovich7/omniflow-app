@@ -65,7 +65,7 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
 
   return (
     <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>
         <Input
           id="name"
@@ -77,7 +77,7 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
           disabled={loading}
         />
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="description">Description (optional)</Label>
         <Textarea
           id="description"

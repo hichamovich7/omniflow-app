@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/page-header';
+import { PageContainer } from '@/components/ui/page-container';
 import { HistoryFilters } from '@/components/history/history-filters';
 import { HistoryTable } from '@/components/history/history-table';
 import { EmptyState } from '@/components/empty-state';
@@ -39,25 +40,36 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
   const { data: generations } = await query;
   const list = generations ?? [];
+  const hasFilters = !!(params.q || params.project || params.language || params.status);
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader title="History" description="Review previous generations" />
 
       <HistoryFilters projects={projects ?? []} />
 
       {list.length === 0 ? (
         <EmptyState
-          title="No generations found"
-          description="Generate your first Pinterest content to see it here"
+          title={hasFilters ? 'No matching results' : 'No generations yet'}
+          description={
+            hasFilters
+              ? 'Try adjusting your filters to find what you\'re looking for.'
+              : 'Generate your first Pinterest content to see it here.'
+          }
         >
-          <Link href="/pinterest" className={buttonVariants()}>
-            Go to Pinterest Generator
-          </Link>
+          {hasFilters ? (
+            <Link href="/history" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Clear filters
+            </Link>
+          ) : (
+            <Link href="/pinterest" className={buttonVariants({ size: 'sm' })}>
+              Go to Generator
+            </Link>
+          )}
         </EmptyState>
       ) : (
         <HistoryTable generations={list} />
       )}
-    </div>
+    </PageContainer>
   );
 }

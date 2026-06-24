@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/page-header';
+import { PageContainer } from '@/components/ui/page-container';
 import { ProjectForm } from '@/components/projects/project-form';
 
 export default async function EditProjectPage({
@@ -21,7 +22,7 @@ export default async function EditProjectPage({
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader title="Edit Project" description="Update project details" />
       <ProjectForm
         mode="edit"
@@ -31,6 +32,6 @@ export default async function EditProjectPage({
           description: project.description,
         }}
       />
-    </div>
+    </PageContainer>
   );
 }

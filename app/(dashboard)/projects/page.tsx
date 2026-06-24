@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/page-header';
+import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,15 @@ import {
 import { ProjectActions } from '@/components/projects/project-actions';
 import { Plus } from 'lucide-react';
 
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export default async function ProjectsPage() {
   const supabase = await createClient();
   const { data: projects } = await supabase
@@ -25,10 +35,10 @@ export default async function ProjectsPage() {
   const list = projects ?? [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Projects" description="Manage your projects">
-        <Link href="/projects/new" className={buttonVariants()}>
-          <Plus className="mr-2 h-4 w-4" />
+    <PageContainer>
+      <PageHeader title="Projects" description="Organize your content by project">
+        <Link href="/projects/new" className={buttonVariants({ size: 'sm' })}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           New Project
         </Link>
       </PageHeader>
@@ -36,38 +46,48 @@ export default async function ProjectsPage() {
       {list.length === 0 ? (
         <EmptyState
           title="No projects yet"
-          description="Create your first project to get started"
+          description="Create your first project to start generating content."
         >
-          <Link href="/projects/new" className={buttonVariants()}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Link href="/projects/new" className={buttonVariants({ size: 'sm' })}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
             New Project
           </Link>
         </EmptyState>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[70px]" />
+                <TableHead className="text-xs font-medium uppercase tracking-wider">
+                  Name
+                </TableHead>
+                <TableHead className="text-xs font-medium uppercase tracking-wider">
+                  Description
+                </TableHead>
+                <TableHead className="text-xs font-medium uppercase tracking-wider">
+                  Created
+                </TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {list.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell className="font-medium">
+                <TableRow key={project.id} className="group">
+                  <TableCell>
                     <div className="flex items-center gap-2">
-                      {project.name}
-                      {project.is_default && <Badge variant="secondary">Default</Badge>}
+                      <span className="text-sm font-medium">{project.name}</span>
+                      {project.is_default && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Default
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(project.created_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
+                  <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                    {project.description || '—'}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {timeAgo(project.created_at)}
                   </TableCell>
                   <TableCell>
                     <ProjectActions
@@ -82,6 +102,6 @@ export default async function ProjectsPage() {
           </Table>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

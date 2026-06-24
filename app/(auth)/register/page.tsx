@@ -62,9 +62,9 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <Card>
+      <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
+          <CardTitle className="text-xl font-semibold">Check your email</CardTitle>
           <CardDescription>
             We sent a confirmation link to <strong>{email}</strong>
           </CardDescription>
@@ -82,14 +82,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card>
+    <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">OmniFlow</CardTitle>
+        <CardTitle className="text-xl font-semibold">OmniFlow</CardTitle>
         <CardDescription>Create your account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -101,7 +101,7 @@ export default function RegisterPage() {
               disabled={loading}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -113,7 +113,7 @@ export default function RegisterPage() {
               disabled={loading}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
             <Input
               id="confirmPassword"

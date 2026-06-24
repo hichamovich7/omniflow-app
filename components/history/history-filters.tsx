@@ -52,8 +52,8 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative w-64">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="relative sm:w-64">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search keyword..."
@@ -67,7 +67,7 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
         value={searchParams.get('project') ?? 'all'}
         onValueChange={(v) => v && updateParam('project', v)}
       >
-        <SelectTrigger className="w-44">
+        <SelectTrigger className="sm:w-40">
           <span className="truncate">
             {searchParams.get('project')
               ? projects.find((p) => p.id === searchParams.get('project'))?.name ?? 'All Projects'
@@ -88,7 +88,7 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
         value={searchParams.get('language') ?? 'all'}
         onValueChange={(v) => v && updateParam('language', v)}
       >
-        <SelectTrigger className="w-36">
+        <SelectTrigger className="sm:w-36">
           <SelectValue placeholder="All Languages" />
         </SelectTrigger>
         <SelectContent>
@@ -105,7 +105,7 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
         value={searchParams.get('status') ?? 'all'}
         onValueChange={(v) => v && updateParam('status', v)}
       >
-        <SelectTrigger className="w-36">
+        <SelectTrigger className="sm:w-36">
           <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>

@@ -14,16 +14,16 @@ La arquitectura está diseñada para minimizar costes, reducir complejidad y per
 
 | Layer            | Technology              |
 | ---------------- | ----------------------- |
-| Frontend         | Next.js 15 (App Router) |
+| Frontend         | Next.js 16 (App Router) |
 | Backend          | Next.js Route Handlers  |
 | Database         | Supabase PostgreSQL     |
 | Storage          | Supabase Storage        |
 | Authentication   | Supabase Auth           |
 | Text & Vision AI | OpenRouter              |
-| Image Generation | OpenRouter                |
-| AI Gateway       | OpenRouter
+| Image Generation | OpenAI (gpt-image-1)    |
+| AI Gateway       | OpenRouter              |
 | Payments         | Stripe                  |
-| Async Jobs       | Inngest                 |
+| Async Jobs       | Inngest (deferred, MVP is synchronous) |
 | Hosting          | Vercel                  |
 
 ---
@@ -63,26 +63,23 @@ deepseek-chat
 
 
 
-En MVP inicial:
+Flujo actual (implementado):
 
 ```txt
 Generate Image Prompt
 ↓
-User generates image manually
-```
-
-En futuras versiones:
-
-```txt
-Generate Image Prompt
-
+OpenAI gpt-image-1
 ↓
 Generated Image
 ↓
-Supabase Storage
+Supabase Storage (generated-images bucket)
 ↓
-CSV Auto Population
+Public URL attached to Pin
+↓
+CSV Auto Population (Media URL column)
 ```
+
+Nota: Image generation usa OpenAI directamente (excepción a Rule #10/11). OpenRouter no soporta /v1/images/generations. Ver DECISIONS.md para detalle.
 
 ---
 
@@ -111,77 +108,133 @@ CSV Auto Population
 /api
 
 ```
+/projects
+  route.ts
+/projects/[id]
+  route.ts
 /pinterest/generate
   route.ts
-
-/pinterest/export-csv
+/pinterest/generate-images
   route.ts
-
+/pinterest/schedule
+  route.ts
+/generations/[id]
+  route.ts
 /credits/check
-  route.ts
-
+  route.ts (deferred)
 /webhooks/stripe
-  route.ts
+  route.ts (deferred)
 ```
 
 /lib
 
-/ai
-
-```
-generateContent.ts
-analyzeImage.ts
-generateImagePrompt.ts
-```
-
 /openrouter
 
 ```
-client.ts
+client.ts          — text/vision AI gateway
+image-client.ts    — (deprecated, replaced by OpenAI)
 ```
 
-/pinterest
+/openai
 
 ```
-generatePins.ts
-csvExport.ts
+image-client.ts    — image generation via gpt-image-1
+```
+
+/prompts
+
+```
+pinterest-pins.ts  — pinterest-pins-v1 prompt
+image-generator.ts — pinterest-image-v1 config
+index.ts           — barrel export
 ```
 
 /supabase
 
 ```
-client.ts
-server.ts
+client.ts          — browser client
+server.ts          — server client
+middleware.ts      — auth middleware
 ```
 
-/stripe
+/validations
+
+```
+project.ts
+pinterest.ts
+schedule.ts
+```
+
+/queries
+
+```
+generations.ts     — shared generation queries
+```
+
+/csv
+
+```
+pinterest.ts       — CSV builder + date formatter
+```
+
+/utils
+
+```
+promise-pool.ts    — concurrency-limited parallel processing
+```
+
+/stripe (deferred)
 
 ```
 checkout.ts
 ```
 
-credits.ts
-
-/jobs
-
-generatePins.ts
-
 /components
 
-/ui
+/ui (Shadcn)
+
+```
+button, input, card, label, separator, table,
+dropdown-menu, badge, sonner, textarea, dialog,
+select, skeleton
+```
 
 /layout
+
+```
+topbar.tsx
+sidebar.tsx
+page-header.tsx
+```
 
 /pinterest
 
 ```
-PinForm.tsx
-PinResult.tsx
-PinPreview.tsx
-PinTable.tsx
+pin-form.tsx
+pin-table.tsx
+generate-images-button.tsx
+export-csv-button.tsx
+schedule-dialog.tsx
 ```
 
 /history
+
+```
+history-table.tsx
+history-filters.tsx
+history-actions.tsx
+delete-generation-dialog.tsx
+```
+
+/projects
+
+```
+project-form.tsx
+project-actions.tsx
+delete-project-dialog.tsx
+```
+
+empty-state.tsx
 
 /types
 

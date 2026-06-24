@@ -35,22 +35,38 @@ export function PinTable({ pins }: PinTableProps) {
   const showDates = hasAnyDates(pins);
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-12">#</TableHead>
-            {showImages && <TableHead className="w-20">Image</TableHead>}
-            <TableHead>Title</TableHead>
-            <TableHead>Board</TableHead>
-            {showDates && <TableHead>Publish Date</TableHead>}
-            <TableHead className="hidden lg:table-cell">Keywords</TableHead>
+            <TableHead className="w-10 text-xs font-medium uppercase tracking-wider">
+              #
+            </TableHead>
+            {showImages && (
+              <TableHead className="w-16 text-xs font-medium uppercase tracking-wider">
+                Image
+              </TableHead>
+            )}
+            <TableHead className="text-xs font-medium uppercase tracking-wider">
+              Title
+            </TableHead>
+            <TableHead className="text-xs font-medium uppercase tracking-wider">
+              Board
+            </TableHead>
+            {showDates && (
+              <TableHead className="text-xs font-medium uppercase tracking-wider">
+                Publish Date
+              </TableHead>
+            )}
+            <TableHead className="hidden lg:table-cell text-xs font-medium uppercase tracking-wider">
+              Keywords
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {pins.map((pin, i) => (
-            <TableRow key={pin.id}>
-              <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+            <TableRow key={pin.id} className="group">
+              <TableCell className="text-sm text-muted-foreground">{i + 1}</TableCell>
               {showImages && (
                 <TableCell>
                   {pin.media_url ? (
@@ -60,12 +76,12 @@ export function PinTable({ pins }: PinTableProps) {
                         alt={pin.title}
                         width={48}
                         height={64}
-                        className="rounded object-cover"
+                        className="rounded-md object-cover"
                         unoptimized
                       />
                     </a>
                   ) : (
-                    <div className="flex h-16 w-12 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+                    <div className="flex h-16 w-12 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
                       —
                     </div>
                   )}
@@ -73,18 +89,18 @@ export function PinTable({ pins }: PinTableProps) {
               )}
               <TableCell>
                 <div className="space-y-1">
-                  <p className="font-medium">{pin.title}</p>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{pin.description}</p>
+                  <p className="text-sm font-medium leading-snug">{pin.title}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{pin.description}</p>
                 </div>
               </TableCell>
-              <TableCell className="whitespace-nowrap">{pin.board}</TableCell>
+              <TableCell className="whitespace-nowrap text-sm">{pin.board}</TableCell>
               {showDates && (
-                <TableCell className="whitespace-nowrap text-sm">
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                   {pin.publish_date ? formatDate(pin.publish_date) : '—'}
                 </TableCell>
               )}
               <TableCell className="hidden max-w-xs truncate lg:table-cell">
-                <span className="text-sm text-muted-foreground">{pin.keywords}</span>
+                <span className="text-xs text-muted-foreground">{pin.keywords}</span>
               </TableCell>
             </TableRow>
           ))}

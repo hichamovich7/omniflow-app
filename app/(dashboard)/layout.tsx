@@ -13,12 +13,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/login');
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('credits_balance')
+    .eq('id', user.id)
+    .single();
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background">
       <Sidebar />
-      <div className="flex flex-1 flex-col">
-        <Topbar email={user.email ?? ''} />
-        <main className="flex-1 p-6">{children}</main>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <Topbar
+          email={user.email ?? ''}
+          creditsBalance={profile?.credits_balance ?? 0}
+        />
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );
