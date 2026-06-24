@@ -157,6 +157,8 @@ Usuario puede organizar su trabajo por proyectos. ✅
 
 ## [TASK-005] Pinterest Generator UI
 
+### Status: COMPLETED
+
 ### Goal
 
 Crear formulario principal de generación.
@@ -164,23 +166,21 @@ Crear formulario principal de generación.
 ### Fields
 
 ```txt id="6wz1nm"
-Keyword
-Language
-Pins Requested
-Website URL
-Pinterest URL
-Reference Image
+Project ✅
+Keyword ✅
+Language ✅
+Pins Requested ✅
 ```
 
 ### Success Criteria
 
-Formulario funcional.
-
-Sin integración IA todavía.
+Formulario funcional. ✅
 
 ---
 
 ## [TASK-006] OpenRouter Integration
+
+### Status: COMPLETED
 
 ### Goal
 
@@ -189,43 +189,44 @@ Crear capa centralizada de IA.
 ### Features
 
 ```txt id="oqw6ie"
-Generate Titles
-Generate Descriptions
-Generate Keywords
-Generate Boards
-Generate Image Prompts
-Analyze Reference Images
+Generate Titles ✅
+Generate Descriptions ✅
+Generate Keywords ✅
+Generate Boards ✅
+Generate Image Prompts ✅
 ```
 
 ### Success Criteria
 
-Respuesta JSON validada mediante Zod.
+Respuesta JSON validada mediante Zod. ✅
 
 ---
 
 ## [TASK-007] Pinterest Generation Job
 
+### Status: COMPLETED
+
 ### Goal
 
-Crear flujo completo de generación.
+Crear flujo completo de generación (MVP síncrono, sin Inngest).
 
 ### Flow
 
 ```txt id="f9s2jr"
-API Route
+API Route ✅
 ↓
-Credits Validation
+OpenRouter ✅
 ↓
-Inngest
+Database ✅
 ↓
-OpenRouter
+Results Page ✅
 ↓
-Database
+CSV Export ✅
 ```
 
 ### Success Criteria
 
-Generación asíncrona funcional.
+Generación funcional con persistencia y export. ✅
 
 ---
 
@@ -421,6 +422,35 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-007] Pinterest Generation Job — 2026-06-24
+
+* Synchronous generation flow: API Route → OpenRouter → DB → Results
+* Generation record created with status tracking (processing/completed/failed)
+* Pins batch inserted after successful OpenRouter response
+* CSV Export on results page (Pinterest Bulk Upload format, UTF-8 BOM)
+* Generation metadata displayed: keyword, language, pins, model, status, date
+
+---
+
+## [TASK-006] OpenRouter Integration — 2026-06-24
+
+* OpenRouter client (lib/openrouter/client.ts) with fetch, 60s timeout, JSON mode
+* Structured prompt for Pinterest SEO content (system + user messages)
+* Zod validation of OpenRouter JSON response
+* Cost-optimized max_tokens: 350 tokens/pin + 100 overhead
+
+---
+
+## [TASK-005] Pinterest Generator UI — 2026-06-24
+
+* PinForm component: project selector, keyword, language, pins count
+* PinTable component: results table with title, description, board, keywords
+* Pinterest page loads projects via Supabase Server Client
+* Results page at /pinterest/[id] with generation metadata + CSV export
+* EmptyState when no projects exist
+
+---
 
 ## [TASK-004] Projects Module — 2026-06-24
 

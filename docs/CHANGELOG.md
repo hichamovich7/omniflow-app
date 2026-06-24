@@ -23,6 +23,37 @@ No registrar cambios menores de formato o comentarios.
 MVP en construcción.
 
 ---
+Known Issue
+
+Pinterest Generator project selector displays project UUID instead of project name.
+Does not affect functionality.
+Will be fixed in next UI refinement pass.
+
+---
+# [0.6.0] - 2026-06-24
+
+## TASK-005 / TASK-006 / TASK-007: Pinterest Generator MVP
+
+### Added
+
+* OpenRouter client (lib/openrouter/client.ts) with fetch wrapper, 60s timeout, JSON mode
+* Pinterest generation API route: POST /api/pinterest/generate
+* PinForm component: project selector, keyword input, language select, pins count select
+* PinTable component: results table showing title, description, board, keywords
+* ExportCsvButton: client-side Pinterest-compatible CSV export (UTF-8 BOM)
+* Generation results page at /pinterest/[id] with metadata badges
+* Pinterest types (types/pinterest.ts): languages, pin options, request/response types
+* Zod validation schemas for generation input and OpenRouter response
+* Structured prompt engineering for Pinterest SEO content generation
+* Cost-optimized max_tokens calculation (350 tokens/pin + 100 overhead)
+* .env.example updated with OpenRouter variables
+
+### Changed
+
+* Pinterest page replaced placeholder with functional generation form
+* Empty state shown when no projects exist (links to create project)
+
+---
 
 # [0.5.0] - 2026-06-24
 
