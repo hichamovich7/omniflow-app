@@ -17,10 +17,10 @@ const mainLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderOpen },
   { href: '/pinterest', label: 'Pinterest', icon: Image },
+  { href: '/history', label: 'History', icon: Clock },
 ];
 
 const disabledLinks = [
-  { href: '/history', label: 'History', icon: Clock },
   { href: '/credits', label: 'Credits', icon: Coins },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

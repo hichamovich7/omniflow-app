@@ -23,13 +23,51 @@ No registrar cambios menores de formato o comentarios.
 MVP en construcción.
 
 ---
-Known Issue
+Mejoras que debo añadir
+
+1) Known Issue
 
 Pinterest Generator project selector displays project UUID instead of project name.
 Does not affect functionality.
 Will be fixed in next UI refinement pass.
 
+ Posibles mejoras futuras despues de TASK 10  ()  
+Paginación: La lista actual carga todas las generaciones. Para usuarios con cientos de generaciones, añadir paginación server-side con range().
+Bulk delete: Seleccionar múltiples generaciones y eliminarlas de una vez.
+Date range filter: UI_UX.md lo menciona. Se puede añadir con un date picker.
+Keyword search index: Si el volumen crece, añadir un GIN index en generations(keyword) para acelerar ilike.
+
 ---
+
+# [0.7.0] - 2026-06-24
+
+## TASK-010: History Module
+
+### Added
+
+* History page with generations table (keyword, project name, language, pins, status, date)
+* Keyword search with 300ms debounce (ilike query)
+* Filters by project, language, and status via URL searchParams
+* Row actions dropdown: View Results, Export CSV, Delete Generation
+* Delete generation with confirmation dialog (CASCADE deletes associated pins)
+* Export CSV directly from history (fetches pins via API, reuses shared CSV lib)
+* GET /api/generations/[id] — returns generation + pins
+* DELETE /api/generations/[id] — deletes generation with CASCADE
+* Shared query utility: lib/queries/generations.ts
+* Shared CSV utility: lib/csv/pinterest.ts
+* DeleteGenerationDialog component
+* HistoryFilters component
+* HistoryTable component
+* HistoryActions component
+
+### Changed
+
+* Sidebar: History link enabled in main navigation
+* ExportCsvButton refactored to use shared CSV utility
+* /pinterest/[id] page refactored to use shared generation query
+
+---
+
 # [0.6.0] - 2026-06-24
 
 ## TASK-005 / TASK-006 / TASK-007: Pinterest Generator MVP

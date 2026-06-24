@@ -278,6 +278,8 @@ CSV descargable e importable en Pinterest.
 
 ## [TASK-010] History Module
 
+### Status: COMPLETED
+
 ### Goal
 
 Guardar y visualizar generaciones anteriores.
@@ -285,15 +287,16 @@ Guardar y visualizar generaciones anteriores.
 ### Features
 
 ```txt id="a8s1dd"
-History List
-Filters
-Generation Details
-Re-export CSV
+History List ✅
+Filters (project, language, status, keyword search) ✅
+Generation Details (via /pinterest/[id]) ✅
+Re-export CSV ✅
+Delete Generation ✅
 ```
 
 ### Success Criteria
 
-Usuario puede recuperar generaciones antiguas.
+Usuario puede recuperar generaciones antiguas. ✅
 
 ---
 
@@ -422,6 +425,21 @@ Stripe Working
 ---
 
 # ✅ COMPLETED TASKS
+
+## [TASK-010] History Module — 2026-06-24
+
+* History list page with generations table (keyword, project, language, pins, status, date)
+* Filters: keyword search (debounced ilike), project, language, status via URL searchParams
+* Actions per row: View Results, Export CSV, Delete Generation
+* Delete with confirmation dialog (CASCADE deletes pins)
+* Export CSV from history (fetches pins via GET /api/generations/[id], reuses shared CSV lib)
+* Shared query utility: lib/queries/generations.ts (used by /pinterest/[id] and API)
+* Shared CSV utility: lib/csv/pinterest.ts (used by ExportCsvButton and HistoryActions)
+* GET /api/generations/[id] — returns generation + pins
+* DELETE /api/generations/[id] — deletes generation + CASCADE pins
+* History enabled in sidebar navigation
+
+---
 
 ## [TASK-007] Pinterest Generation Job — 2026-06-24
 
