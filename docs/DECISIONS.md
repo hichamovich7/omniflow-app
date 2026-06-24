@@ -368,3 +368,27 @@ Defer all four improvements to the backlog until data volume justifies them. The
 * Bulk delete not available — users delete one at a time
 * Date range filter not available — users filter by project/language/status
 * Revisit when generation count exceeds 1000 per user or when multiple users are onboarded
+
+---
+
+## 2026-06-24
+
+### Decision
+
+Prompt Architecture & Partial Completion
+
+### Context
+
+Prompts were hardcoded in the API route. Needed a versioned, extractable structure. Additionally, OpenRouter sometimes returns fewer pins than requested — this was not handled gracefully.
+
+### Decision Taken
+
+1. Extract prompts to lib/prompts/ with explicit IDs (e.g. pinterest-pins-v1) for traceability.
+2. Accept partial results: if OpenRouter returns at least 1 valid pin, mark generation as completed. Log a warning when pinsGenerated < pinsRequested.
+
+### Consequences
+
+* Prompts are versioned and isolated — future A/B testing and iteration are straightforward
+* Partial completions no longer fail the generation — better UX for the user
+* Warning logs enable monitoring partial results without blocking the user
+* PROMPT_ID can be stored in generations table in the future for full traceability

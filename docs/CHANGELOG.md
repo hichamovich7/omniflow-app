@@ -24,6 +24,26 @@ MVP en construcción.
 
 ---
 
+# [0.7.2] - 2026-06-24
+
+## TASK-010B: Prompt Architecture & Partial Completion
+
+### Added
+
+* lib/prompts/pinterest-pins.ts — extracted prompt with ID `pinterest-pins-v1`
+* lib/prompts/index.ts — prompt barrel export
+* Partial completion support: generations with fewer pins than requested are marked `completed`, not `failed`
+* Warning logged when pinsGenerated < pinsRequested
+* API response now includes `pinsGenerated` count
+
+### Changed
+
+* API route refactored to use lib/prompts instead of inline buildPrompt()
+* Results page shows "Generated X of Y pins" badge when partial completion occurs
+* DECISIONS.md: registered prompt architecture decision
+
+---
+
 # [0.7.1] - 2026-06-24
 
 ## TASK-010A: UX & Technical Refinements

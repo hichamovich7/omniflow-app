@@ -38,8 +38,11 @@ export default async function GenerationResultsPage({
 
       <div className="flex flex-wrap gap-2">
         <Badge variant="secondary">{langLabel}</Badge>
-        <Badge variant="secondary">{generation.pins_requested} pins requested</Badge>
-        <Badge variant="secondary">{pins.length} pins generated</Badge>
+        <Badge variant={pins.length < generation.pins_requested ? 'outline' : 'secondary'}>
+          {pins.length < generation.pins_requested
+            ? `Generated ${pins.length} of ${generation.pins_requested} pins`
+            : `${pins.length} pins`}
+        </Badge>
         <Badge variant="secondary">{generation.model_used}</Badge>
         <Badge variant={generation.status === 'completed' ? 'default' : 'destructive'}>
           {generation.status}

@@ -2,54 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { callOpenRouter } from '@/lib/openrouter/client';
 import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
-import { LANGUAGE_LABELS } from '@/types/pinterest';
-import type { SupportedLanguage } from '@/types/pinterest';
+import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import type { ApiResponse } from '@/types/api';
-
-function buildPrompt(keyword: string, language: SupportedLanguage, pinsRequested: number) {
-  const langName = LANGUAGE_LABELS[language];
-
-  const system = `You are an expert Pinterest SEO content creator. You generate high-quality, unique Pinterest content optimized for search and engagement. All content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.`;
-
-  const user = `Generate ${pinsRequested} unique Pinterest pins for the keyword: "${keyword}"
-
-For each pin, provide:
-- title: SEO-optimized Pinterest title (max 100 characters)
-- description: SEO-optimized Pinterest description with call to action (max 500 characters)
-- keywords: 10 to 15 relevant Pinterest keywords, comma separated, no hashtags
-- board: suggested Pinterest board name
-- image_prompt: detailed prompt to generate a vertical Pinterest image (2:3 ratio) for this pin
-
-Rules:
-- Each pin must be unique. Do not repeat titles or descriptions.
-- Titles must be compelling and include the main keyword naturally.
-- Descriptions must include a call to action and relevant keywords.
-- Keywords must be relevant to the pin topic, no duplicates across pins.
-- Board name must be a real Pinterest board category.
-- Image prompts must describe a vertical Pinterest-style image with specific colors, composition, and style.
-- All content must be in ${langName}.
-
-Respond with this exact JSON structure:
-{
-  "pins": [
-    {
-      "title": "...",
-      "description": "...",
-      "keywords": "keyword1, keyword2, keyword3, ...",
-      "board": "...",
-      "image_prompt": "..."
-    }
-  ]
-}`;
-
-  return { system, user };
-}
-
-function estimateMaxTokens(pinsRequested: number): number {
-  const tokensPerPin = 350;
-  const overhead = 100;
-  return pinsRequested * tokensPerPin + overhead;
-}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -115,7 +69,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { system, user: userPrompt } = buildPrompt(keyword, language, pinsRequested);
+    const { system, user: userPrompt } = buildPinterestPinsPrompt({
+      keyword,
+      language,
+      pinsRequested,
+    });
 
     const content = await callOpenRouter({
       model,
@@ -130,11 +88,19 @@ export async function POST(request: Request) {
     const validated = openRouterPinsResponseSchema.safeParse(json);
 
     if (!validated.success) {
-      console.error('OpenRouter response validation failed:', validated.error.issues);
+      console.error(`[${PROMPT_ID}] Response validation failed:`, validated.error.issues);
       await supabase.from('generations').update({ status: 'failed' }).eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: { message: 'AI returned invalid response', code: 'generation_failed' } },
         { status: 500 }
+      );
+    }
+
+    const pinsGenerated = validated.data.pins.length;
+
+    if (pinsGenerated < pinsRequested) {
+      console.warn(
+        `[${PROMPT_ID}] Partial result: requested ${pinsRequested}, received ${pinsGenerated}`
       );
     }
 
@@ -161,8 +127,11 @@ export async function POST(request: Request) {
 
     await supabase.from('generations').update({ status: 'completed' }).eq('id', generation.id);
 
-    return NextResponse.json<ApiResponse<{ generationId: string; status: string }>>(
-      { data: { generationId: generation.id, status: 'completed' }, error: null },
+    return NextResponse.json<ApiResponse<{ generationId: string; status: string; pinsGenerated: number }>>(
+      {
+        data: { generationId: generation.id, status: 'completed', pinsGenerated },
+        error: null,
+      },
       { status: 201 }
     );
   } catch (err) {
