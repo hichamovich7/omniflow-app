@@ -77,7 +77,9 @@ export function PinForm({ projects }: PinFormProps) {
         <Label htmlFor="project">Project</Label>
         <Select value={projectId} onValueChange={(v) => v && setProjectId(v)}>
           <SelectTrigger id="project">
-            <SelectValue placeholder="Select a project" />
+            <span className="truncate">
+              {projects.find((p) => p.id === projectId)?.name ?? 'Select a project'}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {projects.map((p) => (

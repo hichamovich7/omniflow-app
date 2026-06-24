@@ -516,6 +516,17 @@ Stripe Working
 
 ---
 
+# 📋 BACKLOG
+
+Improvements deferred until data volume justifies them.
+
+* History Pagination — server-side pagination with range() for large generation lists
+* Bulk Delete Generations — select multiple generations and delete at once
+* Date Range Filter — add date picker filter to History (documented in UI_UX.md)
+* Keyword Search Optimization — add GIN index on generations(keyword) for faster ilike queries
+
+---
+
 # 🚫 OUT OF MVP
 
 No implementar todavía:

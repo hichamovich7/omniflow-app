@@ -23,19 +23,20 @@ No registrar cambios menores de formato o comentarios.
 MVP en construcción.
 
 ---
-Mejoras que debo añadir
 
-1) Known Issue
+# [0.7.1] - 2026-06-24
 
-Pinterest Generator project selector displays project UUID instead of project name.
-Does not affect functionality.
-Will be fixed in next UI refinement pass.
+## TASK-010A: UX & Technical Refinements
 
- Posibles mejoras futuras despues de TASK 10  ()  
-Paginación: La lista actual carga todas las generaciones. Para usuarios con cientos de generaciones, añadir paginación server-side con range().
-Bulk delete: Seleccionar múltiples generaciones y eliminarlas de una vez.
-Date range filter: UI_UX.md lo menciona. Se puede añadir con un date picker.
-Keyword search index: Si el volumen crece, añadir un GIN index en generations(keyword) para acelerar ilike.
+### Fixed
+
+* Pinterest Generator project selector now displays project name instead of UUID
+* History filters project selector now displays project name instead of UUID
+
+### Changed
+
+* TASKS.md: added Backlog section with deferred improvements (pagination, bulk delete, date range filter, GIN index)
+* DECISIONS.md: registered decision to defer History performance optimizations until data volume justifies them
 
 ---
 

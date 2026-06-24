@@ -68,7 +68,11 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
         onValueChange={(v) => v && updateParam('project', v)}
       >
         <SelectTrigger className="w-44">
-          <SelectValue placeholder="All Projects" />
+          <span className="truncate">
+            {searchParams.get('project')
+              ? projects.find((p) => p.id === searchParams.get('project'))?.name ?? 'All Projects'
+              : 'All Projects'}
+          </span>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Projects</SelectItem>

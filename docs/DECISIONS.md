@@ -344,3 +344,27 @@ Añadir columna role a profiles con tres niveles:
 * superadmin nunca es bloqueado por falta de créditos
 * superadmin nunca es restringido por plan o suscripción Stripe
 * La asignación de roles se gestiona directamente en base de datos, no desde la UI
+
+---
+
+## 2026-06-24
+
+### Decision
+
+Defer History Performance Optimizations
+
+### Context
+
+After implementing the History Module (TASK-010), several potential improvements were identified: pagination, bulk delete, date range filter, and keyword search optimization (GIN index).
+
+### Decision Taken
+
+Defer all four improvements to the backlog until data volume justifies them. The current implementation works well for the MVP scale (single user, hundreds of generations).
+
+### Consequences
+
+* History loads all generations without pagination — acceptable for MVP
+* Keyword search uses ilike without GIN index — acceptable for small datasets
+* Bulk delete not available — users delete one at a time
+* Date range filter not available — users filter by project/language/status
+* Revisit when generation count exceeds 1000 per user or when multiple users are onboarded
