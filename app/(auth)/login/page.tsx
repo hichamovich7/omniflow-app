@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -51,49 +50,56 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl font-semibold">OmniFlow</CardTitle>
-        <CardDescription>Sign in to your account</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
+    <div className="w-full max-w-sm">
+      <div className="mb-8 text-center">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+          <span className="text-sm font-bold text-primary-foreground">O</span>
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Welcome back</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Sign in to OmniFlow</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            className="h-10"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            className="h-10"
+          />
+        </div>
+        {error && (
+          <div className="rounded-lg bg-destructive/5 px-3 py-2">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-primary underline-offset-4 hover:underline">
-            Create account
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+        )}
+        <Button type="submit" className="h-10 w-full" disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign In'}
+        </Button>
+      </form>
+      <p className="mt-6 text-center text-[13px] text-muted-foreground">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="font-medium text-foreground hover:underline">
+          Create account
+        </Link>
+      </p>
+    </div>
   );
 }

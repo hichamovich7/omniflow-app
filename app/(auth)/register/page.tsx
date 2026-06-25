@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const registerSchema = z
   .object({
@@ -62,81 +61,88 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl font-semibold">Check your email</CardTitle>
-          <CardDescription>
-            We sent a confirmation link to <strong>{email}</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-sm text-muted-foreground">
-            Already confirmed?{' '}
-            <Link href="/login" className="text-primary underline-offset-4 hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-sm text-center">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-success/10">
+          <span className="text-lg">✓</span>
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We sent a confirmation link to <strong className="text-foreground">{email}</strong>
+        </p>
+        <p className="mt-6 text-[13px] text-muted-foreground">
+          Already confirmed?{' '}
+          <Link href="/login" className="font-medium text-foreground hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl font-semibold">OmniFlow</CardTitle>
-        <CardDescription>Create your account</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
+    <div className="w-full max-w-sm">
+      <div className="mb-8 text-center">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+          <span className="text-sm font-bold text-primary-foreground">O</span>
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Get started with OmniFlow</p>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            className="h-10"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            className="h-10"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground">Confirm Password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            disabled={loading}
+            className="h-10"
+          />
+        </div>
+        {error && (
+          <div className="rounded-lg bg-destructive/5 px-3 py-2">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Creating account...' : 'Create Account'}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+        )}
+        <Button type="submit" className="h-10 w-full" disabled={loading}>
+          {loading ? 'Creating account...' : 'Create Account'}
+        </Button>
+      </form>
+      <p className="mt-6 text-center text-[13px] text-muted-foreground">
+        Already have an account?{' '}
+        <Link href="/login" className="font-medium text-foreground hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }

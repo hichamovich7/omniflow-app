@@ -6,6 +6,7 @@ import { HistoryFilters } from '@/components/history/history-filters';
 import { HistoryTable } from '@/components/history/history-table';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { Clock, Search } from 'lucide-react';
 
 interface HistoryPageProps {
   searchParams: Promise<Record<string, string | undefined>>;
@@ -44,7 +45,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="History" description="Review previous generations" />
+      <PageHeader title="History" description="Browse your past generations" />
 
       <HistoryFilters projects={projects ?? []} />
 
@@ -54,8 +55,9 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           description={
             hasFilters
               ? 'Try adjusting your filters to find what you\'re looking for.'
-              : 'Generate your first Pinterest content to see it here.'
+              : 'Your generation history will appear here once you create your first batch of pins.'
           }
+          icon={hasFilters ? Search : Clock}
         >
           {hasFilters ? (
             <Link href="/history" className={buttonVariants({ variant: 'outline', size: 'sm' })}>

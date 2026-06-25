@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { LogOut, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,26 +31,22 @@ export function UserMenu({ email }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" />
-        }
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium">
-          {initials}
-        </span>
+        {initials}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel className="font-normal">
-          <p className="truncate text-sm font-medium">{email}</p>
+          <p className="truncate text-sm">{email}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
-          <User className="mr-2 h-4 w-4" />
+          <User className="mr-2 h-3.5 w-3.5" />
           Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="mr-2 h-3.5 w-3.5" />
           Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>

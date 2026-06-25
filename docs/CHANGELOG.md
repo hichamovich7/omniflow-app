@@ -22,6 +22,60 @@ No planned changes.
 
 ---
 
+# [1.0.3] - 2026-06-25
+
+## Blueprint Implementation — Visual Refinement
+
+### Changed
+
+* Dashboard: reordered to Control Center layout — primary CTA "Generate Content" in header, Quick Actions promoted above metrics with hero prominence, Pinterest Generator card uses primary tint and Zap icon, metrics reduced to compact text-lg
+* Sidebar: navigation restructured for multi-platform scalability — "Content" group split into "Generators" (Pinterest, future platforms) and "Library" (History), brand tagline "AI CONTENT OS" added below logo mark
+* Pinterest Generator: elevated to AI Workspace — larger hero icon (h-14 w-14), text-2xl title, taller keyword input (h-12), taller generate button (h-12), increased vertical padding (pt-8 sm:pt-16), wider spacing between hero and form (mb-10)
+* Results page: refined header — larger back button (h-7 w-7), dot separators use border color, actions bar with left padding aligned to content, pin count label above grid
+* Pin cards: redesigned for AI-generated content feel — image placeholder with Sparkles + "AI Generated" label when no image exists, numbered index as circular badge, increased image max-h to 56 (224px), hover shadow-sm + subtle image scale, gap-4 between cards, 13px title size
+
+---
+
+# [1.0.2] - 2026-06-25
+
+## Frontend Architecture Formalization
+
+### Added
+
+* Adopted DESIGN_SYSTEM.md as official visual identity reference
+* Adopted UI_PRINCIPLES.md as official UX principles reference
+* Adopted COMPONENT_STANDARDS.md as official component implementation reference
+* PROJECT.md: added Frontend Standards section referencing the three documents
+* ARCHITECTURE.md: added Frontend Architecture section with four-level hierarchy (Design System → UI Principles → Component Standards → Feature Components)
+* RULES.md: added Rules #26–#31 for frontend development (standards required, reuse before create, visual consistency, server components default, no visual libraries without justification, component standards compliance)
+* RULES.md: Golden Rule updated to include DESIGN_SYSTEM.md, UI_PRINCIPLES.md, COMPONENT_STANDARDS.md
+
+---
+
+# [1.0.1] - 2026-06-25
+
+## TASK-016B: Premium Visual Redesign
+
+### Changed
+
+* Design tokens: deeper indigo accent (oklch hue 260), softer shadows, reduced border opacity (border/60), warmer backgrounds
+* Sidebar: Linear-inspired — branded logo mark, 11px section labels, 13px nav items, 15px icons, primary tint on active state, w-56
+* Topbar: minimal — plain text credits, avatar initials with primary/10 tint, removed Badge for credits
+* Dashboard: complete home redesign — time-based greeting, 4-stat grid, 3 quick action cards with hover arrows, activity timeline with inline metadata
+* Projects: card grid (sm:2 lg:3) replacing table — folder icon, description preview, generation count, relative dates, "Default" as inline text
+* Pinterest Generator: hero-style layout — centered icon + heading + description above form, 3-column settings row, h-11 keyword input, removed Card wrapper
+* Results: streamlined header — back arrow + keyword as h1, inline metadata row, removed Card summary, pin cards with visual prominence
+* PinTable: cards grid (sm:2 lg:3) replacing table — large image thumbnails (aspect 2:3), board as inline pill, #index in corner, line-clamp-3 descriptions
+* History: card-based timeline replacing table — status dots, inline metadata, hover-reveal actions, rounded-xl cards
+* History filters: compact h-9 controls, search with subtle placeholder, tighter select widths
+* Empty states: larger padding (py-20), rounded-2xl icon containers (h-12 w-12), relaxed line-height descriptions, max-w-xs text
+* Auth pages: removed Card wrapper, branded logo mark, "Welcome back" / "Create your account" copy, h-10 inputs, error in tinted background
+* UserMenu: simplified to plain trigger (no Button wrapper), h-7 w-7 avatar
+* PageContainer: max-w-5xl centered, space-y-8 for more breathing room, py-6/py-8 padding
+* PageHeader: 13px description, 0.5 spacing between title and description
+
+---
+
 # [1.0.0] - 2026-06-25
 
 ## TASK-016: UI/UX Design System & Professional Redesign

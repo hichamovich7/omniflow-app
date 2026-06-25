@@ -380,6 +380,46 @@ Todas las API Routes deben seguir este flujo:
 
 ---
 
+# Frontend Architecture
+
+La arquitectura Frontend se organiza en cuatro niveles jerárquicos:
+
+```txt
+Design System
+↓
+UI Principles
+↓
+Component Standards
+↓
+Feature Components
+```
+
+## Design System (DESIGN_SYSTEM.md)
+
+Define la identidad visual del producto: paleta de colores, tipografía, espaciado, radios, sombras, iconografía y las reglas de diseño para cada tipo de componente (botones, cards, tablas, badges, inputs, dialogs, etc.).
+
+Todos los componentes deben utilizar los tokens definidos aquí. Nunca hardcodear valores visuales.
+
+## UI Principles (UI_PRINCIPLES.md)
+
+Define cómo el usuario experimenta el producto: jerarquía visual, flujos de trabajo AI, progressive disclosure, empty states, loading states, error messages y reglas de interacción.
+
+Todo nuevo flujo o pantalla debe respetar estos principios antes de la implementación.
+
+## Component Standards (COMPONENT_STANDARDS.md)
+
+Define cómo se diseñan, implementan y mantienen los componentes React: responsabilidad única, composición, Server vs Client Components, file naming, folder organization, props, variantes, separación de lógica y accesibilidad.
+
+Todo componente nuevo debe verificarse contra estos estándares.
+
+## Feature Components
+
+Son los componentes específicos de cada funcionalidad (Pinterest, Projects, History, etc.). Se construyen componiendo componentes base del Design System y respetando los UI Principles y Component Standards.
+
+La relación entre niveles es estricta: cada nivel inferior debe cumplir con las reglas de todos los niveles superiores.
+
+---
+
 # Technical Rules
 
 * Monolito modular.

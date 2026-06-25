@@ -277,6 +277,20 @@ Aunque el MVP inicial permite exportar CSV sin alojar imágenes automáticamente
 
 ---
 
+# Frontend Standards
+
+OmniFlow dispone de un sistema oficial de diseño y arquitectura Frontend compuesto por tres documentos:
+
+* DESIGN_SYSTEM.md — define la identidad visual: colores, tipografía, espaciado, radios, sombras, iconografía y reglas de diseño para cada tipo de componente.
+* UI_PRINCIPLES.md — define los principios de experiencia de usuario: jerarquía visual, flujos de trabajo, progressive disclosure, empty states, loading states y reglas de interacción.
+* COMPONENT_STANDARDS.md — define las normas de implementación de componentes React: responsabilidad única, composición, Server/Client Components, naming, organización, props, variantes y separación de lógica.
+
+Toda nueva funcionalidad Frontend deberá respetar estos tres documentos.
+
+Cualquier componente nuevo o modificado debe verificarse contra estos estándares antes de considerarse completo.
+
+---
+
 # Out Of Scope (MVP)
 
 Las siguientes funcionalidades no forman parte del MVP:

@@ -1,13 +1,5 @@
+import Link from 'next/link';
 import { StatusDot } from '@/components/ui/status-dot';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { HistoryActions } from './history-actions';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -46,63 +38,36 @@ function timeAgo(dateStr: string): string {
 
 export function HistoryTable({ generations }: HistoryTableProps) {
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-8 text-xs font-medium uppercase tracking-wider" />
-            <TableHead className="text-xs font-medium uppercase tracking-wider">Keyword</TableHead>
-            <TableHead className="hidden sm:table-cell text-xs font-medium uppercase tracking-wider">
-              Project
-            </TableHead>
-            <TableHead className="hidden md:table-cell text-xs font-medium uppercase tracking-wider">
-              Language
-            </TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider">Pins</TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wider">Date</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {generations.map((gen) => {
-            const projectName = Array.isArray(gen.projects)
-              ? gen.projects[0]?.name
-              : gen.projects?.name;
+    <div className="space-y-2">
+      {generations.map((gen) => {
+        const projectName = Array.isArray(gen.projects)
+          ? gen.projects[0]?.name
+          : gen.projects?.name;
 
-            return (
-              <TableRow key={gen.id} className="group">
-                <TableCell>
-                  <StatusDot variant={statusToVariant(gen.status)} />
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm font-medium">{gen.keyword}</span>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  {projectName ? (
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      {projectName}
-                    </Badge>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                  {LANGUAGE_LABELS[gen.language as SupportedLanguage] ?? gen.language}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {gen.pins_requested}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                  {timeAgo(gen.created_at)}
-                </TableCell>
-                <TableCell>
-                  <HistoryActions generationId={gen.id} keyword={gen.keyword} />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+        return (
+          <div
+            key={gen.id}
+            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3.5 transition-colors hover:border-border"
+          >
+            <StatusDot variant={statusToVariant(gen.status)} />
+            <Link href={`/pinterest/${gen.id}`} className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{gen.keyword}</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
+                {projectName && <span>{projectName}</span>}
+                {projectName && <span>·</span>}
+                <span>{LANGUAGE_LABELS[gen.language as SupportedLanguage] ?? gen.language}</span>
+                <span>·</span>
+                <span>{gen.pins_requested} pins</span>
+                <span>·</span>
+                <span>{timeAgo(gen.created_at)}</span>
+              </div>
+            </Link>
+            <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <HistoryActions generationId={gen.id} keyword={gen.keyword} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

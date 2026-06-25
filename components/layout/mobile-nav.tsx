@@ -24,7 +24,7 @@ export function MobileNav() {
         <Menu className="h-5 w-5" />
         <span className="sr-only">Open menu</span>
       </SheetTrigger>
-      <SheetContent side="left" className="w-60 p-0" showCloseButton={false}>
+      <SheetContent side="left" className="w-56 p-0" showCloseButton={false}>
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <div className="flex h-full flex-col" onClick={() => setOpen(false)}>
           <SidebarContent />

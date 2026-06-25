@@ -149,6 +149,25 @@ Before creating:
 
 ## Step 8
 
+Read (before any Frontend work):
+
+```txt
+docs/DESIGN_SYSTEM.md
+docs/UI_PRINCIPLES.md
+docs/COMPONENT_STANDARDS.md
+```
+
+Before creating or modifying:
+
+* Components
+* Pages
+* Layouts
+* Visual styles
+
+---
+
+## Step 9
+
 Read:
 
 ```txt id="u7n3w8"

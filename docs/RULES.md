@@ -418,6 +418,108 @@ hasta que aparezcan oficialmente en PROJECT.md.
 
 ---
 
+# Rule #26 — Frontend Standards Required
+
+Antes de implementar cualquier cambio visual o crear un nuevo componente, revisar obligatoriamente:
+
+```txt
+docs/DESIGN_SYSTEM.md
+docs/UI_PRINCIPLES.md
+docs/COMPONENT_STANDARDS.md
+```
+
+No crear componentes ni modificar UI sin verificar estos documentos.
+
+---
+
+# Rule #27 — Reuse Before Create
+
+Reutilizar componentes existentes antes de crear nuevos.
+
+No duplicar componentes.
+
+No duplicar estilos.
+
+Antes de crear un nuevo componente, verificar si existe uno reutilizable que pueda adaptarse mediante props o variantes.
+
+---
+
+# Rule #28 — Visual Consistency
+
+Mantener la coherencia visual en toda la aplicación.
+
+No hardcodear:
+
+```txt
+Colores
+Espaciados
+Tamaños de fuente
+Border radius
+Sombras
+```
+
+Siempre usar los tokens del Design System.
+
+---
+
+# Rule #29 — Server Components Default
+
+Server Components por defecto.
+
+Client Components únicamente cuando exista interacción real del usuario.
+
+Ejemplos de Client Components justificados:
+
+```txt
+Forms
+Dialogs
+Dropdowns
+Search con debounce
+Date Pickers
+```
+
+Ejemplos que deben ser Server Components:
+
+```txt
+Pages
+Cards
+Lists
+Tables
+Statistics
+```
+
+---
+
+# Rule #30 — No Visual Libraries Without Justification
+
+No introducir nuevas librerías visuales sin una justificación técnica documentada.
+
+El stack visual autorizado es:
+
+```txt
+Tailwind CSS
+Shadcn UI
+Lucide React
+Sonner
+```
+
+Cualquier adición debe aprobarse explícitamente y registrarse en DECISIONS.md.
+
+---
+
+# Rule #31 — Component Standards Compliance
+
+Todo componente nuevo debe seguir las normas de:
+
+```txt
+DESIGN_SYSTEM.md → tokens visuales
+COMPONENT_STANDARDS.md → implementación
+```
+
+Un componente no se considera completo hasta que cumple ambos documentos.
+
+---
+
 # Golden Rule
 
 Si una decisión contradice cualquier documento del proyecto:
@@ -428,6 +530,9 @@ ARCHITECTURE.md
 DATABASE.md
 API.md
 UI_UX.md
+DESIGN_SYSTEM.md
+UI_PRINCIPLES.md
+COMPONENT_STANDARDS.md
 ```
 
 detener la implementación y solicitar aclaración antes de continuar.

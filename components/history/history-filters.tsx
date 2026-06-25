@@ -52,71 +52,73 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative sm:w-64">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="relative flex-1 sm:max-w-xs">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
         <Input
-          placeholder="Search keyword..."
-          className="pl-9"
+          placeholder="Search keywords..."
+          className="pl-9 h-9 text-sm placeholder:text-muted-foreground/40"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
       </div>
 
-      <Select
-        value={searchParams.get('project') ?? 'all'}
-        onValueChange={(v) => v && updateParam('project', v)}
-      >
-        <SelectTrigger className="sm:w-40">
-          <span className="truncate">
-            {searchParams.get('project')
-              ? projects.find((p) => p.id === searchParams.get('project'))?.name ?? 'All Projects'
-              : 'All Projects'}
-          </span>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Projects</SelectItem>
-          {projects.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex gap-2">
+        <Select
+          value={searchParams.get('project') ?? 'all'}
+          onValueChange={(v) => v && updateParam('project', v)}
+        >
+          <SelectTrigger className="h-9 w-36 text-sm">
+            <span className="truncate">
+              {searchParams.get('project')
+                ? projects.find((p) => p.id === searchParams.get('project'))?.name ?? 'Project'
+                : 'Project'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Projects</SelectItem>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        value={searchParams.get('language') ?? 'all'}
-        onValueChange={(v) => v && updateParam('language', v)}
-      >
-        <SelectTrigger className="sm:w-36">
-          <SelectValue placeholder="All Languages" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Languages</SelectItem>
-          {SUPPORTED_LANGUAGES.map((lang) => (
-            <SelectItem key={lang} value={lang}>
-              {LANGUAGE_LABELS[lang]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select
+          value={searchParams.get('language') ?? 'all'}
+          onValueChange={(v) => v && updateParam('language', v)}
+        >
+          <SelectTrigger className="h-9 w-28 text-sm">
+            <SelectValue placeholder="Language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <SelectItem key={lang} value={lang}>
+                {LANGUAGE_LABELS[lang]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        value={searchParams.get('status') ?? 'all'}
-        onValueChange={(v) => v && updateParam('status', v)}
-      >
-        <SelectTrigger className="sm:w-36">
-          <SelectValue placeholder="All Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          {STATUS_OPTIONS.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select
+          value={searchParams.get('status') ?? 'all'}
+          onValueChange={(v) => v && updateParam('status', v)}
+        >
+          <SelectTrigger className="h-9 w-28 text-sm">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            {STATUS_OPTIONS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

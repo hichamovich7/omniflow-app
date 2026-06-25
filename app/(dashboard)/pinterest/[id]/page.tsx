@@ -2,20 +2,16 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getGenerationWithPins } from '@/lib/queries/generations';
-import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
-import { ActionBar } from '@/components/ui/action-bar';
 import { PinTable } from '@/components/pinterest/pin-table';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
 import { GenerateImagesButton } from '@/components/pinterest/generate-images-button';
 import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { buttonVariants } from '@/components/ui/button';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { ImageStatus } from '@/types/database';
-import { ArrowLeft, Calendar, Globe, Cpu, Hash } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 
 function statusBadgeVariant(status: string) {
   switch (status) {
@@ -24,6 +20,14 @@ function statusBadgeVariant(status: string) {
     case 'failed': return 'destructive' as const;
     default: return 'secondary' as const;
   }
+}
+
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export default async function GenerationResultsPage({
@@ -47,69 +51,72 @@ export default async function GenerationResultsPage({
 
   return (
     <PageContainer>
-      <PageHeader title="Generation Results" description={generation.keyword}>
-        <ActionBar>
-          {generation.status === 'completed' && pins.length > 0 && (
+      {/* Header */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/pinterest"
+            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </Link>
+          <div className="space-y-0.5">
+            <h1 className="text-xl font-semibold tracking-tight">{generation.keyword}</h1>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+              <span>{langLabel}</span>
+              <span className="text-border">·</span>
+              <span>
+                {isPartial
+                  ? `${pins.length} of ${generation.pins_requested} pins`
+                  : `${pins.length} pins`}
+              </span>
+              <span className="text-border">·</span>
+              <span>{generation.model_used}</span>
+              <span className="text-border">·</span>
+              <span>{timeAgo(generation.created_at)}</span>
+              <Badge variant={statusBadgeVariant(generation.status)} className="ml-0.5">
+                {generation.status}
+              </Badge>
+              {isPartial && <Badge variant="warning">partial</Badge>}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions bar */}
+        {generation.status === 'completed' && pins.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pl-9">
             <GenerateImagesButton
               generationId={generation.id}
               imageStatus={imageStatus}
               pinsWithoutImages={pinsWithoutImages}
             />
-          )}
-          {generation.status === 'completed' && pins.length > 0 && (
             <ScheduleDialog
               generationId={generation.id}
               pinCount={pins.length}
               hasSchedule={hasSchedule}
             />
-          )}
-          <ExportCsvButton pins={pins} keyword={generation.keyword} />
-          <Link href="/pinterest" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            New
-          </Link>
-        </ActionBar>
-      </PageHeader>
+            <ExportCsvButton pins={pins} keyword={generation.keyword} />
+          </div>
+        )}
+      </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4 text-sm">
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Globe className="h-3.5 w-3.5" />
-            {langLabel}
-          </span>
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Hash className="h-3.5 w-3.5" />
-            {isPartial
-              ? `${pins.length} of ${generation.pins_requested} pins`
-              : `${pins.length} pins`}
-          </span>
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Cpu className="h-3.5 w-3.5" />
-            {generation.model_used}
-          </span>
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Calendar className="h-3.5 w-3.5" />
-            {new Date(generation.created_at).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-          <Badge variant={statusBadgeVariant(generation.status)}>
-            {generation.status}
-          </Badge>
-          {isPartial && (
-            <Badge variant="warning">partial</Badge>
-          )}
-        </CardContent>
-      </Card>
-
+      {/* Generated content */}
       {pins.length > 0 ? (
-        <PinTable pins={pins} />
+        <div className="space-y-3">
+          <p className="text-[13px] font-medium text-muted-foreground">
+            {pins.length} generated {pins.length === 1 ? 'pin' : 'pins'}
+          </p>
+          <PinTable pins={pins} />
+        </div>
       ) : (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground">No pins generated.</p>
+        <div className="rounded-xl border border-dashed border-border/60 py-20 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+            <Sparkles className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium">No pins generated</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            This generation didn&apos;t produce any results.
+          </p>
         </div>
       )}
     </PageContainer>

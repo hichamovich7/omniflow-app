@@ -10,7 +10,6 @@ import type { SupportedLanguage, PinsOption } from '@/types/pinterest';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -73,15 +72,45 @@ export function PinForm({ projects }: PinFormProps) {
   }
 
   return (
-    <Card className="mx-auto max-w-xl">
-      <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="mx-auto max-w-lg pt-8 sm:pt-16">
+      {/* Hero */}
+      <div className="mb-10 text-center">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+          <Sparkles className="h-6 w-6 text-primary" />
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Pinterest Generator</h1>
+        <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+          Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts.
+        </p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="keyword" className="text-xs font-medium text-muted-foreground">
+            Keyword
+          </Label>
+          <Input
+            id="keyword"
+            placeholder="e.g. small bathroom storage ideas"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            maxLength={200}
+            required
+            disabled={loading}
+            className="h-12 text-base placeholder:text-muted-foreground/40"
+          />
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_auto] gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="project">Project</Label>
+            <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
+              Project
+            </Label>
             <Select value={projectId} onValueChange={(v) => v && setProjectId(v)}>
               <SelectTrigger id="project">
-                <span className="truncate">
-                  {projects.find((p) => p.id === projectId)?.name ?? 'Select a project'}
+                <span className="truncate text-sm">
+                  {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
                 </span>
               </SelectTrigger>
               <SelectContent>
@@ -95,77 +124,69 @@ export function PinForm({ projects }: PinFormProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="keyword">Keyword</Label>
-            <Input
-              id="keyword"
-              placeholder="e.g. small bathroom storage ideas"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              maxLength={200}
-              required
-              disabled={loading}
-              className="text-base"
-            />
+            <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
+              Language
+            </Label>
+            <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
+              <SelectTrigger id="language" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <SelectItem key={lang} value={lang}>
+                    {LANGUAGE_LABELS[lang]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="language">Language</Label>
-              <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
-                <SelectTrigger id="language">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <SelectItem key={lang} value={lang}>
-                      {LANGUAGE_LABELS[lang]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="pins">Pins</Label>
-              <Select
-                value={String(pinsRequested)}
-                onValueChange={(v) => v && setPinsRequested(Number(v) as PinsOption)}
-              >
-                <SelectTrigger id="pins">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PINS_OPTIONS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n} {n === 1 ? 'Pin' : 'Pins'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="pins" className="text-xs font-medium text-muted-foreground">
+              Pins
+            </Label>
+            <Select
+              value={String(pinsRequested)}
+              onValueChange={(v) => v && setPinsRequested(Number(v) as PinsOption)}
+            >
+              <SelectTrigger id="pins" className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PINS_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} {n === 1 ? 'Pin' : 'Pins'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+        </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <div className="rounded-lg bg-destructive/5 px-3 py-2">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
 
-          <Button
-            type="submit"
-            disabled={loading || projects.length === 0}
-            className="w-full"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate Pins
-              </>
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <Button
+          type="submit"
+          disabled={loading || projects.length === 0}
+          className="h-12 w-full text-sm font-medium"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate Pins
+            </>
+          )}
+        </Button>
+      </form>
+    </div>
   );
 }
