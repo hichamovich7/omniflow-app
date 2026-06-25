@@ -519,6 +519,17 @@ COMPONENT_STANDARDS.md → implementación
 Un componente no se considera completo hasta que cumple ambos documentos.
 
 ---
+# Rule #32 Al finalizar cualquier TASK es obligatorio:
+
+1. Actualizar TASKS.md.
+2. Actualizar CHANGELOG.md.
+3. Actualizar la documentación afectada.
+4. Ejecutar TypeScript.
+5. Ejecutar ESLint.
+6. Ejecutar Production Build.
+7. Entregar un resumen técnico de la implementación.
+
+Una TASK no puede considerarse completada hasta que estos siete pasos se hayan realizado correctamente.
 
 # Golden Rule
 
