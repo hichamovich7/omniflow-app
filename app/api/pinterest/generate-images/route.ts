@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { generateImage } from '@/lib/openai/image-client';
-import { IMAGE_CONFIG, IMAGE_PROMPT_ID } from '@/lib/prompts/image-generator';
+import { IMAGE_CONFIG, IMAGE_PROMPT_ID, buildImagePrompt } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     async (pin) => {
       const imageBuffer = await generateImage({
         model,
-        prompt: pin.image_prompt,
+        prompt: buildImagePrompt(pin),
         size: IMAGE_CONFIG.size,
       });
 

@@ -206,6 +206,19 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-IMG-001] Base Image Generation Prompt Enhancement — 2026-06-26
+
+* Upgraded image prompt system from pinterest-image-v1 to pinterest-image-v2
+* New buildImagePrompt() wrapper enriches LLM-generated scene descriptions with professional photography directives before sending to gpt-image-1
+* Niche-aware photography style inference (18 categories: food, interior, travel, fashion, garden, beauty, fitness, DIY, family, business, wedding, pet, art, education, tech, holiday, organization + generic fallback)
+* Enhanced LLM instructions to generate hyper-specific scene descriptions (concrete subjects, materials, textures, colors, camera angles) instead of vague keywords
+* Image prompts now always generated in English regardless of content language for optimal gpt-image-1 results
+* Quality directives added: photorealistic, editorial quality, DSLR, bokeh, natural lighting, rule of thirds, Pinterest vertical format
+* Strict negative constraints: no text, typography, watermarks, logos, overlays, frames, borders, or graphic elements
+* Zero changes to API, database, frontend, scheduling, CSV, or architecture
+
+---
+
 ## [TASK-017] Documentation Consolidation — 2026-06-25
 
 * Synchronized all documentation with actual code state

@@ -22,6 +22,28 @@ No planned changes.
 
 ---
 
+# [1.0.5] - 2026-06-26
+
+## TASK-IMG-001: Base Image Generation Prompt Enhancement
+
+### Changed
+
+* Image prompt system upgraded from pinterest-image-v1 to pinterest-image-v2
+* LLM instructions now require hyper-specific scene descriptions: concrete subjects, materials, textures, named colors, camera angles, 3-5 supporting details per scene — replaces vague "detailed prompt for vertical image"
+* Image prompts are now always generated in English regardless of content language for optimal gpt-image-1 results
+* System prompt upgraded: LLM now acts as "visual director" in addition to SEO content creator
+
+### Added
+
+* buildImagePrompt() function in lib/prompts/image-generator.ts — wraps LLM-generated scene descriptions with professional photography directives before sending to gpt-image-1
+* inferPhotographyStyle() — niche-aware photography style mapping based on board name (18 categories + generic fallback)
+* Photography directives: DSLR full-frame, shallow depth of field, bokeh, natural diffused lighting, rule of thirds, vertical 2:3 filling entire frame
+* Quality directives: ultra high resolution, visible textures, rich natural colors, aspirational mood
+* Strict negative constraints: no text, typography, watermarks, logos, overlays, frames, borders, collages, or graphic elements
+* Niche categories: food, interior, travel, fashion, garden, beauty, fitness, DIY, family, business, wedding, pet, art, education, tech, holiday, organization
+
+---
+
 # [1.0.4] - 2026-06-25
 
 ## TASK-017: Documentation Consolidation
