@@ -131,43 +131,19 @@ Ventajas:
 
 ### Decision
 
-Decision
-
-OpenRouter As Unified AI Gateway
-
-Context
-
-Reducir complejidad y proveedores externos.
-
-Decision Taken
-
-OpenRouter gestionará:
-
-- Text Generation
-- Vision Analysis
-- Image Generation
-
-Consequences
-
-Arquitectura más simple.
-Menos integraciones.
-Menor mantenimiento.
+OpenRouter As Unified AI Gateway (Text & Vision)
 
 ### Context
 
-Necesidad futura de generación de imágenes Pinterest.
+Reducir complejidad y proveedores externos. OpenRouter centraliza acceso a modelos de texto y vision.
 
+### Decision Taken
 
-
-
+OpenRouter gestionara text generation y vision analysis. Image generation queda excluida (ver decision 2026-06-24 — OpenAI Direct API).
 
 ### Consequences
 
-Modelos previstos:
-
-* Flux Pro
-* Ideogram
-* Recraft
+Arquitectura mas simple para texto y vision. Menos integraciones. Menor mantenimiento.
 
 ---
 
@@ -417,3 +393,27 @@ Use OpenAI API directly (api.openai.com/v1/images/generations) for image generat
 * lib/openai/image-client.ts handles image generation
 * lib/openrouter/client.ts continues handling text generation
 * If OpenRouter adds image support in the future, migration is straightforward
+
+---
+
+## 2026-06-25
+
+### Decision
+
+Documentation Consolidation & Roadmap Reorder
+
+### Context
+
+After completing TASK-016 (Design System), an audit revealed multiple inconsistencies between documentation and code: TASK-014 referenced OpenRouter for images (uses OpenAI), ARCHITECTURE.md listed React Query (not installed), generation flow documented Inngest and credits validation (not implemented), API.md listed endpoints that don't exist, DATABASE.md had outdated descriptions, RULES.md Rule #11 contradicted DECISIONS.md.
+
+### Decision Taken
+
+Pause feature development to synchronize all documentation with the actual codebase. Reorder roadmap to prioritize: Security → Visual Refinement → Multi-Generator Architecture → WordPress → Credits → Stripe.
+
+### Consequences
+
+* All documentation now reflects actual implementation
+* Non-implemented endpoints explicitly marked as deferred
+* Roadmap reflects strategic priority (security before monetization)
+* Credits and Stripe moved to later phases to focus on platform scalability first
+* WordPress Generator introduced as first expansion target after multi-generator architecture

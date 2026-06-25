@@ -24,7 +24,8 @@ Objetivos:
 | Storage        | Supabase Storage |
 | AI Provider    | OpenRouter       |
 | Payments       | Stripe           |
-| Async Jobs     | Inngest          |
+| Image Gen      | OpenAI           |
+| Async Jobs     | Inngest (deferred) |
 
 ---
 

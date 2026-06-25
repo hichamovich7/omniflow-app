@@ -177,9 +177,9 @@ Stores generated Pinterest pins.
 | description    | text                     | Max 500 chars              |
 | keywords       | text                     | Comma separated keywords   |
 | board          | text                     | Suggested board            |
-| image_prompt   | text                     | Prompt for FAL / Ideogram  |
+| image_prompt   | text                     | Prompt for image generation |
 | image_analysis | text nullable            | Vision analysis            |
-| media_url      | text nullable            | Future generated image URL |
+| media_url      | text nullable            | Generated image URL (Supabase Storage) |
 | link_url       | text nullable            | Website destination        |
 | publish_date   | timestamptz nullable     | Schedule date              |
 | created_at     | timestamptz              |                            |
@@ -330,11 +330,11 @@ reference-images/user-id/image.jpg
 
 ## generated-images
 
-Reserved for future versions.
+Status: Active (created in TASK-014).
 
 Purpose:
 
-Store generated Pinterest images.
+Store generated Pinterest images (OpenAI gpt-image-1).
 
 Examples:
 
@@ -346,9 +346,11 @@ generated-images/user-id/pin-001.png
 
 ## exports
 
+Status: Not yet used. CSV export is currently client-side.
+
 Purpose:
 
-Generated CSV files.
+Reserved for future server-side CSV storage.
 
 Examples:
 

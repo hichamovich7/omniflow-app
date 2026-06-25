@@ -144,7 +144,7 @@ Los componentes UI nunca llaman directamente a:
 
 ```txt
 OpenRouter
-FAL
+OpenAI
 Stripe
 Supabase Admin
 ```
@@ -184,21 +184,18 @@ desde otras partes del proyecto.
 
 ---
 
-# Rule #11 
-Rule #11
+# Rule #11 — OpenRouter Is The Only Text/Vision AI Provider
 
-OpenRouter Is The Only AI Provider
-
-Toda IA debe pasar por OpenRouter.
+Toda IA de texto y vision debe pasar por OpenRouter.
 
 Incluye:
 
 - Text Generation
 - Vision Analysis
-- Image Generation
 
+Excepcion documentada: Image Generation usa OpenAI directamente (gpt-image-1) porque OpenRouter no soporta /v1/images/generations. Ver DECISIONS.md.
 
-
+---
 
 # Rule #12 — Strong Typing Required
 
@@ -230,7 +227,7 @@ Ejemplos:
 * Query Params
 * Webhooks
 * OpenRouter Responses
-* FAL Responses
+* OpenAI Responses
 * Stripe Responses
 
 Utilizar:
@@ -258,19 +255,13 @@ Los componentes solo muestran UI.
 
 ---
 
-# Rule #15 — Async Jobs For Heavy Tasks
+# Rule #15 — Async Jobs For Heavy Tasks (Deferred)
 
-Procesos pesados deben ejecutarse mediante:
+Procesos pesados deberan ejecutarse mediante jobs asincrono cuando se implemente.
 
-```txt
-Inngest
-```
+El MVP actual usa generacion sincrona.
 
-Ejemplos:
-
-* Generación de pines
-* Generación masiva
-* Exportaciones complejas
+Inngest esta previsto pero no implementado.
 
 ---
 

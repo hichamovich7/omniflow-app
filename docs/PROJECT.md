@@ -52,9 +52,7 @@ Permitir que un usuario genere contenido Pinterest listo para publicar en menos 
 
 ## Input Methods
 
-El usuario podrá iniciar una generación utilizando una de las siguientes opciones:
-
-### Keyword Input
+### Keyword Input (Implemented)
 
 Ejemplo:
 
@@ -62,15 +60,15 @@ Ejemplo:
 * small bathroom ideas
 * recettes healthy faciles
 
-### Pinterest URL Input
+### Website URL Input (Planned)
 
-URL de un pin existente para utilizarlo como inspiración.
+URL de una pagina o articulo para generar contenido Pinterest relacionado. El campo existe en el formulario y la base de datos pero no se utiliza en la generacion actual.
 
-### Website URL Input
+### Pinterest URL Input (Planned)
 
-URL de una página o artículo para generar contenido Pinterest relacionado.
+URL de un pin existente para utilizarlo como inspiracion. El campo existe en la base de datos pero no se utiliza en la generacion actual.
 
-### Reference Image Input
+### Reference Image Input (Deferred — TASK-013)
 
 Imagen subida por el usuario para analizar estilo visual y generar nuevos prompts de imagen.
 
@@ -271,9 +269,16 @@ La selección del modelo deberá ser configurable desde el backend.
 
 # Storage
 
-Las imágenes y archivos generados deberán ser compatibles con Supabase Storage.
+Supabase Storage se utiliza para almacenar imagenes generadas.
 
-Aunque el MVP inicial permite exportar CSV sin alojar imágenes automáticamente, la arquitectura deberá prepararse para soportar almacenamiento de imágenes en futuras versiones.
+Bucket activo:
+
+* generated-images — imagenes Pinterest generadas por OpenAI gpt-image-1 (public read, authenticated write)
+
+Buckets reservados:
+
+* reference-images — imagenes de referencia subidas por el usuario (TASK-013)
+* exports — CSV generados server-side (actualmente el export es client-side)
 
 ---
 

@@ -40,10 +40,10 @@ Responsabilidades:
 * Pinterest description generation
 * Pinterest keyword generation
 * Pinterest board suggestion
-* Image analysis
 * Image prompt generation
 * Structured JSON outputs
-* Generación de imágenes
+
+Note: Image generation uses OpenAI directly (gpt-image-1). Image analysis via vision models is deferred (TASK-013). See DECISIONS.md.
 
 Modelo por defecto:
 
@@ -191,12 +191,14 @@ checkout.ts
 
 /components
 
-/ui (Shadcn)
+/ui (Shadcn + Custom)
 
 ```
 button, input, card, label, separator, table,
 dropdown-menu, badge, sonner, textarea, dialog,
-select, skeleton
+select, skeleton, sheet
+action-bar, metric-card, page-container,
+relative-date, status-dot
 ```
 
 /layout
@@ -205,6 +207,8 @@ select, skeleton
 topbar.tsx
 sidebar.tsx
 page-header.tsx
+mobile-nav.tsx
+user-menu.tsx
 ```
 
 /pinterest
@@ -236,6 +240,13 @@ delete-project-dialog.tsx
 
 empty-state.tsx
 
+/skeletons
+
+```
+dashboard-skeleton.tsx
+table-skeleton.tsx
+```
+
 /types
 
 database.ts
@@ -244,32 +255,26 @@ pinterest.ts
 
 ---
 
-# Pinterest Generation Flow
+# Pinterest Generation Flow (Implemented)
 
 User Input
 
 * Keyword
 * Language
 * Number of Pins
-* Optional Website URL
-* Optional Pinterest URL
-* Optional Reference Image
+* Project
 
 ↓
 
-API Route
+API Route (POST /api/pinterest/generate)
 
 ↓
 
-Credits Validation
+Zod Validation
 
 ↓
 
-Inngest Job
-
-↓
-
-OpenRouter
+OpenRouter (google/gemini-2.5-flash)
 
 ↓
 
@@ -283,41 +288,21 @@ Generate
 
 ↓
 
-Store Result
+Store Result (generations + pins tables)
 
 ↓
 
 Return Response
+
+Note: Credits validation is planned (TASK-011) but not yet implemented. Generation is synchronous (Inngest deferred).
 
 ---
 
-# Image Analysis 
+# Image Analysis (Deferred — TASK-013)
 
-Reference Image
+Not yet implemented. Planned flow:
 
-↓
-
-Upload
-
-↓
-
-OpenRouter Vision Model
-
-↓
-
-Image Analysis
-
-↓
-
-Image Prompt Generation
-
-↓
-
-Store Result
-
-↓
-
-Return Response
+Reference Image → Upload → OpenRouter Vision Model → Image Analysis → Image Prompt Generation
 
 ---
 
@@ -428,8 +413,8 @@ La relación entre niveles es estricta: cada nivel inferior debe cumplir con las
 * No any.
 * Server Components por defecto.
 * Client Components solo cuando exista interactividad.
-* React Query para estado remoto.
 * useState para estado local simple.
+* fetch para mutaciones desde Client Components.
 * Supabase RLS obligatorio.
 * OpenRouter como único gateway para texto y visión.
 

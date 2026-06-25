@@ -110,57 +110,13 @@ generation_failed
 
 # GET /api/pinterest/generations
 
-Returns generation history.
-
-## Query Parameters
-
-```txt
-page
-limit
-projectId
-```
-
-## Response
-
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "keyword": "bathroom storage",
-      "language": "en",
-      "pinsRequested": 10,
-      "status": "completed"
-    }
-  ],
-  "error": null
-}
-```
+Status: NOT IMPLEMENTED. History uses server-side Supabase queries directly, not an API route.
 
 ---
 
 # GET /api/pinterest/generations/[id]
 
-Returns one generation with all generated pins.
-
-## Response
-
-```json
-{
-  "data": {
-    "generation": {},
-    "pins": []
-  },
-  "error": null
-}
-```
-
-## Possible Errors
-
-```txt
-not_found
-unauthorized
-```
+Status: NOT IMPLEMENTED. Replaced by GET /api/generations/[id] (see below).
 
 ---
 
@@ -291,33 +247,7 @@ past_date
 
 # POST /api/pinterest/export-csv
 
-Creates Pinterest-compatible CSV.
-
-## Request
-
-```json
-{
-  "generationId": "uuid"
-}
-```
-
-## Response
-
-```json
-{
-  "data": {
-    "downloadUrl": "csv-file-url"
-  },
-  "error": null
-}
-```
-
-## Possible Errors
-
-```txt
-not_found
-csv_generation_failed
-```
+Status: NOT IMPLEMENTED. CSV export is client-side via ExportCsvButton component (lib/csv/pinterest.ts).
 
 ---
 
@@ -349,21 +279,7 @@ Create project.
 
 # GET /api/projects
 
-Returns all user projects.
-
-## Response
-
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "name": "Bathroom Blog DE"
-    }
-  ],
-  "error": null
-}
-```
+Status: NOT IMPLEMENTED. Project listing uses server-side Supabase queries directly, not an API route.
 
 ---
 
@@ -395,86 +311,25 @@ Only project owner can delete.
 
 # GET /api/credits
 
-Returns current balance.
-
-## Response
-
-```json
-{
-  "data": {
-    "creditsBalance": 150
-  },
-  "error": null
-}
-```
+Status: DEFERRED to TASK-011.
 
 ---
 
 # GET /api/credit-transactions
 
-Returns credit history.
-
-## Response
-
-```json
-{
-  "data": [
-    {
-      "credits": -10,
-      "type": "generation",
-      "description": "Generated 10 Pinterest Pins"
-    }
-  ],
-  "error": null
-}
-```
+Status: DEFERRED to TASK-011.
 
 ---
 
 # POST /api/stripe/create-checkout
 
-Creates Stripe checkout session.
-
-## Request
-
-```json
-{
-  "plan": "starter"
-}
-```
-
-## Response
-
-```json
-{
-  "data": {
-    "checkoutUrl": "stripe-url"
-  },
-  "error": null
-}
-```
+Status: DEFERRED to TASK-012.
 
 ---
 
 # POST /api/webhooks/stripe
 
-Stripe webhook endpoint.
-
-## Purpose
-
-Handles:
-
-* Subscription created
-* Subscription renewed
-* Subscription canceled
-* Payment succeeded
-* Payment failed
-
-Updates:
-
-* profiles
-* subscriptions
-* credit_transactions
+Status: DEFERRED to TASK-012.
 
 ---
 

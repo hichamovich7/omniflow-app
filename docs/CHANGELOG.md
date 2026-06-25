@@ -22,6 +22,43 @@ No planned changes.
 
 ---
 
+# [1.0.4] - 2026-06-25
+
+## TASK-017: Documentation Consolidation
+
+### Fixed
+
+* TASKS.md: removed completed tasks from NEXT TASKS section, fixed structure
+* TASKS.md: TASK-014 goal corrected from "OpenRouter" to "OpenAI (gpt-image-1)"
+* TASKS.md: TASK-001 corrected from "Next.js 15" to "Next.js 16"
+* TASKS.md: TASK-014 completed entry corrected from OpenRouter to OpenAI reference
+* ARCHITECTURE.md: removed "React Query" from Technical Rules (not installed)
+* ARCHITECTURE.md: removed Inngest and Credits Validation from generation flow (not implemented)
+* ARCHITECTURE.md: added missing layout components (mobile-nav, user-menu) and skeletons folder
+* ARCHITECTURE.md: added sheet and custom UI components to component list
+* DATABASE.md: pins.image_prompt description corrected from "FAL / Ideogram" to "image generation"
+* DATABASE.md: pins.media_url description corrected from "Future" to "Generated image URL"
+* DATABASE.md: generated-images bucket corrected from "Reserved for future" to "Active"
+* API.md: marked non-implemented endpoints (GET /api/projects, GET /api/pinterest/generations, POST /api/pinterest/export-csv, credits, stripe) as deferred or not implemented
+* RULES.md: Rule #11 corrected — OpenRouter for text/vision only, image generation exception documented
+* RULES.md: Rule #9 and #13 corrected — replaced FAL references with OpenAI
+* RULES.md: Rule #15 updated — Inngest deferred, MVP uses synchronous generation
+* DECISIONS.md: fixed malformed "OpenRouter As Unified AI Gateway" entry
+* PROJECT.md: Storage section updated to reflect implemented state
+* PROJECT.md: Input Methods now distinguish Implemented / Planned / Deferred status
+
+### Changed
+
+* Roadmap reordered: Security → Visual Refinement → Multi-Generator Architecture → WordPress → Credits → Stripe
+* TASK-018 (Security Hardening) defined as next priority
+* TASK-019 (Visual Refinement) defined
+* TASK-020 (Multi-Generator Architecture) defined
+* TASK-021 (WordPress Generator) defined
+* TASK-011/012 moved later in roadmap (Credits and Stripe after platform expansion)
+* MVP Release Checklist updated with current completion status
+
+---
+
 # [1.0.3] - 2026-06-25
 
 ## Blueprint Implementation — Visual Refinement
@@ -191,7 +228,7 @@ No planned changes.
 
 ### Added
 
-* OpenRouter image client (lib/openrouter/image-client.ts) — generates images via /api/v1/images/generations with 120s timeout
+* OpenAI image client (lib/openai/image-client.ts) — generates images via gpt-image-1 with 120s timeout
 * POST /api/pinterest/generate-images — batch image generation for all pins in a generation
 * Promise pool utility (lib/utils/promise-pool.ts) — concurrency-limited parallel processing
 * Image prompt config (lib/prompts/image-generator.ts) — pinterest-image-v1, 1024x1536 vertical
@@ -375,7 +412,7 @@ No planned changes.
 
 ### Added
 
-* Next.js 15 with App Router and TypeScript (strict mode)
+* Next.js 16 with App Router and TypeScript (strict mode)
 * Tailwind CSS v4 + Shadcn UI components (button, input, card, label)
 * Supabase Auth integration (login, register, logout)
 * Auth middleware for route protection
@@ -478,46 +515,6 @@ When:
 * Bug fixes
 * Refactors
 * Performance improvements
-
----
-
-# Example Entries
-
-## [0.2.0] - YYYY-MM-DD
-
-### Added
-
-* Projects Module
-* Project CRUD
-
-### Changed
-
-* Updated dashboard navigation
-
----
-
-## [0.3.0] - YYYY-MM-DD
-
-### Added
-
-* Pinterest Generator
-* OpenRouter Integration
-
-### Changed
-
-* Improved generation workflow
-
----
-
-## [0.4.0] - YYYY-MM-DD
-
-### Added
-
-* CSV Export
-
-### Fixed
-
-* Character count validation
 
 ---
 
