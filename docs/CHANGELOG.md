@@ -22,6 +22,26 @@ No planned changes.
 
 ---
 
+# [1.0.6] - 2026-06-26
+
+## TASK-017A: Roadmap Reorganization
+
+### Changed
+
+* Roadmap reorganizado según la nueva visión estratégica del producto
+* Product Vision added: Research → Analyze → Generate → Review → Images → Schedule → Export
+* Pinterest established as first module implementing the complete flow; WordPress reuses the architecture
+* Roadmap organized in 4 phases after Security Hardening and Visual Refinement
+* FASE 1 — Pinterest Professional Workflow: TASK-020 Editorial Workflow, TASK-021 Image Versioning & Regeneration, TASK-022 Brand Profile & AI Context
+* FASE 2 — Intelligent Content Research: TASK-023 Content Research & Input Sources, TASK-024 Content Analyzer, TASK-025 Pinterest Boards Management
+* FASE 3 — Platform Architecture: TASK-026 Navigation Refactor, TASK-027 Multi-Generator Architecture
+* FASE 4 — WordPress: TASK-028 WordPress Generator
+* TASK-011 Credits and TASK-012 Stripe repositioned after platform phases
+* TASK-013 Image Analysis remains DEFERRED
+* Removed "SEO Articles" from OUT OF MVP (now covered by TASK-028)
+
+---
+
 # [1.0.5] - 2026-06-26
 
 ## TASK-IMG-001: Base Image Generation Prompt Enhancement

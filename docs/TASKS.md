@@ -12,9 +12,25 @@ All tasks through TASK-017 are completed.
 
 ---
 
+# PRODUCT VISION
+
+OmniFlow is an intelligent content workspace.
+
+The product flow for every platform:
+
+```txt
+Research → Analyze → Generate → Review → Images → Schedule → Export
+```
+
+Pinterest is the first module implementing the complete flow.
+
+WordPress will reuse the entire architecture afterwards.
+
+---
+
 # ROADMAP
 
-Ordered by strategic priority.
+Ordered by strategic priority and phased delivery.
 
 ## [TASK-018] Security Hardening
 
@@ -70,49 +86,305 @@ Zero componentes no utilizados. Suspense boundaries funcionales. WCAG AA complia
 
 ---
 
-## [TASK-020] Multi-Generator Architecture
+## FASE 1 — Pinterest Professional Workflow
 
-### Status: PLANNED
+### [TASK-020] Editorial Workflow
 
-### Goal
+#### Status: PLANNED
 
-Preparar la arquitectura para soportar múltiples generadores de contenido (Pinterest, WordPress, Facebook, LinkedIn, etc.) sin duplicar código.
+#### Goal
 
-### Features
+Convertir OmniFlow en un verdadero espacio de trabajo editorial.
+
+#### Features
 
 ```txt
-Abstraer flujo de generación genérico
-Generator registry / factory pattern
-Prompt system extensible por plataforma
-Shared results/history/export components
-Navigation structure para múltiples generadores
+Select / Deselect Pins
+Select All
+Select None
+Invert Selection
+Export Selected Pins
+Generate Images for Selected Pins
+Editorial workflow reutilizable
 ```
 
-### Constraints
+#### Success Criteria
 
-No romper el flujo Pinterest existente.
-
-### Success Criteria
-
-Un nuevo generador puede añadirse creando solo prompt, validation y config específicos.
+Usuario puede seleccionar pins específicos y ejecutar acciones sobre la selección.
 
 ---
 
-## [TASK-021] WordPress Generator
+### [TASK-021] Image Versioning & Regeneration
 
-### Status: PLANNED
+#### Status: PLANNED
 
-### Goal
+#### Goal
 
-Primer generador adicional: contenido WordPress (artículos, meta descriptions, títulos SEO).
+Permitir varias versiones de imagen por pin.
 
-### Depends On
+#### Features
 
-TASK-020 (Multi-Generator Architecture)
+```txt
+Regenerate Image
+Image Versions
+Select Active Image
+Delete Versions
+Export only active image
+```
 
-### Success Criteria
+#### Depends On
 
-Usuario puede generar contenido WordPress optimizado y exportarlo.
+TASK-020 (Editorial Workflow)
+
+#### Success Criteria
+
+Usuario puede regenerar imágenes, mantener versiones y elegir la activa para exportar.
+
+---
+
+### [TASK-022] Brand Profile & AI Context
+
+#### Status: PLANNED
+
+#### Goal
+
+Transformar la descripción del proyecto en el Brand Profile utilizado por toda la IA.
+
+#### Features
+
+```txt
+Description → Brand Profile
+Utilizado por Pinterest Content
+Utilizado por Pinterest Images
+Futuro WordPress
+Futuro Facebook
+Futuro LinkedIn
+Futuro Medium
+```
+
+#### Note
+
+Preparado para evolucionar a Project Memory / Knowledge Base.
+
+#### Success Criteria
+
+Todo contenido generado utiliza el Brand Profile del proyecto como contexto de IA.
+
+---
+
+## FASE 2 — Intelligent Content Research
+
+### [TASK-023] Content Research & Input Sources
+
+#### Status: PLANNED
+
+#### Goal
+
+Convertir OmniFlow en una herramienta de investigación además de generación.
+
+Firecrawl será utilizado como motor de adquisición de contenido.
+
+API prevista: https://www.firecrawl.dev/
+
+#### MVP Research
+
+```txt
+Keyword Research
+Website Research
+Blog URL Research
+Pinterest URL Research
+```
+
+#### MVP Input Sources
+
+```txt
+Keyword
+Image Upload
+Blog URL
+```
+
+#### Future Input Sources
+
+```txt
+PDF
+Markdown
+RSS
+YouTube
+Product URL
+Shopify
+Amazon
+```
+
+#### Success Criteria
+
+Usuario puede investigar contenido desde múltiples fuentes antes de generar.
+
+---
+
+### [TASK-024] Content Analyzer
+
+#### Status: PLANNED
+
+#### Goal
+
+Crear un pipeline común que normalice cualquier entrada antes de enviarla a los generadores.
+
+#### Depends On
+
+TASK-023 (Content Research & Input Sources)
+
+#### Responsibilities
+
+```txt
+Context Extraction
+Theme Detection
+Keywords
+Audience
+Tone
+Category
+Structured Summary
+```
+
+#### Note
+
+Toda entrada deberá pasar por este Analyzer.
+
+#### Success Criteria
+
+Cualquier input source produce un análisis estructurado reutilizable por cualquier generador.
+
+---
+
+### [TASK-025] Pinterest Boards Management
+
+#### Status: PLANNED
+
+#### Goal
+
+Convertir los Boards en entidades reales.
+
+#### Features
+
+```txt
+CRUD Boards
+Organización por Boards
+Historial por Board
+Export por Board
+Base para automatización futura
+```
+
+#### Success Criteria
+
+Boards son entidades persistentes con contenido organizado y exportable.
+
+---
+
+## FASE 3 — Platform Architecture
+
+### [TASK-026] Navigation Refactor
+
+#### Status: PLANNED
+
+#### Goal
+
+Reorganizar OmniFlow por plataformas.
+
+#### Sidebar
+
+```txt
+Pinterest
+  Research
+  Generate
+  Boards
+  History
+
+WordPress
+
+Facebook
+
+LinkedIn
+
+Medium
+```
+
+#### Note
+
+La navegación debe quedar preparada para crecimiento.
+
+#### Success Criteria
+
+Sidebar organizado por plataforma con sub-secciones funcionales.
+
+---
+
+### [TASK-027] Multi-Generator Architecture
+
+#### Status: PLANNED
+
+#### Goal
+
+Crear una arquitectura reutilizable para futuros generadores.
+
+#### Reuses
+
+```txt
+Brand Profile (TASK-022)
+Content Analyzer (TASK-024)
+Navigation (TASK-026)
+Editorial Workflow (TASK-020)
+```
+
+#### Success Criteria
+
+Un nuevo generador puede añadirse reutilizando Brand Profile, Content Analyzer, Navigation y Editorial Workflow.
+
+---
+
+## FASE 4 — WordPress
+
+### [TASK-028] WordPress Generator
+
+#### Status: PLANNED
+
+#### Goal
+
+Primer generador reutilizando toda la arquitectura anterior.
+
+#### Depends On
+
+TASK-027 (Multi-Generator Architecture)
+
+#### Input
+
+```txt
+Keyword
+Image
+Blog URL
+```
+
+#### Generation
+
+```txt
+SEO Article
+Featured Image
+Export
+Publicación futura
+```
+
+#### Reuses
+
+```txt
+Editorial Workflow (TASK-020)
+Image Versioning (TASK-021)
+Brand Profile (TASK-022)
+Content Analyzer (TASK-024)
+Navigation (TASK-026)
+Historial independiente
+```
+
+#### Success Criteria
+
+Usuario puede generar contenido WordPress optimizado reutilizando toda la arquitectura existente.
 
 ---
 
@@ -413,7 +685,6 @@ No implementar todavia:
 ```txt
 Pinterest OAuth
 Pinterest API
-SEO Articles
 Teams
 Analytics Dashboard
 Mobile App
