@@ -22,6 +22,28 @@ No planned changes.
 
 ---
 
+# [1.1.0] - 2026-06-26
+
+## TASK-020: Editorial Workflow
+
+### Added
+
+* EditorialSelectionProvider — reusable React Context for item selection state (components/editorial/selection-provider.tsx)
+* SelectionToolbar — Select All / Select None / Invert buttons with real-time counter (components/editorial/selection-toolbar.tsx)
+* SelectionActionBar — contextual action bar visible only when items are selected (components/editorial/selection-action-bar.tsx)
+* EditorialWorkspace — wrapper composing provider + toolbar + action bar + pin grid (components/editorial/editorial-workspace.tsx)
+* Per-pin selection checkbox in PinTable with hover-reveal and selected state styling
+* Selective image generation: POST /api/pinterest/generate-images now accepts optional pinIds array
+
+### Changed
+
+* PinTable converted to client component with selection context integration
+* ExportCsvButton accepts optional selectedPinIds — exports only selected pins when selection exists
+* GenerateImagesButton accepts optional selectedPinIds — generates images only for selected pins when selection exists
+* Results page refactored to use EditorialWorkspace wrapper — header remains server-rendered, editorial area is client-interactive
+
+---
+
 # [1.0.10] - 2026-06-26
 
 ## Documentation: Final Vision Alignment

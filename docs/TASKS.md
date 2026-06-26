@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-019 are completed.
+All tasks through TASK-020 are completed.
 
 ---
 
@@ -57,32 +57,6 @@ Ningún usuario autenticado puede acceder a recursos de otro usuario.
 ---
 
 ## FASE 1 — Pinterest Professional Workflow
-
-### [TASK-020] Editorial Workflow
-
-#### Status: PLANNED
-
-#### Goal
-
-Convertir OmniFlow en un verdadero espacio de trabajo editorial.
-
-#### Features
-
-```txt
-Select / Deselect Pins
-Select All
-Select None
-Invert Selection
-Export Selected Pins
-Generate Images for Selected Pins
-Editorial workflow reutilizable
-```
-
-#### Success Criteria
-
-Usuario puede seleccionar pins específicos y ejecutar acciones sobre la selección.
-
----
 
 ### [TASK-021] Image Versioning & Regeneration
 
@@ -447,6 +421,22 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-020] Editorial Workflow — 2026-06-26
+
+* Editorial selection system: EditorialSelectionProvider context with reusable selection state (toggle, selectAll, selectNone, invertSelection)
+* SelectionToolbar: Select All / Select None / Invert buttons with real-time counter ("8 selected of 10 pins")
+* SelectionActionBar: contextual action bar shown only when pins are selected, with selection count and Clear button
+* EditorialWorkspace: wrapper component composing provider + toolbar + action bar + pin grid
+* PinTable: added per-pin selection checkbox with visual feedback (primary border + ring when selected, hover-reveal when not)
+* ExportCsvButton: exports only selected pins when selection exists, all pins when no selection
+* GenerateImagesButton: generates images only for selected pins when selection exists
+* API route POST /api/pinterest/generate-images: added optional pinIds filter for selective image generation
+* Accessibility: real input[type=checkbox] with sr-only + aria-label per pin, Clear Selection has aria-label
+* Architecture: editorial components in components/editorial/ — decoupled from Pinterest, reusable for future generators
+* Zero changes to database, prompts, or business logic
+
+---
 
 ## [TASK-019] Frontend Production Readiness — 2026-06-26
 

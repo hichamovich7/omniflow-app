@@ -11,17 +11,19 @@ interface GenerateImagesButtonProps {
   generationId: string;
   imageStatus: ImageStatus;
   pinsWithoutImages: number;
+  selectedPinIds?: Set<string>;
 }
 
 export function GenerateImagesButton({
   generationId,
   imageStatus,
   pinsWithoutImages,
+  selectedPinIds,
 }: GenerateImagesButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(imageStatus === 'processing');
 
-  if (imageStatus === 'completed') {
+  if (imageStatus === 'completed' && !(selectedPinIds && selectedPinIds.size > 0)) {
     return (
       <Button variant="outline" size="sm" disabled>
         <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -30,13 +32,21 @@ export function GenerateImagesButton({
     );
   }
 
+  const hasSelection = selectedPinIds && selectedPinIds.size > 0;
+  const count = hasSelection ? selectedPinIds.size : pinsWithoutImages;
+
   async function handleGenerate() {
     setLoading(true);
+
+    const body: Record<string, unknown> = { generationId };
+    if (hasSelection) {
+      body.pinIds = Array.from(selectedPinIds);
+    }
 
     const res = await fetch('/api/pinterest/generate-images', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ generationId }),
+      body: JSON.stringify(body),
     });
 
     const json = await res.json();
@@ -61,7 +71,7 @@ export function GenerateImagesButton({
   }
 
   return (
-    <Button size="sm" onClick={handleGenerate} disabled={loading || pinsWithoutImages === 0}>
+    <Button size="sm" onClick={handleGenerate} disabled={loading || count === 0}>
       {loading ? (
         <>
           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -70,12 +80,12 @@ export function GenerateImagesButton({
       ) : imageStatus === 'partial' || imageStatus === 'failed' ? (
         <>
           <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
-          Retry ({pinsWithoutImages})
+          Retry ({count})
         </>
       ) : (
         <>
           <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
-          Images ({pinsWithoutImages})
+          Images ({count})
         </>
       )}
     </Button>

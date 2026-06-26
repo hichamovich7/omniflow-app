@@ -9,6 +9,7 @@ import type { Pin } from '@/types/database';
 
 const requestSchema = z.object({
   generationId: z.string().uuid(),
+  pinIds: z.array(z.string().uuid()).optional(),
 });
 
 export async function POST(request: Request) {
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { generationId } = parsed.data;
+  const { generationId, pinIds } = parsed.data;
 
   const { data: generation } = await supabase
     .from('generations')
@@ -56,13 +57,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: pins } = await supabase
+  let pinsQuery = supabase
     .from('pins')
     .select('*')
     .eq('generation_id', generationId)
     .is('media_url', null)
     .order('created_at', { ascending: true })
     .limit(IMAGE_CONFIG.maxBatchSize);
+
+  if (pinIds && pinIds.length > 0) {
+    pinsQuery = pinsQuery.in('id', pinIds);
+  }
+
+  const { data: pins } = await pinsQuery;
 
   const pinsToProcess = (pins ?? []) as Pin[];
 

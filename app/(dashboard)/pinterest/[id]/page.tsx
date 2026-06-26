@@ -3,10 +3,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getGenerationWithPins } from '@/lib/queries/generations';
 import { PageContainer } from '@/components/ui/page-container';
-import { PinTable } from '@/components/pinterest/pin-table';
-import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
-import { GenerateImagesButton } from '@/components/pinterest/generate-images-button';
-import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
+import { EditorialWorkspace } from '@/components/editorial/editorial-workspace';
 import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -75,33 +72,19 @@ export default async function GenerationResultsPage({
             </div>
           </div>
         </div>
-
-        {/* Actions bar */}
-        {generation.status === 'completed' && pins.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pl-9">
-            <GenerateImagesButton
-              generationId={generation.id}
-              imageStatus={imageStatus}
-              pinsWithoutImages={pinsWithoutImages}
-            />
-            <ScheduleDialog
-              generationId={generation.id}
-              pinCount={pins.length}
-              hasSchedule={hasSchedule}
-            />
-            <ExportCsvButton pins={pins} keyword={generation.keyword} />
-          </div>
-        )}
       </div>
 
-      {/* Generated content */}
+      {/* Editorial workspace */}
       {pins.length > 0 ? (
-        <div className="space-y-3">
-          <p className="text-[13px] font-medium text-muted-foreground">
-            {pins.length} generated {pins.length === 1 ? 'pin' : 'pins'}
-          </p>
-          <PinTable pins={pins} />
-        </div>
+        <EditorialWorkspace
+          pins={pins}
+          generationId={generation.id}
+          imageStatus={imageStatus}
+          pinsWithoutImages={pinsWithoutImages}
+          hasSchedule={hasSchedule}
+          keyword={generation.keyword}
+          isCompleted={generation.status === 'completed'}
+        />
       ) : (
         <div className="rounded-xl border border-dashed border-border/60 py-20 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
