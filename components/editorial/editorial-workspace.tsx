@@ -18,6 +18,7 @@ interface EditorialWorkspaceProps {
   hasSchedule: boolean;
   keyword: string;
   isCompleted: boolean;
+  imageVersionCounts: Record<string, number>;
 }
 
 export function EditorialWorkspace(props: EditorialWorkspaceProps) {
@@ -36,9 +37,18 @@ function EditorialWorkspaceContent({
   hasSchedule,
   keyword,
   isCompleted,
+  imageVersionCounts,
 }: EditorialWorkspaceProps) {
   const { selectedIds, selectedCount } = useSelection();
   const allIds = useMemo(() => pins.map(p => p.id), [pins]);
+
+  const allSelectedHaveImages = useMemo(() => {
+    if (selectedCount === 0) return false;
+    return Array.from(selectedIds).every(id => {
+      const pin = pins.find(p => p.id === id);
+      return pin?.media_url != null;
+    });
+  }, [selectedIds, selectedCount, pins]);
 
   return (
     <>
@@ -68,6 +78,13 @@ function EditorialWorkspaceContent({
               imageStatus={imageStatus}
               pinsWithoutImages={pinsWithoutImages}
               selectedPinIds={selectedIds}
+              allPinsHaveImages={allSelectedHaveImages}
+            />
+            <ScheduleDialog
+              generationId={generationId}
+              pinCount={pins.length}
+              hasSchedule={hasSchedule}
+              selectedPinIds={selectedIds}
             />
             <ExportCsvButton
               pins={pins}
@@ -81,7 +98,11 @@ function EditorialWorkspaceContent({
       {pins.length > 0 && (
         <div className="space-y-3">
           <SelectionToolbar allIds={allIds} />
-          <PinTable pins={pins} />
+          <PinTable
+            pins={pins}
+            generationId={generationId}
+            imageVersionCounts={imageVersionCounts}
+          />
         </div>
       )}
     </>

@@ -42,6 +42,7 @@ export const scheduleDaysSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
   frequency: z.enum(DAY_FREQUENCY_OPTIONS),
+  pinIds: z.array(z.string().uuid()).optional(),
 });
 
 export const scheduleHoursSchema = z.object({
@@ -53,6 +54,7 @@ export const scheduleHoursSchema = z.object({
     (v): v is HourInterval => (HOUR_INTERVAL_OPTIONS as readonly number[]).includes(v),
     { message: 'Invalid interval' }
   ),
+  pinIds: z.array(z.string().uuid()).optional(),
 });
 
 export const scheduleSchema = z.discriminatedUnion('mode', [
@@ -63,6 +65,7 @@ export const scheduleSchema = z.discriminatedUnion('mode', [
 export const clearScheduleSchema = z.object({
   generationId: z.string().uuid(),
   clear: z.literal(true),
+  pinIds: z.array(z.string().uuid()).optional(),
 });
 
 export type ScheduleInput = z.infer<typeof scheduleSchema>;

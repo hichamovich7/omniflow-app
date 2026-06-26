@@ -57,16 +57,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const isSelectiveRegeneration = pinIds && pinIds.length > 0;
+
   let pinsQuery = supabase
     .from('pins')
     .select('*')
     .eq('generation_id', generationId)
-    .is('media_url', null)
     .order('created_at', { ascending: true })
     .limit(IMAGE_CONFIG.maxBatchSize);
 
-  if (pinIds && pinIds.length > 0) {
+  if (isSelectiveRegeneration) {
     pinsQuery = pinsQuery.in('id', pinIds);
+  } else {
+    pinsQuery = pinsQuery.is('media_url', null);
   }
 
   const { data: pins } = await pinsQuery;
@@ -90,20 +93,26 @@ export async function POST(request: Request) {
   const { successes, failures } = await promisePool(
     pinsToProcess,
     async (pin) => {
+      const { data: existingVersions } = await supabase
+        .from('pin_images')
+        .select('version')
+        .eq('pin_id', pin.id)
+        .order('version', { ascending: false })
+        .limit(1);
+
+      const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
+
       const imageBuffer = await generateImage({
         model,
-        prompt: buildImagePrompt(pin),
+        prompt: buildImagePrompt(pin, nextVersion),
         size: IMAGE_CONFIG.size,
       });
 
-      const filePath = `${user.id}/${pin.id}.png`;
+      const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
 
       const { error: uploadError } = await supabase.storage
         .from('generated-images')
-        .upload(filePath, imageBuffer, {
-          contentType: 'image/png',
-          upsert: true,
-        });
+        .upload(filePath, imageBuffer, { contentType: 'image/png' });
 
       if (uploadError) {
         throw new Error(`Storage upload failed: ${uploadError.message}`);
@@ -112,6 +121,20 @@ export async function POST(request: Request) {
       const { data: publicUrl } = supabase.storage
         .from('generated-images')
         .getPublicUrl(filePath);
+
+      await supabase
+        .from('pin_images')
+        .update({ is_active: false })
+        .eq('pin_id', pin.id)
+        .eq('is_active', true);
+
+      await supabase.from('pin_images').insert({
+        pin_id: pin.id,
+        storage_path: filePath,
+        url: publicUrl.publicUrl,
+        is_active: true,
+        version: nextVersion,
+      });
 
       await supabase
         .from('pins')

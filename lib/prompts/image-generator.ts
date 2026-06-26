@@ -14,10 +14,10 @@ interface ImagePromptContext {
   image_prompt: string;
 }
 
-export function buildImagePrompt(ctx: ImagePromptContext): string {
+export function buildImagePrompt(ctx: ImagePromptContext, version = 1): string {
   const photographyStyle = inferPhotographyStyle(ctx.board);
 
-  return [
+  const lines = [
     ctx.image_prompt,
     '',
     `Photography style: ${photographyStyle}.`,
@@ -27,9 +27,21 @@ export function buildImagePrompt(ctx: ImagePromptContext): string {
     'Colors: rich saturated natural tones, harmonious warm palette, no harsh neon or artificial colors.',
     'Detail: ultra high resolution with visible textures on all surfaces and materials, crisp fine details throughout.',
     'Mood: aspirational, polished, premium, inviting, scroll-stopping Pinterest aesthetic.',
+  ];
+
+  if (version > 1) {
+    lines.push(
+      '',
+      `VARIATION DIRECTIVE (version ${version}): Create a distinctly different visual interpretation of the same subject. Vary at least three of the following: camera angle (overhead, eye-level, low angle, 45-degree, close-up, wide), composition layout (centered, off-center, negative space left vs right, diagonal leading lines), lighting mood (cool morning, warm golden hour, bright midday, soft overcast, dramatic side-lit), styling and props (different arrangement, alternative surfaces, complementary accessories, seasonal elements), color temperature (warmer, cooler, more muted, more vibrant), and perspective depth (tight macro detail, medium context, wide environmental). The result must look like a fresh take by a different photographer, not a minor edit of the same shot.`,
+    );
+  }
+
+  lines.push(
     '',
     'CRITICAL CONSTRAINTS: The image must contain absolutely no text, no typography, no letters, no numbers, no words, no captions, no titles, no watermarks, no logos, no brand names, no stamps, no overlays, no frames, no borders, no collage layouts, no split screens, no arrows, no icons, and no graphic design elements of any kind. Produce a single clean photographic image only.',
-  ].join('\n');
+  );
+
+  return lines.join('\n');
 }
 
 function inferPhotographyStyle(board: string): string {

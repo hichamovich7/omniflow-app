@@ -126,14 +126,18 @@ Generate images for all pins in a generation.
 
 ## Description
 
-Batch generates Pinterest-optimized images using OpenAI (gpt-image-1). Processes up to 10 pins per batch with max 3 concurrent requests.
+Batch generates Pinterest-optimized images using OpenAI (gpt-image-1). Processes up to 10 pins per batch with max 3 concurrent requests. Supports image versioning — each call creates a new version without overwriting existing images.
 
 ## Request
 
 ```json
 {
-  "generationId": "uuid"
+  "generationId": "uuid",
+  "pinIds": ["uuid", "uuid"]
 }
+```
+
+`pinIds` is optional. When provided, generates images only for the specified pins (supports regeneration of pins that already have images). When omitted, generates images for all pins without images.
 ```
 
 ## Response
@@ -157,6 +161,93 @@ unauthorized
 not_found
 generation_not_completed
 image_generation_failed
+```
+
+---
+
+# GET /api/pinterest/pin-images
+
+List all image versions for a pin.
+
+## Request
+
+Query parameter: `?pinId={uuid}`
+
+## Response
+
+```json
+{
+  "data": {
+    "versions": [
+      {
+        "id": "uuid",
+        "pin_id": "uuid",
+        "url": "https://...",
+        "is_active": true,
+        "version": 2,
+        "created_at": "..."
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+---
+
+# PATCH /api/pinterest/pin-images/[id]
+
+Set an image version as the active image for its pin.
+
+Updates `pins.media_url` to the selected version's URL.
+
+## Response
+
+```json
+{
+  "data": {
+    "pinId": "uuid",
+    "activeImageId": "uuid",
+    "url": "https://..."
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+not_found
+```
+
+---
+
+# DELETE /api/pinterest/pin-images/[id]
+
+Delete an image version. Cannot delete the only remaining version.
+
+If the deleted version was active, the most recent remaining version is promoted.
+
+Deletes the image file from Supabase Storage.
+
+## Response
+
+```json
+{
+  "data": {
+    "deleted": true
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+not_found
+invalid_request (cannot delete only version)
 ```
 
 ---

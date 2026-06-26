@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-020 are completed.
+All tasks through TASK-021 are completed.
 
 ---
 
@@ -57,34 +57,6 @@ Ningún usuario autenticado puede acceder a recursos de otro usuario.
 ---
 
 ## FASE 1 — Pinterest Professional Workflow
-
-### [TASK-021] Image Versioning & Regeneration
-
-#### Status: PLANNED
-
-#### Goal
-
-Permitir varias versiones de imagen por pin.
-
-#### Features
-
-```txt
-Regenerate Image
-Image Versions
-Select Active Image
-Delete Versions
-Export only active image
-```
-
-#### Depends On
-
-TASK-020 (Editorial Workflow)
-
-#### Success Criteria
-
-Usuario puede regenerar imágenes, mantener versiones y elegir la activa para exportar.
-
----
 
 ### [TASK-022] Brand Profile & AI Context
 
@@ -422,6 +394,28 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-021] Image Versioning & Regeneration — 2026-06-26
+
+* New `pin_images` table: stores image versions per pin (id, pin_id, storage_path, url, is_active, version, created_at)
+* Partial unique index enforces one active image per pin at database level
+* Data migration: existing pins.media_url migrated to pin_images version 1 records
+* Storage path changed from `{user_id}/{pin_id}.png` to `{user_id}/{pin_id}/{version}.png`
+* pins.media_url preserved as denormalized field — CSV export, history, and display work unchanged
+* POST /api/pinterest/generate-images: versioned image creation, selective regeneration when pinIds provided
+* GET /api/pinterest/pin-images: list all versions for a pin
+* PATCH /api/pinterest/pin-images/[id]: set active image version, updates pins.media_url
+* DELETE /api/pinterest/pin-images/[id]: delete version with safety checks (cannot delete only version, auto-promotes on active deletion)
+* ImageVersionsDialog: thumbnail grid showing all versions with Set Active / Delete actions
+* PinTable: hover overlay with Regenerate button (per pin) and Versions button (when count > 1)
+* GenerateImagesButton: shows "Regenerate (N)" when all selected pins already have images
+* Integrated with TASK-020 editorial selection — selective regeneration for selected pins
+* Variation directive: regenerated images (version > 1) receive explicit instructions to vary camera angle, composition, lighting, styling, props, and perspective
+* Lightbox preview: click any thumbnail in ImageVersionsDialog to view full-size with dark overlay
+* Visual hierarchy: active version uses primary badge with checkmark, "Use this" is a primary button, delete action de-emphasized as icon-only ghost
+* Architecture reusable for WordPress and future generators (pin_images table, versioning flow)
+
+---
+
 ## [TASK-020] Editorial Workflow — 2026-06-26
 
 * Editorial selection system: EditorialSelectionProvider context with reusable selection state (toggle, selectAll, selectNone, invertSelection)
@@ -433,8 +427,11 @@ Stripe Working                  ⬚ TASK-012
 * GenerateImagesButton: generates images only for selected pins when selection exists
 * API route POST /api/pinterest/generate-images: added optional pinIds filter for selective image generation
 * Accessibility: real input[type=checkbox] with sr-only + aria-label per pin, Clear Selection has aria-label
+* ScheduleDialog: accepts optional selectedPinIds — schedules only selected pins when selection exists
+* PATCH /api/pinterest/schedule: accepts optional pinIds filter for selective scheduling and clearing
+* SelectionActionBar includes Schedule action between Regenerate and Export for consistent editorial flow
 * Architecture: editorial components in components/editorial/ — decoupled from Pinterest, reusable for future generators
-* Zero changes to database, prompts, or business logic
+* Zero changes to database or prompts
 
 ---
 

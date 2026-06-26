@@ -22,6 +22,43 @@ No planned changes.
 
 ---
 
+# [1.2.0] - 2026-06-26
+
+## TASK-021: Image Versioning & Regeneration
+
+### Added
+
+* `pin_images` table with versioning support (migration 005)
+* Partial unique index: one active image per pin enforced at database level
+* GET /api/pinterest/pin-images — list all versions for a pin
+* PATCH /api/pinterest/pin-images/[id] — set active image version
+* DELETE /api/pinterest/pin-images/[id] — delete a version with safety checks
+* ImageVersionsDialog — thumbnail grid for comparing and managing image versions
+* Lightbox preview in ImageVersionsDialog — click any thumbnail to view full-size with dark overlay
+* Per-pin Regenerate button (hover overlay on image area)
+* Per-pin Versions button showing version count (visible when count > 1)
+* PinImage and PinImageInsert types in types/database.ts
+* lib/queries/pin-images.ts — shared query for fetching pin image versions
+* Variation directive in image prompt for version > 1 — regenerated images vary camera angle, composition, lighting, styling, props, and perspective
+
+### Changed
+
+* POST /api/pinterest/generate-images — creates versioned pin_images records instead of overwriting; supports selective regeneration when pinIds provided
+* buildImagePrompt() accepts optional version parameter; version > 1 injects explicit variation instructions for meaningfully different results
+* Storage path changed from `{user_id}/{pin_id}.png` to `{user_id}/{pin_id}/{version}.png`
+* ImageVersionsDialog — active version uses primary badge with checkmark, "Use this" is a primary button, delete action de-emphasized as icon-only ghost button
+* GenerateImagesButton — shows "Regenerate (N)" when all selected pins already have images
+* PinTable — accepts generationId and imageVersionCounts props for regeneration and version display
+* EditorialWorkspace — passes imageVersionCounts to PinTable, computes allPinsHaveImages for button label
+* getGenerationWithPins — returns imageVersionCounts alongside generation and pins
+* ScheduleDialog — accepts optional selectedPinIds for selective scheduling; button shows "Schedule (N)" when selection active
+* PATCH /api/pinterest/schedule — accepts optional pinIds array for selective scheduling and clearing
+* EditorialWorkspace — SelectionActionBar now includes Schedule between Regenerate and Export
+* DATABASE.md — documented pin_images table, updated storage path pattern
+* API.md — documented new pin-images endpoints, updated generate-images documentation
+
+---
+
 # [1.1.0] - 2026-06-26
 
 ## TASK-020: Editorial Workflow

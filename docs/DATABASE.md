@@ -29,6 +29,8 @@ auth.users
   └── generations
 
         └── pins
+
+              └── pin_images
 ```
 
 └── credit_transactions
@@ -211,6 +213,53 @@ Inherited through generation ownership.
 
 ---
 
+# pin_images
+
+Stores image versions for each pin. Each pin can have multiple image versions; exactly one is marked as active.
+
+## Columns
+
+| Column       | Type              | Description                    |
+| ------------ | ----------------- | ------------------------------ |
+| id           | uuid PK           |                                |
+| pin_id       | uuid FK → pins.id | ON DELETE CASCADE              |
+| storage_path | text              | Supabase Storage path          |
+| url          | text              | Public URL                     |
+| is_active    | boolean           | Only one active per pin        |
+| version      | integer           | Sequential version number      |
+| created_at   | timestamptz       |                                |
+
+## Purpose
+
+Enables image versioning and regeneration. Users can generate multiple image versions per pin, compare them, and choose which version to use for export.
+
+## Constraints
+
+* Partial unique index: only one `is_active = true` per pin_id
+* Unique index: `(pin_id, version)` prevents duplicate version numbers
+
+## RLS
+
+Inherited through pin ownership chain:
+
+```sql
+pin_id IN (
+  SELECT p.id FROM pins p
+  JOIN generations g ON p.generation_id = g.id
+  WHERE g.user_id = auth.uid()
+)
+```
+
+## Indexes
+
+```sql
+(pin_id)
+(pin_id) WHERE is_active = true
+(pin_id, version) UNIQUE
+```
+
+---
+
 # Triggers
 
 ## update_updated_at_column()
@@ -339,8 +388,11 @@ Store generated Pinterest images (OpenAI gpt-image-1).
 Examples:
 
 ```txt
-generated-images/user-id/pin-001.png
+generated-images/user-id/pin-id/1.png
+generated-images/user-id/pin-id/2.png
 ```
+
+Path pattern: `{user_id}/{pin_id}/{version}.png`. Each version is stored separately to support image versioning.
 
 ---
 

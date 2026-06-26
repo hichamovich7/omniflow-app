@@ -79,3 +79,17 @@ export type GenerationInsert = Omit<Generation, 'id' | 'created_at' | 'updated_a
 export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at'> & {
   id?: string;
 };
+
+export interface PinImage {
+  id: string;
+  pin_id: string;
+  storage_path: string;
+  url: string;
+  is_active: boolean;
+  version: number;
+  created_at: string;
+}
+
+export type PinImageInsert = Omit<PinImage, 'id' | 'created_at'> & {
+  id?: string;
+};

@@ -27,7 +27,7 @@ export default async function GenerationResultsPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { generation, pins } = await getGenerationWithPins(supabase, id);
+  const { generation, pins, imageVersionCounts } = await getGenerationWithPins(supabase, id);
 
   if (!generation) {
     redirect('/pinterest');
@@ -84,6 +84,7 @@ export default async function GenerationResultsPage({
           hasSchedule={hasSchedule}
           keyword={generation.keyword}
           isCompleted={generation.status === 'completed'}
+          imageVersionCounts={imageVersionCounts}
         />
       ) : (
         <div className="rounded-xl border border-dashed border-border/60 py-20 text-center">

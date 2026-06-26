@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ImageIcon, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ImageIcon, Loader2, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import type { ImageStatus } from '@/types/database';
@@ -12,6 +12,7 @@ interface GenerateImagesButtonProps {
   imageStatus: ImageStatus;
   pinsWithoutImages: number;
   selectedPinIds?: Set<string>;
+  allPinsHaveImages?: boolean;
 }
 
 export function GenerateImagesButton({
@@ -19,11 +20,15 @@ export function GenerateImagesButton({
   imageStatus,
   pinsWithoutImages,
   selectedPinIds,
+  allPinsHaveImages,
 }: GenerateImagesButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(imageStatus === 'processing');
 
-  if (imageStatus === 'completed' && !(selectedPinIds && selectedPinIds.size > 0)) {
+  const hasSelection = selectedPinIds && selectedPinIds.size > 0;
+  const isRegeneration = hasSelection && allPinsHaveImages;
+
+  if (imageStatus === 'completed' && !hasSelection) {
     return (
       <Button variant="outline" size="sm" disabled>
         <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -32,7 +37,6 @@ export function GenerateImagesButton({
     );
   }
 
-  const hasSelection = selectedPinIds && selectedPinIds.size > 0;
   const count = hasSelection ? selectedPinIds.size : pinsWithoutImages;
 
   async function handleGenerate() {
@@ -76,6 +80,11 @@ export function GenerateImagesButton({
         <>
           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           Generating...
+        </>
+      ) : isRegeneration ? (
+        <>
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+          Regenerate ({count})
         </>
       ) : imageStatus === 'partial' || imageStatus === 'failed' ? (
         <>

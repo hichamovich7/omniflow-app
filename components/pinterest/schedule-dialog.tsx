@@ -37,6 +37,7 @@ interface ScheduleDialogProps {
   generationId: string;
   pinCount: number;
   hasSchedule: boolean;
+  selectedPinIds?: Set<string>;
 }
 
 const PREVIEW_LIMIT = 5;
@@ -63,7 +64,9 @@ function getDefaultStartDate(): string {
   return tomorrow.toISOString().split('T')[0];
 }
 
-export function ScheduleDialog({ generationId, pinCount, hasSchedule }: ScheduleDialogProps) {
+export function ScheduleDialog({ generationId, pinCount, hasSchedule, selectedPinIds }: ScheduleDialogProps) {
+  const hasSelection = selectedPinIds && selectedPinIds.size > 0;
+  const effectivePinCount = hasSelection ? selectedPinIds.size : pinCount;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ScheduleMode>('days');
@@ -76,17 +79,18 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule }: Schedule
   const previewDates = useMemo(() => {
     if (!startDate || !startTime) return [];
     return mode === 'hours'
-      ? calculateHourSchedule(pinCount, startDate, startTime, hourInterval)
-      : calculateDaySchedule(pinCount, startDate, startTime, dayFrequency);
-  }, [pinCount, startDate, startTime, mode, dayFrequency, hourInterval]);
+      ? calculateHourSchedule(effectivePinCount, startDate, startTime, hourInterval)
+      : calculateDaySchedule(effectivePinCount, startDate, startTime, dayFrequency);
+  }, [effectivePinCount, startDate, startTime, mode, dayFrequency, hourInterval]);
 
   async function handleApply() {
     setLoading(true);
 
+    const pinIdsArray = hasSelection ? Array.from(selectedPinIds) : undefined;
     const payload =
       mode === 'hours'
-        ? { generationId, mode, startDate, startTime, intervalMinutes: hourInterval }
-        : { generationId, mode, startDate, startTime, frequency: dayFrequency };
+        ? { generationId, mode, startDate, startTime, intervalMinutes: hourInterval, pinIds: pinIdsArray }
+        : { generationId, mode, startDate, startTime, frequency: dayFrequency, pinIds: pinIdsArray };
 
     const res = await fetch('/api/pinterest/schedule', {
       method: 'PATCH',
@@ -113,7 +117,7 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule }: Schedule
     const res = await fetch('/api/pinterest/schedule', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ generationId, clear: true }),
+      body: JSON.stringify({ generationId, clear: true, pinIds: hasSelection ? Array.from(selectedPinIds) : undefined }),
     });
 
     const json = await res.json();
@@ -133,7 +137,7 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule }: Schedule
     <>
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
-        Schedule
+        Schedule{hasSelection ? ` (${effectivePinCount})` : ''}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -141,7 +145,7 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule }: Schedule
           <DialogHeader>
             <DialogTitle>Schedule Pins</DialogTitle>
             <DialogDescription>
-              Set a publishing schedule for {pinCount} pins
+              Set a publishing schedule for {effectivePinCount} {hasSelection ? 'selected ' : ''}pins
             </DialogDescription>
           </DialogHeader>
 

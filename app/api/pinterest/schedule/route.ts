@@ -25,7 +25,7 @@ export async function PATCH(request: Request) {
 
   const clearParsed = clearScheduleSchema.safeParse(body);
   if (clearParsed.success) {
-    const { generationId } = clearParsed.data;
+    const { generationId, pinIds } = clearParsed.data;
 
     const { data: generation } = await supabase
       .from('generations')
@@ -40,10 +40,16 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { data: pins } = await supabase
+    let clearQuery = supabase
       .from('pins')
       .select('id')
       .eq('generation_id', generationId);
+
+    if (pinIds && pinIds.length > 0) {
+      clearQuery = clearQuery.in('id', pinIds);
+    }
+
+    const { data: pins } = await clearQuery;
 
     for (const pin of pins ?? []) {
       await supabase.from('pins').update({ publish_date: null }).eq('id', pin.id);
@@ -62,7 +68,7 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const { generationId, startDate, startTime } = parsed.data;
+  const { generationId, startDate, startTime, pinIds } = parsed.data;
 
   const startDateTime = new Date(`${startDate}T${startTime}`);
   if (startDateTime <= new Date()) {
@@ -85,11 +91,17 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const { data: pins } = await supabase
+  let pinsQuery = supabase
     .from('pins')
     .select('id')
     .eq('generation_id', generationId)
     .order('created_at', { ascending: true });
+
+  if (pinIds && pinIds.length > 0) {
+    pinsQuery = pinsQuery.in('id', pinIds);
+  }
+
+  const { data: pins } = await pinsQuery;
 
   const pinList = pins ?? [];
 
