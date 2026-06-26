@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-017 are completed.
+All tasks through TASK-019 are completed.
 
 ---
 
@@ -53,36 +53,6 @@ UUID validation en URL params
 ### Success Criteria
 
 Ningún usuario autenticado puede acceder a recursos de otro usuario.
-
----
-
-## [TASK-019] Visual Refinement
-
-### Status: PLANNED
-
-### Goal
-
-Completar el rediseño visual y conectar componentes existentes no utilizados.
-
-### Features
-
-```txt
-loading.tsx con skeletons existentes (DashboardSkeleton, TableSkeleton)
-error.tsx boundaries en route groups
-Eliminar duplicación timeAgo() — usar RelativeDate component
-Eliminar duplicación statusToVariant() — extraer utility
-Usar MetricCard en dashboard o eliminarlo
-Configurar remotePatterns en next.config.ts
-Accesibilidad: aria-labels en botones icon-only, contrast ratios
-```
-
-### Constraints
-
-No modificar lógica de negocio ni APIs.
-
-### Success Criteria
-
-Zero componentes no utilizados. Suspense boundaries funcionales. WCAG AA compliance.
 
 ---
 
@@ -478,6 +448,23 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-019] Frontend Production Readiness — 2026-06-26
+
+* Extracted shared utility timeAgo() to lib/utils/format-date.ts — eliminated 4 duplicate implementations
+* Extracted shared utility statusToVariant() to lib/utils/status.ts — eliminated 2 duplicate implementations
+* Loading states: added loading.tsx with skeletons for dashboard, history, projects, pinterest, and results pages
+* Connected existing DashboardSkeleton and TableSkeleton components (previously unused)
+* Error boundary: added error.tsx for the dashboard route group with retry support
+* Configured next.config.ts remotePatterns for Supabase Storage image optimization
+* Removed unoptimized flag from PinTable Image component, added proper sizes attribute
+* Accessibility: added aria-label to icon-only DropdownMenuTriggers (history-actions, project-actions, user-menu)
+* Accessibility: added aria-label to back navigation link on results page
+* Removed dead code: LogoutButton (replaced by UserMenu), openrouter/image-client.ts (replaced by openai/image-client.ts)
+* Removed unused components: MetricCard, ActionBar, RelativeDate (timeAgo utility covers the use case)
+* Zero changes to APIs, database, prompts, or business logic
+
+---
+
 ## [TASK-IMG-001] Base Image Generation Prompt Enhancement — 2026-06-26
 
 * Upgraded image prompt system from pinterest-image-v1 to pinterest-image-v2
@@ -690,3 +677,15 @@ Analytics Dashboard
 Mobile App
 Multi-tenant Organizations
 ```
+
+---
+
+# TECHNICAL DEBT
+
+See:
+
+```txt
+docs/TECHNICAL_DEBT.md
+```
+
+Infrastructure improvements and internal refactoring that do not belong in the product roadmap.

@@ -12,6 +12,7 @@ import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { ImageStatus } from '@/types/database';
 import { ArrowLeft, Sparkles } from 'lucide-react';
+import { timeAgo } from '@/lib/utils/format-date';
 
 function statusBadgeVariant(status: string) {
   switch (status) {
@@ -20,14 +21,6 @@ function statusBadgeVariant(status: string) {
     case 'failed': return 'destructive' as const;
     default: return 'secondary' as const;
   }
-}
-
-function timeAgo(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export default async function GenerationResultsPage({
@@ -57,6 +50,7 @@ export default async function GenerationResultsPage({
           <Link
             href="/pinterest"
             className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted transition-colors"
+            aria-label="Back to generator"
           >
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </Link>

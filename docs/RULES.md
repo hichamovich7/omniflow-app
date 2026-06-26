@@ -398,14 +398,14 @@ Prohibido crear:
 ```txt
 Pinterest OAuth
 Pinterest API
-WordPress Publishing
-SEO Articles
 Teams
 Analytics Dashboard
 Mobile App
 ```
 
 hasta que aparezcan oficialmente en PROJECT.md.
+
+WordPress y SEO Articles forman parte del roadmap oficial (ver TASKS.md). Solo implementar cuando la TASK correspondiente sea la tarea activa.
 
 ---
 

@@ -435,14 +435,14 @@ Current examples:
 ```txt id="t3k8n5"
 Pinterest OAuth
 Pinterest API
-WordPress Publishing
-SEO Articles
 Teams
 Analytics
 Mobile App
 ```
 
 remain out of scope.
+
+WordPress and SEO Articles are part of the official roadmap (see TASKS.md). Only implement when the corresponding TASK is the active task.
 
 ---
 

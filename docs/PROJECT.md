@@ -4,13 +4,19 @@
 
 ## Product Overview
 
-OmniFlow es una plataforma impulsada por IA diseñada para acelerar la creación de contenido para Pinterest.
+OmniFlow es una plataforma de generación de contenido mediante IA.
 
-El sistema permite generar múltiples variantes de pines optimizados para SEO en Pinterest a partir de una palabra clave, una URL o una imagen de referencia.
+El sistema permite investigar, generar, revisar y exportar contenido optimizado para múltiples plataformas a partir de una palabra clave, una URL o una imagen de referencia.
 
-El objetivo principal es reducir el tiempo necesario para investigar, redactar y preparar contenido Pinterest listo para publicar.
+Pinterest es el primer módulo implementado. WordPress será el siguiente gran módulo. Posteriormente podrán añadirse nuevos generadores (Facebook, LinkedIn, Medium).
 
-Durante el MVP, OmniFlow no publicará directamente en Pinterest. En su lugar, generará un archivo CSV compatible con Pinterest Bulk Upload para permitir la programación y publicación masiva de contenido.
+El pipeline de cada módulo sigue el mismo flujo:
+
+```txt
+Research → Analyze → Generate → Review → Images → Schedule → Export
+```
+
+Durante el MVP, la plataforma genera contenido Pinterest y exporta archivos CSV compatibles con Pinterest Bulk Upload. No publica directamente en ninguna plataforma.
 
 ---
 
@@ -18,22 +24,24 @@ Durante el MVP, OmniFlow no publicará directamente en Pinterest. En su lugar, g
 
 Los creadores de contenido y propietarios de blogs invierten una gran cantidad de tiempo en:
 
-* Buscar ideas de contenido para Pinterest.
-* Crear múltiples variantes de títulos.
-* Redactar descripciones optimizadas.
+* Buscar ideas de contenido para cada plataforma.
+* Crear múltiples variantes de títulos y descripciones.
+* Redactar contenido optimizado para SEO.
 * Investigar palabras clave relacionadas.
 * Diseñar prompts para generar imágenes.
-* Preparar archivos CSV para programación masiva.
+* Preparar archivos para publicación masiva.
 
-La mayoría de herramientas existentes cubren solo una parte del proceso.
+La mayoría de herramientas existentes cubren solo una parte del proceso y solo una plataforma.
 
-OmniFlow centraliza este flujo en una única plataforma.
+OmniFlow centraliza todo el flujo en una única plataforma, reutilizando la misma arquitectura para cada generador de contenido.
 
 ---
 
 # Product Goal
 
-Permitir que un usuario genere contenido Pinterest listo para publicar en menos de cinco minutos.
+Permitir que un usuario genere contenido listo para publicar en menos de cinco minutos.
+
+El MVP se centra en Pinterest. La arquitectura permite extender el mismo flujo a WordPress y otras plataformas.
 
 ---
 
@@ -42,7 +50,7 @@ Permitir que un usuario genere contenido Pinterest listo para publicar en menos 
 * Bloggers
 * Affiliate Marketers
 * Niche Site Owners
-* Pinterest Creators
+* Content Creators
 * SEO Specialists
 * Content Agencies
 
@@ -296,6 +304,22 @@ Cualquier componente nuevo o modificado debe verificarse contra estos estándare
 
 ---
 
+# Platform Roadmap
+
+El roadmap de OmniFlow sigue un modelo de expansión modular:
+
+```txt
+Pinterest (Implemented)
+↓
+WordPress (Planned — TASK-028)
+↓
+Facebook, LinkedIn, Medium (Future)
+```
+
+WordPress y la generación de artículos SEO forman parte del roadmap oficial. Ver TASKS.md para detalle.
+
+---
+
 # Out Of Scope (MVP)
 
 Las siguientes funcionalidades no forman parte del MVP:
@@ -303,8 +327,6 @@ Las siguientes funcionalidades no forman parte del MVP:
 * Publicación directa en Pinterest
 * Pinterest OAuth
 * Pinterest API
-* WordPress Publishing
-* SEO Article Generation
 * Multi-user Teams
 * Analytics Dashboard
 * Social Media Scheduling
@@ -319,7 +341,9 @@ El MVP se considerará exitoso cuando un usuario pueda:
 
 1. Introducir una keyword, URL o imagen.
 2. Seleccionar un idioma.
-3. Generar múltiples variantes de pines.
+3. Generar múltiples variantes de contenido optimizado.
 4. Obtener títulos, descripciones, keywords y prompts de imagen.
-5. Exportar un CSV compatible con Pinterest.
-6. Reutilizar el flujo para producir contenido Pinterest de forma repetitiva.
+5. Exportar un CSV compatible con la plataforma destino.
+6. Reutilizar el flujo para producir contenido de forma repetitiva.
+
+El primer módulo validado será Pinterest.

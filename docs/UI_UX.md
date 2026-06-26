@@ -2,7 +2,7 @@
 
 # UI / UX Overview
 
-OmniFlow v1.0 es una aplicación SaaS Pinterest-First.
+OmniFlow es una plataforma de generación de contenido mediante IA. Pinterest es el primer módulo implementado. La interfaz debe soportar múltiples generadores de contenido con el mismo flujo de trabajo.
 
 La interfaz debe priorizar:
 
@@ -12,7 +12,7 @@ La interfaz debe priorizar:
 * Flujo de trabajo repetitivo
 * Mínimos clics para generar contenido
 
-El usuario principal es un creador que genera múltiples pines cada día.
+El usuario principal es un creador que genera múltiples piezas de contenido cada día.
 
 ---
 
@@ -20,7 +20,7 @@ El usuario principal es un creador que genera múltiples pines cada día.
 
 ## Primary Goal
 
-Permitir generar contenido Pinterest en menos de 60 segundos.
+Permitir generar contenido optimizado en menos de 60 segundos. El primer módulo validado es Pinterest.
 
 ---
 
@@ -756,14 +756,21 @@ Generation workflow optimized for desktop.
 
 ---
 
-# Future Screens (Not MVP)
+# Future Screens
+
+## Planned (in roadmap)
+
+* WordPress Generator (TASK-028)
+* Platform-based navigation (TASK-026)
+* Content Research (TASK-023)
+* Boards Management (TASK-025)
+
+## Not MVP
 
 Do not implement yet.
 
 * Pinterest Publishing
 * Pinterest OAuth
-* WordPress Publishing
-* SEO Articles
 * Team Management
 * Analytics Dashboard
 * Mobile App

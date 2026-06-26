@@ -22,6 +22,105 @@ No planned changes.
 
 ---
 
+# [1.0.10] - 2026-06-26
+
+## Documentation: Final Vision Alignment
+
+### Changed
+
+* PROJECT.md: OmniFlow presented as a multi-platform AI content platform; Pinterest identified as first module; WordPress acknowledged as next planned module
+* PROJECT.md: problem statement broadened from Pinterest-only to multi-platform content creation
+* PROJECT.md: success criteria generalized to platform-agnostic language with Pinterest as first validated module
+* PROJECT.md: removed "WordPress Publishing" and "SEO Article Generation" from out-of-scope (now in roadmap)
+* PROJECT.md: added Platform Roadmap section referencing TASKS.md
+* UI_UX.md: overview rewritten from "Pinterest-First SaaS" to multi-platform content workspace
+* UI_UX.md: primary goal broadened to platform-agnostic content generation
+* UI_UX.md: future screens split into "Planned (in roadmap)" and "Not MVP" categories
+* RULES.md: Rule #25 updated — removed WordPress and SEO Articles from prohibited list; added note about roadmap-gated implementation
+* DECISIONS.md: "Pinterest First MVP" decision updated — WordPress and SEO Articles reclassified from "excluded" to "not in MVP, now in roadmap"
+* DECISIONS.md: added "Platform Vision Evolution" decision (2026-06-26)
+
+---
+
+# [1.0.9] - 2026-06-26
+
+## Documentation: Architecture Alignment
+
+### Changed
+
+* ARCHITECTURE.md updated to reflect the new long-term product vision
+* Product vision: OmniFlow presented as an AI content platform, not a Pinterest generator
+* High-level architecture: documented the full pipeline (Research → Analyze → Generate → Review → Images → Schedule → Export) with implemented vs planned status
+* Module architecture: added platform-based module diagram (Core, Pinterest, WordPress, Facebook, LinkedIn, Medium)
+* Pinterest module: separated current state from roadmap evolution
+* Multi-generator strategy: documented Pinterest as validation module, WordPress as first reuse
+* Navigation: documented planned platform-based sidebar structure
+* Scalability target: added "Múltiples plataformas de contenido"
+* Out of scope: removed "SEO Articles" (now covered by TASK-028 WordPress Generator)
+
+### Added
+
+* Product Vision section
+* High-Level Architecture pipeline with implementation status
+* Module Architecture diagram
+* Brand Profile section (planned — TASK-022)
+* Research Layer section (planned — TASK-023)
+* Content Analyzer section (planned — TASK-024)
+* Editorial Workflow section (planned — TASK-020)
+* Pinterest Module section with current state and roadmap
+* Multi-Generator Strategy section
+* Navigation section (planned — TASK-026)
+* Future Evolution section with phased progression
+
+---
+
+# [1.0.8] - 2026-06-26
+
+## Documentation: Technical Debt Separation
+
+### Added
+
+* docs/TECHNICAL_DEBT.md — dedicated document for infrastructure improvements and internal refactoring
+* TASKS.md: technical debt reference section pointing to TECHNICAL_DEBT.md
+* ARCHITECTURE.md: technical debt reference section pointing to TECHNICAL_DEBT.md
+
+### Changed
+
+* ARCHITECTURE.md: updated folder structure — removed deleted files (openrouter/image-client.ts, action-bar, metric-card, relative-date), added new utils (format-date.ts, status.ts)
+
+---
+
+# [1.0.7] - 2026-06-26
+
+## TASK-019: Frontend Production Readiness
+
+### Added
+
+* loading.tsx for dashboard (uses DashboardSkeleton), history (uses TableSkeleton), projects, pinterest, and results pages
+* error.tsx boundary for dashboard route group with retry button
+* lib/utils/format-date.ts — shared timeAgo() utility
+* lib/utils/status.ts — shared statusToVariant() utility
+* aria-label on icon-only DropdownMenuTriggers: history-actions, project-actions, user-menu
+* aria-label on back navigation link in results page
+* next.config.ts: remotePatterns for Supabase Storage (*.supabase.co/storage/**)
+* Image sizes attribute on PinTable for responsive image optimization
+
+### Removed
+
+* LogoutButton component (dead code — replaced by UserMenu in TASK-016)
+* lib/openrouter/image-client.ts (dead code — replaced by lib/openai/image-client.ts in TASK-014)
+* MetricCard component (unused — dashboard uses inline metric grid)
+* ActionBar component (unused — trivial flex wrapper)
+* RelativeDate component (unused — timeAgo() utility covers the use case without requiring a client component)
+* unoptimized flag from PinTable Image component (no longer needed with remotePatterns)
+
+### Changed
+
+* Eliminated 4 duplicate timeAgo() implementations (dashboard, history-table, results, projects)
+* Eliminated 2 duplicate statusToVariant() implementations (dashboard, history-table)
+
+---
+
 # [1.0.6] - 2026-06-26
 
 ## TASK-017A: Roadmap Reorganization

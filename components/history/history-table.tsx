@@ -3,6 +3,8 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { HistoryActions } from './history-actions';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
+import { timeAgo } from '@/lib/utils/format-date';
+import { statusToVariant } from '@/lib/utils/status';
 
 interface GenerationRow {
   id: string;
@@ -16,24 +18,6 @@ interface GenerationRow {
 
 interface HistoryTableProps {
   generations: GenerationRow[];
-}
-
-function statusToVariant(status: string) {
-  switch (status) {
-    case 'completed': return 'success' as const;
-    case 'processing': return 'processing' as const;
-    case 'failed': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-}
-
-function timeAgo(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function HistoryTable({ generations }: HistoryTableProps) {

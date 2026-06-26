@@ -31,8 +31,8 @@ export function PinTable({ pins }: PinTableProps) {
                   src={pin.media_url}
                   alt={pin.title}
                   fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                  unoptimized
                 />
               </div>
             </a>

@@ -32,6 +32,7 @@ export function UserMenu({ email }: UserMenuProps) {
     <DropdownMenu>
       <DropdownMenuTrigger
         className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="User menu"
       >
         {initials}
       </DropdownMenuTrigger>

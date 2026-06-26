@@ -22,7 +22,7 @@ El fundador obtiene la mayor parte de su tráfico desde Pinterest.
 
 ### Decision Taken
 
-El MVP se enfocará exclusivamente en generación de contenido Pinterest.
+El MVP se enfocará en generación de contenido Pinterest como primer módulo de la plataforma.
 
 ### Consequences
 
@@ -33,11 +33,11 @@ Incluido:
 * Credits System
 * History
 
-Excluido:
+No incluido en MVP:
 
-* WordPress Publishing
-* SEO Articles
 * Pinterest API
+
+Nota: WordPress y SEO Articles fueron excluidos del MVP pero ahora forman parte del roadmap oficial (TASK-028). Ver decisión 2026-06-26 — Platform Vision Evolution.
 
 ---
 
@@ -417,3 +417,28 @@ Pause feature development to synchronize all documentation with the actual codeb
 * Roadmap reflects strategic priority (security before monetization)
 * Credits and Stripe moved to later phases to focus on platform scalability first
 * WordPress Generator introduced as first expansion target after multi-generator architecture
+
+---
+
+## 2026-06-26
+
+### Decision
+
+Platform Vision Evolution
+
+### Context
+
+OmniFlow was originally designed as a Pinterest-only tool. After completing the Pinterest module (content generation, image generation, scheduling, export, history), the product vision evolved. Pinterest validated the architecture. The same pipeline (Research → Analyze → Generate → Review → Images → Schedule → Export) can be reused for other content platforms.
+
+### Decision Taken
+
+Redefine OmniFlow as a multi-platform AI content generation platform. Pinterest remains the first implemented module. WordPress becomes the next planned module (TASK-028). Future generators (Facebook, LinkedIn, Medium) will follow the same architecture. WordPress and SEO Articles are no longer out of scope — they are part of the official roadmap.
+
+### Consequences
+
+* PROJECT.md updated to reflect platform vision
+* ARCHITECTURE.md restructured around the multi-module pipeline
+* TASKS.md roadmap organized in 4 phases: Pinterest Professional Workflow, Intelligent Content Research, Platform Architecture, WordPress
+* WordPress and SEO Articles removed from out-of-scope lists
+* All documentation aligned to the same product vision
+* No code changes — this is a strategic direction decision
