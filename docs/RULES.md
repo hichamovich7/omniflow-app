@@ -163,37 +163,38 @@ Provider
 
 ---
 
-# Rule #10 — OpenRouter Is The Only AI Gateway
+# Rule #10 — The AI Engine Is The Only AI Gateway
 
-Todos los modelos de texto y visión deben pasar por:
-
-```txt
-/lib/openrouter
-```
-
-No llamar directamente a:
+Toda llamada a IA (texto, visión o imagen) debe pasar por:
 
 ```txt
-OpenAI
-Anthropic
-Gemini
-DeepSeek
+/lib/ai
 ```
 
-desde otras partes del proyecto.
+usando exclusivamente:
+
+```txt
+generateText()
+analyzeImage()
+generateImage()
+```
+
+No llamar directamente a ningún SDK o API de proveedor (OpenRouter, OpenAI, Anthropic, Gemini, DeepSeek, FAL, Highfield, etc.) desde rutas, componentes o hooks. El proveedor y el modelo se seleccionan dentro de `/lib/ai` según el rol (FAST, SMART, VISION, IMAGE) — nunca en el código que lo invoca.
 
 ---
 
-# Rule #11 — OpenRouter Is The Only Text/Vision AI Provider
+# Rule #11 — Roles, Not Providers
 
-Toda IA de texto y vision debe pasar por OpenRouter.
+Toda IA de texto, visión e imagen se organiza en cuatro roles:
 
-Incluye:
+```txt
+FAST    — generación de contenido (mayoría de las llamadas)
+SMART   — razonamiento complejo, funcionalidades futuras
+VISION  — análisis de imagen de referencia
+IMAGE   — generación de imagen
+```
 
-- Text Generation
-- Vision Analysis
-
-Excepcion documentada: Image Generation usa OpenAI directamente (gpt-image-1) porque OpenRouter no soporta /v1/images/generations. Ver DECISIONS.md.
+Hoy: FAST/SMART/VISION usan OpenRouter, IMAGE usa OpenAI directamente (gpt-image-1) porque OpenRouter no soporta /v1/images/generations. Ver DECISIONS.md. Cambiar el proveedor de un rol es una modificación de configuración en `/lib/ai/config.ts`, nunca del código de negocio.
 
 ---
 

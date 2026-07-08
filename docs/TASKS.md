@@ -394,6 +394,29 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-FIX-001] Pinterest Generation Reliability & Error Visibility — 2026-07-08
+
+* Fixed root cause of "Generation failed" with reasoning-capable FAST models (e.g. `openai/gpt-5-mini`): the model's hidden reasoning tokens consumed the entire `max_tokens` budget before producing any visible content. `lib/ai/services/text.ts` now sends `reasoning: { effort: 'minimal' }` for the FAST role via `lib/ai/providers/openrouter.ts`; SMART keeps default reasoning behavior since it's reserved for complex reasoning tasks
+* New `generations.error_message` column (migration 006) stores a human-readable failure reason instead of discarding it
+* `POST /api/pinterest/generate` classifies known failures (empty AI response, OpenRouter HTTP errors by status, invalid JSON) into specific messages via `classifyGenerationError()`, returned in the API response and persisted for later display
+* Results page empty state (0 pins generated) now shows the stored error reason and a "Regenerate" action (`RegenerateGenerationButton`) that resubmits the same keyword/language/project/pins-count to `POST /api/pinterest/generate`
+* Zero changes to API contracts or response shapes — only error message content and one new nullable DB column
+
+---
+
+## [TASK-AI-001] AI Engine Architecture Refactor — 2026-07-08
+
+* New `lib/ai/` provider-agnostic AI Engine: business code only calls `generateText()`, `analyzeImage()`, `generateImage()`
+* Four AI roles (FAST, SMART, VISION, IMAGE), each independently configurable (provider + model) via env vars, resolved in `lib/ai/config.ts`
+* Provider adapters `lib/ai/providers/openrouter.ts` and `lib/ai/providers/openai.ts` are the only files allowed to call an external AI SDK directly
+* New `lib/ai/prompt-engine/` builds the IMAGE prompt from the Pinterest Package (title, description, keywords, board, image_prompt) — byte-identical output to the previous `lib/prompts/image-generator.ts`, designed to later accept Brand Profile, Camera/Lighting/Composition, Negative Prompt, SEO Intent, Style Presets without changing its interface
+* `VISION` role fully implemented but not wired into any route yet — ready for TASK-013
+* `lib/openrouter/` and `lib/openai/` removed; `POST /api/pinterest/generate` and `POST /api/pinterest/generate-images` now go through the AI Engine
+* Zero changes to API contracts, database schema, prompt content, or product behavior
+* Architecture prep for TASK-022 (Brand Profile), TASK-023 (Research), and TASK-028 (WordPress) — new generators/providers plug in without touching business logic
+
+---
+
 ## [TASK-021] Image Versioning & Regeneration — 2026-06-26
 
 * New `pin_images` table: stores image versions per pin (id, pin_id, storage_path, url, is_active, version, created_at)

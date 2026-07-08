@@ -90,9 +90,9 @@ Todos los módulos reutilizarán la misma arquitectura base: Brand Profile, Cont
 | Database         | Supabase PostgreSQL     |
 | Storage          | Supabase Storage        |
 | Authentication   | Supabase Auth           |
-| Text & Vision AI | OpenRouter              |
-| Image Generation | OpenAI (gpt-image-1)    |
-| AI Gateway       | OpenRouter              |
+| AI Engine        | lib/ai (provider-agnostic) |
+| Text & Vision AI | OpenRouter (via AI Engine) |
+| Image Generation | OpenAI gpt-image-1 (via AI Engine) |
 | Payments         | Stripe                  |
 | Async Jobs       | Inngest (deferred, MVP is synchronous) |
 | Hosting          | Vercel                  |
@@ -101,46 +101,95 @@ Todos los módulos reutilizarán la misma arquitectura base: Brand Profile, Cont
 
 # AI Architecture
 
-## OpenRouter Responsibilities
+## AI Engine
 
-OpenRouter es el único gateway para modelos de texto y visión.
-
-Responsabilidades actuales:
-
-* Content generation (titles, descriptions, keywords, boards)
-* Image prompt generation
-* Structured JSON outputs
-
-Responsabilidades futuras:
-
-* Content analysis
-* Research processing
-* Brand Profile enrichment
-
-Note: Image generation uses OpenAI directly (gpt-image-1). OpenRouter does not support /v1/images/generations. See DECISIONS.md.
-
-Modelo por defecto:
+El código de negocio nunca llama a un proveedor de IA directamente (ni OpenRouter, ni OpenAI, ni ningún futuro proveedor). Toda IA pasa por el AI Engine (`lib/ai/`), que centraliza configuración, selecciona provider/modelo, y expone una interfaz única al resto del proyecto:
 
 ```txt
-google/gemini-2.5-flash
+generateText()
+analyzeImage()
+generateImage()
 ```
 
-Modelos alternativos futuros:
+Ninguna otra parte del proyecto debe importar un SDK de proveedor. Flujo obligatorio:
 
 ```txt
-anthropic/claude-sonnet
-openai/gpt
-deepseek-chat
+UI
+↓
+API Route
+↓
+Business Logic
+↓
+AI Engine (lib/ai/engine.ts)
+↓
+Service (role resolution)
+↓
+Provider Adapter
 ```
+
+### AI Roles
+
+El AI Engine expone cuatro roles. Un rol representa una capacidad de negocio, nunca un proveedor concreto:
+
+| Role   | Responsabilidad                                              | Provider actual | Modelo actual           |
+| ------ | -------------------------------------------------------------- | ---------------- | ------------------------ |
+| FAST   | Generación de contenido (mayoría de las llamadas IA). Produce el Pinterest Package. | openrouter | google/gemini-2.5-flash |
+| SMART  | Reservado para funcionalidades futuras: SEO Articles, AI Agents, Content Research, razonamiento complejo. Sin uso en el MVP Pinterest. | openrouter | google/gemini-2.5-flash |
+| VISION | Análisis de una imagen de referencia cuando el usuario la proporciona. No se usa para generar imágenes. Implementado en el engine, sin ninguna ruta que lo invoque todavía (ver TASK-013, deferred). | openrouter | google/gemini-2.5-flash |
+| IMAGE  | Generación de imágenes Pinterest. Nunca recibe un keyword directamente, solo el prompt ya construido por el Prompt Engine. | openai | gpt-image-1 |
+
+Cada rol se configura de forma independiente vía variables de entorno (`AI_<ROLE>_PROVIDER`, `AI_<ROLE>_MODEL`), con valores por defecto en `lib/ai/config.ts`. Cambiar de proveedor o modelo es un cambio de configuración, no de código.
+
+### Provider Abstraction
+
+```txt
+lib/ai/
+  types.ts            AIRole, AIProvider, AIRoleConfig, ChatMessage
+  config.ts            getRoleConfig(role) — resuelve provider/modelo por rol
+  engine.ts             facade: generateText, analyzeImage, generateImage
+  providers/
+    openrouter.ts       chatCompletion(), visionCompletion()
+    openai.ts           generateImage()
+  services/
+    text.ts             generateText({role, messages, maxTokens, temperature})
+    vision.ts           analyzeImage({imageUrl, instructions, maxTokens})
+    image.ts             generateImage({prompt, size})
+  prompt-engine/
+    engine.ts           buildImagePrompt(pinterestPackage, version)
+    presets.ts           directivas de calidad, constraints negativos, variation directive
+    templates/
+      photography-styles.ts   estilo fotográfico inferido por categoría/nicho
+```
+
+Providers no usados hoy (FAL, Highfield, Anthropic, Gemini, Ollama) pueden añadirse implementando un nuevo archivo en `providers/` y registrándolo en el `switch` del service correspondiente — sin tocar rutas ni componentes.
+
+### Pinterest Package
+
+El Pinterest Package es la salida estructurada del rol FAST para cada pin: `title`, `description`, `keywords`, `board`, `image_prompt`. Es el mismo shape que ya devuelve `lib/prompts/pinterest-pins.ts` — no introduce columnas ni campos nuevos. El Prompt Engine transforma el Pinterest Package en un prompt optimizado para el rol IMAGE; nunca conoce al proveedor final.
+
+### Prompt Engine
+
+Responsable únicamente de construir el prompt de imagen a partir del Pinterest Package. Independiente de providers. Diseñado para incorporar en el futuro, sin romper su interfaz actual:
+
+* Brand Profile / Project Memory
+* Camera, Lighting, Composition
+* Negative Prompt
+* SEO Intent
+* Platform Rules
+* Style Presets
+
+El prompt de texto que produce el Pinterest Package (system/user prompt del rol FAST) sigue viviendo en `lib/prompts/pinterest-pins.ts` — es contenido de negocio Pinterest, no plumbing de proveedor.
 
 ---
 
 ## Image Generation Flow (Implemented)
 
 ```txt
-Generate Image Prompt
+Pinterest Package (FAST)
 ↓
-OpenAI gpt-image-1
+Prompt Engine (lib/ai/prompt-engine)
+↓
+AI Engine → IMAGE role → OpenAI gpt-image-1
 ↓
 Generated Image
 ↓
@@ -151,7 +200,7 @@ Public URL attached to Pin
 CSV Auto Population (Media URL column)
 ```
 
-Nota: Image generation usa OpenAI directamente (excepción a Rule #10/11). Ver DECISIONS.md para detalle.
+El generador de imagen nunca recibe el keyword directamente, solo el prompt ya construido por el Prompt Engine.
 
 ---
 
@@ -263,9 +312,9 @@ API Route (POST /api/pinterest/generate)
 ↓
 Zod Validation
 ↓
-OpenRouter (google/gemini-2.5-flash)
+AI Engine → FAST role (google/gemini-2.5-flash via OpenRouter)
 ↓
-Generate (Titles, Descriptions, Keywords, Boards, Image Prompts)
+Generate Pinterest Package (Titles, Descriptions, Keywords, Boards, Image Prompts)
 ↓
 Store Result (generations + pins tables)
 ↓
@@ -368,9 +417,9 @@ Supported Columns:
 
 # Image Analysis (Deferred — TASK-013)
 
-Not yet implemented. Planned flow:
+Not wired into any route or UI yet. Planned flow (the AI Engine's VISION role already implements the provider call — see "AI Engine" above — it is simply not invoked by TASK-013's product feature yet):
 
-Reference Image → Upload → OpenRouter Vision Model → Image Analysis → Image Prompt Generation
+Reference Image → Upload → AI Engine (VISION role) → Image Analysis (JSON) → FAST role → Pinterest Package → Prompt Engine → IMAGE role
 
 ---
 
@@ -431,23 +480,27 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 
 /lib
 
-/openrouter
+/ai
 
 ```
-client.ts          — text/vision AI gateway
-```
-
-/openai
-
-```
-image-client.ts    — image generation via gpt-image-1
+types.ts                        — AIRole, AIProvider, AIRoleConfig, ChatMessage
+config.ts                       — getRoleConfig(role): provider/model resolution
+engine.ts                       — facade: generateText, analyzeImage, generateImage
+providers/openrouter.ts         — chatCompletion(), visionCompletion()
+providers/openai.ts             — generateImage()
+services/text.ts                — FAST/SMART role resolution
+services/vision.ts              — VISION role resolution
+services/image.ts               — IMAGE role resolution
+prompt-engine/engine.ts         — buildImagePrompt(pinterestPackage, version)
+prompt-engine/presets.ts        — quality directives, negative constraints, variation directive
+prompt-engine/templates/photography-styles.ts — style inference by category
 ```
 
 /prompts
 
 ```
-pinterest-pins.ts  — pinterest-pins-v1 prompt
-image-generator.ts — pinterest-image-v2 config
+pinterest-pins.ts  — pinterest-pins-v2 prompt (Pinterest Package / FAST role)
+image-generator.ts — IMAGE_CONFIG (batch size, concurrency, output size)
 index.ts           — barrel export
 ```
 
@@ -623,10 +676,10 @@ La relación entre niveles es estricta: cada nivel inferior debe cumplir con las
 * useState para estado local simple.
 * fetch para mutaciones desde Client Components.
 * Supabase RLS obligatorio.
-* OpenRouter como único gateway para texto y visión.
+* AI Engine (`lib/ai`) como única puerta de entrada a IA — texto, visión e imagen.
 
 * Todas las respuestas IA deben devolver JSON estructurado.
-* Ningún componente puede llamar directamente a OpenRouter.
+* Ningún componente ni ruta puede llamar directamente a un SDK de proveedor (OpenRouter, OpenAI, o futuros).
 
 Flujo obligatorio:
 
@@ -637,7 +690,7 @@ API Route
 ↓
 Business Logic
 ↓
-Provider
+AI Engine
 ↓
 Response
 ```

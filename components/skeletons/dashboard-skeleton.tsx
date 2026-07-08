@@ -1,14 +1,15 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageContainer } from '@/components/ui/page-container';
 
 export function DashboardSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-4 py-6 md:px-8 md:py-8">
+    <PageContainer>
       <div className="space-y-1">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-64" />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="rounded-xl border border-border/60 p-4 space-y-2">
             <Skeleton className="h-3 w-16" />
@@ -17,8 +18,8 @@ export function DashboardSkeleton() {
         ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
+      <div className="grid gap-6 sm:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} className="flex items-center gap-3 rounded-xl border border-border/60 p-4">
             <Skeleton className="h-9 w-9 rounded-lg" />
             <div className="space-y-1.5">
@@ -44,6 +45,6 @@ export function DashboardSkeleton() {
           ))}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

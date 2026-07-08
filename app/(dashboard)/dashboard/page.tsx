@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageContainer } from '@/components/ui/page-container';
 import { StatusDot } from '@/components/ui/status-dot';
-import { ArrowRight, Sparkles, FolderOpen, Clock, Zap } from 'lucide-react';
+import { ArrowRight, Sparkles, FolderOpen, Clock } from 'lucide-react';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold tracking-tight">
             {greeting}{userName ? `, ${userName}` : ''}
           </h1>
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Your AI content workspace is ready.
           </p>
         </div>
@@ -58,23 +58,8 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Quick Actions — hero prominence */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Link
-          href="/pinterest"
-          className="group relative overflow-hidden rounded-xl border border-primary/20 bg-primary/3 p-5 transition-colors hover:bg-primary/6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-              <Zap className="h-4.5 w-4.5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Pinterest Generator</p>
-              <p className="text-xs text-muted-foreground">Create optimized pins with AI</p>
-            </div>
-          </div>
-          <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/30 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+      {/* Quick Actions — secondary shortcuts (Generate Content above is the one primary action) */}
+      <div className="grid gap-6 sm:grid-cols-2">
         <Link
           href="/projects/new"
           className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-border hover:bg-muted/30"
@@ -108,7 +93,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Metrics — secondary, compact */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         {[
           { label: 'Generations', value: totalGenerations },
           { label: 'Pins Created', value: totalPins },
@@ -116,7 +101,7 @@ export default async function DashboardPage() {
           { label: 'Credits', value: credits },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-border/60 bg-card px-4 py-3">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
               {stat.label}
             </p>
             <p className="mt-0.5 text-lg font-semibold tracking-tight">{stat.value}</p>
@@ -127,11 +112,11 @@ export default async function DashboardPage() {
       {/* Recent Activity */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-medium">Recent Activity</h2>
+          <h2 className="text-sm font-medium">Recent Activity</h2>
           {recentGenerations.length > 0 && (
             <Link
               href="/history"
-              className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               View all
             </Link>
@@ -144,12 +129,12 @@ export default async function DashboardPage() {
               <Sparkles className="h-4.5 w-4.5 text-muted-foreground" />
             </div>
             <p className="text-sm font-medium">No activity yet</p>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Start by creating your first generation.
             </p>
             <Link
               href="/pinterest"
-              className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary hover:underline"
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
             >
               Generate content <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -168,11 +153,11 @@ export default async function DashboardPage() {
                   <StatusDot variant={statusToVariant(gen.status)} />
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-medium">{gen.keyword}</p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {projectName ?? 'No project'} · {LANGUAGE_LABELS[gen.language as SupportedLanguage] ?? gen.language} · {gen.pins_requested} pins
                     </p>
                   </div>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {timeAgo(gen.created_at)}
                   </span>
                 </Link>

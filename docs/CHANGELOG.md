@@ -22,6 +22,51 @@ No planned changes.
 
 ---
 
+# [1.4.0] - 2026-07-08
+
+## TASK-FIX-001: Pinterest Generation Reliability & Error Visibility
+
+### Fixed
+
+* Reasoning-capable FAST models (e.g. `openai/gpt-5-mini`) burned their entire token budget on hidden reasoning, returning empty content and a generic "Generation failed" error. `generateText()` now caps reasoning effort to `minimal` for the FAST role.
+
+### Added
+
+* `generations.error_message` column (migration 006) — persists why a generation failed
+* `classifyGenerationError()` in `POST /api/pinterest/generate` — maps known AI Engine errors to specific, actionable messages instead of a generic failure string
+* `RegenerateGenerationButton` — shown on the results page when a generation produced 0 pins, resubmits the same parameters
+
+No API contract or schema changes beyond the new nullable column.
+
+---
+
+# [1.3.0] - 2026-07-08
+
+## TASK-AI-001: AI Engine Architecture Refactor
+
+### Added
+
+* `lib/ai/` — provider-agnostic AI Engine. Business code now only calls `generateText()`, `analyzeImage()`, `generateImage()` (`lib/ai/engine.ts`)
+* Four AI roles (FAST, SMART, VISION, IMAGE) with independent provider/model configuration via `lib/ai/config.ts` and new env vars (`AI_FAST_PROVIDER`/`MODEL`, `AI_SMART_PROVIDER`/`MODEL`, `AI_VISION_PROVIDER`/`MODEL`, `AI_IMAGE_PROVIDER`/`MODEL`)
+* `lib/ai/providers/openrouter.ts` — `chatCompletion()` (moved from `lib/openrouter/client.ts`) and new `visionCompletion()` (implemented, not yet wired into any route — ready for TASK-013)
+* `lib/ai/providers/openai.ts` — `generateImage()` moved from `lib/openai/image-client.ts`
+* `lib/ai/prompt-engine/` — dedicated Prompt Engine that turns the Pinterest Package into the IMAGE prompt (`engine.ts`, `presets.ts`, `templates/photography-styles.ts`), moved from `lib/prompts/image-generator.ts` with byte-identical prompt text
+* Reserved (unused) `FAL_API_KEY` / `HIGHFIELD_API_KEY` env vars for future image providers
+
+### Changed
+
+* `POST /api/pinterest/generate` — uses `generateText({role: 'FAST', ...})` instead of calling OpenRouter directly
+* `POST /api/pinterest/generate-images` — uses `generateImage()` and `buildImagePrompt()` from the AI Engine instead of calling OpenAI directly
+* `lib/prompts/image-generator.ts` — trimmed to `IMAGE_CONFIG` only (batch size, concurrency, output size)
+
+### Removed
+
+* `lib/openrouter/client.ts`, `lib/openai/image-client.ts` — logic moved into `lib/ai/providers/`
+
+No API contract, database schema, prompt content, or product behavior changed.
+
+---
+
 # [1.2.0] - 2026-06-26
 
 ## TASK-021: Image Versioning & Regeneration

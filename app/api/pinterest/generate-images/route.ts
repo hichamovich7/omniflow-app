@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { generateImage } from '@/lib/openai/image-client';
-import { IMAGE_CONFIG, IMAGE_PROMPT_ID, buildImagePrompt } from '@/lib/prompts/image-generator';
+import { generateImage } from '@/lib/ai/engine';
+import { buildImagePrompt, IMAGE_PROMPT_ID } from '@/lib/ai/prompt-engine/engine';
+import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
@@ -88,8 +89,6 @@ export async function POST(request: Request) {
     .update({ image_status: 'processing' })
     .eq('id', generationId);
 
-  const model = process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1';
-
   const { successes, failures } = await promisePool(
     pinsToProcess,
     async (pin) => {
@@ -103,7 +102,6 @@ export async function POST(request: Request) {
       const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
 
       const imageBuffer = await generateImage({
-        model,
         prompt: buildImagePrompt(pin, nextVersion),
         size: IMAGE_CONFIG.size,
       });

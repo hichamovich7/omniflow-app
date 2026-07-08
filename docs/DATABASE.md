@@ -140,6 +140,7 @@ Represents one Pinterest generation request.
 | credits_used        | integer               | Credits consumed                          |
 | status              | text                  | pending / processing / completed / failed |
 | image_status        | text                  | none / processing / completed / partial / failed |
+| error_message       | text nullable         | Human-readable reason when status = failed |
 | created_at          | timestamptz           |                                           |
 | updated_at          | timestamptz           |                                           |
 

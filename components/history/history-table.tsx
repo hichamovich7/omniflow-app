@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { StatusDot } from '@/components/ui/status-dot';
+import { Badge } from '@/components/ui/badge';
 import { HistoryActions } from './history-actions';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
-import { statusToVariant } from '@/lib/utils/status';
+import { statusToBadgeVariant } from '@/lib/utils/status';
 
 interface GenerationRow {
   id: string;
@@ -22,7 +22,7 @@ interface HistoryTableProps {
 
 export function HistoryTable({ generations }: HistoryTableProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {generations.map((gen) => {
         const projectName = Array.isArray(gen.projects)
           ? gen.projects[0]?.name
@@ -33,7 +33,7 @@ export function HistoryTable({ generations }: HistoryTableProps) {
             key={gen.id}
             className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3.5 transition-colors hover:border-border"
           >
-            <StatusDot variant={statusToVariant(gen.status)} />
+            <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
             <Link href={`/pinterest/${gen.id}`} className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{gen.keyword}</p>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">

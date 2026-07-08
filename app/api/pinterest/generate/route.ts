@@ -1,9 +1,39 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { callOpenRouter } from '@/lib/openrouter/client';
+import { generateText } from '@/lib/ai/engine';
+import { getRoleConfig } from '@/lib/ai/config';
 import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import type { ApiResponse } from '@/types/api';
+
+function classifyGenerationError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (message === 'OpenRouter returned empty response') {
+    return "The AI model didn't return any content — it likely ran out of response tokens before finishing. Try again, or request fewer pins.";
+  }
+
+  const httpMatch = message.match(/^OpenRouter error: (\d+)$/);
+  if (httpMatch) {
+    const status = Number(httpMatch[1]);
+    if (status === 401 || status === 403) {
+      return 'AI provider rejected the request (authentication error). Please contact support.';
+    }
+    if (status === 429) {
+      return 'AI provider rate limit reached. Try again in a moment.';
+    }
+    if (status >= 500) {
+      return 'AI provider is temporarily unavailable. Try again shortly.';
+    }
+    return `AI provider request failed (HTTP ${status}). Try again.`;
+  }
+
+  if (err instanceof SyntaxError) {
+    return "The AI returned a response that wasn't valid JSON. Try again.";
+  }
+
+  return 'Generation failed. Please try again.';
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -43,7 +73,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const model = process.env.OPENROUTER_TEXT_MODEL ?? 'google/gemini-2.5-flash';
+  const model = getRoleConfig('FAST').model;
 
   const { data: generation, error: genError } = await supabase
     .from('generations')
@@ -75,8 +105,8 @@ export async function POST(request: Request) {
       pinsRequested,
     });
 
-    const content = await callOpenRouter({
-      model,
+    const content = await generateText({
+      role: 'FAST',
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: userPrompt },
@@ -89,9 +119,10 @@ export async function POST(request: Request) {
 
     if (!validated.success) {
       console.error(`[${PROMPT_ID}] Response validation failed:`, validated.error.issues);
-      await supabase.from('generations').update({ status: 'failed' }).eq('id', generation.id);
+      const errorMessage = 'AI returned an invalid response format. Try again.';
+      await supabase.from('generations').update({ status: 'failed', error_message: errorMessage }).eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
-        { data: null, error: { message: 'AI returned invalid response', code: 'generation_failed' } },
+        { data: null, error: { message: errorMessage, code: 'generation_failed' } },
         { status: 500 }
       );
     }
@@ -118,9 +149,10 @@ export async function POST(request: Request) {
 
     if (pinsError) {
       console.error('Failed to insert pins:', pinsError);
-      await supabase.from('generations').update({ status: 'failed' }).eq('id', generation.id);
+      const errorMessage = 'Failed to save generated pins. Try again.';
+      await supabase.from('generations').update({ status: 'failed', error_message: errorMessage }).eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
-        { data: null, error: { message: 'Failed to save generated pins', code: 'server_error' } },
+        { data: null, error: { message: errorMessage, code: 'server_error' } },
         { status: 500 }
       );
     }
@@ -136,9 +168,10 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     console.error('Generation failed:', err);
-    await supabase.from('generations').update({ status: 'failed' }).eq('id', generation.id);
+    const errorMessage = classifyGenerationError(err);
+    await supabase.from('generations').update({ status: 'failed', error_message: errorMessage }).eq('id', generation.id);
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: 'Generation failed', code: 'generation_failed' } },
+      { data: null, error: { message: errorMessage, code: 'generation_failed' } },
       { status: 500 }
     );
   }

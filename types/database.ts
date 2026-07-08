@@ -38,6 +38,7 @@ export interface Generation {
   credits_used: number;
   status: GenerationStatus;
   image_status: ImageStatus;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,10 +71,11 @@ export type ProjectInsert = Omit<Project, 'id' | 'created_at' | 'updated_at' | '
   is_default?: boolean;
 };
 
-export type GenerationInsert = Omit<Generation, 'id' | 'created_at' | 'updated_at' | 'status' | 'credits_used'> & {
+export type GenerationInsert = Omit<Generation, 'id' | 'created_at' | 'updated_at' | 'status' | 'credits_used' | 'error_message'> & {
   id?: string;
   status?: GenerationStatus;
   credits_used?: number;
+  error_message?: string | null;
 };
 
 export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at'> & {

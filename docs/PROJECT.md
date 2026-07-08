@@ -259,19 +259,22 @@ La lógica exacta de consumo será definida en una fase posterior.
 
 # AI Providers
 
-La plataforma utilizará OpenRouter como capa de acceso a modelos de IA.
+OmniFlow nunca depende directamente de un proveedor de IA. El código de negocio solo conoce el AI Engine (`lib/ai/`), que expone cuatro roles — FAST, SMART, VISION, IMAGE — cada uno configurable de forma independiente (proveedor + modelo) vía variables de entorno. Ver docs/ARCHITECTURE.md para el detalle.
 
-Esto permitirá utilizar distintos proveedores según coste, calidad y disponibilidad.
+Proveedores actuales:
 
-Ejemplos:
+* OpenRouter — texto (FAST, SMART) y visión (VISION)
+* OpenAI — generación de imágenes (IMAGE), gpt-image-1
 
-* OpenAI
+Proveedores futuros que la arquitectura permite añadir sin tocar código de negocio:
+
 * Anthropic
-* Google
+* Google Gemini
 * DeepSeek
 * Mistral
+* FAL, Highfield (imagen)
 
-La selección del modelo deberá ser configurable desde el backend.
+Cambiar de proveedor o modelo es un cambio de configuración, no de código.
 
 ---
 

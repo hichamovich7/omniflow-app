@@ -43,3 +43,7 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Skills (installed via `npx skills add`, not project source)
+.agents/
+skills-lock.json

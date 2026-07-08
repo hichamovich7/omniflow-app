@@ -79,13 +79,16 @@ export function PinForm({ projects }: PinFormProps) {
           <Sparkles className="h-6 w-6 text-primary" />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">Pinterest Generator</h1>
-        <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
           Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts.
         </p>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-5 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8"
+      >
         <div className="space-y-1.5">
           <Label htmlFor="keyword" className="text-xs font-medium text-muted-foreground">
             Keyword
@@ -98,7 +101,7 @@ export function PinForm({ projects }: PinFormProps) {
             maxLength={200}
             required
             disabled={loading}
-            className="h-12 text-base placeholder:text-muted-foreground/40"
+            className="h-12 text-sm placeholder:text-muted-foreground/40"
           />
         </div>
 

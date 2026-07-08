@@ -54,7 +54,7 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {pins.map((pin, i) => {
           const selected = isSelected(pin.id);
           const versionCount = imageVersionCounts[pin.id] ?? 0;
@@ -133,7 +133,7 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
                   </div>
                 </div>
               ) : (
-                <div className="flex aspect-2/3 max-h-36 w-full items-center justify-center bg-muted/50">
+                <div className="flex aspect-2/3 max-h-56 w-full items-center justify-center bg-muted/50">
                   <div className="text-center">
                     <Sparkles className="mx-auto h-5 w-5 text-muted-foreground/30" />
                     <p className="mt-1.5 text-[10px] text-muted-foreground/40">AI Generated</p>

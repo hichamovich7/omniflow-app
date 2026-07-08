@@ -8,7 +8,7 @@ interface TopbarProps {
 
 export function Topbar({ email, creditsBalance }: TopbarProps) {
   return (
-    <header className="flex h-12 items-center justify-between border-b border-border/60 px-4 md:px-6">
+    <header className="flex h-14 items-center justify-between border-b border-border/60 px-4 md:px-6">
       <div className="flex items-center">
         <MobileNav />
       </div>

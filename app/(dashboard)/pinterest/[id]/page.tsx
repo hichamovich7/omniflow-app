@@ -4,21 +4,14 @@ import { createClient } from '@/lib/supabase/server';
 import { getGenerationWithPins } from '@/lib/queries/generations';
 import { PageContainer } from '@/components/ui/page-container';
 import { EditorialWorkspace } from '@/components/editorial/editorial-workspace';
+import { RegenerateGenerationButton } from '@/components/pinterest/regenerate-generation-button';
 import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { ImageStatus } from '@/types/database';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
-
-function statusBadgeVariant(status: string) {
-  switch (status) {
-    case 'completed': return 'success' as const;
-    case 'processing': return 'warning' as const;
-    case 'failed': return 'destructive' as const;
-    default: return 'secondary' as const;
-  }
-}
+import { statusToBadgeVariant } from '@/lib/utils/status';
 
 export default async function GenerationResultsPage({
   params,
@@ -65,7 +58,7 @@ export default async function GenerationResultsPage({
               <span>{generation.model_used}</span>
               <span className="text-border">·</span>
               <span>{timeAgo(generation.created_at)}</span>
-              <Badge variant={statusBadgeVariant(generation.status)} className="ml-0.5">
+              <Badge variant={statusToBadgeVariant(generation.status)} className="ml-0.5">
                 {generation.status}
               </Badge>
               {isPartial && <Badge variant="warning">partial</Badge>}
@@ -92,9 +85,17 @@ export default async function GenerationResultsPage({
             <Sparkles className="h-5 w-5 text-muted-foreground" />
           </div>
           <p className="text-sm font-medium">No pins generated</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            This generation didn&apos;t produce any results.
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+            {generation.error_message ?? "This generation didn't produce any results."}
           </p>
+          <div className="mt-4 flex justify-center">
+            <RegenerateGenerationButton
+              projectId={generation.project_id}
+              keyword={generation.keyword}
+              language={generation.language}
+              pinsRequested={generation.pins_requested}
+            />
+          </div>
         </div>
       )}
     </PageContainer>
