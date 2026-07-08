@@ -58,33 +58,7 @@ Ningún usuario autenticado puede acceder a recursos de otro usuario.
 
 ## FASE 1 — Pinterest Professional Workflow
 
-### [TASK-022] Brand Profile & AI Context
-
-#### Status: PLANNED
-
-#### Goal
-
-Transformar la descripción del proyecto en el Brand Profile utilizado por toda la IA.
-
-#### Features
-
-```txt
-Description → Brand Profile
-Utilizado por Pinterest Content
-Utilizado por Pinterest Images
-Futuro WordPress
-Futuro Facebook
-Futuro LinkedIn
-Futuro Medium
-```
-
-#### Note
-
-Preparado para evolucionar a Project Memory / Knowledge Base.
-
-#### Success Criteria
-
-Todo contenido generado utiliza el Brand Profile del proyecto como contexto de IA.
+TASK-022 completed — see Completed Tasks below.
 
 ---
 
@@ -393,6 +367,18 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-022] Brand Profile & AI Context — 2026-07-08
+
+* `projects.description` (already existing, no schema change) now doubles as the project's Brand Profile — project identification and AI context
+* New `lib/brand-profile.ts` (`buildBrandProfileContext()`) — Core Platform-level helper, reusable by any future generator, not Pinterest-specific
+* `lib/prompts/pinterest-pins.ts`: `buildPinterestPinsPrompt()` accepts an optional `brandProfile` and injects it into the FAST role's system prompt
+* `POST /api/pinterest/generate` fetches `project.description` and passes it through — title, description, keywords, board, and `image_prompt` are all generated under this brand-aware system prompt
+* Pinterest image generation inherits the Brand Profile transitively: the LLM-generated `image_prompt` is already brand-aware before the Prompt Engine adds photographic directives — no change needed in `lib/ai/prompt-engine`
+* `ProjectForm`: relabeled "Description" → "Brand Profile" with a helper line clarifying it drives AI generation (copy only, no new field)
+* Zero DB migration, zero API contract change
+
+---
 
 ## [TASK-FIX-001] Pinterest Generation Reliability & Error Visibility — 2026-07-08
 

@@ -4,6 +4,7 @@ import { generateText } from '@/lib/ai/engine';
 import { getRoleConfig } from '@/lib/ai/config';
 import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
+import { buildBrandProfileContext } from '@/lib/brand-profile';
 import type { ApiResponse } from '@/types/api';
 
 function classifyGenerationError(err: unknown): string {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id')
+    .select('id, description')
     .eq('id', projectId)
     .single();
 
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
       keyword,
       language,
       pinsRequested,
+      brandProfile: buildBrandProfileContext(project.description),
     });
 
     const content = await generateText({

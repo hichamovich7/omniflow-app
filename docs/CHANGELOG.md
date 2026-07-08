@@ -22,6 +22,21 @@ No planned changes.
 
 ---
 
+# [1.5.0] - 2026-07-08
+
+## TASK-022: Brand Profile & AI Context
+
+### Added
+
+* `lib/brand-profile.ts` — `buildBrandProfileContext()`, a Core Platform helper reusable by any future generator
+* `projects.description` now flows into Pinterest generation as brand context (tone, audience, style), injected into the FAST role's system prompt — no schema change, no new API fields
+
+### Changed
+
+* `ProjectForm` — "Description" relabeled "Brand Profile" with a helper line explaining it drives AI generation (copy only)
+
+---
+
 # [1.4.0] - 2026-07-08
 
 ## TASK-FIX-001: Pinterest Generation Reliability & Error Visibility

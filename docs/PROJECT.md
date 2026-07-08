@@ -257,6 +257,17 @@ La lógica exacta de consumo será definida en una fase posterior.
 
 ---
 
+# Brand Profile
+
+Cada proyecto tiene un campo Description (opcional, hasta 500 caracteres) que cumple doble función:
+
+* Identificar el proyecto en la interfaz (projects, selector del generador)
+* Actuar como Brand Profile: contexto de marca (tono, audiencia, estilo) que la IA respeta al generar contenido
+
+Todo contenido generado para un proyecto — títulos, descripciones, keywords, board y prompts de imagen — utiliza este contexto. No requiere ningún campo adicional; es el mismo campo Description reutilizado como contexto de IA (ver docs/ARCHITECTURE.md, TASK-022).
+
+---
+
 # AI Providers
 
 OmniFlow nunca depende directamente de un proveedor de IA. El código de negocio solo conoce el AI Engine (`lib/ai/`), que expone cuatro roles — FAST, SMART, VISION, IMAGE — cada uno configurable de forma independiente (proveedor + modelo) vía variables de entorno. Ver docs/ARCHITECTURE.md para el detalle.

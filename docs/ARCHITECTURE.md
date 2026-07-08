@@ -204,25 +204,26 @@ El generador de imagen nunca recibe el keyword directamente, solo el prompt ya c
 
 ---
 
-# Brand Profile (Planned — TASK-022)
+# Brand Profile (Implemented — TASK-022)
 
-El Brand Profile será el contexto permanente del proyecto utilizado por toda la IA.
+El Brand Profile es el contexto permanente del proyecto utilizado por toda la IA. En el MVP, es directamente el campo `projects.description` (ya existente, sin cambios de esquema) formateado por `lib/brand-profile.ts` (`buildBrandProfileContext()`) e inyectado en el system prompt del rol FAST (`lib/prompts/pinterest-pins.ts`).
 
-Representa la identidad editorial de la marca: tono, audiencia, estilo visual, valores y temas principales.
+Es un concepto de Core Platform, no específico de Pinterest — cualquier generador futuro reutiliza la misma función.
 
-Será reutilizado por:
+Reutilizado hoy por:
 
-* Pinterest content generation
-* Pinterest image generation
+* Pinterest content generation (title, description, keywords, board)
+* Pinterest image generation — de forma transitiva: `image_prompt` lo genera el rol FAST bajo el mismo system prompt brand-aware, antes de que el Prompt Engine añada las directivas fotográficas
+
+Reutilizable en el futuro por:
+
 * WordPress content generation
 * Facebook, LinkedIn, Medium (futuro)
 
 Evolución prevista:
 
 ```txt
-Project Description (actual)
-↓
-Brand Profile (TASK-022)
+Project Description (TASK-022, actual)
 ↓
 Project Memory / Knowledge Base (futuro)
 ```

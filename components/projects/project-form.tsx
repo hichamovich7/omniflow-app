@@ -78,16 +78,19 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="description">Description (optional)</Label>
+        <Label htmlFor="description">Brand Profile (optional)</Label>
         <Textarea
           id="description"
-          placeholder="e.g. German Pinterest project for bathroom niche"
+          placeholder="e.g. German Pinterest project for bathroom niche — friendly, cozy tone"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={500}
           rows={3}
           disabled={loading}
         />
+        <p className="text-xs text-muted-foreground">
+          Used as context for all AI-generated content in this project.
+        </p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-3">
