@@ -29,6 +29,7 @@ No planned changes.
 ### Fixed
 
 * Reasoning-capable FAST models (e.g. `openai/gpt-5-mini`) burned their entire token budget on hidden reasoning, returning empty content and a generic "Generation failed" error. `generateText()` now caps reasoning effort to `minimal` for the FAST role.
+* Intermittent "response wasn't valid JSON" failures at higher pin counts: OpenRouter occasionally returns HTTP 200 with `finish_reason: "error"` (an interrupted upstream stream) after emitting partial content. `chatCompletion()` now detects this and retries automatically (up to 3 attempts) instead of trying to parse truncated content.
 
 ### Added
 

@@ -13,6 +13,10 @@ function classifyGenerationError(err: unknown): string {
     return "The AI model didn't return any content — it likely ran out of response tokens before finishing. Try again, or request fewer pins.";
   }
 
+  if (message.startsWith('OpenRouter stream error')) {
+    return 'The AI provider connection was interrupted mid-response. Please try again.';
+  }
+
   const httpMatch = message.match(/^OpenRouter error: (\d+)$/);
   if (httpMatch) {
     const status = Number(httpMatch[1]);

@@ -1,6 +1,8 @@
 import type { ChatMessage } from '../types';
 
 interface OpenRouterChoice {
+  finish_reason?: string;
+  error?: { message: string; code?: number };
   message: {
     content: string;
   };
@@ -18,7 +20,34 @@ interface ChatCompletionOptions {
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
-export async function chatCompletion({
+const STREAM_ERROR_RETRY_ATTEMPTS = 3;
+const STREAM_ERROR_RETRY_DELAY_MS = 500;
+
+// OpenRouter sometimes returns HTTP 200 with a mid-stream provider failure
+// embedded in the choice itself (finish_reason: "error"), after already
+// emitting partial content. That partial content is not valid JSON, so it
+// must be treated as a failure and retried rather than parsed.
+export async function chatCompletion(options: ChatCompletionOptions): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= STREAM_ERROR_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await chatCompletionOnce(options);
+    } catch (err) {
+      lastError = err;
+      const isStreamError = err instanceof Error && err.message.startsWith('OpenRouter stream error');
+      if (!isStreamError || attempt === STREAM_ERROR_RETRY_ATTEMPTS) {
+        throw err;
+      }
+      console.warn(`OpenRouter stream error, retrying (attempt ${attempt}/${STREAM_ERROR_RETRY_ATTEMPTS})...`);
+      await new Promise((resolve) => setTimeout(resolve, STREAM_ERROR_RETRY_DELAY_MS * attempt));
+    }
+  }
+
+  throw lastError;
+}
+
+async function chatCompletionOnce({
   model,
   messages,
   maxTokens,
@@ -60,7 +89,14 @@ export async function chatCompletion({
     }
 
     const data = (await res.json()) as OpenRouterResponse;
-    const content = data.choices?.[0]?.message?.content;
+    const choice = data.choices?.[0];
+
+    if (choice?.finish_reason === 'error') {
+      console.error('OpenRouter stream error:', choice.error);
+      throw new Error(`OpenRouter stream error: ${choice.error?.message ?? 'unknown'}`);
+    }
+
+    const content = choice?.message?.content;
 
     if (!content) {
       throw new Error('OpenRouter returned empty response');

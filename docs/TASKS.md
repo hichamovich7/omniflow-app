@@ -397,8 +397,9 @@ Stripe Working                  ⬚ TASK-012
 ## [TASK-FIX-001] Pinterest Generation Reliability & Error Visibility — 2026-07-08
 
 * Fixed root cause of "Generation failed" with reasoning-capable FAST models (e.g. `openai/gpt-5-mini`): the model's hidden reasoning tokens consumed the entire `max_tokens` budget before producing any visible content. `lib/ai/services/text.ts` now sends `reasoning: { effort: 'minimal' }` for the FAST role via `lib/ai/providers/openrouter.ts`; SMART keeps default reasoning behavior since it's reserved for complex reasoning tasks
+* Fixed a second, intermittent failure mode: OpenRouter occasionally returns HTTP 200 with the failure embedded in the choice itself (`finish_reason: "error"`, e.g. "Stream ended before a terminal response event") after already emitting partial content, which is not valid JSON. `lib/ai/providers/openrouter.ts` now detects this and automatically retries (up to 3 attempts) before surfacing an error — this was the cause of the intermittent "response wasn't valid JSON" failures at higher pin counts (10+)
 * New `generations.error_message` column (migration 006) stores a human-readable failure reason instead of discarding it
-* `POST /api/pinterest/generate` classifies known failures (empty AI response, OpenRouter HTTP errors by status, invalid JSON) into specific messages via `classifyGenerationError()`, returned in the API response and persisted for later display
+* `POST /api/pinterest/generate` classifies known failures (empty AI response, interrupted provider stream, OpenRouter HTTP errors by status, invalid JSON) into specific messages via `classifyGenerationError()`, returned in the API response and persisted for later display
 * Results page empty state (0 pins generated) now shows the stored error reason and a "Regenerate" action (`RegenerateGenerationButton`) that resubmits the same keyword/language/project/pins-count to `POST /api/pinterest/generate`
 * Zero changes to API contracts or response shapes — only error message content and one new nullable DB column
 
