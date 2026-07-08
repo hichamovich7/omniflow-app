@@ -72,12 +72,15 @@ Creates one generation request and produces Pinterest content using AI.
   "pinsRequested": 10,
   "board": "Boho Bathroom Ideas",
   "websiteUrl": "https://example.com",
-  "pinterestUrl": "",
-  "referenceImageUrl": ""
+  "pinterestUrl": ""
 }
 ```
 
 `board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
+
+`websiteUrl`/`pinterestUrl` are optional (TASK-023). Normally carried over silently from a Research result via "Continue to Generate" — recorded on the generation for provenance only, not injected into the AI prompt (see TASK-024, Content Analyzer, for that wiring).
+
+`generations.reference_image_url` exists in the database schema but has no corresponding request field yet — deferred to TASK-013 (Image Analysis).
 
 ## Response
 
@@ -463,6 +466,72 @@ Rename a board.
 Delete a board.
 
 Pins previously assigned to this board are not deleted — `pins.board_id` is set to null (ON DELETE SET NULL). The free-text `pins.board` value is untouched.
+
+---
+
+# POST /api/research
+
+Research a topic from a keyword, website, blog, or Pinterest URL using Firecrawl.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "sourceType": "website",
+  "input": "https://example.com/blog/bathroom-storage"
+}
+```
+
+`sourceType` is one of `keyword`, `website`, `blog`, `pinterest`. `input` must be a valid URL when `sourceType` is `website`, `blog`, or `pinterest`; any non-empty string (max 500 chars) when `keyword`.
+
+## Response
+
+```json
+{
+  "data": {
+    "researchId": "uuid",
+    "title": "Bathroom Storage Ideas | Example Blog",
+    "content": "# Bathroom Storage Ideas\n\n...",
+    "sourceUrl": "https://example.com/blog/bathroom-storage"
+  },
+  "error": null
+}
+```
+
+For `sourceType: "keyword"`, `content` is an aggregation of the top 3 web search result snippets (title, description, URL), not full page content.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_request
+invalid_project
+research_failed
+```
+
+---
+
+# DELETE /api/research/[id]
+
+Delete a research result. No PATCH — results are immutable once created.
+
+## Response
+
+```json
+{
+  "data": {
+    "success": true
+  },
+  "error": null
+}
+```
+
+---
+
+# GET /api/research
+
+Status: NOT IMPLEMENTED. Research history uses server-side Supabase queries directly, not an API route (same convention as Projects/Boards).
 
 ---
 

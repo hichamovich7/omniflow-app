@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Coins,
   Settings,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Generators',
     items: [
+      { href: '/research', label: 'Research', icon: Search },
       { href: '/pinterest', label: 'Pinterest', icon: Sparkles },
     ],
   },

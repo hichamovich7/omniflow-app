@@ -31,13 +31,13 @@ El pipeline completo del producto:
 ```txt
 Project (Brand Profile)
 ↓
-Research                  (Planned — TASK-023)
+Research                  (Implemented — TASK-023)
 ↓
 Content Analyzer          (Planned — TASK-024)
 ↓
 Generator                 (Implemented — Pinterest)
 ↓
-Editorial Review          (Planned — TASK-020)
+Editorial Review          (Implemented — TASK-020)
 ↓
 Image Generation          (Implemented)
 ↓
@@ -230,20 +230,30 @@ Project Memory / Knowledge Base (futuro)
 
 ---
 
-# Research Layer (Planned — TASK-023)
+# Research Layer (Implemented — TASK-023)
 
-OmniFlow evolucionará hacia una plataforma capaz de investigar contenido antes de generarlo.
+`lib/research/` — provider-agnostic content-acquisition layer, mirrors the structure of `lib/ai/`:
 
-Research soportará:
+```txt
+lib/research/
+  types.ts                    ResearchSourceType, ResearchOutput
+  engine.ts                   runResearch() — the only entry point routes call
+  providers/
+    firecrawl.ts               scrapeUrl(), searchWeb() — raw fetch, no SDK dependency
+```
 
-* Keyword Research
-* Website Research
-* Blog URL Research
-* Pinterest URL Research
+Research supports four source types, stored in `research_results` (see DATABASE.md):
 
-El motor de adquisición de contenido podrá utilizar proveedores como Firecrawl. La arquitectura no estará acoplada exclusivamente a un proveedor — debe permanecer abierta para futuros proveedores de investigación.
+* Keyword Research — `searchWeb()`, aggregates top 3 Firecrawl `/search` result snippets
+* Website Research — `scrapeUrl()`, full page markdown via Firecrawl `/scrape`
+* Blog URL Research — same as Website Research (mechanically identical, distinguished only by label for the user)
+* Pinterest URL Research — same as Website Research
 
-Futuras fuentes de entrada:
+`runResearch()` is the only entry point the `/api/research` route calls — Firecrawl can be swapped or supplemented by other providers later without touching route code, matching the AI Engine's provider-swappable philosophy.
+
+**Not yet wired into generation**: research content is acquired, stored, and previewed on the `/research` page, but not injected into the Pinterest generation prompt. That requires normalization (theme, tone, audience, structured summary) — TASK-024 (Content Analyzer)'s job. The only bridge today is a UI convenience: "Continue to Generate" carries a suggested keyword (and, for URL sources, the source URL) into the Pinterest Generator form via query params.
+
+Future input sources (not MVP):
 
 ```txt
 PDF, Markdown, RSS, YouTube
@@ -330,7 +340,7 @@ Note: Credits validation is planned (TASK-011) but not yet implemented. Generati
 El módulo Pinterest evolucionará para implementar el pipeline completo:
 
 ```txt
-Research             (Planned — TASK-023)
+Research             (Implemented — TASK-023)
 ↓
 Generate             (Implemented)
 ↓
@@ -453,6 +463,7 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 ```
 /dashboard
 /projects
+/research
 /pinterest
 /boards
 /history
@@ -470,6 +481,10 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 /boards
   route.ts
 /boards/[id]
+  route.ts
+/research
+  route.ts
+/research/[id]
   route.ts
 /pinterest/generate
   route.ts
@@ -503,6 +518,14 @@ services/image.ts               — IMAGE role resolution
 prompt-engine/engine.ts         — buildImagePrompt(pinterestPackage, version)
 prompt-engine/presets.ts        — quality directives, negative constraints, variation directive
 prompt-engine/templates/photography-styles.ts — style inference by category
+```
+
+/research
+
+```
+types.ts                        — ResearchSourceType, ResearchOutput
+engine.ts                       — facade: runResearch()
+providers/firecrawl.ts          — scrapeUrl(), searchWeb()
 ```
 
 /prompts

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, pinsRequested, board } = parsed.data;
+  const { projectId, keyword, language, pinsRequested, board, websiteUrl, pinterestUrl } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -89,6 +89,8 @@ export async function POST(request: Request) {
       keyword,
       language,
       pins_requested: pinsRequested,
+      website_url: websiteUrl ?? null,
+      pinterest_url: pinterestUrl ?? null,
       model_used: model,
       credits_used: 0,
       status: 'processing',

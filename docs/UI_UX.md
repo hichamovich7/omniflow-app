@@ -54,6 +54,8 @@ Dashboard
 
 Projects
 
+Research
+
 Pinterest Generator
 
 Boards
@@ -175,6 +177,62 @@ Table:
 
 ---
 
+# Research
+
+Route:
+
+```txt
+/research
+```
+
+Purpose:
+
+Research a topic from a keyword, website, blog, or Pinterest URL before generating pins, using Firecrawl. Step 1 of the product pipeline (Research → Generate → ...).
+
+---
+
+## Research Form
+
+Fields:
+
+* Project (select)
+* Source (select: Keyword, Website URL, Blog URL, Pinterest URL)
+* Input (single text field, label/placeholder changes with Source — keyword text for Keyword, URL for the others)
+
+Action:
+
+* Research button — calls Firecrawl, shows a preview panel below the form (title + content, scrollable)
+
+---
+
+## Research Preview
+
+Shown after a successful Research call:
+
+* Title (page title for scraped sources, the keyword itself for Keyword source)
+* Source URL (scraped sources only)
+* Content preview (scrollable box)
+* "Continue to Generate" button — navigates to the Pinterest Generator with a suggested keyword (and, for URL sources, the source URL) pre-filled
+
+Note: content here is not yet fed into AI generation — that requires the Content Analyzer (TASK-024, planned). Continue to Generate is a convenience handoff, not an AI context change.
+
+---
+
+## Research History
+
+List of past research results for the selected project, below the form:
+
+* Source-type badge
+* Input, title, relative date
+* Delete action (hover-reveal)
+
+Empty states:
+
+* No projects yet → prompt to create a project first (research belongs to a project)
+* Has projects, no research yet → simple empty message
+
+---
+
 # Pinterest Generator
 
 Route:
@@ -183,7 +241,7 @@ Route:
 /pinterest
 ```
 
-Main feature of the application.
+Main feature of the application. Can be reached directly, or via "Continue to Generate" from the Research page (pre-fills Keyword, Project, and — for URL sources — a hidden Website/Pinterest URL carried through for provenance on the generation record; no visible field for it).
 
 ---
 

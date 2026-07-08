@@ -97,6 +97,29 @@ export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at' | 'board_id
   board_id?: string | null;
 };
 
+export type ResearchSourceType = 'keyword' | 'website' | 'blog' | 'pinterest';
+export type ResearchStatus = 'completed' | 'failed';
+
+export interface ResearchResult {
+  id: string;
+  project_id: string;
+  user_id: string;
+  source_type: ResearchSourceType;
+  input: string;
+  title: string | null;
+  content: string;
+  source_url: string | null;
+  status: ResearchStatus;
+  error_message: string | null;
+  created_at: string;
+}
+
+export type ResearchResultInsert = Omit<ResearchResult, 'id' | 'created_at' | 'status' | 'error_message'> & {
+  id?: string;
+  status?: ResearchStatus;
+  error_message?: string | null;
+};
+
 export interface PinImage {
   id: string;
   pin_id: string;

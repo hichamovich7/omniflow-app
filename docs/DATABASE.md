@@ -135,9 +135,9 @@ Represents one Pinterest generation request.
 | keyword             | text                  | Main keyword                              |
 | language            | text                  | Validated in application layer             |
 | pins_requested      | integer               | CHECK > 0. Validated in application layer  |
-| website_url         | text nullable         |                                           |
-| pinterest_url       | text nullable         |                                           |
-| reference_image_url | text nullable         | Supabase Storage URL                      |
+| website_url         | text nullable         | Set when carried over from a Research result (TASK-023); provenance only, not used in the AI prompt |
+| pinterest_url       | text nullable         | Set when carried over from a Research result (TASK-023); provenance only, not used in the AI prompt |
+| reference_image_url | text nullable         | Supabase Storage URL. Not yet populated — deferred to TASK-013 (Image Analysis) |
 | model_used          | text                  | Validated in application layer            |
 | credits_used        | integer               | Credits consumed                          |
 | status              | text                  | pending / processing / completed / failed |
@@ -251,6 +251,46 @@ user_id = auth.uid()
 (project_id, name) UNIQUE
 (project_id)
 ```
+
+---
+
+# research_results
+
+Stores Firecrawl-acquired research content (TASK-023) — keyword web search, or scraped website/blog/Pinterest URLs. Write-once records, scoped per project. Preview-only: content here is not yet fed into the AI generation prompt (that normalization step is TASK-024, Content Analyzer). A "Continue to Generate" action on the Research page carries a suggested keyword (and, for URL sources, the source URL) into the Pinterest Generator form.
+
+## Columns
+
+| Column        | Type                    | Description                                       |
+| ------------- | ----------------------- | -------------------------------------------------- |
+| id            | uuid PK                 |                                                     |
+| project_id    | uuid FK → projects.id   | ON DELETE CASCADE                                  |
+| user_id       | uuid FK → profiles.id   | ON DELETE CASCADE                                  |
+| source_type   | text                    | `keyword` \| `website` \| `blog` \| `pinterest`    |
+| input         | text                    | The keyword or URL submitted                       |
+| title         | text nullable           | Page title (scrape) or the keyword itself (search) |
+| content       | text                    | Markdown content or aggregated search snippets, capped at ~12,000 chars |
+| source_url    | text nullable           | Resolved URL for scrape sources; null for keyword search |
+| status        | text                    | `completed` \| `failed`                            |
+| error_message | text nullable           | Set when `status = 'failed'`                       |
+| created_at    | timestamptz             |                                                     |
+
+## Purpose
+
+Lets a user research a topic from multiple sources before generating pins. Uses `lib/research/engine.ts` (`runResearch()`) — a provider-agnostic entry point currently backed by Firecrawl (`lib/research/providers/firecrawl.ts`), matching the same provider-swappable philosophy as the AI Engine (`lib/ai/`).
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+## Indexes
+
+```sql
+(project_id)
+```
+
+No `updated_at`/trigger — results are immutable once created, like `pins`.
 
 ---
 

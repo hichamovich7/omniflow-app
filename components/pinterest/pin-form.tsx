@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, Sparkles } from 'lucide-react';
 import { generatePinsSchema } from '@/lib/validations/pinterest';
@@ -37,10 +37,18 @@ interface PinFormProps {
 
 export function PinForm({ projects, boards }: PinFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
 
-  const [projectId, setProjectId] = useState(defaultProject?.id ?? '');
-  const [keyword, setKeyword] = useState('');
+  // Carried over from a Research result (Continue to Generate) — invisible passthrough,
+  // not editable fields, just recorded on the generation for provenance.
+  const websiteUrl = searchParams.get('websiteUrl') ?? undefined;
+  const pinterestUrl = searchParams.get('pinterestUrl') ?? undefined;
+
+  const [projectId, setProjectId] = useState(
+    searchParams.get('projectId') ?? defaultProject?.id ?? ''
+  );
+  const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
   const [board, setBoard] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
@@ -59,6 +67,8 @@ export function PinForm({ projects, boards }: PinFormProps) {
       language,
       pinsRequested,
       board: board.trim() || undefined,
+      websiteUrl,
+      pinterestUrl,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);

@@ -18,12 +18,39 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+No planned changes.
+
+---
+
+# [1.7.0] - 2026-07-09
+
+## TASK-023: Content Research & Input Sources
+
+### Added
+
+* New `lib/research/` provider-agnostic layer (`runResearch()`, Firecrawl provider) — same philosophy as `lib/ai/`, swappable without touching route code
+* New `research_results` table (migration 008): keyword/website/blog/Pinterest URL research, scoped per project, immutable
+* New `/research` page: research form, content preview, per-project research history with delete
+* `POST /api/research`, `DELETE /api/research/[id]`
+* "Continue to Generate" bridges Research → Pinterest Generator (suggested keyword + source URL via query params); `generations.website_url`/`pinterest_url` (previously unused columns) now populated for provenance
+* Sidebar: "Research" added to the Generators group
+
+Deliberately out of scope: scraped content is not yet fed into the AI generation prompt (TASK-024, Content Analyzer, will normalize research before generators consume it). Image Upload input source remains deferred to TASK-013.
+
 ## Pinterest Generator: manual board selection
 
 ### Added
 
 * Optional `board` field on the Pinterest Generator form (combobox — pick an existing board for the selected project or type a new one). When set, it overrides the AI's per-pin board suggestion for the whole batch; when left blank, behavior is unchanged (AI suggests per pin, auto-linked via `findOrCreateBoardIds`).
 * `POST /api/pinterest/generate` accepts an optional `board` field.
+
+Follow-up to TASK-025 (Pinterest Boards Management) — no schema change.
+
+## History: Board filter
+
+### Added
+
+* Board filter on the History page, scoped to the selected Project (changing Project clears the Board filter). Filters generations by matching `pins.board_id` for the chosen board, since a board isn't directly linked to a generation.
 
 Follow-up to TASK-025 (Pinterest Boards Management) — no schema change.
 

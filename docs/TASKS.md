@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-025 are completed.
+All tasks through TASK-025 are completed. TASK-023 also completed (out of order — Firecrawl was set up first, making it the natural next step).
 
 ---
 
@@ -64,52 +64,7 @@ TASK-022 completed — see Completed Tasks below.
 
 ## FASE 2 — Intelligent Content Research
 
-### [TASK-023] Content Research & Input Sources
-
-#### Status: PLANNED
-
-#### Goal
-
-Convertir OmniFlow en una herramienta de investigación además de generación.
-
-Firecrawl será utilizado como motor de adquisición de contenido.
-
-API prevista: https://www.firecrawl.dev/
-
-#### MVP Research
-
-```txt
-Keyword Research
-Website Research
-Blog URL Research
-Pinterest URL Research
-```
-
-#### MVP Input Sources
-
-```txt
-Keyword
-Image Upload
-Blog URL
-```
-
-#### Future Input Sources
-
-```txt
-PDF
-Markdown
-RSS
-YouTube
-Product URL
-Shopify
-Amazon
-```
-
-#### Success Criteria
-
-Usuario puede investigar contenido desde múltiples fuentes antes de generar.
-
----
+TASK-023 completed — see Completed Tasks below.
 
 ### [TASK-024] Content Analyzer
 
@@ -347,6 +302,20 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-023] Content Research & Input Sources — 2026-07-09
+
+* New provider-agnostic `lib/research/` layer (mirrors `lib/ai/`): `engine.ts` (`runResearch()`), `providers/firecrawl.ts` (`scrapeUrl()`, `searchWeb()`) — raw `fetch`, no SDK dependency, response shapes verified against the live Firecrawl API before implementation
+* New `research_results` table (migration 008): stores keyword/website/blog/Pinterest URL research, scoped per project, write-once (no `updated_at`)
+* New `/research` page: Project + Source Type + Input form, preview panel after a successful call, research history list per project, delete action
+* `POST /api/research`, `DELETE /api/research/[id]` (no PATCH — results are immutable)
+* "Continue to Generate" bridges Research → Pinterest Generator: carries a suggested keyword (and, for URL sources, the source URL) via query params — `PinForm` reads `keyword`/`projectId`/`websiteUrl`/`pinterestUrl` from `useSearchParams()` on mount
+* `generations.website_url`/`pinterest_url` (existing unused columns from migration 001) now populated when carried over from Research — provenance only, zero AI prompt change
+* Sidebar: "Research" added to the Generators group, above Pinterest — kept as a flat `/research` route (not nested under `/pinterest/...`) to avoid a real active-link collision (`pathname.startsWith('/pinterest/')` would double-highlight both items)
+* Scope boundary (deliberate): scraped/researched content is acquired, stored, and previewed only — not injected into the Pinterest generation prompt. That normalization is TASK-024 (Content Analyzer)'s job; building throwaway prompt-injection now would just get replaced
+* Image Upload input source and PDF/Markdown/RSS/YouTube/Product URL/Shopify/Amazon remain out of scope (TASK-013 deferred separately; explicitly "Future Input Sources")
+
+---
 
 ## [TASK-025] Pinterest Boards Management — 2026-07-08
 
