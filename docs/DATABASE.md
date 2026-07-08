@@ -29,8 +29,10 @@ auth.users
   └── generations
 
         └── pins
-
+              │
               └── pin_images
+
+  └── boards (pins.board_id references this, nullable)
 ```
 
 └── credit_transactions
@@ -179,7 +181,8 @@ Stores generated Pinterest pins.
 | title          | text                     | Max 100 chars              |
 | description    | text                     | Max 500 chars              |
 | keywords       | text                     | Comma separated keywords   |
-| board          | text                     | Suggested board            |
+| board          | text                     | Suggested board (AI free text, denormalized) |
+| board_id       | uuid nullable FK → boards.id | Real board entity, auto-linked at generation time (TASK-025). ON DELETE SET NULL |
 | image_prompt   | text                     | Prompt for image generation |
 | image_analysis | text nullable            | Vision analysis            |
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
@@ -210,6 +213,43 @@ Inherited through generation ownership.
 (generation_id)
 (language)
 (created_at DESC)
+(board_id)
+```
+
+---
+
+# boards
+
+Real Pinterest board entities (TASK-025). `pins.board` remains a free-text field (AI-suggested name, used for CSV/display); `pins.board_id` links to the real entity when one is matched or created.
+
+## Columns
+
+| Column     | Type                    | Description        |
+| ---------- | ----------------------- | ------------------- |
+| id         | uuid PK                 |                     |
+| project_id | uuid FK → projects.id   | ON DELETE CASCADE   |
+| user_id    | uuid FK → profiles.id   | ON DELETE CASCADE   |
+| name       | text                    | Board name          |
+| created_at | timestamptz             |                     |
+| updated_at | timestamptz             |                     |
+
+## Purpose
+
+Organizes pins into persistent, manageable Pinterest boards, scoped per project (a project represents one niche/blog, matching how a real Pinterest account organizes boards).
+
+At generation time, each pin's AI-suggested `board` name is matched case-insensitively against existing boards for the project; unmatched names create a new board automatically (see `lib/queries/boards.ts` `findOrCreateBoardIds()`). No pre-existing pins are backfilled — only pins generated after this table's migration get `board_id` set.
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+## Indexes
+
+```sql
+(project_id, name) UNIQUE
+(project_id)
 ```
 
 ---

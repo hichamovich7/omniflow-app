@@ -43,6 +43,19 @@ export interface Generation {
   updated_at: string;
 }
 
+export interface Board {
+  id: string;
+  project_id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BoardInsert = Omit<Board, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string;
+};
+
 export interface Pin {
   id: string;
   generation_id: string;
@@ -51,6 +64,7 @@ export interface Pin {
   description: string;
   keywords: string;
   board: string;
+  board_id: string | null;
   image_prompt: string;
   image_analysis: string | null;
   media_url: string | null;
@@ -78,8 +92,9 @@ export type GenerationInsert = Omit<Generation, 'id' | 'created_at' | 'updated_a
   error_message?: string | null;
 };
 
-export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at'> & {
+export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at' | 'board_id'> & {
   id?: string;
+  board_id?: string | null;
 };
 
 export interface PinImage {

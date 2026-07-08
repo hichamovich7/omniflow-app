@@ -15,6 +15,7 @@ export default function HistoryLoading() {
         <Skeleton className="h-9 w-32" />
         <Skeleton className="h-9 w-32" />
         <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-9 w-32" />
       </div>
 
       <TableSkeleton rows={6} />

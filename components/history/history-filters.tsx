@@ -18,17 +18,28 @@ interface ProjectOption {
   name: string;
 }
 
+interface BoardOption {
+  id: string;
+  name: string;
+  project_id: string;
+}
+
 interface HistoryFiltersProps {
   projects: ProjectOption[];
+  boards: BoardOption[];
 }
 
 const STATUS_OPTIONS = ['completed', 'processing', 'failed', 'pending'] as const;
 
-export function HistoryFilters({ projects }: HistoryFiltersProps) {
+export function HistoryFilters({ projects, boards }: HistoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [keyword, setKeyword] = useState(searchParams.get('q') ?? '');
+  const selectedProject = searchParams.get('project');
+  const boardOptions = selectedProject
+    ? boards.filter((b) => b.project_id === selectedProject)
+    : boards;
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -51,6 +62,17 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
     router.replace(`/history?${params.toString()}`);
   }
 
+  function handleProjectChange(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value && value !== 'all') {
+      params.set('project', value);
+    } else {
+      params.delete('project');
+    }
+    params.delete('board');
+    router.replace(`/history?${params.toString()}`);
+  }
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <div className="relative flex-1 sm:max-w-xs">
@@ -66,7 +88,7 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
       <div className="flex gap-2">
         <Select
           value={searchParams.get('project') ?? 'all'}
-          onValueChange={(v) => v && updateParam('project', v)}
+          onValueChange={(v) => v && handleProjectChange(v)}
         >
           <SelectTrigger className="h-9 w-36 text-sm">
             <span className="truncate">
@@ -80,6 +102,27 @@ export function HistoryFilters({ projects }: HistoryFiltersProps) {
             {projects.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={searchParams.get('board') ?? 'all'}
+          onValueChange={(v) => v && updateParam('board', v)}
+        >
+          <SelectTrigger className="h-9 w-36 text-sm">
+            <span className="truncate">
+              {searchParams.get('board')
+                ? boardOptions.find((b) => b.id === searchParams.get('board'))?.name ?? 'Board'
+                : 'Board'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Boards</SelectItem>
+            {boardOptions.map((b) => (
+              <SelectItem key={b.id} value={b.id}>
+                {b.name}
               </SelectItem>
             ))}
           </SelectContent>

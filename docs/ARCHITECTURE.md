@@ -300,6 +300,7 @@ Pinterest es el primer módulo funcional. Cubre:
 
 * Content generation (titles, descriptions, keywords, boards, image prompts)
 * AI image generation (gpt-image-1)
+* Boards Management (real `boards` entities, auto-linked at generation time — TASK-025)
 * Scheduling (spread by days / spread by hours)
 * CSV export (Pinterest Bulk Upload format)
 * History with filters
@@ -333,13 +334,13 @@ Research             (Planned — TASK-023)
 ↓
 Generate             (Implemented)
 ↓
-Editorial Review     (Planned — TASK-020)
+Editorial Review     (Implemented — TASK-020)
 ↓
 Image Generation     (Implemented)
 ↓
-Image Versioning     (Planned — TASK-021)
+Image Versioning     (Implemented — TASK-021)
 ↓
-Boards Management    (Planned — TASK-025)
+Boards Management    (Implemented — TASK-025)
 ↓
 Scheduling           (Implemented)
 ↓
@@ -453,6 +454,7 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 /dashboard
 /projects
 /pinterest
+/boards
 /history
 /credits
 /settings
@@ -464,6 +466,10 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 /projects
   route.ts
 /projects/[id]
+  route.ts
+/boards
+  route.ts
+/boards/[id]
   route.ts
 /pinterest/generate
   route.ts
@@ -480,6 +486,8 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 ```
 
 /lib
+
+brand-profile.ts — buildBrandProfileContext(), Core Platform helper for AI context (TASK-022)
 
 /ai
 
@@ -519,12 +527,14 @@ middleware.ts      — auth middleware
 project.ts
 pinterest.ts
 schedule.ts
+board.ts
 ```
 
 /queries
 
 ```
 generations.ts     — shared generation queries
+boards.ts          — getBoardWithPins(), findOrCreateBoardIds()
 ```
 
 /csv
@@ -576,6 +586,14 @@ pin-table.tsx
 generate-images-button.tsx
 export-csv-button.tsx
 schedule-dialog.tsx
+```
+
+/boards
+
+```
+board-form.tsx
+board-actions.tsx
+delete-board-dialog.tsx
 ```
 
 /history

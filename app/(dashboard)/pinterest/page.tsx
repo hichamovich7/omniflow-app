@@ -13,6 +13,11 @@ export default async function PinterestPage() {
     .select('id, name, is_default')
     .order('created_at', { ascending: false });
 
+  const { data: boards } = await supabase
+    .from('boards')
+    .select('id, name, project_id')
+    .order('name', { ascending: true });
+
   const list = projects ?? [];
 
   return (
@@ -29,7 +34,7 @@ export default async function PinterestPage() {
           </Link>
         </EmptyState>
       ) : (
-        <PinForm projects={list} />
+        <PinForm projects={list} boards={boards ?? []} />
       )}
     </PageContainer>
   );

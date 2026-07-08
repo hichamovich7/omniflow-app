@@ -21,6 +21,11 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     .select('id, name')
     .order('name');
 
+  const { data: boards } = await supabase
+    .from('boards')
+    .select('id, name, project_id')
+    .order('name', { ascending: true });
+
   let query = supabase
     .from('generations')
     .select('id, keyword, language, pins_requested, status, created_at, projects(name)')
@@ -38,16 +43,24 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   if (params.status) {
     query = query.eq('status', params.status);
   }
+  if (params.board) {
+    const { data: pinRows } = await supabase
+      .from('pins')
+      .select('generation_id')
+      .eq('board_id', params.board);
+    const generationIds = Array.from(new Set((pinRows ?? []).map((p) => p.generation_id)));
+    query = query.in('id', generationIds.length > 0 ? generationIds : ['00000000-0000-0000-0000-000000000000']);
+  }
 
   const { data: generations } = await query;
   const list = generations ?? [];
-  const hasFilters = !!(params.q || params.project || params.language || params.status);
+  const hasFilters = !!(params.q || params.project || params.language || params.status || params.board);
 
   return (
     <PageContainer>
       <PageHeader title="History" description="Browse your past generations" />
 
-      <HistoryFilters projects={projects ?? []} />
+      <HistoryFilters projects={projects ?? []} boards={boards ?? []} />
 
       {list.length === 0 ? (
         <EmptyState

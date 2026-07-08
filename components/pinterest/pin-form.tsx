@@ -24,26 +24,42 @@ interface ProjectOption {
   is_default: boolean;
 }
 
-interface PinFormProps {
-  projects: ProjectOption[];
+interface BoardOption {
+  id: string;
+  name: string;
+  project_id: string;
 }
 
-export function PinForm({ projects }: PinFormProps) {
+interface PinFormProps {
+  projects: ProjectOption[];
+  boards: BoardOption[];
+}
+
+export function PinForm({ projects, boards }: PinFormProps) {
   const router = useRouter();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
 
   const [projectId, setProjectId] = useState(defaultProject?.id ?? '');
   const [keyword, setKeyword] = useState('');
+  const [board, setBoard] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const boardOptions = boards.filter((b) => b.project_id === projectId);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const parsed = generatePinsSchema.safeParse({ projectId, keyword, language, pinsRequested });
+    const parsed = generatePinsSchema.safeParse({
+      projectId,
+      keyword,
+      language,
+      pinsRequested,
+      board: board.trim() || undefined,
+    });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
       return;
@@ -103,6 +119,27 @@ export function PinForm({ projects }: PinFormProps) {
             disabled={loading}
             className="h-12 text-sm placeholder:text-muted-foreground/40"
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
+            Board (optional)
+          </Label>
+          <Input
+            id="board"
+            list="board-options"
+            placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
+            value={board}
+            onChange={(e) => setBoard(e.target.value)}
+            maxLength={100}
+            disabled={loading}
+            className="h-12 text-sm placeholder:text-muted-foreground/40"
+          />
+          <datalist id="board-options">
+            {boardOptions.map((b) => (
+              <option key={b.id} value={b.name} />
+            ))}
+          </datalist>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_auto] gap-4">

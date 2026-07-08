@@ -56,6 +56,8 @@ Projects
 
 Pinterest Generator
 
+Boards
+
 History
 
 Credits
@@ -233,6 +235,24 @@ Required:
 ```txt
 Yes
 ```
+
+---
+
+### Board
+
+Type:
+
+```txt
+Text Input (combobox — suggests existing boards for the selected project, or type a new name)
+```
+
+Required:
+
+```txt
+No
+```
+
+When left blank, the AI suggests a board per pin (auto-linked as before). When filled, every generated pin is assigned to that one board.
 
 ---
 
@@ -439,6 +459,69 @@ Downloads Pinterest-compatible CSV.
 
 ---
 
+# Boards
+
+Route:
+
+```txt
+/boards
+```
+
+Purpose:
+
+Manage Pinterest boards as real entities. Boards are created automatically when a generation's suggested board name doesn't match an existing one, or manually via "New Board".
+
+---
+
+## Boards List
+
+Card grid, one card per board:
+
+* Name
+* Project
+* Pin count
+* Actions (Edit, Delete)
+
+Empty states:
+
+* No projects yet → prompt to create a project first (a board must belong to a project)
+* Has projects, no boards yet → prompt to create a board manually (boards are otherwise created automatically during generation)
+
+---
+
+## Board Detail
+
+Route:
+
+```txt
+/boards/[id]
+```
+
+Shows:
+
+* Board name, project, pin count
+* Export CSV (this board's pins only)
+* Edit / Delete actions
+* Pin grid (image, title, description) — read-only, no selection or regeneration since pins here may span multiple generations
+
+---
+
+## New / Edit Board
+
+Route:
+
+```txt
+/boards/new
+/boards/[id]/edit
+```
+
+Fields:
+
+* Project (select, create only — fixed after creation)
+* Name
+
+---
+
 # History
 
 Route:
@@ -456,6 +539,7 @@ Review previous generations.
 ## Filters
 
 * Project
+* Board (scoped to the selected project; changing Project clears the Board filter)
 * Language
 * Date Range
 
@@ -763,7 +847,6 @@ Generation workflow optimized for desktop.
 * WordPress Generator (TASK-028)
 * Platform-based navigation (TASK-026)
 * Content Research (TASK-023)
-* Boards Management (TASK-025)
 
 ## Not MVP
 

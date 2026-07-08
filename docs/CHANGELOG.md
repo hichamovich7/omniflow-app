@@ -18,7 +18,31 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
-No planned changes.
+## Pinterest Generator: manual board selection
+
+### Added
+
+* Optional `board` field on the Pinterest Generator form (combobox — pick an existing board for the selected project or type a new one). When set, it overrides the AI's per-pin board suggestion for the whole batch; when left blank, behavior is unchanged (AI suggests per pin, auto-linked via `findOrCreateBoardIds`).
+* `POST /api/pinterest/generate` accepts an optional `board` field.
+
+Follow-up to TASK-025 (Pinterest Boards Management) — no schema change.
+
+---
+
+# [1.6.0] - 2026-07-08
+
+## TASK-025: Pinterest Boards Management
+
+### Added
+
+* `boards` table (migration 007) — real Pinterest board entities, scoped per project
+* `pins.board_id` (nullable FK) — links a pin to its board; existing free-text `pins.board` untouched
+* Auto-linking at generation time (`findOrCreateBoardIds()`): AI-suggested board names are matched case-insensitively and turned into persistent boards automatically
+* `POST /api/boards`, `PATCH /api/boards/[id]`, `DELETE /api/boards/[id]`
+* `/boards`, `/boards/new`, `/boards/[id]`, `/boards/[id]/edit` pages — CRUD, per-board pin history, per-board CSV export
+* "Boards" nav item in the sidebar Library group
+
+No changes to History, PinTable, or the CSV builder.
 
 ---
 

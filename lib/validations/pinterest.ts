@@ -9,6 +9,7 @@ export const generatePinsSchema = z.object({
     (v): v is (typeof PINS_OPTIONS)[number] => (PINS_OPTIONS as readonly number[]).includes(v),
     { message: 'Invalid number of pins' }
   ),
+  board: z.string().trim().max(100, 'Board name is too long').optional(),
 });
 
 const pinResponseSchema = z.object({

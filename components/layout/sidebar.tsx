@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Sparkles,
   Clock,
+  LayoutGrid,
   Coins,
   Settings,
 } from 'lucide-react';
@@ -41,6 +42,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Library',
     items: [
+      { href: '/boards', label: 'Boards', icon: LayoutGrid },
       { href: '/history', label: 'History', icon: Clock },
     ],
   },

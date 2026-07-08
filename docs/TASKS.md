@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-021 are completed.
+All tasks through TASK-025 are completed.
 
 ---
 
@@ -145,27 +145,7 @@ Cualquier input source produce un análisis estructurado reutilizable por cualqu
 
 ---
 
-### [TASK-025] Pinterest Boards Management
-
-#### Status: PLANNED
-
-#### Goal
-
-Convertir los Boards en entidades reales.
-
-#### Features
-
-```txt
-CRUD Boards
-Organización por Boards
-Historial por Board
-Export por Board
-Base para automatización futura
-```
-
-#### Success Criteria
-
-Boards son entidades persistentes con contenido organizado y exportable.
+TASK-025 completed — see Completed Tasks below.
 
 ---
 
@@ -367,6 +347,18 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-025] Pinterest Boards Management — 2026-07-08
+
+* New `boards` table (migration 007): `id`, `project_id` (FK, boards belong to a project), `user_id`, `name`, timestamps. Unique `(project_id, name)`, RLS scoped to owner
+* New nullable `pins.board_id` FK (ON DELETE SET NULL) alongside the existing free-text `pins.board` (kept unchanged for CSV/display) — no backfill, only new pins get linked
+* Auto-linking at generation time: `lib/queries/boards.ts` `findOrCreateBoardIds()` matches AI-suggested board names case-insensitively against existing boards for the project and creates missing ones — pins are organized into real board entities with no manual step, wired into `POST /api/pinterest/generate`
+* CRUD: `POST /api/boards`, `PATCH /api/boards/[id]`, `DELETE /api/boards/[id]` (mirrors the Projects API pattern)
+* New UI: `/boards` (list), `/boards/new`, `/boards/[id]` (detail — pin history for that board + Export CSV scoped to it, reuses `ExportCsvButton`/`generatePinterestCsv` as-is), `/boards/[id]/edit`
+* Sidebar: "Boards" added to the Library group
+* Zero changes to History, PinTable, or the CSV builder
+
+---
 
 ## [TASK-022] Brand Profile & AI Context — 2026-07-08
 

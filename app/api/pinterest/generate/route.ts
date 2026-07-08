@@ -5,6 +5,7 @@ import { getRoleConfig } from '@/lib/ai/config';
 import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
+import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import type { ApiResponse } from '@/types/api';
 
 function classifyGenerationError(err: unknown): string {
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, pinsRequested } = parsed.data;
+  const { projectId, keyword, language, pinsRequested, board } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -141,13 +142,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const pinsToInsert = validated.data.pins.map((pin) => ({
+    const boardNames = board
+      ? validated.data.pins.map(() => board)
+      : validated.data.pins.map((pin) => pin.board);
+
+    const boardIdByName = await findOrCreateBoardIds(supabase, projectId, user.id, boardNames);
+
+    const pinsToInsert = validated.data.pins.map((pin, i) => ({
       generation_id: generation.id,
       language,
       title: pin.title,
       description: pin.description,
       keywords: pin.keywords,
-      board: pin.board,
+      board: boardNames[i],
+      board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
       image_prompt: pin.image_prompt,
     }));
 

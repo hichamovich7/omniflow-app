@@ -70,11 +70,14 @@ Creates one generation request and produces Pinterest content using AI.
   "keyword": "badezimmer inspiration schrank",
   "language": "de",
   "pinsRequested": 10,
+  "board": "Boho Bathroom Ideas",
   "websiteUrl": "https://example.com",
   "pinterestUrl": "",
   "referenceImageUrl": ""
 }
 ```
+
+`board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
 
 ## Response
 
@@ -397,6 +400,69 @@ All fields are optional. When is_default is true, the previous default project i
 Delete project.
 
 Only project owner can delete.
+
+---
+
+# POST /api/boards
+
+Create a board.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "name": "Boho Bathroom Ideas"
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "boardId": "uuid"
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_request
+invalid_project
+server_error (duplicate name within the same project)
+```
+
+---
+
+# GET /api/boards
+
+Status: NOT IMPLEMENTED. Board listing uses server-side Supabase queries directly, not an API route (same convention as Projects).
+
+---
+
+# PATCH /api/boards/[id]
+
+Rename a board.
+
+## Request
+
+```json
+{
+  "name": "Updated Board Name"
+}
+```
+
+---
+
+# DELETE /api/boards/[id]
+
+Delete a board.
+
+Pins previously assigned to this board are not deleted — `pins.board_id` is set to null (ON DELETE SET NULL). The free-text `pins.board` value is untouched.
 
 ---
 
