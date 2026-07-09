@@ -318,6 +318,16 @@ Cualquier componente nuevo o modificado debe verificarse contra estos estándare
 
 ---
 
+# User Documentation
+
+OmniFlow incluye una Guía in-app (`/guide`) dirigida al usuario final — distinta de `docs/*`, que es documentación para desarrolladores/Claude.
+
+Contenido en `lib/guide/content.ts`, organizado por funcionalidad (Projects, Research, Analyze, Generate, Editorial Review, AI Images, Boards, Scheduling, Export, History).
+
+Regla: toda funcionalidad visible para el usuario debe reflejarse en la Guía al momento de implementarse — no queda como tarea separada.
+
+---
+
 # Platform Roadmap
 
 El roadmap de OmniFlow sigue un modelo de expansión modular:

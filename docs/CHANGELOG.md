@@ -22,6 +22,20 @@ No planned changes.
 
 ---
 
+# [1.11.0] - 2026-07-09
+
+## User Guide
+
+### Added
+
+* New in-app Guide (`/guide`), added to the sidebar's Account group — one page, one card per feature (Projects, Research, Analyze, Generate, Editorial Review, AI Images, Boards, Scheduling, Export, History), with an anchor-link chip row for quick navigation
+* Content lives in `lib/guide/content.ts` (`guideSections`) — plain data, no markdown parser or CMS added
+* New standing rule in `CLAUDE.md` Documentation Discipline: any user-facing feature must update the Guide at the same time it ships, not as a follow-up task
+
+No API or database changes — static content page only.
+
+---
+
 # [1.10.1] - 2026-07-09
 
 ## TASK-FIX-002: History Pagination

@@ -67,6 +67,7 @@ Platforms (disabled — coming soon)
   Medium
 
 Account
+  Guide
   Credits
   Settings
 ```
@@ -627,6 +628,28 @@ Actions:
 
 * View
 * Export CSV Again
+
+---
+
+# Guide
+
+Route:
+
+```txt
+/guide
+```
+
+Purpose:
+
+User-facing documentation explaining how each shipped feature works — distinct from `docs/*` (developer-facing). Content lives in `lib/guide/content.ts` (`guideSections`).
+
+Layout:
+
+* Anchor chip row at the top — one per section, jumps to that section's card
+* One card per section: icon, title, one-line summary, bullet points
+* Static content, no data fetching — Server Component
+
+Must be updated whenever a user-facing feature ships (see CLAUDE.md Documentation Discipline).
 
 ---
 

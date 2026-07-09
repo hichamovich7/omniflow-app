@@ -234,6 +234,16 @@ UI → UI_UX.md
 Product → PROJECT.md
 ```
 
+Whenever a user-facing feature ships or changes:
+
+Update the in-app user Guide.
+
+```txt id="dg1a9k"
+lib/guide/content.ts
+```
+
+Add or update the relevant section (`guideSections` entry) so `/guide` always reflects what the product actually does. This is user-facing documentation, distinct from `docs/*` (which is for Claude/developers) — do not skip it just because `docs/UI_UX.md` was already updated.
+
 ---
 
 # Credit System Rules

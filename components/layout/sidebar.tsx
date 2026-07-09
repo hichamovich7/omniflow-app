@@ -15,6 +15,7 @@ import {
   ThumbsUp,
   Briefcase,
   PenSquare,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Account',
     items: [
+      { href: '/guide', label: 'Guide', icon: BookOpen },
       { href: '/credits', label: 'Credits', icon: Coins, disabled: true },
       { href: '/settings', label: 'Settings', icon: Settings, disabled: true },
     ],
