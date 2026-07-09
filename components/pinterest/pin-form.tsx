@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Sparkle } from 'lucide-react';
 import { generatePinsSchema } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, PINS_OPTIONS } from '@/types/pinterest';
 import type { SupportedLanguage, PinsOption } from '@/types/pinterest';
@@ -45,6 +45,10 @@ export function PinForm({ projects, boards }: PinFormProps) {
   const websiteUrl = searchParams.get('websiteUrl') ?? undefined;
   const pinterestUrl = searchParams.get('pinterestUrl') ?? undefined;
 
+  // Carried over from a Research result's Analyze step — unlike websiteUrl/pinterestUrl this
+  // actually changes AI output, so it's surfaced to the user (see indicator below).
+  const analysisId = searchParams.get('analysisId') ?? undefined;
+
   const [projectId, setProjectId] = useState(
     searchParams.get('projectId') ?? defaultProject?.id ?? ''
   );
@@ -69,6 +73,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
       board: board.trim() || undefined,
       websiteUrl,
       pinterestUrl,
+      analysisId,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
@@ -109,6 +114,13 @@ export function PinForm({ projects, boards }: PinFormProps) {
           Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts.
         </p>
       </div>
+
+      {analysisId && (
+        <div className="mb-5 flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2 text-xs font-medium text-primary">
+          <Sparkle className="h-3.5 w-3.5 shrink-0" />
+          Using content analysis from Research
+        </div>
+      )}
 
       {/* Form */}
       <form

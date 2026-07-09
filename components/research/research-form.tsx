@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Search, Trash2 } from 'lucide-react';
+import { Loader2, Search, Trash2, Sparkle } from 'lucide-react';
 import { createResearchSchema } from '@/lib/validations/research';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,9 +50,20 @@ interface ResearchFormProps {
 }
 
 interface Preview {
+  researchId: string;
   title: string | null;
   content: string;
   sourceUrl: string | null;
+}
+
+interface Analysis {
+  analysisId: string;
+  theme: string;
+  keywords: string;
+  audience: string;
+  tone: string;
+  category: string;
+  summary: string;
 }
 
 export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
@@ -65,6 +76,8 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ResearchResultRow | null>(null);
 
   const history = researchResults.filter((r) => r.project_id === projectId);
@@ -73,6 +86,7 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
     e.preventDefault();
     setError(null);
     setPreview(null);
+    setAnalysis(null);
 
     const parsed = createResearchSchema.safeParse({ projectId, sourceType, input });
     if (!parsed.success) {
@@ -104,6 +118,31 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
     router.refresh();
   }
 
+  async function handleAnalyze() {
+    if (!preview) return;
+    setAnalyzing(true);
+    setError(null);
+
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ researchResultId: preview.researchId }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || json.error) {
+      const message = json.error?.message ?? 'Analysis failed';
+      setError(message);
+      toast.error(message);
+      setAnalyzing(false);
+      return;
+    }
+
+    setAnalysis(json.data);
+    setAnalyzing(false);
+  }
+
   function handleContinue() {
     const params = new URLSearchParams({ projectId });
     const keyword = sourceType === 'keyword' ? input : (preview?.title ?? input).slice(0, 200);
@@ -115,6 +154,10 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
       } else if (sourceType === 'website' || sourceType === 'blog') {
         params.set('websiteUrl', preview.sourceUrl);
       }
+    }
+
+    if (analysis) {
+      params.set('analysisId', analysis.analysisId);
     }
 
     router.push(`/pinterest?${params.toString()}`);
@@ -216,6 +259,61 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
           <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
             {preview.content}
           </div>
+
+          {analysis ? (
+            <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                <Sparkle className="h-3.5 w-3.5" />
+                Content Analysis
+              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                <div>
+                  <dt className="text-muted-foreground">Theme</dt>
+                  <dd className="font-medium">{analysis.theme}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Category</dt>
+                  <dd className="font-medium">{analysis.category}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Audience</dt>
+                  <dd className="font-medium">{analysis.audience}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Tone</dt>
+                  <dd className="font-medium">{analysis.tone}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-muted-foreground">Keywords</dt>
+                  <dd className="font-medium">{analysis.keywords}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-muted-foreground">Summary</dt>
+                  <dd className="font-medium">{analysis.summary}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : (
+            <Button
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkle className="mr-2 h-4 w-4" />
+                  Analyze
+                </>
+              )}
+            </Button>
+          )}
+
           <Button onClick={handleContinue} className="w-full sm:w-auto">
             Continue to Generate
           </Button>

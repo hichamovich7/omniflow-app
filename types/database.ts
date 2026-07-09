@@ -120,6 +120,24 @@ export type ResearchResultInsert = Omit<ResearchResult, 'id' | 'created_at' | 's
   error_message?: string | null;
 };
 
+export interface ContentAnalysis {
+  id: string;
+  research_result_id: string;
+  project_id: string;
+  user_id: string;
+  theme: string;
+  keywords: string;
+  audience: string;
+  tone: string;
+  category: string;
+  summary: string;
+  created_at: string;
+}
+
+export type ContentAnalysisInsert = Omit<ContentAnalysis, 'id' | 'created_at'> & {
+  id?: string;
+};
+
 export interface PinImage {
   id: string;
   pin_id: string;

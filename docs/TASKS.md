@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-025 are completed. TASK-023 also completed (out of order — Firecrawl was set up first, making it the natural next step).
+All tasks through TASK-025 are completed. TASK-023 and TASK-024 also completed (TASK-023 out of order — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop).
 
 ---
 
@@ -66,37 +66,7 @@ TASK-022 completed — see Completed Tasks below.
 
 TASK-023 completed — see Completed Tasks below.
 
-### [TASK-024] Content Analyzer
-
-#### Status: PLANNED
-
-#### Goal
-
-Crear un pipeline común que normalice cualquier entrada antes de enviarla a los generadores.
-
-#### Depends On
-
-TASK-023 (Content Research & Input Sources)
-
-#### Responsibilities
-
-```txt
-Context Extraction
-Theme Detection
-Keywords
-Audience
-Tone
-Category
-Structured Summary
-```
-
-#### Note
-
-Toda entrada deberá pasar por este Analyzer.
-
-#### Success Criteria
-
-Cualquier input source produce un análisis estructurado reutilizable por cualquier generador.
+TASK-024 completed — see Completed Tasks below.
 
 ---
 
@@ -302,6 +272,19 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-024] Content Analyzer — 2026-07-09
+
+* New provider-agnostic `lib/analyzer/` layer (mirrors `lib/research/`/`lib/ai/`): `engine.ts` (`analyzeContent()`, calls the AI Engine's SMART role), `types.ts` (`AnalysisOutput`), `context.ts` (`buildAnalysisContext()`, pure function mirroring `lib/brand-profile.ts`)
+* New `content_analyses` table (migration 009): theme/keywords/audience/tone/category/summary per research result, unique `research_result_id` FK, write-once (no `updated_at`)
+* New `POST /api/analyze`: idempotent — returns the existing analysis for a `researchResultId` instead of re-running the AI; rejects research results that aren't owned by the caller or aren't `status: completed`
+* Research page: visible "Analyze" button appears after a successful research call; result panel (Theme, Category, Audience, Tone, Keywords, Summary) shown before "Continue to Generate" — analysis is opt-in and visible by design, not automatic
+* `analysisId` flows through query params exactly like the existing `websiteUrl`/`pinterestUrl` passthrough (Research page → `/pinterest?...` → `PinForm` → POST body)
+* `POST /api/pinterest/generate` accepts optional `analysisId`, fetches the `content_analyses` row (ownership-checked), and injects `buildAnalysisContext()` into the system prompt alongside Brand Profile — fully backward compatible, direct-keyword generation without Research/Analyze is unchanged
+* Pinterest Generator form shows a one-line indicator ("Using content analysis from Research") when `analysisId` is present — unlike the silent URL passthrough, this one changes AI output
+* Closes the scope boundary TASK-023 deliberately left open: research content now reaches AI generation through a structured, generator-agnostic analysis step, reusable by any future generator (e.g. WordPress, TASK-028) via the same `buildAnalysisContext()` helper
+
+---
 
 ## [TASK-023] Content Research & Input Sources — 2026-07-09
 

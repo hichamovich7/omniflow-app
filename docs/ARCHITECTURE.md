@@ -33,7 +33,7 @@ Project (Brand Profile)
 ↓
 Research                  (Implemented — TASK-023)
 ↓
-Content Analyzer          (Planned — TASK-024)
+Content Analyzer          (Implemented — TASK-024)
 ↓
 Generator                 (Implemented — Pinterest)
 ↓
@@ -251,7 +251,7 @@ Research supports four source types, stored in `research_results` (see DATABASE.
 
 `runResearch()` is the only entry point the `/api/research` route calls — Firecrawl can be swapped or supplemented by other providers later without touching route code, matching the AI Engine's provider-swappable philosophy.
 
-**Not yet wired into generation**: research content is acquired, stored, and previewed on the `/research` page, but not injected into the Pinterest generation prompt. That requires normalization (theme, tone, audience, structured summary) — TASK-024 (Content Analyzer)'s job. The only bridge today is a UI convenience: "Continue to Generate" carries a suggested keyword (and, for URL sources, the source URL) into the Pinterest Generator form via query params.
+Research content reaches generation through the Content Analyzer (see below): the Research page's "Analyze" step normalizes it into structured context, which "Continue to Generate" then carries forward alongside the suggested keyword and source URL via query params.
 
 Future input sources (not MVP):
 
@@ -262,21 +262,29 @@ Product URL, Shopify, Amazon
 
 ---
 
-# Content Analyzer (Planned — TASK-024)
+# Content Analyzer (Implemented — TASK-024)
 
-Cualquier entrada deberá pasar por un proceso común de análisis antes de llegar a los generadores.
+`lib/analyzer/` — provider-agnostic normalization layer, mirrors the structure of `lib/research/` and `lib/ai/`:
 
-Responsabilidades:
+```txt
+lib/analyzer/
+  types.ts                    AnalysisOutput
+  engine.ts                   analyzeContent() — the only entry point routes call
+  context.ts                  buildAnalysisContext() — pure fn, prompt-injectable string (mirrors lib/brand-profile.ts)
+```
 
-* Context Extraction
-* Theme Detection
+`analyzeContent()` calls the AI Engine's SMART role (`generateText()`) to extract, from a `research_results` row's title/content:
+
+* Theme
 * Keywords
 * Audience
 * Tone
 * Category
 * Structured Summary
 
-El Content Analyzer produce un análisis estructurado reutilizable por cualquier generador, independientemente de la plataforma destino.
+Results are stored in `content_analyses` (see DATABASE.md), one row per research result (`POST /api/analyze` is idempotent — re-analyzing returns the existing row). The Research page surfaces this as a visible "Analyze" step: the structured breakdown is shown to the user before they continue to a generator, rather than run silently.
+
+Reusable by any generator, independent of the target platform: `buildAnalysisContext()` takes an `AnalysisOutput` (or `null`) and returns a prompt-injectable string, the same pattern as `buildBrandProfileContext()`. Currently wired into `POST /api/pinterest/generate` via an optional `analysisId` — WordPress (TASK-028) and future generators will reuse the same helper without any change to `lib/analyzer/`.
 
 ---
 

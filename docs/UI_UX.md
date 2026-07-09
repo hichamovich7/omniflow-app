@@ -187,7 +187,7 @@ Route:
 
 Purpose:
 
-Research a topic from a keyword, website, blog, or Pinterest URL before generating pins, using Firecrawl. Step 1 of the product pipeline (Research → Generate → ...).
+Research a topic from a keyword, website, blog, or Pinterest URL before generating pins, using Firecrawl. Step 1 of the product pipeline (Research → Analyze → Generate → ...).
 
 ---
 
@@ -212,9 +212,10 @@ Shown after a successful Research call:
 * Title (page title for scraped sources, the keyword itself for Keyword source)
 * Source URL (scraped sources only)
 * Content preview (scrollable box)
-* "Continue to Generate" button — navigates to the Pinterest Generator with a suggested keyword (and, for URL sources, the source URL) pre-filled
+* "Analyze" button (outline style) — calls the Content Analyzer, replaces itself with a structured result panel (Theme, Category, Audience, Tone, Keywords, Summary) once done
+* "Continue to Generate" button — navigates to the Pinterest Generator with a suggested keyword (and, for URL sources, the source URL) pre-filled; if an analysis was run, its id is carried forward too
 
-Note: content here is not yet fed into AI generation — that requires the Content Analyzer (TASK-024, planned). Continue to Generate is a convenience handoff, not an AI context change.
+Analysis is opt-in and visible, not automatic: the user sees exactly what will be injected into AI generation before continuing (TASK-024). Skipping "Analyze" and clicking "Continue to Generate" directly still works — generation proceeds without analysis context, same as before TASK-024.
 
 ---
 
@@ -242,6 +243,8 @@ Route:
 ```
 
 Main feature of the application. Can be reached directly, or via "Continue to Generate" from the Research page (pre-fills Keyword, Project, and — for URL sources — a hidden Website/Pinterest URL carried through for provenance on the generation record; no visible field for it).
+
+If a content analysis was carried over from Research, a small indicator ("Using content analysis from Research") is shown above the form — unlike the hidden URL passthrough, this one changes AI output, so it stays visible (TASK-024).
 
 ---
 

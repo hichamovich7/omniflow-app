@@ -151,6 +151,66 @@ No se pueden modificar proyectos ajenos
 
 ---
 
+# Content Analyzer
+
+---
+
+## Analyze Button
+
+Verificar:
+
+```txt id="ca01an"
+Botón "Analyze" visible tras un Research exitoso
+Botón deshabilitado/spinner mientras se analiza
+Panel estructurado (Theme, Category, Audience, Tone, Keywords, Summary) se muestra al finalizar
+```
+
+---
+
+## Idempotency
+
+Verificar:
+
+```txt id="ca02id"
+Re-analizar el mismo research result devuelve el análisis existente sin re-llamar a la IA
+```
+
+---
+
+## Ownership & Status Guard
+
+Verificar:
+
+```txt id="ca03ow"
+researchResultId de otro usuario es rechazado (400), no filtrado
+research_results con status "failed" no puede analizarse
+```
+
+---
+
+## Generation Wiring
+
+Verificar:
+
+```txt id="ca04ge"
+"Continue to Generate" tras Analyze añade analysisId a la URL de /pinterest
+Indicador "Using content analysis from Research" visible en el formulario de Pinterest cuando aplica
+Pins generados reflejan el theme/audience/tone del análisis
+```
+
+---
+
+## Backward Compatibility
+
+Verificar:
+
+```txt id="ca05bc"
+Generación directa por keyword (sin Research/Analyze) sigue funcionando sin cambios
+analysisId ausente no rompe la generación
+```
+
+---
+
 # Pinterest Generator
 
 ---

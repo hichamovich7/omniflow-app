@@ -5,6 +5,7 @@ import { getRoleConfig } from '@/lib/ai/config';
 import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
+import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import type { ApiResponse } from '@/types/api';
 
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, pinsRequested, board, websiteUrl, pinterestUrl } = parsed.data;
+  const { projectId, keyword, language, pinsRequested, board, websiteUrl, pinterestUrl, analysisId } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -77,6 +78,25 @@ export async function POST(request: Request) {
       { data: null, error: { message: 'Project not found', code: 'invalid_project' } },
       { status: 400 }
     );
+  }
+
+  let analysisContext: string | null = null;
+
+  if (analysisId) {
+    const { data: analysis } = await supabase
+      .from('content_analyses')
+      .select('theme, keywords, audience, tone, category, summary')
+      .eq('id', analysisId)
+      .single();
+
+    if (!analysis) {
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: 'Content analysis not found', code: 'invalid_analysis' } },
+        { status: 400 }
+      );
+    }
+
+    analysisContext = buildAnalysisContext(analysis);
   }
 
   const model = getRoleConfig('FAST').model;
@@ -112,6 +132,7 @@ export async function POST(request: Request) {
       language,
       pinsRequested,
       brandProfile: buildBrandProfileContext(project.description),
+      analysisContext: analysisContext ?? undefined,
     });
 
     const content = await generateText({

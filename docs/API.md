@@ -72,13 +72,16 @@ Creates one generation request and produces Pinterest content using AI.
   "pinsRequested": 10,
   "board": "Boho Bathroom Ideas",
   "websiteUrl": "https://example.com",
-  "pinterestUrl": ""
+  "pinterestUrl": "",
+  "analysisId": "uuid"
 }
 ```
 
 `board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
 
-`websiteUrl`/`pinterestUrl` are optional (TASK-023). Normally carried over silently from a Research result via "Continue to Generate" — recorded on the generation for provenance only, not injected into the AI prompt (see TASK-024, Content Analyzer, for that wiring).
+`websiteUrl`/`pinterestUrl` are optional (TASK-023). Normally carried over silently from a Research result via "Continue to Generate" — recorded on the generation for provenance only, not injected into the AI prompt.
+
+`analysisId` is optional (TASK-024). When provided, it must reference a `content_analyses` row owned by the caller; its theme/audience/tone/category/summary are injected into the AI system prompt via `buildAnalysisContext()`, alongside Brand Profile. Carried over from a Research result's "Analyze" step, same query-param handoff as `websiteUrl`/`pinterestUrl`.
 
 `generations.reference_image_url` exists in the database schema but has no corresponding request field yet — deferred to TASK-013 (Image Analysis).
 
@@ -109,6 +112,7 @@ Amount depends on:
 unauthorized
 insufficient_credits
 invalid_language
+invalid_analysis
 generation_failed
 ```
 
@@ -532,6 +536,48 @@ Delete a research result. No PATCH — results are immutable once created.
 # GET /api/research
 
 Status: NOT IMPLEMENTED. Research history uses server-side Supabase queries directly, not an API route (same convention as Projects/Boards).
+
+---
+
+# POST /api/analyze
+
+Analyze a research result into a structured summary (theme, keywords, audience, tone, category, summary) — TASK-024.
+
+## Request
+
+```json
+{
+  "researchResultId": "uuid"
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "analysisId": "uuid",
+    "theme": "Small bathroom storage",
+    "keywords": "bathroom storage, small bathroom ideas, ...",
+    "audience": "Homeowners with small bathrooms looking for space-saving solutions",
+    "tone": "Practical, inspirational",
+    "category": "Home Organization",
+    "summary": "Covers space-saving storage solutions for small bathrooms..."
+  },
+  "error": null
+}
+```
+
+Idempotent: if a `content_analyses` row already exists for `researchResultId`, it's returned as-is without calling the AI again. The referenced research result must belong to the caller and have `status: "completed"`.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_request
+invalid_research_result
+analysis_failed
+```
 
 ---
 

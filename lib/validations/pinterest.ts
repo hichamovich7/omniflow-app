@@ -12,6 +12,7 @@ export const generatePinsSchema = z.object({
   board: z.string().trim().max(100, 'Board name is too long').optional(),
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),
   pinterestUrl: z.string().trim().url('Invalid Pinterest URL').optional(),
+  analysisId: z.string().uuid('Invalid analysis ID').optional(),
 });
 
 const pinResponseSchema = z.object({

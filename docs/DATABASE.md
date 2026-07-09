@@ -294,6 +294,46 @@ No `updated_at`/trigger — results are immutable once created, like `pins`.
 
 ---
 
+# content_analyses
+
+Stores the structured analysis of a `research_results` row (TASK-024) — theme, keywords, audience, tone, category, and a short summary. One analysis per research result (unique FK). Produced by `lib/analyzer/engine.ts` (`analyzeContent()`, SMART AI role) via `POST /api/analyze`, and consumed by generators as prompt context (`lib/analyzer/context.ts` `buildAnalysisContext()`) — currently wired into `POST /api/pinterest/generate` via an optional `analysisId`.
+
+## Columns
+
+| Column              | Type                          | Description                                  |
+| ------------------- | ----------------------------- | --------------------------------------------- |
+| id                  | uuid PK                       |                                               |
+| research_result_id  | uuid FK → research_results.id | UNIQUE, ON DELETE CASCADE                    |
+| project_id          | uuid FK → projects.id         | ON DELETE CASCADE                            |
+| user_id             | uuid FK → profiles.id         | ON DELETE CASCADE                            |
+| theme               | text                          | Core topic/theme in a short phrase           |
+| keywords            | text                          | Comma-separated, like `pins.keywords`        |
+| audience            | text                          | Target audience                              |
+| tone                | text                          | Tone/voice of the content                    |
+| category            | text                          | Best-fitting content category                |
+| summary             | text                          | 2-3 sentence structured summary              |
+| created_at          | timestamptz                   |                                               |
+
+## Purpose
+
+Normalizes raw research content into a structured, generator-agnostic context object before it reaches AI generation — the "Analyze" step of the `Research → Analyze → Generate` pipeline. `POST /api/analyze` is idempotent: re-analyzing the same `research_result_id` returns the existing row instead of calling the AI again.
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+## Indexes
+
+```sql
+(project_id)
+```
+
+No `updated_at`/trigger — immutable once created, like `research_results`.
+
+---
+
 # pin_images
 
 Stores image versions for each pin. Each pin can have multiple image versions; exactly one is marked as active.

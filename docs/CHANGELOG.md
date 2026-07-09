@@ -22,6 +22,24 @@ No planned changes.
 
 ---
 
+# [1.8.0] - 2026-07-09
+
+## TASK-024: Content Analyzer
+
+### Added
+
+* New `lib/analyzer/` provider-agnostic normalization layer (`analyzeContent()`, SMART AI role) — same philosophy as `lib/research/` and `lib/ai/`
+* New `content_analyses` table (migration 009): structured theme/keywords/audience/tone/category/summary per research result, immutable, one row per `research_result_id`
+* New `POST /api/analyze` — idempotent (returns the existing analysis on re-click instead of re-running the AI)
+* Research page: visible "Analyze" button + result panel after a successful research call, shown before "Continue to Generate"
+* `buildAnalysisContext()` (`lib/analyzer/context.ts`) injects the analysis into the AI system prompt, same pattern as Brand Profile — wired into `POST /api/pinterest/generate` via an optional `analysisId`
+* Pinterest Generator form shows a visible indicator when generation is using a carried-over analysis
+* Closes the `Research → Analyze → Generate` loop: research content now reaches AI generation, deliberately deferred by TASK-023
+
+Fully backward compatible: `analysisId` is optional everywhere — direct-keyword Pinterest generation without Research/Analyze is unchanged.
+
+---
+
 # [1.7.0] - 2026-07-09
 
 ## TASK-023: Content Research & Input Sources
