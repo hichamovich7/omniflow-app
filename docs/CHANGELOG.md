@@ -22,6 +22,23 @@ No planned changes.
 
 ---
 
+# [1.11.1] - 2026-07-09
+
+## TASK-FIX-003: Research Reliability & Pinterest URL Removal
+
+### Fixed
+
+* Research failures now show a specific, actionable error message (blocked / timeout / rate-limited / unsupported site / no content) instead of one generic string, persisted and displayed on the failed history row, with a Retry action
+* Firecrawl scrape calls now use `onlyMainContent`/`waitFor` for more reliable content extraction
+
+### Removed
+
+* "Pinterest URL" removed as a Research source — Firecrawl does not support scraping pinterest.com at all (confirmed via live testing, not fixable with scrape params). Historical Pinterest research results remain visible; new submissions are rejected server-side.
+
+No database migration — the `source_type` CHECK constraint is unchanged, only the app-level validation and UI selector changed.
+
+---
+
 # [1.11.0] - 2026-07-09
 
 ## User Guide

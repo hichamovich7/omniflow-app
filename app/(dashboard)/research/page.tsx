@@ -14,7 +14,7 @@ export default async function ResearchPage() {
     supabase.from('projects').select('id, name, is_default').order('created_at', { ascending: false }),
     supabase
       .from('research_results')
-      .select('id, project_id, source_type, input, title, status, created_at')
+      .select('id, project_id, source_type, input, title, status, error_message, created_at')
       .order('created_at', { ascending: false }),
   ]);
 

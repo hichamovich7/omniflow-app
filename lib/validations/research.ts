@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
-const RESEARCH_SOURCE_TYPES = ['keyword', 'website', 'blog', 'pinterest'] as const;
-const URL_SOURCE_TYPES = new Set(['website', 'blog', 'pinterest']);
+// 'pinterest' is intentionally excluded: Firecrawl does not support scraping
+// pinterest.com ("we do not support this site", 403, confirmed via live testing) —
+// every Pinterest URL research submitted was guaranteed to fail. Historical
+// 'pinterest' rows still exist and are still readable/displayable; only new
+// submissions are blocked here.
+const RESEARCH_SOURCE_TYPES = ['keyword', 'website', 'blog'] as const;
+const URL_SOURCE_TYPES = new Set(['website', 'blog']);
 
 export const createResearchSchema = z
   .object({

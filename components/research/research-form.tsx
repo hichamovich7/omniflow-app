@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Search, Trash2, Sparkle, CircleAlert } from 'lucide-react';
+import { Loader2, Search, Trash2, Sparkle, CircleAlert, RotateCcw } from 'lucide-react';
 import { createResearchSchema } from '@/lib/validations/research';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,12 @@ import { DeleteResearchDialog } from './delete-research-dialog';
 import { timeAgo } from '@/lib/utils/format-date';
 
 type SourceType = 'keyword' | 'website' | 'blog' | 'pinterest';
+// 'pinterest' is selectable in neither the form below nor createResearchSchema
+// (lib/validations/research.ts) — Firecrawl doesn't support scraping pinterest.com,
+// every submission failed. Kept in SOURCE_TYPE_CONFIG only so historical rows with
+// source_type = 'pinterest' still render a correct badge label.
+type SelectableSourceType = 'keyword' | 'website' | 'blog';
+const SELECTABLE_SOURCE_TYPES: SelectableSourceType[] = ['keyword', 'website', 'blog'];
 
 const SOURCE_TYPE_CONFIG: Record<SourceType, { label: string; placeholder: string }> = {
   keyword: { label: 'Keyword', placeholder: 'e.g. small bathroom storage ideas' },
@@ -41,6 +47,7 @@ interface ResearchResultRow {
   input: string;
   title: string | null;
   status: 'completed' | 'failed';
+  error_message: string | null;
   created_at: string;
 }
 
@@ -163,6 +170,16 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
     router.push(`/pinterest?${params.toString()}`);
   }
 
+  function handleRetry(row: ResearchResultRow) {
+    setProjectId(row.project_id);
+    setSourceType(row.source_type);
+    setInput(row.input);
+    setError(null);
+    setPreview(null);
+    setAnalysis(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   const config = SOURCE_TYPE_CONFIG[sourceType];
 
   return (
@@ -201,7 +218,7 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
                 <span className="truncate text-sm">{config.label}</span>
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(SOURCE_TYPE_CONFIG) as SourceType[]).map((type) => (
+                {SELECTABLE_SOURCE_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
                     {SOURCE_TYPE_CONFIG[type].label}
                   </SelectItem>
@@ -351,7 +368,20 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
                     <span>·</span>
                     <span>{timeAgo(r.created_at)}</span>
                   </div>
+                  {r.status === 'failed' && r.error_message && (
+                    <p className="mt-1 text-[11px] text-destructive">{r.error_message}</p>
+                  )}
                 </div>
+                {r.status === 'failed' && r.source_type !== 'pinterest' && (
+                  <button
+                    type="button"
+                    aria-label="Retry research"
+                    onClick={() => handleRetry(r)}
+                    className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label="Delete research result"

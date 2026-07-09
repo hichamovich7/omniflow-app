@@ -242,14 +242,15 @@ lib/research/
     firecrawl.ts               scrapeUrl(), searchWeb() — raw fetch, no SDK dependency
 ```
 
-Research supports four source types, stored in `research_results` (see DATABASE.md):
+Research supports three source types, stored in `research_results` (see DATABASE.md):
 
 * Keyword Research — `searchWeb()`, aggregates top 3 Firecrawl `/search` result snippets
-* Website Research — `scrapeUrl()`, full page markdown via Firecrawl `/scrape`
+* Website Research — `scrapeUrl()`, main-content markdown via Firecrawl `/scrape` (`onlyMainContent: true`, `waitFor: 3000`)
 * Blog URL Research — same as Website Research (mechanically identical, distinguished only by label for the user)
-* Pinterest URL Research — same as Website Research
 
-`runResearch()` is the only entry point the `/api/research` route calls — Firecrawl can be swapped or supplemented by other providers later without touching route code, matching the AI Engine's provider-swappable philosophy.
+Pinterest URL Research was removed from the selectable sources (TASK-FIX-003) — Firecrawl does not support scraping pinterest.com at all (403, "we do not support this site"), confirmed via live testing; no scrape parameters fix this. `research_results.source_type` still permits `pinterest` at the database level for historical rows, but `createResearchSchema` (`lib/validations/research.ts`) no longer accepts it for new submissions, and the Research Form no longer offers it.
+
+`runResearch()` is the only entry point the `/api/research` route calls — Firecrawl can be swapped or supplemented by other providers later without touching route code, matching the AI Engine's provider-swappable philosophy. Failures are classified (`classifyResearchError()` in `app/api/research/route.ts`) into specific, actionable messages instead of one generic string, and persisted to `research_results.error_message` — mirroring `classifyGenerationError()` in the Pinterest generate route.
 
 Research content reaches generation through the Content Analyzer (see below): the Research page's "Analyze" step normalizes it into structured context, which "Continue to Generate" then carries forward alongside the suggested keyword and source URL via query params.
 

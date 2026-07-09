@@ -475,7 +475,7 @@ Pins previously assigned to this board are not deleted — `pins.board_id` is se
 
 # POST /api/research
 
-Research a topic from a keyword, website, blog, or Pinterest URL using Firecrawl.
+Research a topic from a keyword, website, or blog using Firecrawl.
 
 ## Request
 
@@ -487,7 +487,9 @@ Research a topic from a keyword, website, blog, or Pinterest URL using Firecrawl
 }
 ```
 
-`sourceType` is one of `keyword`, `website`, `blog`, `pinterest`. `input` must be a valid URL when `sourceType` is `website`, `blog`, or `pinterest`; any non-empty string (max 500 chars) when `keyword`.
+`sourceType` is one of `keyword`, `website`, `blog`. `input` must be a valid URL when `sourceType` is `website` or `blog`; any non-empty string (max 500 chars) when `keyword`.
+
+`pinterest` is intentionally not accepted here — Firecrawl does not support scraping pinterest.com (confirmed via live testing: 403, "we do not support this site"), every submission failed. The `research_results.source_type` CHECK constraint still allows `pinterest` at the database level so historical rows remain valid and readable; only new submissions are rejected (`invalid_request`).
 
 ## Response
 

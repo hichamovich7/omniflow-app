@@ -192,7 +192,9 @@ Route:
 
 Purpose:
 
-Research a topic from a keyword, website, blog, or Pinterest URL before generating pins, using Firecrawl. Step 1 of the product pipeline (Research → Analyze → Generate → ...).
+Research a topic from a keyword, website, or blog before generating pins, using Firecrawl. Step 1 of the product pipeline (Research → Analyze → Generate → ...).
+
+Note: Pinterest URL is not offered as a Source — Firecrawl does not support scraping pinterest.com ("we do not support this site", confirmed via live testing), every submission failed. Historical research results with source type "Pinterest URL" may still exist and are displayed correctly (read-only), but the option is not selectable for new research.
 
 ---
 
@@ -201,7 +203,7 @@ Research a topic from a keyword, website, blog, or Pinterest URL before generati
 Fields:
 
 * Project (select)
-* Source (select: Keyword, Website URL, Blog URL, Pinterest URL)
+* Source (select: Keyword, Website URL, Blog URL)
 * Input (single text field, label/placeholder changes with Source — keyword text for Keyword, URL for the others)
 
 Action:
@@ -228,8 +230,9 @@ Analysis is opt-in and visible, not automatic: the user sees exactly what will b
 
 List of past research results for the selected project, below the form:
 
-* Source-type badge
+* Source-type badge (neutral/outline — never colored by status)
 * Input, title, relative date
+* Failed rows: separate red "Failed" badge, the stored error message shown inline below the row, and a Retry action (hover-reveal) that re-populates the form with the same Project/Source/Input — except for historical Pinterest-source rows, which have no Retry (retrying is guaranteed to fail)
 * Delete action (hover-reveal)
 
 Empty states:

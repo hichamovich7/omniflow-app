@@ -33,12 +33,15 @@ export async function scrapeUrl(url: string): Promise<ResearchOutput> {
       Authorization: `Bearer ${getApiKey()}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ url, formats: ['markdown'] }),
+    body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, waitFor: 3000 }),
   });
 
   if (!res.ok) {
     const body = await res.text();
     console.error('Firecrawl scrape HTTP error:', res.status, body);
+    if (body.includes('we do not support this site')) {
+      throw new Error('Firecrawl does not support this site');
+    }
     throw new Error(`Firecrawl error: ${res.status}`);
   }
 

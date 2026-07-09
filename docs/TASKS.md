@@ -241,7 +241,15 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
-## [TASK-FIX-002] History Pagination — 2026-07-09
+## [TASK-FIX-003] Research Reliability & Pinterest URL Removal — 2026-07-09
+
+* `lib/research/providers/firecrawl.ts` `scrapeUrl()`: added `onlyMainContent: true` and `waitFor: 3000` to the Firecrawl `/scrape` call — strips nav/footer noise and gives JS-heavy pages time to render before capture; verified live against a real website research call, still works
+* New `classifyResearchError()` in `app/api/research/route.ts` (mirrors `classifyGenerationError()` from the Pinterest generate route): failures are now classified into specific, actionable messages (blocked/timeout/rate-limited/unsupported site/no content) instead of one generic string, and the real message is persisted to `research_results.error_message` — previously it was hard-coded to the same generic text regardless of cause
+* Research History now displays the stored `error_message` inline under failed rows, and a Retry action (hover-reveal) that re-populates the form with the same Project/Source/Input
+* **Root cause found via live testing**: Pinterest URL research was failing 100% of the time because Firecrawl does not support scraping pinterest.com at all (`403`, `"we do not support this site"`) — not a bot-detection or JS-timing issue, and not fixable with `proxy`/`waitFor`/other scrape params (tested `proxy: 'auto'` live, same result)
+* "Pinterest URL" removed from the Research Form's Source selector and from `createResearchSchema` (`lib/validations/research.ts`) — new submissions are rejected at the API, not just hidden in the UI. Retry is also hidden for historical Pinterest-source rows (would just fail again with a validation error)
+* `research_results.source_type` CHECK constraint intentionally left unchanged — historical `pinterest` rows remain valid and readable (see DATABASE.md)
+* Zero changes to `content_analyses`/`generations` — Analyze and Generate are unaffected, this only touches the Research acquisition step
 
 * `app/(dashboard)/history/page.tsx`: server-side pagination via Supabase `.range()` + `{ count: 'exact' }`, 20 generations per page, all existing filters (keyword/project/board/language/status) applied before the range so pagination is always computed on the filtered set
 * New `components/history/history-pagination.tsx`: Server Component, Previous/Next links preserving all current query params, hidden entirely when there's only one page

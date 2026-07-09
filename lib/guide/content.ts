@@ -35,10 +35,11 @@ export const guideSections: GuideSection[] = [
     id: 'research',
     title: 'Research',
     icon: Search,
-    summary: 'Research a topic before generating content — from a keyword, a website, a blog post, or a Pinterest URL.',
+    summary: 'Research a topic before generating content — from a keyword, a website, or a blog post.',
     points: [
-      'Choose a Source: Keyword (web search), Website URL, Blog URL, or Pinterest URL (scraped content).',
+      'Choose a Source: Keyword (web search), Website URL, or Blog URL.',
       'Results are saved to your Research History for the selected Project.',
+      'If a research fails, you\'ll see exactly why (e.g. the site blocked access, or timed out) — use the Retry action on that row to try again.',
       'Research on its own does not change what the AI generates — that happens in the Analyze step.',
     ],
   },

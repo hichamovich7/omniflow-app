@@ -6,6 +6,42 @@ import type { ApiResponse } from '@/types/api';
 
 const RESEARCH_ERROR_MESSAGE = "Couldn't retrieve content from that source. Check the URL and try again.";
 
+function classifyResearchError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (message === 'Firecrawl returned no content for that URL') {
+    return "This page didn't return any readable content — it may require login, block automated access, or render slowly. Try a different URL.";
+  }
+
+  if (message === 'Firecrawl returned no search results for that keyword') {
+    return 'No web results found for that keyword. Try a different or broader keyword.';
+  }
+
+  if (message === 'Firecrawl does not support this site') {
+    return "This site isn't supported by our research provider. Try a different URL, or use Keyword research instead.";
+  }
+
+  const httpMatch = message.match(/^Firecrawl error: (\d+)$/);
+  if (httpMatch) {
+    const status = Number(httpMatch[1]);
+    if (status === 401 || status === 403) {
+      return 'That source blocked automated access. Try a different URL.';
+    }
+    if (status === 408) {
+      return 'The request timed out while loading that page. Try again.';
+    }
+    if (status === 429) {
+      return 'Rate limit reached. Try again in a moment.';
+    }
+    if (status >= 500) {
+      return 'The content service is temporarily unavailable. Try again shortly.';
+    }
+    return `Request failed (HTTP ${status}). Try again.`;
+  }
+
+  return RESEARCH_ERROR_MESSAGE;
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -84,6 +120,7 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     console.error('Research failed:', err);
+    const errorMessage = classifyResearchError(err);
 
     await supabase.from('research_results').insert({
       project_id: projectId,
@@ -92,11 +129,11 @@ export async function POST(request: Request) {
       input,
       content: '',
       status: 'failed',
-      error_message: RESEARCH_ERROR_MESSAGE,
+      error_message: errorMessage,
     });
 
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: RESEARCH_ERROR_MESSAGE, code: 'research_failed' } },
+      { data: null, error: { message: errorMessage, code: 'research_failed' } },
       { status: 500 }
     );
   }

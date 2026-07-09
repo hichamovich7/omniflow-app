@@ -265,7 +265,7 @@ Stores Firecrawl-acquired research content (TASK-023) — keyword web search, or
 | id            | uuid PK                 |                                                     |
 | project_id    | uuid FK → projects.id   | ON DELETE CASCADE                                  |
 | user_id       | uuid FK → profiles.id   | ON DELETE CASCADE                                  |
-| source_type   | text                    | `keyword` \| `website` \| `blog` \| `pinterest`    |
+| source_type   | text                    | `keyword` \| `website` \| `blog` \| `pinterest` (CHECK constraint allows `pinterest` for historical rows only — the app no longer submits it, see TASK-FIX-003) |
 | input         | text                    | The keyword or URL submitted                       |
 | title         | text nullable           | Page title (scrape) or the keyword itself (search) |
 | content       | text                    | Markdown content or aggregated search snippets, capped at ~12,000 chars |
