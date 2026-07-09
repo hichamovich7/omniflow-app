@@ -47,24 +47,28 @@ Permitir generar contenido optimizado en menos de 60 segundos. El primer módulo
 
 ## Sidebar
 
-Elementos:
+Organizado por plataforma (TASK-026):
 
 ```txt
-Dashboard
+Workspace
+  Dashboard
+  Projects
 
-Projects
+Pinterest
+  Research
+  Generate
+  Boards
+  History
 
-Research
+Platforms (disabled — coming soon)
+  WordPress
+  Facebook
+  LinkedIn
+  Medium
 
-Pinterest Generator
-
-Boards
-
-History
-
-Credits
-
-Settings
+Account
+  Credits
+  Settings
 ```
 
 ---

@@ -59,6 +59,7 @@ export function HistoryFilters({ projects, boards }: HistoryFiltersProps) {
     } else {
       params.delete(key);
     }
+    params.delete('page');
     router.replace(`/history?${params.toString()}`);
   }
 
@@ -70,6 +71,7 @@ export function HistoryFilters({ projects, boards }: HistoryFiltersProps) {
       params.delete('project');
     }
     params.delete('board');
+    params.delete('page');
     router.replace(`/history?${params.toString()}`);
   }
 

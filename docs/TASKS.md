@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-025 are completed. TASK-023 and TASK-024 also completed (TASK-023 out of order — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop).
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes.
 
 ---
 
@@ -76,39 +76,7 @@ TASK-025 completed — see Completed Tasks below.
 
 ## FASE 3 — Platform Architecture
 
-### [TASK-026] Navigation Refactor
-
-#### Status: PLANNED
-
-#### Goal
-
-Reorganizar OmniFlow por plataformas.
-
-#### Sidebar
-
-```txt
-Pinterest
-  Research
-  Generate
-  Boards
-  History
-
-WordPress
-
-Facebook
-
-LinkedIn
-
-Medium
-```
-
-#### Note
-
-La navegación debe quedar preparada para crecimiento.
-
-#### Success Criteria
-
-Sidebar organizado por plataforma con sub-secciones funcionales.
+TASK-026 completed — see Completed Tasks below.
 
 ---
 
@@ -272,6 +240,27 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-002] History Pagination — 2026-07-09
+
+* `app/(dashboard)/history/page.tsx`: server-side pagination via Supabase `.range()` + `{ count: 'exact' }`, 20 generations per page, all existing filters (keyword/project/board/language/status) applied before the range so pagination is always computed on the filtered set
+* New `components/history/history-pagination.tsx`: Server Component, Previous/Next links preserving all current query params, hidden entirely when there's only one page
+* `components/history/history-filters.tsx`: changing any filter now resets `page` to 1, so switching projects/keywords never leaves the user stranded on an out-of-range page for the new result set
+* Out-of-range `page` values (e.g. stale bookmark, manual URL edit) redirect server-side to the last valid page instead of showing a misleading "No generations yet" empty state when generations actually exist — caught during manual verification
+* Removed from BACKLOG (was deferred "until data volume justifies them" — the account used for verification already had enough generations to make single-page scrolling noticeably worse)
+* Zero changes to API routes or database — query-level pagination only
+
+---
+
+## [TASK-026] Navigation Refactor — 2026-07-09
+
+* `components/layout/sidebar.tsx` `navGroups` reorganized from function-based grouping (Generators / Library / Account) to platform-based grouping (Workspace / Pinterest / Platforms / Account) — matches the structure already specified in `docs/ARCHITECTURE.md`'s Navigation section
+* Pinterest group now contains Research, Generate (renamed from "Pinterest" — the group header already says Pinterest), Boards, History — same 4 routes as before (`/research`, `/pinterest`, `/boards`, `/history`), zero URL changes, zero broken links
+* New disabled "Platforms" group: WordPress, Facebook, LinkedIn, Medium — placeholders using the same `disabled` pattern already established for Credits/Settings, preparing the sidebar for TASK-028 (WordPress) and beyond without inventing new UI patterns
+* `components/layout/mobile-nav.tsx` needed no changes — it already reuses `SidebarContent`, single source of truth for both desktop and mobile nav
+* Zero changes to routes, pages, APIs, or database — sidebar data structure only
+
+---
 
 ## [TASK-024] Content Analyzer — 2026-07-09
 
@@ -598,7 +587,6 @@ Stripe Working                  ⬚ TASK-012
 
 Improvements deferred until data volume justifies them.
 
-* History Pagination — server-side pagination with range() for large generation lists
 * Bulk Delete Generations — select multiple generations and delete at once
 * Date Range Filter — add date picker filter to History
 * Keyword Search Optimization — add GIN index on generations(keyword) for faster ilike queries

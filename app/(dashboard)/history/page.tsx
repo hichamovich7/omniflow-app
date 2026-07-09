@@ -1,12 +1,16 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { HistoryFilters } from '@/components/history/history-filters';
 import { HistoryTable } from '@/components/history/history-table';
+import { HistoryPagination } from '@/components/history/history-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Clock, Search } from 'lucide-react';
+
+const PAGE_SIZE = 20;
 
 interface HistoryPageProps {
   searchParams: Promise<Record<string, string | undefined>>;
@@ -15,6 +19,7 @@ interface HistoryPageProps {
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
+  const currentPage = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
 
   const { data: projects } = await supabase
     .from('projects')
@@ -28,7 +33,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
   let query = supabase
     .from('generations')
-    .select('id, keyword, language, pins_requested, status, created_at, projects(name)')
+    .select('id, keyword, language, pins_requested, status, created_at, projects(name)', { count: 'exact' })
     .order('created_at', { ascending: false });
 
   if (params.q) {
@@ -52,9 +57,23 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
     query = query.in('id', generationIds.length > 0 ? generationIds : ['00000000-0000-0000-0000-000000000000']);
   }
 
-  const { data: generations } = await query;
+  const rangeStart = (currentPage - 1) * PAGE_SIZE;
+  query = query.range(rangeStart, rangeStart + PAGE_SIZE - 1);
+
+  const { data: generations, count } = await query;
   const list = generations ?? [];
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
   const hasFilters = !!(params.q || params.project || params.language || params.status || params.board);
+
+  if (list.length === 0 && currentPage > totalPages) {
+    const clamped = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (key !== 'page' && value) clamped.set(key, value);
+    }
+    if (totalPages > 1) clamped.set('page', String(totalPages));
+    const queryString = clamped.toString();
+    redirect(queryString ? `/history?${queryString}` : '/history');
+  }
 
   return (
     <PageContainer>
@@ -83,7 +102,10 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           )}
         </EmptyState>
       ) : (
-        <HistoryTable generations={list} />
+        <>
+          <HistoryTable generations={list} />
+          <HistoryPagination currentPage={currentPage} totalPages={totalPages} searchParams={params} />
+        </>
       )}
     </PageContainer>
   );

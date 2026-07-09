@@ -22,6 +22,32 @@ No planned changes.
 
 ---
 
+# [1.10.1] - 2026-07-09
+
+## TASK-FIX-002: History Pagination
+
+### Added
+
+* Server-side pagination on the History page (`app/(dashboard)/history/page.tsx`) — 20 generations per page via Supabase `.range()`, Previous/Next controls, applied after all existing filters
+* Changing a filter resets to page 1; navigating to an out-of-range page redirects to the last valid page instead of showing an incorrect empty state
+
+No API or database changes.
+
+---
+
+# [1.10.0] - 2026-07-09
+
+## TASK-026: Navigation Refactor
+
+### Changed
+
+* Sidebar reorganized from function-based groups (Generators / Library / Account) to platform-based groups (Workspace / Pinterest / Platforms / Account), per the structure already specified in ARCHITECTURE.md
+* New disabled "Platforms" group (WordPress, Facebook, LinkedIn, Medium) — same pattern as the existing disabled Credits/Settings items, preparing the sidebar for TASK-028 and future generators
+
+No route, API, or database changes — sidebar data structure only (`components/layout/sidebar.tsx`).
+
+---
+
 # [1.9.0] - 2026-07-09
 
 ## Visual Redesign: AI Purple + Cyan Rebrand

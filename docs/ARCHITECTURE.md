@@ -386,26 +386,30 @@ Los siguientes generadores (Facebook, LinkedIn, Medium) seguirán exactamente el
 
 ---
 
-# Navigation (Planned — TASK-026)
+# Navigation (Implemented — TASK-026)
 
-La navegación evolucionará hacia una estructura organizada por plataforma:
+La navegación está organizada por plataforma en `components/layout/sidebar.tsx` (`navGroups`), consumida tanto por el sidebar de escritorio como por `mobile-nav.tsx` (reutiliza `SidebarContent`, no hay una segunda fuente de verdad):
 
 ```txt
-Dashboard
-Projects
+Workspace
+  Dashboard
+  Projects
 Pinterest
   Research
   Generate
   Boards
   History
-WordPress
-Facebook
-LinkedIn
-Medium
-Settings
+Platforms (disabled placeholders)
+  WordPress
+  Facebook
+  LinkedIn
+  Medium
+Account
+  Credits
+  Settings
 ```
 
-La estructura actual agrupa por funcionalidad (Generators / Library / Account). TASK-026 la reorganizará por plataforma para soportar el crecimiento modular.
+Ninguna ruta cambió — `/research`, `/pinterest`, `/boards`, `/history` siguen siendo las mismas; solo se reagruparon visualmente bajo "Pinterest" en vez de "Generators"/"Library". WordPress/Facebook/LinkedIn/Medium usan el mismo patrón `disabled` ya existente (como Credits/Settings) — placeholders sin ruta funcional, preparados para que cada plataforma futura (empezando por WordPress, TASK-028) reciba su propio grupo con sub-secciones, siguiendo el mismo patrón que Pinterest.
 
 ---
 

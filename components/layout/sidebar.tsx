@@ -11,6 +11,10 @@ import {
   Coins,
   Settings,
   Search,
+  FileText,
+  ThumbsUp,
+  Briefcase,
+  PenSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,17 +39,21 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Generators',
+    label: 'Pinterest',
     items: [
       { href: '/research', label: 'Research', icon: Search },
-      { href: '/pinterest', label: 'Pinterest', icon: Sparkles },
+      { href: '/pinterest', label: 'Generate', icon: Sparkles },
+      { href: '/boards', label: 'Boards', icon: LayoutGrid },
+      { href: '/history', label: 'History', icon: Clock },
     ],
   },
   {
-    label: 'Library',
+    label: 'Platforms',
     items: [
-      { href: '/boards', label: 'Boards', icon: LayoutGrid },
-      { href: '/history', label: 'History', icon: Clock },
+      { href: '/wordpress', label: 'WordPress', icon: FileText, disabled: true },
+      { href: '/facebook', label: 'Facebook', icon: ThumbsUp, disabled: true },
+      { href: '/linkedin', label: 'LinkedIn', icon: Briefcase, disabled: true },
+      { href: '/medium', label: 'Medium', icon: PenSquare, disabled: true },
     ],
   },
   {
