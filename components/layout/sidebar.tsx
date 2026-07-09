@@ -64,7 +64,7 @@ export function SidebarContent() {
     <>
       <div className="flex h-14 shrink-0 items-center px-5">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-linear-to-br from-primary to-brand-accent shadow-sm">
             <span className="text-[10px] font-bold text-primary-foreground">O</span>
           </div>
           <div className="flex flex-col">

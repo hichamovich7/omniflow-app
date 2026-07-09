@@ -34,9 +34,10 @@ Not:
 
 ## Visual Language
 
-* White is the dominant color. Content sits on white.
+* Near-white (with a subtle violet tint) is the dominant color. Content sits on white cards.
 * Gray exists to create hierarchy and separation. Never as decoration.
-* Blue is the single accent color. It means "action" and "active". Nothing else.
+* Violet is the single primary/action accent color. It means "action" and "active". Nothing else.
+* Cyan is a rare brand-accent highlight reserved for AI/analysis-context moments (e.g. Content Analyzer). It is not a structural or interactive color — never used for buttons, navigation, or general UI chrome.
 * Semantic colors (green, amber, red) appear only inside badges and status indicators. They never appear in backgrounds, borders, or large surfaces.
 * Typography creates hierarchy. Not borders. Not colors. Not boxes.
 * Shadows are elevation signals, not decoration. Most surfaces have no shadow at all.
@@ -116,7 +117,7 @@ The user should answer "Where am I?" by glancing at the sidebar.
 
 ### Logo Area
 
-* Product mark: small rounded square with initial "O", using primary color
+* Product mark: small rounded square with initial "O", diagonal gradient from primary to brand-accent
 * Product name: "OmniFlow" in 13px font-semibold
 * Height: 56px (h-14)
 * No border below — the logo area blends into the navigation

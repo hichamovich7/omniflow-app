@@ -116,7 +116,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
       </div>
 
       {analysisId && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2 text-xs font-medium text-primary">
+        <div className="mb-5 flex items-center gap-2 rounded-lg bg-brand-accent/5 px-3 py-2 text-xs font-medium text-brand-accent">
           <Sparkle className="h-3.5 w-3.5 shrink-0" />
           Using content analysis from Research
         </div>

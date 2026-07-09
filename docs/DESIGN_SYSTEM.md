@@ -1,6 +1,6 @@
 # OmniFlow Design System
 
-Version: 1.0
+Version: 1.1
 
 ---
 
@@ -86,7 +86,7 @@ Users should immediately know:
 
 ## Primary
 
-Blue
+Violet (`#7C3AED`)
 
 Used only for:
 
@@ -100,19 +100,33 @@ Never use the primary color as page background.
 
 ---
 
+## Brand Accent
+
+Cyan (`#0891B2`)
+
+A rare highlight color, not a structural one. Reserved for AI/analysis-context moments only (e.g. the Content Analyzer panel, "using content analysis" indicators). Not used for buttons, navigation, or general interactive elements — those stay Primary.
+
+Distinct from shadcn's internal `--accent` token (a structural hover-state color used across menus/dropdowns, which stays in the neutral/violet family, not cyan).
+
+---
+
 ## Neutral
 
 Background
 
-White
+Near-white with a subtle violet tint (`#FAF5FF`)
+
+Cards / Popovers
+
+Pure white — stays achromatic even though the page background is tinted, so dense forms/tables remain maximally legible during all-day use.
 
 Secondary Background
 
-Very light gray
+Very light violet-tinted gray
 
 Borders
 
-Soft gray
+Soft violet (`#DDD6FE`)
 
 Muted Text
 
@@ -120,7 +134,7 @@ Medium gray
 
 Primary Text
 
-Near black
+Deep indigo (`#1E1B4B`)
 
 ---
 
@@ -150,11 +164,11 @@ Only semantic components may use these colors.
 
 Font Family
 
-Geist
+Headings: Space Grotesk
+
+Body: DM Sans
 
 Fallback:
-
-Inter
 
 System UI
 

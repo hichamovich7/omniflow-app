@@ -22,6 +22,25 @@ No planned changes.
 
 ---
 
+# [1.9.0] - 2026-07-09
+
+## Visual Redesign: AI Purple + Cyan Rebrand
+
+### Changed
+
+* New color palette — violet/purple primary (`#7C3AED`) + cyan brand accent (`#0891B2`) replacing the single blue accent; new `--brand-accent` token added (`app/globals.css`), scoped to AI/analysis-context highlights only (Content Analyzer panel, Pinterest "using content analysis" indicator), distinct from shadcn's structural `--accent`
+* New typography pairing — Space Grotesk (headings) + DM Sans (body), replacing Geist; `--font-heading` is now independent of `--font-sans` (previously aliased) and applied globally via a new `h1..h6` base-layer rule
+* Sidebar logo mark updated to a two-tone gradient (primary → brand-accent)
+* Page background now carries a subtle violet tint; cards/popovers stay achromatic for legibility in dense forms/tables
+
+### Fixed
+
+* Research history: a failed Pinterest-source research result showed a red "Pinterest URL" badge, reading as a miscolored category tag rather than a status indicator. Source-type badge is now always neutral (`outline` variant); a separate "Failed" badge with an icon appears only when `status === 'failed'`.
+
+No schema or API changes — CSS tokens and four component files only.
+
+---
+
 # [1.8.0] - 2026-07-09
 
 ## TASK-024: Content Analyzer

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Search, Trash2, Sparkle } from 'lucide-react';
+import { Loader2, Search, Trash2, Sparkle, CircleAlert } from 'lucide-react';
 import { createResearchSchema } from '@/lib/validations/research';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -261,8 +261,8 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
           </div>
 
           {analysis ? (
-            <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+            <div className="space-y-3 rounded-lg border border-brand-accent/20 bg-brand-accent/5 p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-brand-accent">
                 <Sparkle className="h-3.5 w-3.5" />
                 Content Analysis
               </div>
@@ -335,9 +335,15 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
                 key={r.id}
                 className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3.5 transition-colors hover:border-border"
               >
-                <Badge variant={r.status === 'failed' ? 'destructive' : 'secondary'}>
-                  {SOURCE_TYPE_CONFIG[r.source_type].label}
-                </Badge>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Badge variant="outline">{SOURCE_TYPE_CONFIG[r.source_type].label}</Badge>
+                  {r.status === 'failed' && (
+                    <Badge variant="destructive" className="gap-1">
+                      <CircleAlert className="h-3 w-3" />
+                      Failed
+                    </Badge>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.title ?? r.input}</p>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
