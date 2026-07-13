@@ -1,5 +1,6 @@
 import { getRoleConfig } from '../config';
 import { generateImage as generateImageOpenAI } from '../providers/openai';
+import { generateImage as generateImageOpenRouter } from '../providers/openrouter';
 
 interface GenerateImageParams {
   prompt: string;
@@ -12,6 +13,8 @@ export async function generateImage({ prompt, size }: GenerateImageParams): Prom
   switch (provider) {
     case 'openai':
       return generateImageOpenAI({ model, prompt, size });
+    case 'openrouter':
+      return generateImageOpenRouter({ model, prompt, size });
     default:
       throw new Error(`Unsupported image provider: ${provider}`);
   }

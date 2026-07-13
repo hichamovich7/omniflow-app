@@ -108,6 +108,70 @@ async function chatCompletionOnce({
   }
 }
 
+interface ImageGenerationOptions {
+  model: string;
+  prompt: string;
+  size: string;
+}
+
+interface OpenRouterImageResponseData {
+  b64_json?: string;
+}
+
+interface OpenRouterImageResponse {
+  data: OpenRouterImageResponseData[];
+}
+
+export async function generateImage({
+  model,
+  prompt,
+  size,
+}: ImageGenerationOptions): Promise<Buffer> {
+  const apiKey = process.env.OPENROUTER_IMAGE_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENROUTER_IMAGE_API_KEY is not set');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/images', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model, prompt, size }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('OpenRouter Image API error:', res.status, body);
+      let message = body;
+      try {
+        const parsed = JSON.parse(body) as { error?: { message?: string } };
+        message = parsed.error?.message ?? body;
+      } catch {
+        // body wasn't JSON; fall back to the raw text above.
+      }
+      throw new Error(`OpenRouter image generation failed: ${message}`);
+    }
+
+    const json = (await res.json()) as OpenRouterImageResponse;
+    const imageData = json.data?.[0];
+
+    if (!imageData?.b64_json) {
+      throw new Error('No image data in OpenRouter response');
+    }
+
+    return Buffer.from(imageData.b64_json, 'base64');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 interface VisionCompletionOptions {
   model: string;
   imageUrl: string;
