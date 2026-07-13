@@ -8,7 +8,7 @@ export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   fr: 'Français',
 };
 
-export const PINS_OPTIONS = [1, 5, 10, 20, 30] as const;
+export const PINS_OPTIONS = [1, 3, 5, 7, 8, 10, 20, 30] as const;
 export type PinsOption = (typeof PINS_OPTIONS)[number];
 
 export interface GenerateRequest {
