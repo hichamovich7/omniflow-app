@@ -94,7 +94,7 @@ export function GenerateImagesButton({
       ) : (
         <>
           <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
-          Images ({count})
+          Generate Images ({count})
         </>
       )}
     </Button>
