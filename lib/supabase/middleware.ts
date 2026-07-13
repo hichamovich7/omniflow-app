@@ -36,9 +36,17 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
   const isCallbackRoute = pathname.startsWith('/auth/callback');
   const isPublicRoute = pathname === '/';
+  const isApiRoute = pathname.startsWith('/api');
 
   if (isCallbackRoute) {
     return supabaseResponse;
+  }
+
+  if (!user && isApiRoute) {
+    return NextResponse.json(
+      { data: null, error: { message: 'Unauthorized', code: 'unauthorized' } },
+      { status: 401 }
+    );
   }
 
   if (!user && !isAuthRoute && !isPublicRoute) {
