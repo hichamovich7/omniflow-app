@@ -241,6 +241,17 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-FIX-004] Design System Consistency Corrections — 2026-07-14
+
+* `app/globals.css` `--background` : suppression du tint violet (`oklch(0.977 0.014 308)` / `#FAF5FF` → `oklch(0.985 0 0)` / `#FAFAFA`) — le violet est désormais réservé aux éléments interactifs uniquement
+* Nouvelle prop `narrow` sur `components/ui/page-container.tsx` `PageContainer()` — limite les pages de formulaire simples (Research, Generate, New/Edit Project, New/Edit Board) à `max-w-2xl` au lieu du `max-w-7xl` des pages liste/grille
+* Discipline "One Primary Per Screen" appliquée : les boutons de navigation/liste ("New Board", "Create Project", "New Project", "Go to Generator", "Continue to Generate") passent de `primary` (défaut) à `variant: 'outline'` dans `boards/page.tsx`, `pinterest/page.tsx`, `research/page.tsx`, `projects/page.tsx`, `history/page.tsx`, `research-form.tsx` — un seul CTA violet plein reste visible par écran
+* Boutons de soumission de formulaire (`pin-form.tsx`, `research-form.tsx`) passés de pleine largeur (`w-full`) à alignés à droite, taille au label (`h-11 px-6`)
+* `components/layout/sidebar.tsx` : item de nav actif restylé — fond plein + texte violet remplacé par une barre indicatrice gauche de 2px + texte foreground sombre
+* Zero changes aux routes, APIs ou base de données — changements visuels/CSS et props de composants uniquement
+
+---
+
 ## [TASK-FIX-003] Research Reliability & Pinterest URL Removal — 2026-07-09
 
 * `lib/research/providers/firecrawl.ts` `scrapeUrl()`: added `onlyMainContent: true` and `waitFor: 3000` to the Firecrawl `/scrape` call — strips nav/footer noise and gives JS-heavy pages time to render before capture; verified live against a real website research call, still works

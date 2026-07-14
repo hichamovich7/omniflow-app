@@ -22,6 +22,22 @@ No planned changes.
 
 ---
 
+# [1.11.2] - 2026-07-14
+
+## TASK-FIX-004: Design System Consistency Corrections
+
+### Changed
+
+* Fond de page passé d'un tint violet subtil à un gris neutre — le violet est réservé aux boutons/liens/états actifs uniquement
+* Les pages de formulaire (Research, Generate, New/Edit Project, New/Edit Board) ne s'étirent plus sur toute la largeur — largeur plafonnée via la nouvelle prop `narrow` de `PageContainer`
+* Discipline "un seul bouton primary par écran" appliquée : les boutons secondaires/de navigation (Boards, Projects, Pinterest, Research, History) passent en style outline
+* Boutons de soumission (Research, Generate Pins) désormais alignés à droite et dimensionnés au label plutôt qu'en pleine largeur
+* Indicateur de nav actif dans la sidebar : fond plein remplacé par une barre gauche + texte foreground sombre
+
+No database migration, no API contract changes — CSS and component-prop changes only.
+
+---
+
 # [1.11.1] - 2026-07-09
 
 ## TASK-FIX-003: Research Reliability & Pinterest URL Removal
