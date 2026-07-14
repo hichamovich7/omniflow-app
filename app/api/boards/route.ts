@@ -16,7 +16,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid JSON body', code: 'invalid_json' } },
+      { status: 400 }
+    );
+  }
+
   const parsed = createBoardSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -30,7 +39,7 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id')
+    .select('id, user_id')
     .eq('id', projectId)
     .single();
 
@@ -38,6 +47,13 @@ export async function POST(request: Request) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Project not found', code: 'invalid_project' } },
       { status: 400 }
+    );
+  }
+
+  if (project.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this project', code: 'forbidden' } },
+      { status: 403 }
     );
   }
 

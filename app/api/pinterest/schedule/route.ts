@@ -21,7 +21,15 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid JSON body', code: 'invalid_json' } },
+      { status: 400 }
+    );
+  }
 
   const clearParsed = clearScheduleSchema.safeParse(body);
   if (clearParsed.success) {
@@ -29,7 +37,7 @@ export async function PATCH(request: Request) {
 
     const { data: generation } = await supabase
       .from('generations')
-      .select('id')
+      .select('id, user_id')
       .eq('id', generationId)
       .single();
 
@@ -37,6 +45,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: { message: 'Generation not found', code: 'not_found' } },
         { status: 404 }
+      );
+    }
+
+    if (generation.user_id !== user.id) {
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: 'You do not have access to this generation', code: 'forbidden' } },
+        { status: 403 }
       );
     }
 
@@ -80,7 +95,7 @@ export async function PATCH(request: Request) {
 
   const { data: generation } = await supabase
     .from('generations')
-    .select('id')
+    .select('id, user_id')
     .eq('id', generationId)
     .single();
 
@@ -88,6 +103,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Generation not found', code: 'not_found' } },
       { status: 404 }
+    );
+  }
+
+  if (generation.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this generation', code: 'forbidden' } },
+      { status: 403 }
     );
   }
 

@@ -7,6 +7,7 @@ import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/pr
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 
 function classifyGenerationError(err: unknown): string {
@@ -55,7 +56,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
+  const rateLimit = await checkRateLimit(user.id, 'pinterest/generate', 60, 3600);
+  if (!rateLimit.allowed) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },
+      { status: 429 }
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid JSON body', code: 'invalid_json' } },
+      { status: 400 }
+    );
+  }
+
   const parsed = generatePinsSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -69,7 +87,7 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id, description')
+    .select('id, description, user_id')
     .eq('id', projectId)
     .single();
 
@@ -80,12 +98,19 @@ export async function POST(request: Request) {
     );
   }
 
+  if (project.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this project', code: 'forbidden' } },
+      { status: 403 }
+    );
+  }
+
   let analysisContext: string | null = null;
 
   if (analysisId) {
     const { data: analysis } = await supabase
       .from('content_analyses')
-      .select('theme, keywords, audience, tone, category, summary')
+      .select('theme, keywords, audience, tone, category, summary, user_id')
       .eq('id', analysisId)
       .single();
 
@@ -93,6 +118,13 @@ export async function POST(request: Request) {
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: { message: 'Content analysis not found', code: 'invalid_analysis' } },
         { status: 400 }
+      );
+    }
+
+    if (analysis.user_id !== user.id) {
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: 'You do not have access to this content analysis', code: 'forbidden' } },
+        { status: 403 }
       );
     }
 

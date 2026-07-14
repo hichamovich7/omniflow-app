@@ -16,7 +16,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid JSON body', code: 'invalid_json' } },
+      { status: 400 }
+    );
+  }
+
   const parsed = createProjectSchema.safeParse(body);
 
   if (!parsed.success) {

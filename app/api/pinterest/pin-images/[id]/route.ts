@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getPinOwnerUserId } from '@/lib/queries/pin-images';
+import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 import type { PinImage } from '@/types/database';
 
@@ -20,6 +22,13 @@ export async function PATCH(
     );
   }
 
+  if (!isValidUuid(id)) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid image version ID', code: 'invalid_id' } },
+      { status: 400 }
+    );
+  }
+
   const { data: pinImage } = await supabase
     .from('pin_images')
     .select('*')
@@ -34,6 +43,15 @@ export async function PATCH(
   }
 
   const image = pinImage as PinImage;
+
+  const ownerUserId = await getPinOwnerUserId(supabase, image.pin_id);
+
+  if (ownerUserId !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this image version', code: 'forbidden' } },
+      { status: 403 }
+    );
+  }
 
   if (image.is_active) {
     return NextResponse.json<ApiResponse<{ pinId: string; activeImageId: string; url: string }>>({
@@ -81,6 +99,13 @@ export async function DELETE(
     );
   }
 
+  if (!isValidUuid(id)) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid image version ID', code: 'invalid_id' } },
+      { status: 400 }
+    );
+  }
+
   const { data: pinImage } = await supabase
     .from('pin_images')
     .select('*')
@@ -95,6 +120,15 @@ export async function DELETE(
   }
 
   const image = pinImage as PinImage;
+
+  const ownerUserId = await getPinOwnerUserId(supabase, image.pin_id);
+
+  if (ownerUserId !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this image version', code: 'forbidden' } },
+      { status: 403 }
+    );
+  }
 
   const { count } = await supabase
     .from('pin_images')

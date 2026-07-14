@@ -22,6 +22,26 @@ No planned changes.
 
 ---
 
+# [1.12.0] - 2026-07-14
+
+## TASK-018: Security Hardening
+
+### Added
+
+* Application-level rate limiting on AI-cost-incurring endpoints — new `api_rate_limits` table + `increment_rate_limit()` Postgres function (migration 010), `lib/rate-limit.ts` (`checkRateLimit()`). Limits: `pinterest/generate`, `research`, and `analyze` at 60/hour, `pinterest/generate-images` at 20/hour. Returns `429` (`rate_limited`) when exceeded
+* Explicit app-level ownership checks (`user_id === auth.uid()`, `403 forbidden`) on every API route that loads a resource by ID — defense-in-depth alongside existing RLS policies (`projects/[id]`, `boards/[id]`, `generations/[id]`, `research/[id]`, `pinterest/pin-images/[id]` and `pinterest/pin-images`, `pinterest/generate`, `pinterest/schedule`, `boards`, `research`, `analyze`)
+* `lib/utils/uuid.ts` (`isValidUuid()`) — URL `[id]` params are now format-validated before hitting the database, returns `400 invalid_id`
+* `lib/queries/pin-images.ts` `getPinOwnerUserId()` — resolves ownership through the `pin_images → pins → generations` chain, since `pin_images` has no direct `user_id` column
+
+### Fixed
+
+* `is_default` cross-user bug in `PATCH /api/projects/[id]` — the default-project swap now explicitly scopes both updates to `user_id = auth.uid()` instead of relying solely on RLS
+* Malformed JSON request bodies no longer crash with an unhandled 500 — all 9 POST/PATCH routes now return `400 invalid_json`
+
+No changes to existing request/response shapes for valid requests, no changes to business logic — new error paths and one new table only.
+
+---
+
 # [1.11.2] - 2026-07-14
 
 ## TASK-FIX-004: Design System Consistency Corrections

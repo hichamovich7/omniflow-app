@@ -11,7 +11,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:3000/api/pinterest/generate -H \"Content-Type: application/json\" -d '{}')",
       "Bash(sed -i 's/timeout: 60000/timeout: 90000/g; s/waitForTimeout\\(1500\\)/waitForTimeout\\(1500\\);\\\\n    await page.waitForSelector\\(\\\\x27#keyword\\\\x27, { timeout: 15000 }\\).catch\\(\\(\\) => {}\\)/' verify-task024.js)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000 --max-time 5)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ]
   }
 }

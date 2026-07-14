@@ -54,6 +54,21 @@ Never expose service_role keys to the client.
 
 ---
 
+# Rate Limiting
+
+Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit()`), backed by the `api_rate_limits` table (fixed window counter, see DATABASE.md). Returns `429` with code `rate_limited` when exceeded.
+
+| Endpoint                             | Limit      |
+| ------------------------------------- | ---------- |
+| POST /api/pinterest/generate          | 60 / hour  |
+| POST /api/pinterest/generate-images   | 20 / hour  |
+| POST /api/research                    | 60 / hour  |
+| POST /api/analyze                     | 60 / hour  |
+
+Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider.
+
+---
+
 # POST /api/pinterest/generate
 
 Generate Pinterest content.
@@ -110,6 +125,9 @@ Amount depends on:
 
 ```txt
 unauthorized
+forbidden
+rate_limited
+invalid_json
 insufficient_credits
 invalid_language
 invalid_analysis
@@ -168,6 +186,9 @@ Batch generates Pinterest-optimized images using OpenAI (gpt-image-1). Processes
 
 ```txt
 unauthorized
+forbidden
+rate_limited
+invalid_json
 not_found
 generation_not_completed
 image_generation_failed
@@ -203,6 +224,15 @@ Query parameter: `?pinId={uuid}`
 }
 ```
 
+## Possible Errors
+
+```txt
+unauthorized
+invalid_request
+not_found
+forbidden
+```
+
 ---
 
 # PATCH /api/pinterest/pin-images/[id]
@@ -228,7 +258,9 @@ Updates `pins.media_url` to the selected version's URL.
 
 ```txt
 unauthorized
+invalid_id
 not_found
+forbidden
 ```
 
 ---
@@ -256,7 +288,9 @@ Deletes the image file from Supabase Storage.
 
 ```txt
 unauthorized
+invalid_id
 not_found
+forbidden
 invalid_request (cannot delete only version)
 ```
 
@@ -339,6 +373,8 @@ weekday
 
 ```txt
 unauthorized
+forbidden
+invalid_json
 not_found
 invalid_schedule
 past_date
@@ -400,6 +436,17 @@ Update project.
 
 All fields are optional. When is_default is true, the previous default project is unmarked.
 
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+invalid_json
+invalid_request
+```
+
 ---
 
 # DELETE /api/projects/[id]
@@ -407,6 +454,15 @@ All fields are optional. When is_default is true, the previous default project i
 Delete project.
 
 Only project owner can delete.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+```
 
 ---
 
@@ -438,6 +494,8 @@ Create a board.
 
 ```txt
 unauthorized
+forbidden
+invalid_json
 invalid_request
 invalid_project
 server_error (duplicate name within the same project)
@@ -463,6 +521,17 @@ Rename a board.
 }
 ```
 
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+invalid_json
+invalid_request
+```
+
 ---
 
 # DELETE /api/boards/[id]
@@ -470,6 +539,15 @@ Rename a board.
 Delete a board.
 
 Pins previously assigned to this board are not deleted — `pins.board_id` is set to null (ON DELETE SET NULL). The free-text `pins.board` value is untouched.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+```
 
 ---
 
@@ -511,6 +589,9 @@ For `sourceType: "keyword"`, `content` is an aggregation of the top 3 web search
 
 ```txt
 unauthorized
+forbidden
+rate_limited
+invalid_json
 invalid_request
 invalid_project
 research_failed
@@ -531,6 +612,15 @@ Delete a research result. No PATCH — results are immutable once created.
   },
   "error": null
 }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
 ```
 
 ---
@@ -576,6 +666,9 @@ Idempotent: if a `content_analyses` row already exists for `researchResultId`, i
 
 ```txt
 unauthorized
+forbidden
+rate_limited
+invalid_json
 invalid_request
 invalid_research_result
 analysis_failed
@@ -633,8 +726,10 @@ Returns one generation with all generated pins.
 ## Possible Errors
 
 ```txt
-not_found
 unauthorized
+invalid_id
+not_found
+forbidden
 ```
 
 ---
@@ -657,8 +752,10 @@ Delete a generation and all associated pins (CASCADE).
 ## Possible Errors
 
 ```txt
-not_found
 unauthorized
+invalid_id
+not_found
+forbidden
 ```
 
 ---
@@ -684,6 +781,14 @@ insufficient_credits
 invalid_request
 invalid_language
 invalid_project
+invalid_json
+invalid_id
+```
+
+## Rate Limiting
+
+```txt
+rate_limited
 ```
 
 ## Generation

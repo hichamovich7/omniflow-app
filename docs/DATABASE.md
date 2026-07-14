@@ -39,6 +39,8 @@ auth.users
 
 └── subscriptions
 
+└── api_rate_limits
+
 ---
 
 # profiles
@@ -378,6 +380,49 @@ pin_id IN (
 (pin_id) WHERE is_active = true
 (pin_id, version) UNIQUE
 ```
+
+---
+
+# api_rate_limits
+
+Tracks per-user, per-endpoint request counts within a fixed time window (TASK-018). Backs application-level rate limiting on AI-cost-incurring endpoints — independent of RLS/ownership checks, which govern data access, not request volume.
+
+## Columns
+
+| Column       | Type                  | Description                                              |
+| ------------ | --------------------- | ---------------------------------------------------------- |
+| id           | uuid PK               |                                                            |
+| user_id      | uuid FK → profiles.id | ON DELETE CASCADE                                          |
+| endpoint     | text                  | Logical endpoint identifier (e.g. `pinterest/generate`)    |
+| window_start | timestamptz           | Start of the fixed window this row counts                  |
+| count        | integer               | Requests seen in this window, default 1                    |
+| created_at   | timestamptz           |                                                            |
+
+## Purpose
+
+Fixed-window counter, incremented atomically per request via the `increment_rate_limit()` Postgres function (single `INSERT ... ON CONFLICT DO UPDATE`, avoids the read-then-write race of separate SELECT/UPDATE calls). `lib/rate-limit.ts` (`checkRateLimit()`) computes the current window boundary, calls the function via `supabase.rpc()`, and compares the returned count against the endpoint's limit.
+
+## Functions
+
+```sql
+increment_rate_limit(p_user_id uuid, p_endpoint text, p_window_start timestamptz) RETURNS integer
+```
+
+Upserts the counter row for `(user_id, endpoint, window_start)` and returns the new count.
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+## Indexes
+
+```sql
+(user_id, endpoint, window_start) UNIQUE
+```
+
+No `updated_at` — rows are superseded by new window rows, not updated in place beyond the counter increment.
 
 ---
 

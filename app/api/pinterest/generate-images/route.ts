@@ -5,6 +5,7 @@ import { generateImage } from '@/lib/ai/engine';
 import { buildImagePrompt, IMAGE_PROMPT_ID } from '@/lib/ai/prompt-engine/engine';
 import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
 
@@ -26,7 +27,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
+  const rateLimit = await checkRateLimit(user.id, 'pinterest/generate-images', 20, 3600);
+  if (!rateLimit.allowed) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },
+      { status: 429 }
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid JSON body', code: 'invalid_json' } },
+      { status: 400 }
+    );
+  }
+
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -40,7 +58,7 @@ export async function POST(request: Request) {
 
   const { data: generation } = await supabase
     .from('generations')
-    .select('id, image_status, status')
+    .select('id, image_status, status, user_id')
     .eq('id', generationId)
     .single();
 
@@ -48,6 +66,13 @@ export async function POST(request: Request) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Generation not found', code: 'not_found' } },
       { status: 404 }
+    );
+  }
+
+  if (generation.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this generation', code: 'forbidden' } },
+      { status: 403 }
     );
   }
 

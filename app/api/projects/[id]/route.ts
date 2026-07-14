@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { updateProjectSchema } from '@/lib/validations/project';
+import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 
 export async function PATCH(
@@ -20,7 +21,24 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const body = await request.json();
+
+  if (!isValidUuid(id)) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid project ID', code: 'invalid_id' } },
+      { status: 400 }
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid JSON body', code: 'invalid_json' } },
+      { status: 400 }
+    );
+  }
+
   const parsed = updateProjectSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -30,15 +48,40 @@ export async function PATCH(
     );
   }
 
+  const { data: existingProject } = await supabase
+    .from('projects')
+    .select('id, user_id')
+    .eq('id', id)
+    .single();
+
+  if (!existingProject) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Project not found', code: 'not_found' } },
+      { status: 404 }
+    );
+  }
+
+  if (existingProject.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this project', code: 'forbidden' } },
+      { status: 403 }
+    );
+  }
+
   const { is_default, ...fields } = parsed.data;
 
   if (is_default) {
     await supabase
       .from('projects')
       .update({ is_default: false })
+      .eq('user_id', user.id)
       .eq('is_default', true);
 
-    await supabase.from('projects').update({ is_default: true }).eq('id', id);
+    await supabase
+      .from('projects')
+      .update({ is_default: true })
+      .eq('id', id)
+      .eq('user_id', user.id);
   }
 
   const hasFieldUpdates = Object.keys(fields).length > 0;
@@ -48,6 +91,7 @@ export async function PATCH(
       .from('projects')
       .update(fields)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -99,7 +143,38 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const { error: dbError } = await supabase.from('projects').delete().eq('id', id);
+  if (!isValidUuid(id)) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid project ID', code: 'invalid_id' } },
+      { status: 400 }
+    );
+  }
+
+  const { data: existingProject } = await supabase
+    .from('projects')
+    .select('id, user_id')
+    .eq('id', id)
+    .single();
+
+  if (!existingProject) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Project not found', code: 'not_found' } },
+      { status: 404 }
+    );
+  }
+
+  if (existingProject.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this project', code: 'forbidden' } },
+      { status: 403 }
+    );
+  }
+
+  const { error: dbError } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id);
 
   if (dbError) {
     return NextResponse.json<ApiResponse<null>>(

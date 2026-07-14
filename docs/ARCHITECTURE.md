@@ -516,6 +516,7 @@ Todas las imágenes generadas deberán almacenarse en Supabase Storage y dispone
 /lib
 
 brand-profile.ts — buildBrandProfileContext(), Core Platform helper for AI context (TASK-022)
+rate-limit.ts — checkRateLimit(userId, endpoint, limit, windowSeconds), fixed-window rate limiting (TASK-018)
 
 /ai
 
@@ -571,6 +572,7 @@ board.ts
 ```
 generations.ts     — shared generation queries
 boards.ts          — getBoardWithPins(), findOrCreateBoardIds()
+pin-images.ts      — getPinImageVersions(), getPinOwnerUserId() (TASK-018)
 ```
 
 /csv
@@ -585,6 +587,7 @@ pinterest.ts       — CSV builder + date formatter
 promise-pool.ts    — concurrency-limited parallel processing
 format-date.ts     — shared timeAgo() utility
 status.ts          — shared statusToVariant() utility
+uuid.ts            — isValidUuid(), URL param validation (TASK-018)
 ```
 
 /stripe (deferred)

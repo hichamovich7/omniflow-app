@@ -34,25 +34,7 @@ Ordered by strategic priority and phased delivery.
 
 ## [TASK-018] Security Hardening
 
-### Status: PLANNED
-
-### Goal
-
-Corregir vulnerabilidades de seguridad antes de avanzar con nuevas funcionalidades.
-
-### Features
-
-```txt
-Ownership validation (user_id filter) en todas las API routes
-Fix is_default cross-user bug en projects
-Rate limiting en endpoints de generación
-try/catch en request.json() para todas las rutas
-UUID validation en URL params
-```
-
-### Success Criteria
-
-Ningún usuario autenticado puede acceder a recursos de otro usuario.
+TASK-018 completed — see Completed Tasks below.
 
 ---
 
@@ -232,7 +214,7 @@ AI Image Generation Working     ✅
 Scheduling Working              ✅
 CSV Export Working               ✅
 History Working                 ✅
-Security Hardening              ⬚ TASK-018
+Security Hardening              ✅
 Credits Working                 ⬚ TASK-011
 Stripe Working                  ⬚ TASK-012
 ```
@@ -240,6 +222,20 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-018] Security Hardening — 2026-07-14
+
+* New `api_rate_limits` table (migration 010) + `increment_rate_limit()` Postgres function — atomic fixed-window counter (single `INSERT ... ON CONFLICT DO UPDATE`, avoids the read-then-write race of separate SELECT/UPDATE calls under concurrent requests)
+* New `lib/rate-limit.ts` `checkRateLimit(userId, endpoint, limit, windowSeconds)` — applied to `POST /api/pinterest/generate` (60/hour), `POST /api/pinterest/generate-images` (20/hour), `POST /api/research` (60/hour), `POST /api/analyze` (60/hour); returns `429` (`rate_limited`) when exceeded, fails open (allows the request) if the rate-limit check itself errors, so an infra hiccup on this table never blocks generation
+* Explicit `user_id === auth.uid()` ownership checks (`403 forbidden`) added in every API route that loads a resource by ID, as defense-in-depth alongside existing RLS policies — `projects/[id]`, `boards/[id]`, `generations/[id]`, `research/[id]`, `pinterest/pin-images/[id]`, `pinterest/pin-images` (GET by `pinId`), `pinterest/generate` (project + optional analysis), `pinterest/schedule` (generation), `boards` (project), `research` (project), `analyze` (research result)
+* New `lib/queries/pin-images.ts` `getPinOwnerUserId()` — `pin_images` has no direct `user_id` column, so ownership is resolved by walking `pin_images → pins → generations.user_id`
+* Fixed `is_default` cross-user bug in `app/api/projects/[id]/route.ts`: the bulk "clear previous default" update and the "set new default" update now both carry an explicit `.eq('user_id', user.id)` instead of relying solely on RLS to scope the write
+* try/catch added around every `request.json()` call across the 9 POST/PATCH routes — malformed JSON now returns `400` (`invalid_json`) instead of surfacing as an unhandled exception
+* New `lib/utils/uuid.ts` `isValidUuid()` — validates the `[id]` URL param format in `projects/[id]`, `boards/[id]`, `generations/[id]`, `research/[id]`, `pinterest/pin-images/[id]` before it reaches a database query; returns `400` (`invalid_id`)
+* Pre-implementation audit confirmed RLS (Rule #7) was already correctly enforced on every table via the anon-key Supabase client (no `service_role` usage found in application code) — the vulnerabilities this task targeted were app-layer gaps (RULES.md Rule #6 violations), not live cross-user data exposure
+* Zero changes to existing business logic, request/response shapes, or unrelated routes — security layers only
+
+---
 
 ## [TASK-FIX-004] Design System Consistency Corrections — 2026-07-14
 
