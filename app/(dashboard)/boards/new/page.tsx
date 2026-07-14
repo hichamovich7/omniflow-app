@@ -11,7 +11,7 @@ export default async function NewBoardPage() {
     .order('created_at', { ascending: false });
 
   return (
-    <PageContainer>
+    <PageContainer narrow>
       <PageHeader title="New Board" description="Create a new Pinterest board" />
       <BoardForm mode="create" projects={projects ?? []} />
     </PageContainer>

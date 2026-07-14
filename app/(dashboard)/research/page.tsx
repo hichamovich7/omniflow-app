@@ -21,7 +21,7 @@ export default async function ResearchPage() {
   const list = projects ?? [];
 
   return (
-    <PageContainer>
+    <PageContainer narrow>
       <PageHeader
         title="Research"
         description="Research a topic from a keyword, website, blog, or Pinterest URL before generating pins"
@@ -33,7 +33,7 @@ export default async function ResearchPage() {
           description="Research belongs to a project. Create a project before researching a source."
           icon={Search}
         >
-          <Link href="/projects/new" className={buttonVariants({ size: 'sm' })}>
+          <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Project
           </Link>

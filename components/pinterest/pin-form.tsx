@@ -103,7 +103,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
   }
 
   return (
-    <div className="mx-auto max-w-lg pt-8 sm:pt-16">
+    <div className="pt-8 sm:pt-16">
       {/* Hero */}
       <div className="mb-10 text-center">
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
@@ -231,23 +231,25 @@ export function PinForm({ projects, boards }: PinFormProps) {
           </div>
         )}
 
-        <Button
-          type="submit"
-          disabled={loading || projects.length === 0}
-          className="h-12 w-full text-sm font-medium"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Pins
-            </>
-          )}
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            disabled={loading || projects.length === 0}
+            className="h-11 px-6 text-sm font-medium"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate Pins
+              </>
+            )}
+          </Button>
+        </div>
       </form>
     </div>
   );

@@ -24,7 +24,7 @@ export default async function EditBoardPage({
   const projectName = Array.isArray(board.projects) ? board.projects[0]?.name : board.projects?.name;
 
   return (
-    <PageContainer>
+    <PageContainer narrow>
       <PageHeader title="Edit Board" description="Update board details" />
       <BoardForm
         mode="edit"

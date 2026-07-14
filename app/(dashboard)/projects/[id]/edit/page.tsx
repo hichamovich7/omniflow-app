@@ -22,7 +22,7 @@ export default async function EditProjectPage({
   }
 
   return (
-    <PageContainer>
+    <PageContainer narrow>
       <PageHeader title="Edit Project" description="Update project details" />
       <ProjectForm
         mode="edit"

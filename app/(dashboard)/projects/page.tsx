@@ -21,7 +21,7 @@ export default async function ProjectsPage() {
   return (
     <PageContainer>
       <PageHeader title="Projects" description="Organize your content by project">
-        <Link href="/projects/new" className={buttonVariants({ size: 'sm' })}>
+        <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           New Project
         </Link>

@@ -99,7 +99,7 @@ export function BoardForm({ mode, boardId, projects, defaultValues }: BoardFormP
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {mode === 'create' && projects && (
         <div className="space-y-1.5">
           <Label htmlFor="project">Project</Label>

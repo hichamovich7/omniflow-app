@@ -21,14 +21,14 @@ export default async function PinterestPage() {
   const list = projects ?? [];
 
   return (
-    <PageContainer>
+    <PageContainer narrow>
       {list.length === 0 ? (
         <EmptyState
           title="No projects yet"
           description="Create a project before generating pins. Projects help you organize your content."
           icon={Sparkles}
         >
-          <Link href="/projects/new" className={buttonVariants({ size: 'sm' })}>
+          <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Project
           </Link>

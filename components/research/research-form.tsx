@@ -250,19 +250,21 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
           </div>
         )}
 
-        <Button type="submit" disabled={loading || !projectId} className="h-12 w-full text-sm font-medium">
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Researching...
-            </>
-          ) : (
-            <>
-              <Search className="mr-2 h-4 w-4" />
-              Research
-            </>
-          )}
-        </Button>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={loading || !projectId} className="h-11 px-6 text-sm font-medium">
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Researching...
+              </>
+            ) : (
+              <>
+                <Search className="mr-2 h-4 w-4" />
+                Research
+              </>
+            )}
+          </Button>
+        </div>
       </form>
 
       {preview && (
@@ -331,7 +333,7 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
             </Button>
           )}
 
-          <Button onClick={handleContinue} className="w-full sm:w-auto">
+          <Button onClick={handleContinue} variant="outline" className="w-full sm:w-auto">
             Continue to Generate
           </Button>
         </div>

@@ -96,7 +96,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
               Clear filters
             </Link>
           ) : (
-            <Link href="/pinterest" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/pinterest" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
               Go to Generator
             </Link>
           )}

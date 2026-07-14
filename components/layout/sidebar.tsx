@@ -111,10 +111,10 @@ export function SidebarContent() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors duration-100',
+                      'flex items-center gap-2.5 rounded-lg border-l-2 pl-2 pr-2.5 py-1.5 text-[13px] transition-colors duration-100',
                       isActive
-                        ? 'bg-primary/8 text-primary font-medium'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        ? 'border-primary text-foreground font-medium'
+                        : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
                     <item.icon className="h-[15px] w-[15px]" />

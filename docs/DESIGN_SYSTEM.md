@@ -1,6 +1,6 @@
 # OmniFlow Design System
 
-Version: 1.1
+Version: 1.2
 
 ---
 
@@ -114,11 +114,11 @@ Distinct from shadcn's internal `--accent` token (a structural hover-state color
 
 Background
 
-Near-white with a subtle violet tint (`#FAF5FF`)
+Near-white, fully neutral (`#FAFAFA`) — no perceptible violet tint. Violet is reserved for interactive elements only (see Buttons discipline below), never for structural surfaces.
 
 Cards / Popovers
 
-Pure white — stays achromatic even though the page background is tinted, so dense forms/tables remain maximally legible during all-day use.
+Pure white — one step lighter than the page background, so dense forms/tables remain maximally legible during all-day use.
 
 Secondary Background
 
@@ -246,6 +246,32 @@ Grid gap:
 
 ---
 
+## Content Width By Page Type
+
+Not every page should stretch to the full 1280px. `PageContainer` accepts a `narrow` prop for this.
+
+List / grid pages — max-width 1280px (default, unchanged)
+
+```txt
+Dashboard
+Projects
+Boards
+History
+```
+
+Simple form pages — max-width ~672px (`max-w-2xl`), centered, `<PageContainer narrow>`
+
+```txt
+Research
+Generate (Pinterest Generator)
+New / Edit Project
+New / Edit Board
+```
+
+A form page stretched to 1280px reads as unfinished — inputs and a single submit button floating in empty space. Narrow width keeps the eye's travel distance short and the form feeling intentional.
+
+---
+
 # Radius
 
 Small components
@@ -309,6 +335,18 @@ Disabled state required.
 Hover state required.
 
 Focus state required.
+
+---
+
+## Discipline: One Primary Per Screen
+
+Primary (solid violet) is reserved for exactly **one** button per screen — the single most important action a user takes there (e.g. "Generate Content" on the Dashboard, "Research" on Research, "Generate Pins" on the Generator).
+
+Repeated or list-level actions — "New Project", "New Board", "Create Project", "Continue to Generate", "Go to Generator", and similar navigational shortcuts that appear every time the user visits a page — always use Outline, never Primary. These are not the page's core action; they are a way in or a way forward, and should read as neutral, dark-text (`--foreground`, deep indigo) controls rather than compete with the screen's one true CTA.
+
+A screen showing two solid-violet buttons at once is a bug. Modals are an exception: a dialog's own primary action (e.g. "Apply Schedule") may be solid violet independently of the page behind it, since it is evaluated as its own self-contained context.
+
+Form submit buttons (Research, Generate Pins) size to their label plus padding and align to the right of the form — never full-width. A full-width button on a narrow form reads as an oversized target with no visual weight; a right-aligned, standard-size button reads as a deliberate, confident action.
 
 ---
 
@@ -409,9 +447,9 @@ Account
 
 Active item:
 
-* primary color
-* subtle background
-* left indicator
+* dark foreground text (not violet)
+* a 2px left indicator bar in the primary color
+* no filled background
 
 Collapsed mode must remain usable.
 
