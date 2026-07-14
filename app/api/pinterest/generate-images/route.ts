@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await checkRateLimit(user.id, 'pinterest/generate-images', 20, 3600);
+  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/generate-images', 20, 3600);
   if (!rateLimit.allowed) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },

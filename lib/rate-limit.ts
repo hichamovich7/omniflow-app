@@ -7,11 +7,31 @@ export interface RateLimitResult {
 
 export async function checkRateLimit(
   userId: string,
+  userEmail: string,
   endpoint: string,
   limit: number,
   windowSeconds: number
 ): Promise<RateLimitResult> {
+  // Admin short-circuit: compared against the server-only env var, never a
+  // client-supplied value — userEmail always comes from the caller's verified
+  // supabase.auth.getUser() session (see call sites in the API routes).
+  if (userEmail && userEmail === process.env.ADMIN_EMAIL) {
+    return { allowed: true, remaining: limit };
+  }
+
   const supabase = await createClient();
+
+  // is_rate_limit_bypassed() is self-referential (reads auth.jwt() ->> 'email'
+  // server-side) — it answers only for the caller's own session, so passing
+  // userEmail here would be redundant and can't be used to check anyone else.
+  const { data: bypassed, error: bypassError } = await supabase.rpc('is_rate_limit_bypassed');
+
+  if (bypassError) {
+    console.error(`Rate limit bypass check failed for ${endpoint}:`, bypassError);
+  } else if (bypassed) {
+    return { allowed: true, remaining: limit };
+  }
+
   const windowMs = windowSeconds * 1000;
   const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
 

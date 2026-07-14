@@ -223,6 +223,20 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-029] Rate Limit Bypass Admin Panel — 2026-07-14
+
+* New `rate_limit_bypass` table (migration 011) — `email`, `added_at`, RLS enabled with **no policies** (deny-all for the normal anon/authenticated client, matching the requested "deny all direct access")
+* New `is_rate_limit_bypassed()` Postgres function (SECURITY DEFINER) — self-referential, takes no email argument, reads `auth.jwt() ->> 'email'` internally so it can only ever answer for the caller's own session; `GRANT EXECUTE ... TO authenticated` is safe to expose broadly because of this
+* New `lib/supabase/admin.ts` `createAdminClient()` — the project's first use of the Supabase `service_role` key (RULES.md Rule #7 allows it "en procesos controlados"); scoped exclusively to `app/api/admin/bypass-emails/route.ts`, every handler of which re-verifies `user.email === process.env.ADMIN_EMAIL` via the normal session client *before* the service-role client is ever touched
+* `lib/rate-limit.ts` `checkRateLimit()` signature extended to `(userId, userEmail, endpoint, limit, windowSeconds)`: (a) `userEmail === process.env.ADMIN_EMAIL` short-circuits to `{ allowed: true }` with no DB call, (b) otherwise calls `is_rate_limit_bypassed()` — a match short-circuits the same way, (c) otherwise falls through to the existing `increment_rate_limit()` counter from TASK-018, unchanged
+* All 4 existing call sites (`pinterest/generate`, `pinterest/generate-images`, `research`, `analyze`) updated to pass `user.email ?? ''` — sourced exclusively from the same `supabase.auth.getUser()` call that already produced `user.id`, never from client input (see confirmation below)
+* New `app/(dashboard)/admin/bypass/page.tsx` — Server Component, checks `user.email === process.env.ADMIN_EMAIL` first and calls `notFound()` (404, no "access denied" message) if it doesn't match; only then reads the bypass list via its own `createAdminClient()` call. No sidebar entry — reachable only by direct URL
+* New `app/api/admin/bypass-emails/route.ts` (GET/POST/DELETE) — each handler independently re-runs the same `ADMIN_EMAIL` check via `requireAdmin()` and returns 404 on failure, regardless of what the page-level check already did (defense in depth — the route is directly reachable by URL)
+* New `components/admin/bypass-email-form.tsx` / `bypass-email-table.tsx` — Card/Table/Dialog/Button/Input reused as-is per DESIGN_SYSTEM.md, mirroring the existing Boards CRUD pattern (`BoardForm`/`DeleteBoardDialog`)
+* Zero changes to TASK-018's ownership validation, `is_default` fix, `request.json()` try/catch, or UUID param validation — untouched, out of scope for this task
+
+---
+
 ## [TASK-018] Security Hardening — 2026-07-14
 
 * New `api_rate_limits` table (migration 010) + `increment_rate_limit()` Postgres function — atomic fixed-window counter (single `INSERT ... ON CONFLICT DO UPDATE`, avoids the read-then-write race of separate SELECT/UPDATE calls under concurrent requests)

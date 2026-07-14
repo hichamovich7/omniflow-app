@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await checkRateLimit(user.id, 'research', 60, 3600);
+  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'research', 60, 3600);
   if (!rateLimit.allowed) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },

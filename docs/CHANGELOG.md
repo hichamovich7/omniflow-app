@@ -22,6 +22,21 @@ No planned changes.
 
 ---
 
+# [1.13.0] - 2026-07-14
+
+## TASK-029: Rate Limit Bypass Admin Panel
+
+### Added
+
+* `rate_limit_bypass` table (migration 011) + `is_rate_limit_bypassed()` Postgres function — self-referential (no email argument, reads the caller's own JWT), safe to expose to all authenticated users via `RPC`. Table itself has RLS enabled with no policies (deny-all direct access)
+* `lib/supabase/admin.ts` `createAdminClient()` — first use of the `service_role` key in this codebase, confined to `app/api/admin/bypass-emails/route.ts`, only ever reached after an `ADMIN_EMAIL` session check
+* `lib/rate-limit.ts` `checkRateLimit()` now takes `userEmail` and checks, in order: `ADMIN_EMAIL` env match → `rate_limit_bypass` table membership → the existing per-window counter (TASK-018, unchanged)
+* `/admin/bypass` — hidden Server Component page (404 via `notFound()` for non-admins, no sidebar link) to add/remove bypass emails, backed by `GET/POST/DELETE /api/admin/bypass-emails` (each independently re-checks `ADMIN_EMAIL`)
+
+No changes to TASK-018's rate limiting counters, ownership checks, `is_default` fix, JSON try/catch, or UUID validation.
+
+---
+
 # [1.12.0] - 2026-07-14
 
 ## TASK-018: Security Hardening

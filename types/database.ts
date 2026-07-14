@@ -151,3 +151,9 @@ export interface PinImage {
 export type PinImageInsert = Omit<PinImage, 'id' | 'created_at'> & {
   id?: string;
 };
+
+export interface RateLimitBypassEntry {
+  id: string;
+  email: string;
+  added_at: string;
+}
