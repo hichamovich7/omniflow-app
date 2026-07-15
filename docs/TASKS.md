@@ -64,11 +64,15 @@ TASK-026 completed — see Completed Tasks below.
 
 ### [TASK-027] Multi-Generator Architecture
 
-#### Status: PLANNED
+#### Status: DEFERRED
 
 #### Goal
 
 Crear una arquitectura reutilizable para futuros generadores.
+
+#### Note
+
+Decisión 2026-07-15 (ver DECISIONS.md): no se trata como tarea separada antes de WordPress. Se pasa directamente a TASK-028, reutilizando pragmáticamente la infraestructura ya genérica (Brand Profile, Content Analyzer, Navigation, Editorial Workflow) y aceptando duplicación razonable en la parte específica del generador. Se reconsiderará una vez WordPress esté construido, cuando los patrones comunes reales entre Pinterest y WordPress sean visibles en el código.
 
 #### Reuses
 
@@ -95,9 +99,9 @@ Un nuevo generador puede añadirse reutilizando Brand Profile, Content Analyzer,
 
 Primer generador reutilizando toda la arquitectura anterior.
 
-#### Depends On
+#### Note
 
-TASK-027 (Multi-Generator Architecture)
+No depende de TASK-027 (decisión 2026-07-15, ver DECISIONS.md) — reutiliza directamente Brand Profile, Content Analyzer, Navigation y Editorial Workflow, con duplicación razonable en la parte específica del generador.
 
 #### Input
 
