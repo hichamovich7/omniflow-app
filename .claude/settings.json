@@ -14,7 +14,8 @@
       "PowerShell(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)",
       "Bash(echo \"EXIT_CODE=$?\")",
       "Bash(echo \"TSC_EXIT=$?\")",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(git tag *)"
     ]
   }
 }
