@@ -204,6 +204,35 @@ Generacion consistente de prompts Pinterest basados en imagen de referencia.
 
 ---
 
+## [TASK-030] Admin Dashboard (Users & Roles Management)
+
+### Status: PLANNED
+
+### Goal
+
+Extender el panel admin actual (`/admin/bypass`) a un dashboard real de gestión de usuarios y roles.
+
+### Scope
+
+```txt
+Consolidar el control de acceso admin sobre profiles.role (user/admin/superadmin,
+ya decidido en DECISIONS.md) en lugar del sistema actual ADMIN_EMAIL + rate_limit_bypass
+Página /admin/users: listado de usuarios, actividad (generaciones, proyectos),
+gestión de roles (otorgar/revocar permisos admin)
+Vista de créditos por usuario — depende de TASK-011 (Credits System),
+añadir solo una vez completado TASK-011
+```
+
+### Depends On
+
+Ninguna dependencia obligatoria para empezar. La vista de créditos por usuario espera a TASK-011 (Credits System).
+
+### Success Criteria
+
+Control de acceso admin basado en `profiles.role`; `/admin/users` permite ver actividad de usuarios y gestionar roles; vista de créditos añadida solo tras TASK-011.
+
+---
+
 # MVP RELEASE CHECKLIST
 
 ```txt
