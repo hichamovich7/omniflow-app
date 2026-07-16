@@ -41,6 +41,14 @@ auth.users
 
 └── api_rate_limits
 
+```
+  └── wordpress_generations (TASK-028, independent from generations/pins)
+
+        └── wordpress_articles
+
+              └── wordpress_article_images
+```
+
 ---
 
 # profiles
@@ -383,6 +391,116 @@ pin_id IN (
 
 ---
 
+# wordpress_generations
+
+One row per WordPress article generation request (TASK-028, Option 1: keyword → SEO article). Independent history from Pinterest's `generations`/`pins` — deliberately not reused, per the 2026-07-15 decision to duplicate the generator-specific layer rather than force a shared abstraction after a single example.
+
+## Columns
+
+| Column      | Type                   | Description                                    |
+| ----------- | ---------------------- | ----------------------------------------------- |
+| id          | uuid PK                |                                                  |
+| project_id  | uuid FK → projects.id  | ON DELETE CASCADE                               |
+| user_id     | uuid FK → profiles.id  | ON DELETE CASCADE                               |
+| keyword     | text                   |                                                  |
+| language    | text                   |                                                  |
+| source_type | text                   | `keyword` / `url` / `pins`, default `keyword`. Only `keyword` (Option 1) is implemented; `url` and `pins` are reserved for Options 2/3 |
+| status      | text                   | `pending` / `processing` / `completed` / `failed` |
+| created_at  | timestamptz            |                                                  |
+
+No `updated_at` — the row transitions status once (processing → completed/failed) via a single UPDATE from the API route, same pattern as `research_results`.
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+## Indexes
+
+```sql
+(user_id)
+(project_id)
+(created_at desc)
+```
+
+---
+
+# wordpress_articles
+
+The generated article for a `wordpress_generations` row. One-to-one in practice (Option 1 generates exactly one article per generation), modeled as a child table for future options that may retry/version.
+
+## Columns
+
+| Column                 | Type                              | Description                              |
+| ---------------------- | ---------------------------------- | ----------------------------------------- |
+| id                     | uuid PK                            |                                            |
+| generation_id          | uuid FK → wordpress_generations.id | ON DELETE CASCADE                         |
+| title                  | text                                | SEO title (H1), max 70 chars enforced by the outline schema |
+| slug                   | text                                | URL-friendly slug                         |
+| meta_description       | text                                | 150-160 chars enforced by the outline schema |
+| content                | text                                | Full article body in Markdown — the source of truth. `{{IMAGE_N}}` markers are already resolved to `![alt](url)` before this row is written |
+| word_count             | integer                            | Computed from the final content           |
+| featured_image_prompt  | text nullable                      | AI-generated scene description for the featured image |
+| featured_image_url     | text nullable                      | Public Supabase Storage URL, null if generation failed |
+| status                 | text                                | `pending` / `processing` / `completed` / `failed` |
+| created_at             | timestamptz                        |                                            |
+
+## Purpose
+
+Content is stored as Markdown, not HTML — HTML is derived at export time via `exportToHtml()` (`lib/wordpress/export.ts`, using `marked`), never persisted.
+
+## RLS
+
+```sql
+generation_id in (
+  select id from wordpress_generations where user_id = auth.uid()
+)
+```
+
+## Indexes
+
+```sql
+(generation_id)
+```
+
+---
+
+# wordpress_article_images
+
+Internal images referenced from the article body via `{{IMAGE_N}}` markers (2-3 per article). The featured image is NOT stored here — it lives on `wordpress_articles.featured_image_url`, a single column, not a list.
+
+## Columns
+
+| Column           | Type                          | Description                                  |
+| ---------------- | ------------------------------ | ---------------------------------------------- |
+| id               | uuid PK                        |                                                |
+| article_id       | uuid FK → wordpress_articles.id | ON DELETE CASCADE                             |
+| placement_marker | text                            | e.g. `IMAGE_1`, `IMAGE_2`, `IMAGE_3`          |
+| prompt           | text                            | AI-generated scene description                |
+| alt_text         | text                            | SEO/accessibility alt text                     |
+| url              | text nullable                   | Public Supabase Storage URL, null if that image's generation failed |
+| position         | integer                         | Order among the article's internal images      |
+| created_at       | timestamptz                     |                                                |
+
+## RLS
+
+```sql
+article_id in (
+  select wa.id from wordpress_articles wa
+  join wordpress_generations wg on wa.generation_id = wg.id
+  where wg.user_id = auth.uid()
+)
+```
+
+## Indexes
+
+```sql
+(article_id)
+```
+
+---
+
 # api_rate_limits
 
 Tracks per-user, per-endpoint request counts within a fixed time window (TASK-018). Backs application-level rate limiting on AI-cost-incurring endpoints — independent of RLS/ownership checks, which govern data access, not request volume.
@@ -559,6 +677,25 @@ generated-images/user-id/pin-id/2.png
 ```
 
 Path pattern: `{user_id}/{pin_id}/{version}.png`. Each version is stored separately to support image versioning.
+
+---
+
+## wordpress-images
+
+Status: Active (created in TASK-028, migration 012).
+
+Purpose:
+
+Store generated WordPress featured + internal images.
+
+Examples:
+
+```txt
+wordpress-images/user-id/generation-id/FEATURED.png
+wordpress-images/user-id/generation-id/IMAGE_1.png
+```
+
+Path pattern: `{user_id}/{generation_id}/{marker}.png`. Unlike `generated-images`, there is no versioning — one image per marker per generation.
 
 ---
 

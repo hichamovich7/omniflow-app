@@ -64,6 +64,7 @@ Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit(
 | POST /api/pinterest/generate-images   | 20 / hour  |
 | POST /api/research                    | 60 / hour  |
 | POST /api/analyze                     | 60 / hour  |
+| POST /api/wordpress/generate          | 20 / hour  |
 
 Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider.
 
@@ -193,6 +194,61 @@ not_found
 generation_not_completed
 image_generation_failed
 ```
+
+---
+
+# POST /api/wordpress/generate
+
+Generate a WordPress SEO article (TASK-028, Option 1: keyword → article).
+
+## Description
+
+Creates one `wordpress_generations` row and synchronously produces a full article: an outline is planned first (title, slug, meta description, H2 sections, featured + 2-3 internal image prompts), then the full Markdown body is written from that outline, then all images are generated and their `{{IMAGE_N}}` markers resolved into the Markdown before the `wordpress_articles` row is written. A single request can take up to ~60 seconds (2 text calls + up to 4 image calls, no async job queue — see RULES.md Rule #15, deferred).
+
+Options 2 (reference image) and 3 (rewrite from a blog URL) are not implemented — only `source_type: "keyword"` is accepted.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "keyword": "small bathroom storage ideas",
+  "language": "en"
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "generationId": "uuid",
+    "status": "completed"
+  },
+  "error": null
+}
+```
+
+Fetch the full article via a server-side Supabase query (`lib/queries/wordpress.ts`, `getWordPressArticleByGenerationId()`) at `/wordpress/[generationId]` — there is no separate `GET /api/wordpress/generations/[id]` route, same pattern as Pinterest's results page.
+
+## Credits
+
+Not yet enforced — TASK-011 (Credits System) is still PLANNED, same as `/api/pinterest/generate`.
+
+## Possible Errors
+
+```txt
+unauthorized
+forbidden
+rate_limited
+invalid_json
+invalid_request
+invalid_project
+generation_failed
+server_error
+```
+
+If image generation partially fails, the article still completes — failed markers are stripped from the content rather than left as raw `{{IMAGE_N}}` text, and `wordpress_article_images.url` / `wordpress_articles.featured_image_url` are `null` for the images that failed.
 
 ---
 

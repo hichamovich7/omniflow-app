@@ -49,9 +49,15 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'WordPress',
+    items: [
+      { href: '/wordpress', label: 'Generate', icon: FileText },
+      { href: '/wordpress/history', label: 'History', icon: Clock },
+    ],
+  },
+  {
     label: 'Platforms',
     items: [
-      { href: '/wordpress', label: 'WordPress', icon: FileText, disabled: true },
       { href: '/facebook', label: 'Facebook', icon: ThumbsUp, disabled: true },
       { href: '/linkedin', label: 'LinkedIn', icon: Briefcase, disabled: true },
       { href: '/medium', label: 'Medium', icon: PenSquare, disabled: true },

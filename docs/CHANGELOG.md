@@ -22,7 +22,26 @@ No planned changes.
 
 ---
 
-# [1.13.0] - 2026-07-14
+# [1.14.0] - 2026-07-15
+
+## TASK-028 (Option 1): WordPress Article Generator
+
+### Added
+
+* `wordpress_generations` / `wordpress_articles` / `wordpress_article_images` tables (migration 012) + `wordpress-images` storage bucket — independent history from Pinterest's `generations`/`pins`, per the TASK-027-deferral decision (duplicate the generator layer, reuse only what's already generic)
+* `lib/ai/prompts/seo-guidelines.ts` — generator-agnostic SEO rules (heading structure, keyword placement, meta description length, paragraph length, active voice, target word count), importable by any future long-form generator
+* `lib/ai/prompts/wordpress-outline-prompt.ts` + `wordpress-article-prompt.ts` — two-step generation: an outline (title, slug, meta description, H2 sections, 1 featured + 2-3 internal image prompts) is planned and Zod-validated first, then the full Markdown article is written from that outline and Zod-validated
+* `lib/wordpress/generate-article.ts` — orchestrates both AI text calls plus parallel image generation (`generateImage()`, role IMAGE, bounded concurrency via the existing `promisePool`); `{{IMAGE_N}}` markers are resolved into `![alt](url)` before the article is persisted. Text role centralized to `FAST` via a single `TEXT_ROLE` constant — the one place to switch to `SMART` if quality requires it
+* `POST /api/wordpress/generate` — mirrors `/api/pinterest/generate`'s auth/ownership/rate-limit pattern (20/hour); reuses `buildBrandProfileContext()` unchanged, no Content Analyzer / Editorial Workflow wiring (out of scope for a bare-keyword flow)
+* `lib/wordpress/export.ts` — `exportToMarkdown()` (passthrough, content is already the source of truth) and `exportToHtml()` (via `marked`, new dependency — see DECISIONS.md)
+* `/wordpress` (form) and `/wordpress/[id]` (article view, Copy Markdown / Copy HTML / Download .md) — sidebar entry unhidden (`disabled` removed), no other nav restructuring
+* `lib/guide/content.ts` — new "WordPress Generator" guide section
+
+### Not implemented (explicitly out of scope for Option 1)
+
+* Options 2 (reference image input) and 3 (rewrite from blog URL) — remain PLANNED
+* Direct WordPress REST API publishing — export is copy/download only
+* Credits enforcement — same gap as Pinterest generation, blocked on TASK-011
 
 ## TASK-029: Rate Limit Bypass Admin Panel
 

@@ -15,7 +15,8 @@
       "Bash(echo \"EXIT_CODE=$?\")",
       "Bash(echo \"TSC_EXIT=$?\")",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(git tag *)"
+      "Bash(git tag *)",
+      "Bash(git push *)"
     ]
   }
 }

@@ -9,6 +9,7 @@ import {
   CalendarClock,
   Download,
   Clock,
+  FileText,
 } from 'lucide-react';
 
 export interface GuideSection {
@@ -125,6 +126,17 @@ export const guideSections: GuideSection[] = [
       'Filter by keyword, Project, Board, language, or status.',
       'Results are paginated 20 at a time — use Previous / Next at the bottom of the list.',
       'From here you can revisit results, export CSV, or delete a generation.',
+    ],
+  },
+  {
+    id: 'wordpress',
+    title: 'WordPress Generator',
+    icon: FileText,
+    summary: 'Turn a keyword into a full SEO article: an outline is planned first, then the article is written from it, with a featured image and 2-3 internal images.',
+    points: [
+      'Enter a keyword, choose a Project and a language — the same Brand Profile used by Pinterest generation is reused here.',
+      'Generation runs in one request and can take up to a minute (outline, full article, then all images).',
+      'The article is stored as Markdown — use Copy Markdown, Copy HTML, or Download .md to take it to WordPress or anywhere else. There is no direct WordPress publishing yet.',
     ],
   },
 ];

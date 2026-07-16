@@ -528,6 +528,37 @@ Downloads Pinterest-compatible CSV.
 
 ---
 
+# WordPress Generator (TASK-028, Option 1)
+
+Route:
+
+```txt
+/wordpress
+```
+
+Same page structure as the Pinterest Generator form. Fields: Keyword (text, required), Project (select), Language (select) — no Pins/Board fields, no Research/Analyze passthrough (Option 1 starts from a bare keyword). Submit button reads "Generate Article" and its loading label warns generation can take up to a minute (2 AI text calls + up to 4 image calls, synchronous).
+
+---
+
+# WordPress Article (Results)
+
+Route:
+
+```txt
+/wordpress/[id]
+```
+
+Displayed after generation. Header mirrors the Pinterest Results page (back link, keyword, language, word count, status badge). Body:
+
+* Copy Markdown / Copy HTML / Download .md buttons (`components/wordpress/copy-export-buttons.tsx`)
+* Featured image (if generated)
+* Meta description
+* Rendered article (Markdown → HTML via `marked`, styled with Tailwind child-selector utilities — no typography plugin, see RULES.md Rule #30)
+
+No Editorial Workflow selection UI here — a single generated article has nothing to multi-select, unlike Pinterest's batch of pins.
+
+---
+
 # Boards
 
 Route:
@@ -935,9 +966,8 @@ Generation workflow optimized for desktop.
 
 ## Planned (in roadmap)
 
-* WordPress Generator (TASK-028)
-* Platform-based navigation (TASK-026)
-* Content Research (TASK-023)
+* WordPress Generator — Options 2/3 (TASK-028, Option 1 implemented)
+* Admin Dashboard — Users & Roles (TASK-030)
 
 ## Not MVP
 

@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED.
 
 ---
 
@@ -93,47 +93,51 @@ Un nuevo generador puede añadirse reutilizando Brand Profile, Content Analyzer,
 
 ### [TASK-028] WordPress Generator
 
-#### Status: PLANNED
-
-#### Goal
-
-Primer generador reutilizando toda la arquitectura anterior.
+#### Status: Option 1 completed 2026-07-15 — Options 2/3 PLANNED
 
 #### Note
 
-No depende de TASK-027 (decisión 2026-07-15, ver DECISIONS.md) — reutiliza directamente Brand Profile, Content Analyzer, Navigation y Editorial Workflow, con duplicación razonable en la parte específica del generador.
+No depende de TASK-027 (decisión 2026-07-15, ver DECISIONS.md) — reutiliza directamente Brand Profile y Navigation, con duplicación razonable en la parte específica del generador (prompts, tablas, ruta API). Content Analyzer y Editorial Workflow (selección) siguen siendo reutilizables mais no están conectados por Option 1 (generación por keyword directo, sin pasar por Research/Analyze).
 
-#### Input
-
-```txt
-Keyword
-Image
-Blog URL
-```
-
-#### Generation
+#### Option 1 — Keyword → SEO Article (DONE)
 
 ```txt
-SEO Article
-Featured Image
-Export
-Publicación futura
+Input: Keyword, Project, Language
+Generation: outline (Zod-validated) → full article from outline (Zod-validated) → 1 featured image + 2-3 internal images (role IMAGE)
+Content stored as Markdown (source of truth), {{IMAGE_N}} markers resolved to real URLs before storage
+Export: Copy Markdown, Copy HTML (via `marked`), Download .md — no direct WordPress REST API publishing
 ```
 
-#### Reuses
+Text role centralized to `FAST` in `lib/wordpress/generate-article.ts` (`TEXT_ROLE` constant) — single place to switch to `SMART` if quality requires it.
+
+#### Option 2 — Image → SEO Article (PLANNED, not implemented)
 
 ```txt
-Editorial Workflow (TASK-020)
-Image Versioning (TASK-021)
-Brand Profile (TASK-022)
-Content Analyzer (TASK-024)
-Navigation (TASK-026)
-Historial independiente
+Input: reference image instead of / alongside a keyword
+Depends on: TASK-013 (Image Analysis) — VISION role wiring
 ```
+
+#### Option 3 — Blog URL → Rewritten/Optimized Article (PLANNED, not implemented)
+
+```txt
+Input: existing blog post URL to rewrite or SEO-optimize
+Could reuse Research (TASK-023) source_type: 'blog' fetching, and Content Analyzer (TASK-024)
+```
+
+#### Reuses (Option 1)
+
+```txt
+Brand Profile (TASK-022) — buildBrandProfileContext(), unchanged
+Navigation (TASK-026) — sidebar entry unhidden
+AI Engine (generateText, generateImage) — unchanged, no new provider code
+Historial independiente — wordpress_generations / wordpress_articles / wordpress_article_images (migration 012), separate from generations/pins
+```
+
+Not yet wired into Option 1: Content Analyzer (TASK-024) and Editorial Workflow selection (TASK-020) — the keyword-only flow doesn't go through Research/Analyze, and a single generated article has nothing to multi-select. Both remain available for Options 2/3 or a future batch mode.
 
 #### Success Criteria
 
-Usuario puede generar contenido WordPress optimizado reutilizando toda la arquitectura existente.
+Usuario puede generar un artículo SEO completo desde un keyword, con imagen destacada e imágenes internas, y exportarlo en Markdown o HTML. (Cumplido por Option 1.) Options 2 y 3 quedan PLANNED.
 
 ---
 

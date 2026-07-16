@@ -4,7 +4,7 @@
 
 OmniFlow es una plataforma de generación de contenido mediante IA construida como un monolito modular con Next.js y Supabase.
 
-Pinterest es el primer módulo implementado. WordPress será el siguiente. La arquitectura está diseñada para soportar múltiples generadores de contenido sin duplicar código.
+Pinterest fue el primer módulo implementado. WordPress (Option 1) es el segundo. La arquitectura reutiliza lo que ya es genérico (Brand Profile, Navigation, AI Engine) y acepta duplicación razonable en la parte específica de cada generador — ver "Multi-Generator Strategy" más abajo.
 
 El MVP actual cubre generación de contenido Pinterest, generación de imágenes, programación y exportación CSV.
 
@@ -20,7 +20,7 @@ No es un generador de pines. Es una plataforma donde cada módulo sigue el mismo
 Research → Analyze → Generate → Review → Images → Schedule → Export
 ```
 
-Pinterest implementa este flujo primero. WordPress lo reutilizará después. Los siguientes generadores seguirán exactamente el mismo patrón.
+Pinterest implementa este flujo. WordPress (Option 1) implementa una variante propia (outline → article → images), no una reutilización directa — ver "Multi-Generator Strategy".
 
 ---
 
@@ -68,7 +68,7 @@ OmniFlow
 │
 ├── Pinterest              (Implemented)
 │
-├── WordPress              (Planned — TASK-028)
+├── WordPress              (Implemented — TASK-028 Option 1; Options 2/3 Planned)
 │
 ├── Facebook               (Future)
 │
@@ -214,10 +214,10 @@ Reutilizado hoy por:
 
 * Pinterest content generation (title, description, keywords, board)
 * Pinterest image generation — de forma transitiva: `image_prompt` lo genera el rol FAST bajo el mismo system prompt brand-aware, antes de que el Prompt Engine añada las directivas fotográficas
+* WordPress content generation (TASK-028) — `buildBrandProfileContext()` reutilizado sin cambios en el outline prompt
 
 Reutilizable en el futuro por:
 
-* WordPress content generation
 * Facebook, LinkedIn, Medium (futuro)
 
 Evolución prevista:
@@ -285,7 +285,7 @@ lib/analyzer/
 
 Results are stored in `content_analyses` (see DATABASE.md), one row per research result (`POST /api/analyze` is idempotent — re-analyzing returns the existing row). The Research page surfaces this as a visible "Analyze" step: the structured breakdown is shown to the user before they continue to a generator, rather than run silently.
 
-Reusable by any generator, independent of the target platform: `buildAnalysisContext()` takes an `AnalysisOutput` (or `null`) and returns a prompt-injectable string, the same pattern as `buildBrandProfileContext()`. Currently wired into `POST /api/pinterest/generate` via an optional `analysisId` — WordPress (TASK-028) and future generators will reuse the same helper without any change to `lib/analyzer/`.
+Reusable by any generator, independent of the target platform: `buildAnalysisContext()` takes an `AnalysisOutput` (or `null`) and returns a prompt-injectable string, the same pattern as `buildBrandProfileContext()`. Currently wired only into `POST /api/pinterest/generate` via an optional `analysisId`. WordPress TASK-028 Option 1 does not wire it in — its flow starts from a bare keyword, not a Research result — but the helper is ready for Options 2/3 or a future Research-first WordPress flow without any change to `lib/analyzer/`.
 
 ---
 
@@ -372,18 +372,17 @@ History              (Implemented)
 
 # Multi-Generator Strategy
 
-Pinterest es el módulo de validación. Toda la arquitectura se probará primero en Pinterest antes de extenderla a otros generadores.
+Pinterest es el módulo de validación. TASK-027 (extraer una arquitectura de generador genérica) fue DEFERRED el 2026-07-15: con un solo caso concreto (Pinterest), diseñar una abstracción común habría sido adivinar el patrón sin un segundo ejemplo real para validarlo (ver DECISIONS.md).
 
-Cuando la arquitectura esté madura, WordPress (TASK-028) reutilizará:
+WordPress (TASK-028, Option 1) se construyó directamente sobre las piezas ya genéricas, sin pasar por TASK-027:
 
-* Editorial Workflow (TASK-020)
-* Brand Profile (TASK-022)
-* Content Analyzer (TASK-024)
-* Navigation (TASK-026)
-* Scheduling
-* Export
+* Brand Profile (TASK-022) — `buildBrandProfileContext()` reutilizado tal cual
+* Navigation (TASK-026) — misma estructura `navGroups`, solo se quitó `disabled`
+* AI Engine (`generateText`, `generateImage`) — cero código nuevo de proveedor
 
-Los siguientes generadores (Facebook, LinkedIn, Medium) seguirán exactamente el mismo patrón. La creación de un nuevo generador requerirá únicamente configuración específica de plataforma, validación y prompts — sin duplicar infraestructura.
+Y duplicó pragmáticamente la parte específica del generador en lugar de generalizarla: prompts propios (`lib/ai/prompts/wordpress-*`), esquemas Zod propios, tablas propias (`wordpress_generations`/`wordpress_articles`/`wordpress_article_images`, independientes de `generations`/`pins`), y ruta API propia. Content Analyzer (TASK-024) y Editorial Workflow (TASK-020) quedan disponibles pero no conectados a Option 1 — la generación por keyword no pasa por Research/Analyze, y un solo artículo no tiene nada que multi-seleccionar.
+
+Los siguientes generadores (Facebook, LinkedIn, Medium, y las Options 2/3 de WordPress) evaluarán caso por caso qué piezas reutilizar directamente y qué merece duplicarse, en vez de asumir una plantilla común — TASK-027 se reconsiderará solo cuando existan patrones reales repetidos entre dos o más generadores.
 
 ---
 
@@ -400,17 +399,17 @@ Pinterest
   Generate
   Boards
   History
-Platforms (disabled placeholders)
-  WordPress
-  Facebook
-  LinkedIn
-  Medium
+Platforms
+  WordPress            (Implemented — TASK-028 Option 1)
+  Facebook             (disabled placeholder)
+  LinkedIn             (disabled placeholder)
+  Medium               (disabled placeholder)
 Account
   Credits
   Settings
 ```
 
-Ninguna ruta cambió — `/research`, `/pinterest`, `/boards`, `/history` siguen siendo las mismas; solo se reagruparon visualmente bajo "Pinterest" en vez de "Generators"/"Library". WordPress/Facebook/LinkedIn/Medium usan el mismo patrón `disabled` ya existente (como Credits/Settings) — placeholders sin ruta funcional, preparados para que cada plataforma futura (empezando por WordPress, TASK-028) reciba su propio grupo con sub-secciones, siguiendo el mismo patrón que Pinterest.
+Ninguna ruta cambió — `/research`, `/pinterest`, `/boards`, `/history` siguen siendo las mismas; solo se reagruparon visualmente bajo "Pinterest" en vez de "Generators"/"Library". Facebook/LinkedIn/Medium siguen usando el patrón `disabled` ya existente (como Credits/Settings) — placeholders sin ruta funcional. WordPress (TASK-028) fue el primero en salir de ese estado: solo se quitó `disabled` de su entrada, sin crear un grupo dedicado con sub-secciones (no había necesidad — una sola página de formulario y una de resultado, como Pinterest antes de Boards/History).
 
 ---
 
@@ -780,14 +779,14 @@ Intelligent Content Research (Fase 2)
 ↓
 Platform Architecture (Fase 3)
 ↓
-WordPress Module (Fase 4)
+WordPress Module (Fase 4) — Option 1 done, Options 2/3 pending
 ↓
 Additional Generators (Future)
 ↓
 Full AI Content Platform
 ```
 
-Cada fase se construye sobre la anterior. Pinterest valida la arquitectura. WordPress la reutiliza. Los siguientes generadores la escalan.
+Cada fase se construye sobre la anterior. Pinterest valida la arquitectura. WordPress reutiliza lo genérico y duplica lo específico (ver "Multi-Generator Strategy"). Los siguientes generadores decidirán caso por caso.
 
 ---
 
