@@ -10,6 +10,13 @@ export const generateArticleSchema = z.object({
 
 export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;
 
+export const generateArticleFromPinsSchema = z.object({
+  pinIds: z.array(z.string().uuid()).min(1, 'Select at least one pin').max(20, 'Too many pins selected'),
+  researchNotes: z.string().trim().max(2000, 'Research notes are too long').optional(),
+});
+
+export type GenerateArticleFromPinsInput = z.infer<typeof generateArticleFromPinsSchema>;
+
 const outlineImageSchema = z.object({
   placementMarker: z.string().min(1),
   prompt: z.string().min(1),
@@ -38,6 +45,18 @@ export const wordpressOutlineSchema = z.object({
 });
 
 export type WordPressOutline = z.infer<typeof wordpressOutlineSchema>;
+
+/**
+ * Same shape as wordpressOutlineSchema, except `images` length is pinned to
+ * however many internal images are actually available to reuse (0-3 selected
+ * pins with an active image) instead of Option 1's fixed 2-3 — the pins flow
+ * never generates internal images, it only has as many as pins supply.
+ */
+export function buildWordpressPinsOutlineSchema(imageCount: number) {
+  return wordpressOutlineSchema.extend({
+    images: z.array(outlineImageSchema).length(imageCount),
+  });
+}
 
 const faqItemSchema = z.object({
   question: z.string().min(1),

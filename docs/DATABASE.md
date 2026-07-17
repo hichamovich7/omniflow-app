@@ -404,7 +404,9 @@ One row per WordPress article generation request (TASK-028, Option 1: keyword �
 | user_id     | uuid FK → profiles.id  | ON DELETE CASCADE                               |
 | keyword     | text                   |                                                  |
 | language    | text                   |                                                  |
-| source_type | text                   | `keyword` / `url` / `pins`, default `keyword`. Only `keyword` (Option 1) is implemented; `url` and `pins` are reserved for Options 2/3 |
+| source_type | text                   | `keyword` / `url` / `pins`. `keyword` (Option 1) and `pins` (Option 4) are implemented; `url` is reserved for Option 3 |
+| research_notes | text nullable       | Optional user-supplied SEO research, migration 013                |
+| source_pin_ids | uuid[] nullable     | Pinterest pin IDs this generation was built from (Option 4 only, migration 014). No FK on array elements — ownership of the referenced pins is validated at insert time in the API route, not enforced by the DB |
 | status      | text                   | `pending` / `processing` / `completed` / `failed` |
 | created_at  | timestamptz            |                                                  |
 

@@ -22,6 +22,28 @@ No planned changes.
 
 ---
 
+# [1.15.0] - 2026-07-17
+
+## TASK-028 (Option 4): WordPress Article Generator — Selected Pins → Unified Article
+
+### Added
+
+* `source_pin_ids uuid[]` on `wordpress_generations` (migration 014) — provenance for pins-based generations, no FK on array elements (ownership validated in the API route)
+* `lib/ai/prompts/wordpress-from-pins-prompt.ts` — `buildWordPressFromPinsPrompt()`, synthesizes one unified article outline from multiple pins' title/description/keywords (not a concatenation); reuses the same fixed 10-block structure as Option 1. A frequency-based heuristic (`deriveThemeKeyword()`) picks a seed phrase across the pins' keywords to anchor `buildSeoGuidelines()`'s single-primary-keyword rule — the actual title/angle synthesis is still the model's own
+* `lib/validations/wordpress.ts` — `buildWordpressPinsOutlineSchema(imageCount)`, same shape as Option 1's outline schema except `images` length is pinned to however many internal images are actually available (0-3) instead of a fixed 2-3; `generateArticleFromPinsSchema` for the new route's request body
+* `lib/wordpress/generate-article.ts` — `generateArticleFromPins()`: same outline → article two-step pipeline as Option 1, but only the featured image is generated (`generateImage()`, role IMAGE, from a prompt describing the unified theme); internal images are the selected pins' own active `pin_images` URLs, copied as-is into the `{{IMAGE_N}}` markers — no `generateImage()` call or re-upload for those. No `addExternalLink()` call yet (pending the external-link 404 fix, tracked separately)
+* `POST /api/wordpress/generate-from-pins` — separate route from Option 1's `/api/wordpress/generate` (pins-based ownership check instead of project-based, no `keyword`/`language` in the request). Validates all selected pins share one `generation_id` (400 if not), derives `project_id` and `language` server-side from the pins, rate-limited same as Option 1 (20/hour)
+* `lib/queries/pin-images.ts` — `getActivePinImageUrls()`, batch lookup of each pin's active `pin_images.url`
+* `components/pinterest/generate-wordpress-button.tsx` — "Generate WordPress Article" action in `SelectionActionBar` (Pinterest Editorial Workflow), active from 1 pin selected; warns via dialog before navigating when fewer than 3 pins are selected
+* `/wordpress?pinIds=...` — pins-source mode on the existing WordPress generator page: pin thumbnails/titles preview, optional Research Notes, Project/Language are not selectable (derived from the pins) — new `components/wordpress/pins-source-article-form.tsx`
+
+### Decisions
+
+* Featured image is always newly generated from the article's unified theme (never a reused pin image); internal images are always reused pin images (never freshly generated) — see DECISIONS.md 2026-07-17
+* Labeled "Option 4" rather than reusing "Option 3" (already reserved in TASKS.md for a future Blog URL → rewritten article flow) — see DECISIONS.md 2026-07-17
+
+---
+
 # [1.14.0] - 2026-07-15
 
 ## TASK-028 (Option 1): WordPress Article Generator

@@ -8,6 +8,7 @@ import { PinTable } from '@/components/pinterest/pin-table';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
 import { GenerateImagesButton } from '@/components/pinterest/generate-images-button';
 import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
+import { GenerateWordPressButton } from '@/components/pinterest/generate-wordpress-button';
 import type { Pin, ImageStatus } from '@/types/database';
 
 interface EditorialWorkspaceProps {
@@ -91,6 +92,7 @@ function EditorialWorkspaceContent({
               keyword={keyword}
               selectedPinIds={selectedIds}
             />
+            <GenerateWordPressButton selectedPinIds={selectedIds} />
           </SelectionActionBar>
         </>
       )}

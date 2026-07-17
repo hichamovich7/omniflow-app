@@ -132,9 +132,11 @@ export const guideSections: GuideSection[] = [
     id: 'wordpress',
     title: 'WordPress Generator',
     icon: FileText,
-    summary: 'Turn a keyword into a full SEO article: an outline is planned first, then the article is written from it, with a featured image and 2-3 internal images.',
+    summary: 'Turn a keyword — or a set of selected Pinterest pins — into a full SEO article: an outline is planned first, then the article is written from it, with a featured image and internal images.',
     points: [
       'Enter a keyword, choose a Project and a language — the same Brand Profile used by Pinterest generation is reused here.',
+      'Or generate from pins: select 1 or more pins on a Pinterest generation page and use "Generate WordPress Article" in the selection toolbar. AI identifies the pins\' common theme and writes one unified article — Project and language are taken from the pins automatically. Fewer than 3 pins still works, with a warning that the result may be thin.',
+      'From pins, the featured image is always freshly generated for the article\'s unified theme; internal images (up to 3) reuse the pins\' own already-generated images instead of creating new ones.',
       'Generation runs in one request and can take up to a minute (outline, full article, then all images).',
       'The article is stored as Markdown — use Copy Markdown, Copy HTML, or Download .md to take it to WordPress or anywhere else. There is no direct WordPress publishing yet.',
     ],

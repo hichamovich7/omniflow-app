@@ -567,3 +567,47 @@ Intégré dans `lib/wordpress/generate-article.ts` entre la rédaction de l'arti
 * Les liens internes restent explicitement hors scope tant que la connexion WordPress (accès aux pages existantes du site cible) n'existe pas
 
 **Correctif 2026-07-17** : un premier test a produit un lien externe en 404. Cause : la vérification annoncée dans le prompt ("verify the source is real... never invent") reposait entièrement sur la déclaration du modèle, sans aucun contrôle côté serveur — le modèle peut mal recopier une URL réelle ou citer une page qui a bougé depuis son entraînement, même avec la recherche web activée. `addExternalLink()` fait désormais un vrai contrôle HTTP (HEAD, puis GET en repli pour les serveurs qui rejettent HEAD, timeout 8s) avant d'accepter le lien ; si l'URL ne répond pas en 2xx, seul le lien Markdown `[texte](url)` est retiré (le texte d'ancrage est conservé), pas tout l'article. Le prompt a aussi été renforcé ("copy the URL exactly as returned... do not retype or reconstruct from memory").
+
+Ce correctif n'est pas considéré clos — un traitement complémentaire est prévu séparément. `lib/ai/services/external-link.ts` n'a pas été touché par Option 4 (voir entrée suivante) : `generateArticleFromPins()` n'appelle pas `addExternalLink()` du tout, précisément pour ne pas mélanger ce correctif en cours avec la nouvelle fonctionnalité.
+
+---
+
+## 2026-07-17
+
+### Decision
+
+TASK-028 : nouvelle Option "Pins Pinterest sélectionnés → article unifié" nommée Option 4, pas Option 3
+
+### Context
+
+La demande initiale faisait référence à cette fonctionnalité comme "Option 3", mais TASKS.md réservait déjà ce nom à une idée distincte et non implémentée : "Blog URL → Rewritten/Optimized Article" (réutilisation possible de Research `source_type: 'blog'` et du Content Analyzer). La fonctionnalité "pins sélectionnés" ne correspond à aucune des Options 2/3 déjà documentées. Par la règle d'or d'AGENT.md ("quand documentation et code sont en désaccord, la documentation fait foi") et la règle "ne pas inventer de fonctionnalité produit sans clarification", ce conflit a été soumis à l'utilisateur avant implémentation plutôt que résolu silencieusement.
+
+### Decision Taken
+
+Créée en tant qu'**Option 4** dans TASKS.md, laissant Option 2 (Image → Article) et Option 3 (Blog URL → Article réécrit) intactes et toujours PLANNED. Le code (route API, composants) utilise également ce nom : `/api/wordpress/generate-from-pins`, pas de références à "Option 3" dans les commentaires ou l'UI.
+
+### Consequences
+
+* Une future implémentation de l'Option 3 (Blog URL) n'entrera pas en conflit de nommage avec cette fonctionnalité
+* `source_type` sur `wordpress_generations` reste `'pins'` (déjà réservé par la contrainte CHECK de la migration 012, qui anticipait cette valeur sans l'implémenter) — aucun changement de schéma nécessaire au-delà de `source_pin_ids`
+
+---
+
+## 2026-07-17
+
+### Decision
+
+TASK-028 (Option 4) : image mise en avant toujours régénérée, images internes toujours réutilisées telles quelles
+
+### Context
+
+Pour un article de synthèse basé sur plusieurs pins, deux approches étaient possibles pour l'image mise en avant (featured image) : réutiliser l'image d'un des pins sélectionnés, ou en générer une nouvelle. Réutiliser l'image d'un pin poserait un problème éditorial : cette image a été conçue pour représenter *un seul* pin (un angle spécifique), pas le thème unifié de l'article de synthèse — elle serait donc thématiquement incohérente avec un article qui couvre plusieurs pins à la fois. À l'inverse, régénérer les images internes (2-3 images déjà existantes et déjà payées en crédits IA lors de la génération Pinterest) serait un gaspillage direct de crédits pour un résultat visuellement redondant.
+
+### Decision Taken
+
+Séparation stricte : la featured image est **toujours** générée via `generateImage()` (rôle IMAGE) à partir d'un prompt décrivant le thème unifié de l'article (jamais un pin en particulier) ; les images internes (jusqu'à 3) sont **toujours** les images actives déjà générées des pins sélectionnés (`pin_images.is_active = true`), copiées par URL Supabase Storage existante — sans nouvel appel `generateImage()`, sans re-upload.
+
+### Consequences
+
+* Coût IA par génération Option 4 : un seul appel `generateImage()` (featured) au lieu de 3-4 (Option 1) — économie de crédits directe, cohérente avec le fait que les images internes existent déjà
+* Si un pin sélectionné n'a pas d'image active (jamais générée, ou toutes les versions supprimées), il ne fournit simplement pas d'image interne — le nombre d'images internes de l'article peut donc être inférieur à 3, y compris 0 ; `buildWordpressPinsOutlineSchema` accepte cette plage 0-3 (contrairement à l'Option 1, qui exige toujours 2-3)

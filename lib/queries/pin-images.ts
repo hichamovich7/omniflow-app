@@ -14,6 +14,25 @@ export async function getPinImageVersions(
   return (data ?? []) as PinImage[];
 }
 
+/**
+ * Active image URL per pin, for pins that have one. Missing entries mean the
+ * pin has no active image (never generated, or all versions deleted).
+ */
+export async function getActivePinImageUrls(
+  supabase: SupabaseClient,
+  pinIds: string[]
+): Promise<Map<string, string>> {
+  if (pinIds.length === 0) return new Map();
+
+  const { data } = await supabase
+    .from('pin_images')
+    .select('pin_id, url')
+    .in('pin_id', pinIds)
+    .eq('is_active', true);
+
+  return new Map((data ?? []).map((row) => [row.pin_id as string, row.url as string]));
+}
+
 export async function getPinOwnerUserId(
   supabase: SupabaseClient,
   pinId: string

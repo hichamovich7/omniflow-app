@@ -3,8 +3,14 @@ import { generateText, generateImage } from '@/lib/ai/engine';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
+import { buildWordPressFromPinsPrompt } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
+import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import { addExternalLink } from '@/lib/ai/services/external-link';
-import { wordpressOutlineSchema, wordpressArticleResponseSchema } from '@/lib/validations/wordpress';
+import {
+  wordpressOutlineSchema,
+  wordpressArticleResponseSchema,
+  buildWordpressPinsOutlineSchema,
+} from '@/lib/validations/wordpress';
 import { promisePool } from '@/lib/utils/promise-pool';
 import type { SupportedLanguage } from '@/types/pinterest';
 
@@ -91,8 +97,18 @@ export async function generateWordPressArticle(
     maxTokens: OUTLINE_MAX_TOKENS,
   });
 
-  const outlineValidated = wordpressOutlineSchema.safeParse(JSON.parse(outlineRaw));
+  // TEMP DEBUG (remove after diagnosing the "invalid outline format" failure)
+  let outlineJson: unknown;
+  try {
+    outlineJson = JSON.parse(outlineRaw);
+  } catch (err) {
+    console.error('[wordpress] TEMP DEBUG — outline JSON.parse failed. Raw response below:\n' + outlineRaw);
+    throw err;
+  }
+  const outlineValidated = wordpressOutlineSchema.safeParse(outlineJson);
   if (!outlineValidated.success) {
+    console.error('[wordpress] TEMP DEBUG — outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
+    console.error('[wordpress] TEMP DEBUG — Raw response below:\n' + outlineRaw);
     throw new Error('AI returned an invalid outline format. Try again.');
   }
   const outline = outlineValidated.data;
@@ -187,6 +203,142 @@ export async function generateWordPressArticle(
     wordCount,
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl: urlByMarker.get('FEATURED') ?? null,
+    internalImages,
+  };
+}
+
+interface GenerateArticleFromPinsParams {
+  supabase: SupabaseClient;
+  userId: string;
+  generationId: string;
+  /**
+   * All selected pins, text only. The caller must order this array so that
+   * the first `internalImageUrls.length` entries are exactly the pins whose
+   * image is being reused, in the same order as `internalImageUrls` — the
+   * outline prompt maps "image slot N" to "pin N" in this list.
+   */
+  pins: PinSummary[];
+  /** Active pin_images URLs to reuse as internal images, already capped to at most 3. */
+  internalImageUrls: string[];
+  language: SupportedLanguage;
+  brandProfileDescription: string | null;
+  researchNotes?: string | null;
+}
+
+/**
+ * Pins → unified article generation (TASK-028 Option 4). Same outline → full
+ * article two-step pipeline as generateWordPressArticle, but:
+ * - the outline is synthesized from multiple pins' theme instead of a keyword
+ * - internal images are the pins' own already-generated images, copied as-is
+ *   (no generateImage() call, no storage upload — just their existing public URL)
+ * - only the featured image is newly generated, from the outline's unified-theme prompt
+ * - no addExternalLink() call yet (TASK-028: pending the external-link 404 fix)
+ */
+export async function generateArticleFromPins(
+  params: GenerateArticleFromPinsParams
+): Promise<GenerateArticleResult> {
+  const { supabase, userId, generationId, pins, internalImageUrls, language, brandProfileDescription, researchNotes } = params;
+  const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
+  const imageCount = internalImageUrls.length;
+
+  // Step 1: outline, synthesized from the pins' theme
+  const { system: outlineSystem, user: outlineUser } = buildWordPressFromPinsPrompt({
+    pins,
+    brandProfileContext: brandProfileContext || undefined,
+    researchNotes: researchNotes || undefined,
+    language,
+    imageCount,
+  });
+
+  const outlineRaw = await generateText({
+    role: TEXT_ROLE,
+    messages: [
+      { role: 'system', content: outlineSystem },
+      { role: 'user', content: outlineUser },
+    ],
+    maxTokens: OUTLINE_MAX_TOKENS,
+  });
+
+  // TEMP DEBUG (remove after diagnosing the "invalid outline format" failure)
+  let outlineJson: unknown;
+  try {
+    outlineJson = JSON.parse(outlineRaw);
+  } catch (err) {
+    console.error('[wordpress-from-pins] TEMP DEBUG — outline JSON.parse failed. Raw response below:\n' + outlineRaw);
+    throw err;
+  }
+  const outlineValidated = buildWordpressPinsOutlineSchema(imageCount).safeParse(outlineJson);
+  if (!outlineValidated.success) {
+    console.error('[wordpress-from-pins] TEMP DEBUG — outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
+    console.error('[wordpress-from-pins] TEMP DEBUG — Raw response below:\n' + outlineRaw);
+    throw new Error('AI returned an invalid outline format. Try again.');
+  }
+  const outline = outlineValidated.data;
+
+  // Step 2: full article, written from the validated outline — identical to Option 1
+  const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({
+    outline,
+    language,
+  });
+
+  const articleRaw = await generateText({
+    role: TEXT_ROLE,
+    messages: [
+      { role: 'system', content: articleSystem },
+      { role: 'user', content: articleUser },
+    ],
+    maxTokens: ARTICLE_MAX_TOKENS,
+  });
+
+  const articleValidated = wordpressArticleResponseSchema.safeParse(JSON.parse(articleRaw));
+  if (!articleValidated.success) {
+    throw new Error('AI returned an invalid article format. Try again.');
+  }
+  let content = articleValidated.data.content;
+
+  // Step 3: featured image only — generated fresh from the unified-theme prompt.
+  const imageBuffer = await generateImage({ prompt: outline.featuredImage.prompt, size: WORDPRESS_IMAGE_CONFIG.size });
+  const filePath = `${userId}/${generationId}/FEATURED.png`;
+
+  let featuredImageUrl: string | null = null;
+  try {
+    const { error: uploadError } = await supabase.storage
+      .from('wordpress-images')
+      .upload(filePath, imageBuffer, { contentType: 'image/png' });
+
+    if (uploadError) throw new Error(`Storage upload failed for FEATURED: ${uploadError.message}`);
+
+    const { data: publicUrl } = supabase.storage.from('wordpress-images').getPublicUrl(filePath);
+    featuredImageUrl = publicUrl.publicUrl;
+  } catch (err) {
+    console.warn('[wordpress-from-pins] featured image failed:', err instanceof Error ? err.message : err);
+  }
+
+  // Step 4: resolve {{IMAGE_N}} markers to the reused pin image URLs (no generation, no upload).
+  for (const [i, img] of outline.images.entries()) {
+    const url = internalImageUrls[i] ?? null;
+    const markerPattern = new RegExp(`\\{\\{${img.placementMarker}\\}\\}`, 'g');
+    content = content.replace(markerPattern, url ? `![${img.altText}](${url})` : '');
+  }
+
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+
+  const internalImages: GeneratedArticleImage[] = outline.images.map((img, i) => ({
+    placementMarker: img.placementMarker,
+    prompt: img.prompt,
+    altText: img.altText,
+    url: internalImageUrls[i] ?? null,
+    position: i,
+  }));
+
+  return {
+    title: outline.title,
+    slug: outline.slug,
+    metaDescription: outline.metaDescription,
+    content,
+    wordCount,
+    featuredImagePrompt: outline.featuredImage.prompt,
+    featuredImageUrl,
     internalImages,
   };
 }

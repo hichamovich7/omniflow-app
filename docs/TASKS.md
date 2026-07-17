@@ -93,11 +93,11 @@ Un nuevo generador puede añadirse reutilizando Brand Profile, Content Analyzer,
 
 ### [TASK-028] WordPress Generator
 
-#### Status: Option 1 completed 2026-07-15 — Options 2/3 PLANNED
+#### Status: Options 1 and 4 completed (2026-07-15, 2026-07-17) — Options 2/3 PLANNED
 
 #### Note
 
-No depende de TASK-027 (decisión 2026-07-15, ver DECISIONS.md) — reutiliza directamente Brand Profile y Navigation, con duplicación razonable en la parte específica del generador (prompts, tablas, ruta API). Content Analyzer y Editorial Workflow (selección) siguen siendo reutilizables mais no están conectados por Option 1 (generación por keyword directo, sin pasar por Research/Analyze).
+No depende de TASK-027 (decisión 2026-07-15, ver DECISIONS.md) — reutiliza directamente Brand Profile y Navigation, con duplicación razonable en la parte específica del generador (prompts, tablas, ruta API). Content Analyzer y Editorial Workflow (selección) siguen siendo reutilizables mais no están conectados por Option 1 (generación por keyword directo, sin pasar por Research/Analyze). Option 4 sí conecta Editorial Workflow selection (TASK-020).
 
 #### Option 1 — Keyword → SEO Article (DONE)
 
@@ -124,6 +124,20 @@ Input: existing blog post URL to rewrite or SEO-optimize
 Could reuse Research (TASK-023) source_type: 'blog' fetching, and Content Analyzer (TASK-024)
 ```
 
+#### Option 4 — Selected Pins → Unified Article (DONE 2026-07-17)
+
+```txt
+Input: 1+ Pinterest pins selected from an Editorial Workflow generation (Pinterest module), via SelectionActionBar → "Generate WordPress Article"
+Project and Language are derived server-side from the selected pins (their shared generation → project_id, and pins.language) — no manual Project/Language selectors in this mode. All selected pins must belong to the same generation, or the request is rejected (400).
+Generation: outline synthesized from the pins' combined theme (lib/ai/prompts/wordpress-from-pins-prompt.ts) — one cohesive article, not a concatenation — then the full article is written from that outline using the exact same 10-block article prompt as Option 1 (lib/ai/prompts/wordpress-article-prompt.ts), unchanged.
+Featured image: newly generated via generateImage() (role IMAGE), from a prompt describing the article's unified theme — never a reused pin image.
+Internal images (up to 3): the active pin_images image of up to 3 of the selected pins, copied by URL as-is — no generateImage() call, no re-upload. See DECISIONS.md 2026-07-17 for why this split (fresh featured image, reused internal images).
+No addExternalLink() call yet — pending the external-link 404 fix (tracked separately, out of scope for this option).
+< 3 pins selected: allowed, but the UI warns before navigating ("may lack enough source material") and the API logs a warning; not a hard block.
+source_type: 'pins', source_pin_ids: uuid[] on wordpress_generations records provenance.
+Route: POST /api/wordpress/generate-from-pins (separate from Option 1's /api/wordpress/generate — different input shape, ownership check is pins-based instead of project-based).
+```
+
 #### Reuses (Option 1)
 
 ```txt
@@ -133,11 +147,11 @@ AI Engine (generateText, generateImage) — unchanged, no new provider code
 Historial independiente — wordpress_generations / wordpress_articles / wordpress_article_images (migration 012), separate from generations/pins
 ```
 
-Not yet wired into Option 1: Content Analyzer (TASK-024) and Editorial Workflow selection (TASK-020) — the keyword-only flow doesn't go through Research/Analyze, and a single generated article has nothing to multi-select. Both remain available for Options 2/3 or a future batch mode.
+Not yet wired into Option 1: Content Analyzer (TASK-024) — the keyword-only flow doesn't go through Research/Analyze. Editorial Workflow selection (TASK-020) is now wired, but only by Option 4.
 
 #### Success Criteria
 
-Usuario puede generar un artículo SEO completo desde un keyword, con imagen destacada e imágenes internas, y exportarlo en Markdown o HTML. (Cumplido por Option 1.) Options 2 y 3 quedan PLANNED.
+Usuario puede generar un artículo SEO completo desde un keyword, con imagen destacada e imágenes internas, y exportarlo en Markdown o HTML. (Cumplido por Option 1.) Usuario puede seleccionar pins de Pinterest y generar un artículo SEO unificado, con imagen destacada nueva e imágenes internas reutilizadas de los pins. (Cumplido por Option 4.) Options 2 y 3 quedan PLANNED.
 
 ---
 
