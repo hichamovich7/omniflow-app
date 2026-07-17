@@ -3,6 +3,7 @@ import { generateText, generateImage } from '@/lib/ai/engine';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
+import { addExternalLink } from '@/lib/ai/services/external-link';
 import { wordpressOutlineSchema, wordpressArticleResponseSchema } from '@/lib/validations/wordpress';
 import { promisePool } from '@/lib/utils/promise-pool';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -33,6 +34,7 @@ interface GenerateArticleParams {
   keyword: string;
   language: SupportedLanguage;
   brandProfileDescription: string | null;
+  researchNotes?: string | null;
 }
 
 interface GeneratedImageResult {
@@ -69,13 +71,14 @@ export interface GenerateArticleResult {
 export async function generateWordPressArticle(
   params: GenerateArticleParams
 ): Promise<GenerateArticleResult> {
-  const { supabase, userId, generationId, keyword, language, brandProfileDescription } = params;
+  const { supabase, userId, generationId, keyword, language, brandProfileDescription, researchNotes } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
 
   // Step 1: outline
   const { system: outlineSystem, user: outlineUser } = buildWordPressOutlinePrompt({
     keyword,
     brandProfileContext: brandProfileContext || undefined,
+    researchNotes: researchNotes || undefined,
     language,
   });
 
@@ -114,6 +117,13 @@ export async function generateWordPressArticle(
     throw new Error('AI returned an invalid article format. Try again.');
   }
   let content = articleValidated.data.content;
+
+  // Step 2b: best-effort single external link (real, web-search-verified source).
+  // Runs before image marker resolution so it never has to reason about
+  // {{IMAGE_N}} markers — see lib/ai/services/external-link.ts for the
+  // no-link-found / provider-error fallback (article is simply returned as-is).
+  const externalLink = await addExternalLink(content, outline.title, language);
+  content = externalLink.content;
 
   // Step 3: featured image + internal images, generated in parallel (bounded concurrency)
   const imageTasks = [

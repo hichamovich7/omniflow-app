@@ -7,6 +7,7 @@ export const OUTLINE_PROMPT_ID = 'wordpress-outline-v2';
 interface OutlinePromptContext {
   keyword: string;
   brandProfileContext?: string;
+  researchNotes?: string;
   language: SupportedLanguage;
 }
 
@@ -16,7 +17,11 @@ export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
 
   const system = `You are an expert SEO content strategist. You plan long-form WordPress articles optimized for search engines, featured snippets, and AI answer engines — before a single word of the article is written. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
-  const user = `Plan the outline for a WordPress article targeting the keyword: "${ctx.keyword}"
+  const researchNotesBlock = ctx.researchNotes
+    ? `\n\nThe user has provided this prior SEO research — take it into account for the structure and secondary keywords (e.g. secondary keywords to weave into sections/FAQ, a search intent to match, or specific angles to cover). Treat it as informed guidance, not a rigid script — still use your own judgment on structure:\n${ctx.researchNotes}`
+    : '';
+
+  const user = `Plan the outline for a WordPress article targeting the keyword: "${ctx.keyword}"${researchNotesBlock}
 
 ${guidelines}
 

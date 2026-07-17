@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language } = parsed.data;
+  const { projectId, keyword, language, researchNotes } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
       keyword,
       language,
       source_type: 'keyword',
+      research_notes: researchNotes ?? null,
       status: 'processing',
     })
     .select()
@@ -133,6 +134,7 @@ export async function POST(request: Request) {
       keyword,
       language,
       brandProfileDescription: project.description,
+      researchNotes,
     });
 
     const { data: article, error: articleError } = await supabase

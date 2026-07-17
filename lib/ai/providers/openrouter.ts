@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../types';
+import type { AITool, ChatMessage } from '../types';
 
 interface OpenRouterChoice {
   finish_reason?: string;
@@ -18,6 +18,23 @@ interface ChatCompletionOptions {
   maxTokens: number;
   temperature?: number;
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  tools?: AITool[];
+}
+
+// Translates the provider-agnostic AITool shape into OpenRouter's actual wire
+// format. OpenRouter's web search is not OpenAI-style function calling — it's
+// a gateway-side plugin (`plugins: [{ id: "web", max_results }]`, $4/1000
+// results, Exa-backed) that augments the model's context before generation,
+// so it works independently of whether the underlying model has native tool
+// calling. This is the only place that OpenRouter-specific plugin shape exists.
+function toOpenRouterPlugins(tools?: AITool[]): { id: string; max_results: number }[] | undefined {
+  if (!tools || tools.length === 0) return undefined;
+
+  const plugins = tools
+    .filter((tool): tool is Extract<AITool, { type: 'openrouter:web_search' }> => tool.type === 'openrouter:web_search')
+    .map((tool) => ({ id: 'web', max_results: tool.parameters.max_results }));
+
+  return plugins.length > 0 ? plugins : undefined;
 }
 
 const STREAM_ERROR_RETRY_ATTEMPTS = 3;
@@ -53,14 +70,22 @@ async function chatCompletionOnce({
   maxTokens,
   temperature = 0.7,
   reasoningEffort,
+  tools,
 }: ChatCompletionOptions): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY is not set');
   }
 
+  const plugins = toOpenRouterPlugins(tools);
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  // Web-search-augmented calls take longer than a plain completion (the
+  // gateway performs the search before the model even starts generating) —
+  // give them more room than the default 60s so a slow search doesn't get
+  // mistaken for a hung request.
+  const timeoutMs = plugins ? 90000 : 60000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -78,6 +103,7 @@ async function chatCompletionOnce({
         temperature,
         response_format: { type: 'json_object' },
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
+        ...(plugins && { plugins }),
       }),
       signal: controller.signal,
     });

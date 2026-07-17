@@ -10,6 +10,7 @@ import type { SupportedLanguage } from '@/types/pinterest';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ export function ArticleForm({ projects }: ArticleFormProps) {
   const [projectId, setProjectId] = useState(defaultProject?.id ?? '');
   const [keyword, setKeyword] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
+  const [researchNotes, setResearchNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -42,7 +44,12 @@ export function ArticleForm({ projects }: ArticleFormProps) {
     e.preventDefault();
     setError(null);
 
-    const parsed = generateArticleSchema.safeParse({ projectId, keyword, language });
+    const parsed = generateArticleSchema.safeParse({
+      projectId,
+      keyword,
+      language,
+      researchNotes: researchNotes.trim() || undefined,
+    });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
       return;
@@ -101,6 +108,21 @@ export function ArticleForm({ projects }: ArticleFormProps) {
             required
             disabled={loading}
             className="h-12 text-sm placeholder:text-muted-foreground/40"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="research-notes" className="text-xs font-medium text-muted-foreground">
+            Research Notes (optional)
+          </Label>
+          <Textarea
+            id="research-notes"
+            placeholder="Paste secondary keywords, search intent, or angles to cover — e.g. from a SEMrush export or existing SEO research"
+            value={researchNotes}
+            onChange={(e) => setResearchNotes(e.target.value)}
+            maxLength={2000}
+            disabled={loading}
+            className="min-h-20 text-sm placeholder:text-muted-foreground/40"
           />
         </div>
 

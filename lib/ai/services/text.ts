@@ -1,12 +1,13 @@
 import { getRoleConfig } from '../config';
 import { chatCompletion } from '../providers/openrouter';
-import type { ChatMessage } from '../types';
+import type { AITool, ChatMessage } from '../types';
 
 interface GenerateTextParams {
   role: 'FAST' | 'SMART';
   messages: ChatMessage[];
   maxTokens: number;
   temperature?: number;
+  tools?: AITool[];
 }
 
 export async function generateText({
@@ -14,6 +15,7 @@ export async function generateText({
   messages,
   maxTokens,
   temperature,
+  tools,
 }: GenerateTextParams): Promise<string> {
   const { provider, model } = getRoleConfig(role);
 
@@ -25,7 +27,7 @@ export async function generateText({
 
   switch (provider) {
     case 'openrouter':
-      return chatCompletion({ model, messages, maxTokens, temperature, reasoningEffort });
+      return chatCompletion({ model, messages, maxTokens, temperature, reasoningEffort, tools });
     default:
       throw new Error(`Unsupported text provider for role ${role}: ${provider}`);
   }

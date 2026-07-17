@@ -24,5 +24,12 @@ AEO (Answer Engine Optimization) structure — standard editorial layout for lon
 9. Conclusion.
 10. Soft CTA — a low-pressure invitation to a next action (read a related article, subscribe), never a hard sales pitch. Its tone must match the Brand Profile rather than read as a fixed generic phrase reused across every article.
 
-Target length: 1800-2500 words for the full body content (Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, Conclusion, Soft CTA — the FAQ answers are captured separately and are not part of this count).`;
+Target length: 1800-2500 words for the full body content (Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, Conclusion, Soft CTA — the FAQ answers are captured separately and are not part of this count).
+
+External linking — one real, verified source, never a guess:
+- Exactly one external link per article, to a genuinely authoritative source (a reputable publication, official documentation, a government/industry body, or similarly credible site) that backs a factual claim already in the article.
+- The link must be found and verified via live web search, never invented or guessed from training data — a plausible-looking URL that hasn't been checked is worse than no link at all.
+- The link is woven into an existing sentence with relevant anchor text (never "click here" or "this article") — it never gets its own sentence or paragraph just to hold it.
+- If no genuinely relevant, verifiable source exists for this topic, skip the external link entirely rather than forcing an unrelated or low-quality one.
+- Internal links (to other pages on the target site) are out of scope until the site is actually connected — do not invent internal links.`;
 }

@@ -9,14 +9,16 @@ export interface WordPressGeneration {
   keyword: string;
   language: string;
   source_type: WordPressSourceType;
+  research_notes: string | null;
   status: WordPressGenerationStatus;
   created_at: string;
 }
 
-export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type'> & {
+export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes'> & {
   id?: string;
   status?: WordPressGenerationStatus;
   source_type?: WordPressSourceType;
+  research_notes?: string | null;
 };
 
 export interface WordPressArticle {

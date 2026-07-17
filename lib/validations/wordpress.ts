@@ -5,6 +5,7 @@ export const generateArticleSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
   language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
+  researchNotes: z.string().trim().max(2000, 'Research notes are too long').optional(),
 });
 
 export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;
