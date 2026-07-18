@@ -99,6 +99,8 @@ Un nuevo generador puede añadirse reutilizando Brand Profile, Content Analyzer,
 
 No depende de TASK-027 (decisión 2026-07-15, ver DECISIONS.md) — reutiliza directamente Brand Profile y Navigation, con duplicación razonable en la parte específica del generador (prompts, tablas, ruta API). Content Analyzer y Editorial Workflow (selección) siguen siendo reutilizables mais no están conectados por Option 1 (generación por keyword directo, sin pasar por Research/Analyze). Option 4 sí conecta Editorial Workflow selection (TASK-020).
 
+2026-07-18: fix de fiabilidad (Options 1 y 4) — `title`/`metaTitle`/`slug`/`metaDescription` del outline se truncan de forma determinista a un límite de palabra completa antes de la validación Zod, en vez de dejar que el modelo cuente caracteres. Eliminó el falso "AI returned an invalid outline format" que aparecía cuando el modelo superaba el límite (visto en alemán, no específico a ese idioma). Ver DECISIONS.md 2026-07-18.
+
 #### Option 1 — Keyword → SEO Article (DONE)
 
 ```txt

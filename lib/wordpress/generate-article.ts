@@ -12,6 +12,7 @@ import {
   buildWordpressPinsOutlineSchema,
 } from '@/lib/validations/wordpress';
 import { promisePool } from '@/lib/utils/promise-pool';
+import { truncateAtWordBoundary } from '@/lib/utils/text-truncate';
 import type { SupportedLanguage } from '@/types/pinterest';
 
 // Centralizes the text-generation role for TASK-028 Option 1: FAST while the
@@ -32,6 +33,60 @@ const WORDPRESS_IMAGE_CONFIG = {
 // the JSON response before it finished, breaking JSON.parse.
 const OUTLINE_MAX_TOKENS = 3000;
 const ARTICLE_MAX_TOKENS = 8000;
+
+// The full-article write (10-block AEO structure, 1800-2500 words, 8000 max
+// tokens) routinely runs past the provider's default 60s fetch timeout —
+// measured at ~60-90s for this prompt, unlike the much lighter outline call
+// (~15-20s), which keeps the shared default. See DECISIONS.md 2026-07-18.
+const ARTICLE_GENERATION_TIMEOUT_MS = 120000;
+
+// Kept in sync with the max()s on wordpressOutlineSchema (lib/validations/wordpress.ts).
+const TITLE_MAX_LENGTH = 100;
+const META_TITLE_MAX_LENGTH = 70;
+const SLUG_MAX_LENGTH = 100;
+const META_DESCRIPTION_MAX_LENGTH = 160;
+
+interface RawOutlineTextFields {
+  title?: unknown;
+  metaTitle?: unknown;
+  slug?: unknown;
+  metaDescription?: unknown;
+}
+
+/**
+ * LLM character counting is unreliable across languages (German compound
+ * words especially) — rather than let the outline fail Zod validation and
+ * force a full retry, the length-sensitive fields are deterministically
+ * truncated at a word boundary before the schema ever sees them. Zod's
+ * max()s become an unreachable backstop instead of a real failure mode, so
+ * `wordpressOutlineSchema.safeParse` only ever rejects genuine structural
+ * problems (missing fields, wrong types) — never length overflow.
+ * metaTitle falls back to a truncated `title` when the model omits it.
+ */
+function applyOutlineTextLimits(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw;
+  const outline = raw as RawOutlineTextFields;
+
+  const title = typeof outline.title === 'string' ? truncateAtWordBoundary(outline.title, TITLE_MAX_LENGTH) : outline.title;
+
+  const metaTitleSource = typeof outline.metaTitle === 'string' ? outline.metaTitle : typeof title === 'string' ? title : '';
+  const metaTitle = metaTitleSource ? truncateAtWordBoundary(metaTitleSource, META_TITLE_MAX_LENGTH) : outline.metaTitle;
+
+  // Slug has no spaces to break on, so truncateAtWordBoundary degrades to a
+  // hard cut at maxLength — strip a trailing hyphen that cut might leave so
+  // the slug regex (no leading/trailing hyphen) still validates.
+  const slug =
+    typeof outline.slug === 'string'
+      ? truncateAtWordBoundary(outline.slug, SLUG_MAX_LENGTH).replace(/-+$/, '')
+      : outline.slug;
+
+  const metaDescription =
+    typeof outline.metaDescription === 'string'
+      ? truncateAtWordBoundary(outline.metaDescription, META_DESCRIPTION_MAX_LENGTH)
+      : outline.metaDescription;
+
+  return { ...outline, title, metaTitle, slug, metaDescription };
+}
 
 interface GenerateArticleParams {
   supabase: SupabaseClient;
@@ -58,6 +113,7 @@ export interface GeneratedArticleImage {
 
 export interface GenerateArticleResult {
   title: string;
+  metaTitle: string;
   slug: string;
   metaDescription: string;
   content: string;
@@ -97,18 +153,17 @@ export async function generateWordPressArticle(
     maxTokens: OUTLINE_MAX_TOKENS,
   });
 
-  // TEMP DEBUG (remove after diagnosing the "invalid outline format" failure)
   let outlineJson: unknown;
   try {
     outlineJson = JSON.parse(outlineRaw);
   } catch (err) {
-    console.error('[wordpress] TEMP DEBUG — outline JSON.parse failed. Raw response below:\n' + outlineRaw);
+    console.error('[wordpress] outline JSON.parse failed. Raw response below:\n' + outlineRaw);
     throw err;
   }
-  const outlineValidated = wordpressOutlineSchema.safeParse(outlineJson);
+  const outlineValidated = wordpressOutlineSchema.safeParse(applyOutlineTextLimits(outlineJson));
   if (!outlineValidated.success) {
-    console.error('[wordpress] TEMP DEBUG — outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
-    console.error('[wordpress] TEMP DEBUG — Raw response below:\n' + outlineRaw);
+    console.error('[wordpress] outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
+    console.error('[wordpress] Raw response below:\n' + outlineRaw);
     throw new Error('AI returned an invalid outline format. Try again.');
   }
   const outline = outlineValidated.data;
@@ -126,6 +181,7 @@ export async function generateWordPressArticle(
       { role: 'user', content: articleUser },
     ],
     maxTokens: ARTICLE_MAX_TOKENS,
+    timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
   });
 
   const articleValidated = wordpressArticleResponseSchema.safeParse(JSON.parse(articleRaw));
@@ -197,6 +253,7 @@ export async function generateWordPressArticle(
 
   return {
     title: outline.title,
+    metaTitle: outline.metaTitle,
     slug: outline.slug,
     metaDescription: outline.metaDescription,
     content,
@@ -250,6 +307,7 @@ export async function generateArticleFromPins(
     imageCount,
   });
 
+  let stepStart = Date.now();
   const outlineRaw = await generateText({
     role: TEXT_ROLE,
     messages: [
@@ -258,19 +316,19 @@ export async function generateArticleFromPins(
     ],
     maxTokens: OUTLINE_MAX_TOKENS,
   });
+  console.log(`[wordpress-from-pins] outline generateText took ${Date.now() - stepStart}ms`);
 
-  // TEMP DEBUG (remove after diagnosing the "invalid outline format" failure)
   let outlineJson: unknown;
   try {
     outlineJson = JSON.parse(outlineRaw);
   } catch (err) {
-    console.error('[wordpress-from-pins] TEMP DEBUG — outline JSON.parse failed. Raw response below:\n' + outlineRaw);
+    console.error('[wordpress-from-pins] outline JSON.parse failed. Raw response below:\n' + outlineRaw);
     throw err;
   }
-  const outlineValidated = buildWordpressPinsOutlineSchema(imageCount).safeParse(outlineJson);
+  const outlineValidated = buildWordpressPinsOutlineSchema(imageCount).safeParse(applyOutlineTextLimits(outlineJson));
   if (!outlineValidated.success) {
-    console.error('[wordpress-from-pins] TEMP DEBUG — outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
-    console.error('[wordpress-from-pins] TEMP DEBUG — Raw response below:\n' + outlineRaw);
+    console.error('[wordpress-from-pins] outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
+    console.error('[wordpress-from-pins] Raw response below:\n' + outlineRaw);
     throw new Error('AI returned an invalid outline format. Try again.');
   }
   const outline = outlineValidated.data;
@@ -281,6 +339,7 @@ export async function generateArticleFromPins(
     language,
   });
 
+  stepStart = Date.now();
   const articleRaw = await generateText({
     role: TEXT_ROLE,
     messages: [
@@ -288,16 +347,47 @@ export async function generateArticleFromPins(
       { role: 'user', content: articleUser },
     ],
     maxTokens: ARTICLE_MAX_TOKENS,
+    timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
   });
+  console.log(`[wordpress-from-pins] article generateText took ${Date.now() - stepStart}ms`);
 
-  const articleValidated = wordpressArticleResponseSchema.safeParse(JSON.parse(articleRaw));
+  let articleJson: unknown;
+  try {
+    articleJson = JSON.parse(articleRaw);
+  } catch (err) {
+    console.error(
+      '[wordpress-from-pins] article JSON.parse failed:',
+      err instanceof Error ? err.message : err,
+      '\nRaw response below:\n' + articleRaw
+    );
+    throw err;
+  }
+  const articleValidated = wordpressArticleResponseSchema.safeParse(articleJson);
   if (!articleValidated.success) {
+    console.error(
+      '[wordpress-from-pins] article Zod validation failed:',
+      JSON.stringify(articleValidated.error.format(), null, 2)
+    );
     throw new Error('AI returned an invalid article format. Try again.');
   }
   let content = articleValidated.data.content;
 
   // Step 3: featured image only — generated fresh from the unified-theme prompt.
-  const imageBuffer = await generateImage({ prompt: outline.featuredImage.prompt, size: WORDPRESS_IMAGE_CONFIG.size });
+  // Unlike Option 1 (which routes all image generation through promisePool so a
+  // failed image never kills the article), this call is unguarded on purpose
+  // right now — surface the real error instead of masking it.
+  let imageBuffer: Buffer;
+  stepStart = Date.now();
+  try {
+    imageBuffer = await generateImage({ prompt: outline.featuredImage.prompt, size: WORDPRESS_IMAGE_CONFIG.size });
+    console.log(`[wordpress-from-pins] featured image generateImage took ${Date.now() - stepStart}ms`);
+  } catch (err) {
+    console.error(
+      `[wordpress-from-pins] featured image generation failed after ${Date.now() - stepStart}ms:`,
+      err instanceof Error ? err.message : err
+    );
+    throw err;
+  }
   const filePath = `${userId}/${generationId}/FEATURED.png`;
 
   let featuredImageUrl: string | null = null;
@@ -311,7 +401,10 @@ export async function generateArticleFromPins(
     const { data: publicUrl } = supabase.storage.from('wordpress-images').getPublicUrl(filePath);
     featuredImageUrl = publicUrl.publicUrl;
   } catch (err) {
-    console.warn('[wordpress-from-pins] featured image failed:', err instanceof Error ? err.message : err);
+    console.error(
+      '[wordpress-from-pins] featured image upload failed:',
+      err instanceof Error ? err.message : err
+    );
   }
 
   // Step 4: resolve {{IMAGE_N}} markers to the reused pin image URLs (no generation, no upload).
@@ -333,6 +426,7 @@ export async function generateArticleFromPins(
 
   return {
     title: outline.title,
+    metaTitle: outline.metaTitle,
     slug: outline.slug,
     metaDescription: outline.metaDescription,
     content,

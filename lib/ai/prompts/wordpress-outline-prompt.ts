@@ -27,7 +27,8 @@ ${guidelines}
 
 The article follows a fixed 10-block structure (H1, Introduction, Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, FAQ, Conclusion, Soft CTA). At this planning stage, provide:
 
-- title: SEO-optimized H1 title (max 70 characters), includes the primary keyword
+- title: SEO-optimized H1 title, includes the primary keyword. Aim for around 70 characters — the system will trim anything longer at a word boundary, so write it naturally rather than counting characters defensively.
+- metaTitle: a <title>/search-result-facing version of the title, includes the primary keyword. Aim for around 60 characters (70 is trimmed automatically if you go over) — it can be a tighter rephrasing of the title, not just a copy.
 - slug: URL-friendly slug (lowercase, hyphens, ASCII only, derived from the title)
 - metaDescription: 150-160 characters, includes the primary keyword
 - quickAnswerAngle: one sentence describing the direct answer the Quick Answer block will give (the article step will expand this into the final 40-60 word answer)
@@ -49,6 +50,7 @@ Image prompt rules (apply to both featuredImage and images):
 Respond with this exact JSON structure:
 {
   "title": "...",
+  "metaTitle": "...",
   "slug": "...",
   "metaDescription": "...",
   "quickAnswerAngle": "...",

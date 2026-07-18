@@ -27,6 +27,7 @@ export interface WordPressArticle {
   id: string;
   generation_id: string;
   title: string;
+  meta_title: string | null;
   slug: string;
   meta_description: string;
   content: string;
@@ -37,10 +38,11 @@ export interface WordPressArticle {
   created_at: string;
 }
 
-export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'featured_image_prompt' | 'featured_image_url'> & {
+export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'meta_title' | 'featured_image_prompt' | 'featured_image_url'> & {
   id?: string;
   word_count?: number;
   status?: WordPressArticleStatus;
+  meta_title?: string | null;
   featured_image_prompt?: string | null;
   featured_image_url?: string | null;
 };

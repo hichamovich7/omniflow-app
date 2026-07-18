@@ -125,6 +125,28 @@ Eliminar cuando se implemente el logger centralizado.
 
 ---
 
+# WordPress Generation — Synchronous Pipeline Approaching Timeout Ceiling
+
+## Estado actual
+
+`generateWordPressArticle()` / `generateArticleFromPins()` (`lib/wordpress/generate-article.ts`) ejecutan de forma síncrona, dentro de una única request HTTP: outline (AI) → full article (AI, hasta 120s) → featured image (AI) → hasta 3 internal images (AI, Option 1). Las rutas API (`/api/wordpress/generate`, `/api/wordpress/generate-from-pins`) ahora declaran `maxDuration = 180` (Vercel) para dar margen — ver DECISIONS.md 2026-07-18.
+
+## Motivo por el que es deuda, no bug
+
+180s es suficiente hoy, pero el pipeline solo va a crecer: `addExternalLink()` (búsqueda web, ya diferida para Option 4, pendiente de reactivar) añade otra llamada AI con su propio timeout; cualquier paso futuro (más research, más imágenes, un segundo pase de calidad) se apila sobre el mismo request síncrono. Cada vez que un timeout se queda corto, la solución fácil es subirlo — pero eso no escala indefinidamente, y en algún punto la duración total choca con límites de plataforma (Vercel Pro tope real) o con la experiencia de usuario (una request de 2-3 minutos sin feedback intermedio).
+
+Inngest ya está reservado en `.env.local` (`docs/DEPLOYMENT.md` § Inngest Configuration) pero no está conectado a este pipeline.
+
+## Mejora futura
+
+Mover la generación WordPress a un job asíncrono (Inngest): la request HTTP solo encola el trabajo y devuelve inmediatamente (`status: 'processing'`, ya es el modelo actual de `wordpress_generations.status`), un worker ejecuta el pipeline sin límite de duración de función serverless, y el frontend hace polling o se suscribe a la actualización de estado. Esto también abriría la puerta a mostrar progreso por etapa (outline listo → artículo listo → imágenes) en vez de un spinner único.
+
+## Prioridad
+
+Baja — no implementar hasta que un timeout real se dispare en producción con el pipeline actual, o hasta que se añada una etapa (ej. `addExternalLink()`) que empuje la duración total cerca del límite de 180s.
+
+---
+
 # Principios
 
 * No crear TASK para mejoras que no aporten valor al usuario.

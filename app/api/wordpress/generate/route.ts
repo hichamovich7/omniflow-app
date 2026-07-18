@@ -5,6 +5,12 @@ import { generateWordPressArticle } from '@/lib/wordpress/generate-article';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 
+// Outline + full-article generation (up to ARTICLE_GENERATION_TIMEOUT_MS =
+// 120s) plus up to 4 image generations can exceed Vercel's default function
+// duration. No effect in local dev; on Vercel this requires the Pro plan
+// (Hobby caps at 60s regardless of this value) — see docs/DEPLOYMENT.md.
+export const maxDuration = 180;
+
 function classifyGenerationError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
 
@@ -142,6 +148,7 @@ export async function POST(request: Request) {
       .insert({
         generation_id: generation.id,
         title: result.title,
+        meta_title: result.metaTitle,
         slug: result.slug,
         meta_description: result.metaDescription,
         content: result.content,

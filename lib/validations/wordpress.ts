@@ -24,10 +24,21 @@ const outlineImageSchema = z.object({
 });
 
 export const wordpressOutlineSchema = z.object({
-  title: z.string().min(1).max(70),
+  // H1 shown on the page — generous ceiling, deterministically truncated
+  // (truncateAtWordBoundary) before this schema ever sees it, so this max is
+  // a last-resort backstop, not the real length control. See metaTitle below
+  // for the strict SEO-facing limit.
+  title: z.string().min(1).max(100),
+  // <title>/SERP-facing title, separate from the H1 so the strict 60-70 char
+  // SEO limit never has to compromise the on-page H1's readability. Optional
+  // because the model may omit it — generate-article.ts falls back to a
+  // truncated `title` before this schema runs, so by validation time it's
+  // always populated.
+  metaTitle: z.string().min(1).max(70),
   slug: z
     .string()
     .min(1)
+    .max(100)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase, hyphen-separated, ASCII only'),
   metaDescription: z.string().min(1).max(160),
   quickAnswerAngle: z.string().min(1),

@@ -22,6 +22,48 @@ No planned changes.
 
 ---
 
+# [1.15.2] - 2026-07-18
+
+## TASK-028: fix "Article generation failed" on the WordPress article-writing step — per-call OpenRouter timeout instead of one fixed 60s/90s for every call
+
+### Added
+
+* `lib/ai/providers/openrouter.ts` / `lib/ai/services/text.ts`: `generateText()` now accepts an optional `timeoutMs`, threaded through `chatCompletion()` → `chatCompletionOnce()`, overriding the default 60s (90s with web-search plugins) fetch timeout. Omitted, behavior is unchanged for every existing caller (Pinterest generation, outline generation, `addExternalLink()`)
+* `lib/wordpress/generate-article.ts`: `ARTICLE_GENERATION_TIMEOUT_MS = 120000`, passed to the full-article `generateText()` call in both `generateWordPressArticle()` (Option 1) and `generateArticleFromPins()` (Option 4) — measured at ~60-90s in practice for the 8000-max-token, 10-block, 1800-2500-word prompt, vs ~15-20s for the much lighter outline call that keeps the shared default
+* Step-timing `console.log`s in `generateArticleFromPins()` (outline/article/featured-image duration in ms) — used to pin down the exact step and elapsed time behind the `AbortError` this fix addresses
+* `export const maxDuration = 180` on both `/api/wordpress/generate` and `/api/wordpress/generate-from-pins` — Vercel deployment prep, no effect in local dev
+
+### Decisions
+
+* Per-call timeout override, generous timeout for the article-writing step only, rather than raising the shared default for every text call — see DECISIONS.md 2026-07-18
+* Vercel Pro plan required for these two routes once deployed (Hobby's 60s hard cap ignores `maxDuration`) — documented in DEPLOYMENT.md
+* The growing synchronous AI pipeline (outline → article → images, soon + external link search) approaching the timeout ceiling is logged as technical debt pointing toward an eventual move to Inngest, not fixed now — see TECHNICAL_DEBT.md
+
+---
+
+# [1.15.1] - 2026-07-18
+
+## TASK-028: fix "AI returned an invalid outline format" — title/metaTitle length is now enforced deterministically, not by the model
+
+### Added
+
+* `lib/utils/text-truncate.ts` — `truncateAtWordBoundary()`, cuts a string to a max length at the last complete word (never mid-word, no "..." appended)
+* `meta_title` column on `wordpress_articles` (migration 015, nullable) — separate `<title>`/SERP-facing field from the on-page `title` (H1)
+* `getMetaTitle()` (`lib/wordpress/export.ts`) — falls back to a truncated `title` for articles generated before migration 015 (`meta_title` is null)
+* Article page (`/wordpress/[id]`) now displays the meta title above the meta description
+
+### Changed
+
+* `lib/validations/wordpress.ts`: `wordpressOutlineSchema.title` limit raised `max(70)` → `max(100)` (now just a backstop); new `metaTitle` field, `max(70)`; `slug` gains an explicit `max(100)` it never had
+* `lib/wordpress/generate-article.ts`: both `generateWordPressArticle()` (Option 1) and `generateArticleFromPins()` (Option 4) now run `applyOutlineTextLimits()` — truncates `title`, `metaTitle`, `slug`, `metaDescription` on the model's raw outline JSON before Zod validation, so `safeParse` can no longer reject for length overflow, only for genuine structural errors
+* `lib/ai/prompts/wordpress-outline-prompt.ts` / `wordpress-from-pins-prompt.ts`: length instructions reworded from a hard "max N characters" to "aim for ~N, the system trims automatically" — the model no longer needs to sacrifice writing quality to hit an exact character count it can't reliably measure across languages
+
+### Decisions
+
+* Separate H1/meta title + deterministic word-boundary truncation instead of a retry-on-overflow loop — see DECISIONS.md 2026-07-18
+
+---
+
 # [1.15.0] - 2026-07-17
 
 ## TASK-028 (Option 4): WordPress Article Generator — Selected Pins → Unified Article

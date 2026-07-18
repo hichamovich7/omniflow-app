@@ -19,6 +19,8 @@ interface ChatCompletionOptions {
   temperature?: number;
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   tools?: AITool[];
+  /** Overrides the default 60s/90s(with plugins) fetch timeout for calls known to run long. */
+  timeoutMs?: number;
 }
 
 // Translates the provider-agnostic AITool shape into OpenRouter's actual wire
@@ -71,6 +73,7 @@ async function chatCompletionOnce({
   temperature = 0.7,
   reasoningEffort,
   tools,
+  timeoutMs,
 }: ChatCompletionOptions): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -83,9 +86,10 @@ async function chatCompletionOnce({
   // Web-search-augmented calls take longer than a plain completion (the
   // gateway performs the search before the model even starts generating) —
   // give them more room than the default 60s so a slow search doesn't get
-  // mistaken for a hung request.
-  const timeoutMs = plugins ? 90000 : 60000;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  // mistaken for a hung request. An explicit timeoutMs (e.g. the WordPress
+  // full-article write, which routinely runs past 60s) always wins over both.
+  const effectiveTimeoutMs = timeoutMs ?? (plugins ? 90000 : 60000);
+  const timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {

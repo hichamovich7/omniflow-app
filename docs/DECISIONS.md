@@ -611,3 +611,51 @@ Séparation stricte : la featured image est **toujours** générée via `generat
 
 * Coût IA par génération Option 4 : un seul appel `generateImage()` (featured) au lieu de 3-4 (Option 1) — économie de crédits directe, cohérente avec le fait que les images internes existent déjà
 * Si un pin sélectionné n'a pas d'image active (jamais générée, ou toutes les versions supprimées), il ne fournit simplement pas d'image interne — le nombre d'images internes de l'article peut donc être inférieur à 3, y compris 0 ; `buildWordpressPinsOutlineSchema` accepte cette plage 0-3 (contrairement à l'Option 1, qui exige toujours 2-3)
+
+---
+
+## 2026-07-18
+
+### Decision
+
+TASK-028 : titre H1 séparé du meta title SEO, troncature déterministe à une limite de mot plutôt que retry sur dépassement de longueur
+
+### Context
+
+`wordpressOutlineSchema.title` imposait `max(70)`, rejeté par Zod dès que le modèle dépassait cette limite — observé en reproduisant le flux "10 pins Küchen" (Option 4) : le modèle a produit un titre allemand de 80 caractères ("Moderne Küchenplanung und Innenarchitektur: zeitlose Materialien & clevere Zonen"), l'outline entier a été rejeté, et l'échec est remonté au frontend comme "AI returned an invalid outline format. Try again." — un message générique qui masque une cause parfaitement déterministe. Le prompt demandait déjà "max 70 characters" ; le modèle ne le respecte pas de façon fiable, un problème de comptage de caractères LLM connu pour être plus marqué sur les langues aux mots composés longs (allemand) mais pas spécifique à l'allemand — n'importe quelle langue peut produire un dépassement ponctuel. Un simple correctif de la limite Zod (ex: passer à 90) aurait seulement déplacé le seuil de rejet, pas supprimé le mode de défaillance ; un retry sur le modèle aurait ajouté de la latence/coût sans garantie de succès (rien n'empêche un deuxième dépassement).
+
+### Decision Taken
+
+Deux changements structurels combinés :
+1. **Séparation title (H1) / metaTitle (SEO)** — `title` (affiché en H1 sur la page) passe à `max(100)`, généreux et rarement atteint ; `metaTitle` (nouveau champ, `<title>`/SERP, stocké dans `wordpress_articles.meta_title`, nullable, migration 015) reste à la limite stricte SEO de 70, avec repli sur `title` tronqué si le modèle omet le champ.
+2. **Troncature déterministe avant validation** — `truncateAtWordBoundary()` (`lib/utils/text-truncate.ts`, coupe à la dernière limite de mot complet, jamais en plein mot, sans "...") est appliquée à `title`, `metaTitle`, `slug` et `metaDescription` sur la sortie brute du modèle, avant que `wordpressOutlineSchema` ne la valide. Les `max()` Zod deviennent un garde-fou inatteignable plutôt qu'un vrai mode d'échec : `safeParse` ne peut plus jamais rejeter pour dépassement de longueur, uniquement pour de vraies erreurs de structure (champs manquants, mauvais types). Le prompt garde son instruction de longueur (utile pour réduire la fréquence des dépassements et donc les coupes visibles) mais précise désormais que le système corrige automatiquement un dépassement, pour que le modèle écrive naturellement plutôt que de sacrifier la qualité rédactionnelle pour tenir un compte de caractères qu'il maîtrise mal.
+
+### Consequences
+
+* Le message "AI returned an invalid outline format. Try again." ne peut plus être déclenché par un dépassement de longueur, dans aucune langue — seulement par une vraie erreur de structure JSON/schéma
+* Les articles générés avant la migration 015 n'ont pas de `meta_title` en base ; `getMetaTitle()` (`lib/wordpress/export.ts`) calcule un repli à l'affichage/export (`title` tronqué à 70) plutôt que de nécessiter un backfill
+* `slug` gagne une limite explicite (`max(100)`, alignée sur `title`) qu'il n'avait jamais eue — sans dépendance à un espace pour couper proprement, la troncature retire un trait d'union final résiduel après la coupe pour rester conforme à la regex du slug
+* S'applique identiquement à l'Option 1 (`generateWordPressArticle`) et l'Option 4 (`generateArticleFromPins`) — un seul point de troncature partagé (`applyOutlineTextLimits()` dans `lib/wordpress/generate-article.ts`), pas de logique dupliquée entre les deux pipelines
+
+---
+
+## 2026-07-18
+
+### Decision
+
+TASK-028 : timeout OpenRouter paramétrable par appel (au lieu d'un timeout fixe partagé), timeout généreux dédié à l'étape de rédaction complète de l'article
+
+### Context
+
+En reproduisant le flux "10 pins Küchen" (Option 4) après le correctif de longueur de titre ci-dessus, l'outline passait désormais la validation Zod (16.5s, confirmé par un log de timing ajouté pour l'occasion), mais la génération échouait toujours — cette fois avec `AbortError: This operation was aborted`, exactement 60023ms après la fin de l'outline. `chatCompletionOnce()` (`lib/ai/providers/openrouter.ts`) appliquait un timeout fetch unique et partagé (`plugins ? 90000 : 60000`) à *tous* les appels texte, qu'il s'agisse d'un outline léger (3000 tokens max, ~15-20s en pratique) ou de la rédaction complète de l'article (8000 tokens max, structure 10-blocs, cible 1800-2500 mots, ~60-90s en pratique). Le seuil de 60s convient au premier mais coupe systématiquement le second avant qu'il ait fini d'écrire. Sans rapport avec le correctif de longueur de titre — un problème de timeout distinct et préexistant, qui touche potentiellement aussi l'Option 1 (même prompt article, même timeout partagé).
+
+### Decision Taken
+
+`timeoutMs` devient un paramètre optionnel traversant `generateText()` → `chatCompletion()` → `chatCompletionOnce()`, avec le comportement par défaut (60s / 90s si plugins de recherche web) inchangé quand il n'est pas fourni — les appels légers (outline WordPress, génération Pinterest FAST, `addExternalLink()`) gardent leur échec rapide en cas de vrai problème, pas de dégradation de leur détection de panne. Seul l'appel de rédaction complète de l'article (`buildWordPressArticlePrompt`, utilisé identiquement par Option 1 et Option 4) passe désormais `timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS` (120000ms), une constante dédiée dans `lib/wordpress/generate-article.ts` avec commentaire expliquant la mesure (~60-90s réels) qui justifie la marge.
+
+En préparation du déploiement Vercel (pas encore effectif, aucun effet en dev local) : `export const maxDuration = 180` ajouté sur les deux routes API WordPress, documenté dans DEPLOYMENT.md comme nécessitant le plan Vercel Pro (le plan Hobby plafonne à 60s, quelle que soit la valeur de `maxDuration`).
+
+### Consequences
+
+* Le pipeline Option 4 "10 pins Küchen" testé de bout en bout à nouveau après ce correctif — voir résultat du test dans la conversation
+* Ce n'est qu'un sursis, pas une solution durable : `addExternalLink()` (recherche web, actuellement désactivé pour Option 4, en attente de réactivation) ajoutera un appel AI de plus sur ce même pipeline synchrone, et chaque futur ajout rapprochera la durée totale du plafond de 180s. Empiler des timeouts de plus en plus généreux n'est pas extensible indéfiniment — un passage à un traitement asynchrone (Inngest, déjà réservé dans `.env.local` mais non connecté à ce pipeline) sera nécessaire à terme. Noté comme dette technique, pas comme correctif immédiat — voir TECHNICAL_DEBT.md

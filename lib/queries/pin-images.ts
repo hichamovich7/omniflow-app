@@ -24,11 +24,15 @@ export async function getActivePinImageUrls(
 ): Promise<Map<string, string>> {
   if (pinIds.length === 0) return new Map();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('pin_images')
     .select('pin_id, url')
     .in('pin_id', pinIds)
     .eq('is_active', true);
+
+  if (error) {
+    console.error('[pin-images] getActivePinImageUrls query failed:', error);
+  }
 
   return new Map((data ?? []).map((row) => [row.pin_id as string, row.url as string]));
 }

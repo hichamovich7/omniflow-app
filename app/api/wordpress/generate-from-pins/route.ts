@@ -12,6 +12,12 @@ import type { SupportedLanguage } from '@/types/pinterest';
 const MAX_INTERNAL_IMAGES = 3;
 const MAX_KEYWORD_LENGTH = 200;
 
+// Outline + full-article generation (up to ARTICLE_GENERATION_TIMEOUT_MS =
+// 120s) plus the featured image generation can exceed Vercel's default
+// function duration. No effect in local dev; on Vercel this requires the Pro
+// plan (Hobby caps at 60s regardless of this value) — see docs/DEPLOYMENT.md.
+export const maxDuration = 180;
+
 function classifyGenerationError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
 
@@ -211,6 +217,7 @@ export async function POST(request: Request) {
       .insert({
         generation_id: generation.id,
         title: result.title,
+        meta_title: result.metaTitle,
         slug: result.slug,
         meta_description: result.metaDescription,
         content: result.content,
@@ -223,7 +230,7 @@ export async function POST(request: Request) {
       .single();
 
     if (articleError) {
-      console.error('Failed to insert wordpress article:', articleError);
+      console.error('[wordpress-from-pins] DB insert (wordpress_articles) failed:', articleError);
       const errorMessage = 'Failed to save the generated article. Try again.';
       await supabase.from('wordpress_generations').update({ status: 'failed' }).eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
@@ -244,7 +251,7 @@ export async function POST(request: Request) {
 
       const { error: imagesError } = await supabase.from('wordpress_article_images').insert(imagesToInsert);
       if (imagesError) {
-        console.error('Failed to insert wordpress article images:', imagesError);
+        console.error('[wordpress-from-pins] DB insert (wordpress_article_images) failed:', imagesError);
       }
     }
 
@@ -255,7 +262,10 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (err) {
-    console.error('WordPress generation from pins failed:', err);
+    console.error(
+      '[wordpress-from-pins] generation failed:',
+      err instanceof Error ? `${err.name}: ${err.message}\n${err.stack}` : err
+    );
     const errorMessage = classifyGenerationError(err);
     await supabase.from('wordpress_generations').update({ status: 'failed' }).eq('id', generation.id);
     return NextResponse.json<ApiResponse<null>>(

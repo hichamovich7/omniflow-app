@@ -438,9 +438,10 @@ The generated article for a `wordpress_generations` row. One-to-one in practice 
 | ---------------------- | ---------------------------------- | ----------------------------------------- |
 | id                     | uuid PK                            |                                            |
 | generation_id          | uuid FK → wordpress_generations.id | ON DELETE CASCADE                         |
-| title                  | text                                | SEO title (H1), max 70 chars enforced by the outline schema |
-| slug                   | text                                | URL-friendly slug                         |
-| meta_description       | text                                | 150-160 chars enforced by the outline schema |
+| title                  | text                                | On-page H1, max 100 chars — deterministically truncated at a word boundary (`truncateAtWordBoundary`) before the outline schema validates it, never rejected for length |
+| meta_title             | text nullable                       | `<title>`/SERP-facing title, max 70 chars, same truncation. Nullable — rows from before migration 015 have none; readers fall back to `title` truncated to 70 (`getMetaTitle()` in `lib/wordpress/export.ts`) |
+| slug                   | text                                | URL-friendly slug, max 100 chars, same truncation (trailing hyphen stripped after cut) |
+| meta_description       | text                                | 150-160 chars, same truncation             |
 | content                | text                                | Full article body in Markdown — the source of truth. `{{IMAGE_N}}` markers are already resolved to `![alt](url)` before this row is written |
 | word_count             | integer                            | Computed from the final content           |
 | featured_image_prompt  | text nullable                      | AI-generated scene description for the featured image |

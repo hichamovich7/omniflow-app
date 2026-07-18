@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
 import { createClient } from '@/lib/supabase/server';
-import { exportToMarkdown, exportToHtml } from '@/lib/wordpress/export';
+import { exportToMarkdown, exportToHtml, getMetaTitle } from '@/lib/wordpress/export';
 import { PageContainer } from '@/components/ui/page-container';
 import { ArticleContent } from '@/components/wordpress/article-content';
 import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
@@ -79,7 +79,10 @@ export default async function WordPressArticlePage({
           )}
 
           <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8">
-            <p className="mb-6 text-sm text-muted-foreground">{article.meta_description}</p>
+            <p className="text-xs text-muted-foreground/80">
+              <span className="font-medium">Meta title:</span> {getMetaTitle(article)}
+            </p>
+            <p className="mb-6 mt-1 text-sm text-muted-foreground">{article.meta_description}</p>
             <ArticleContent html={exportToHtml(article)} />
           </div>
 

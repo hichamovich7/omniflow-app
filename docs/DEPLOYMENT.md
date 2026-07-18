@@ -193,6 +193,14 @@ Default Next.js output.
 
 ---
 
+## Function Duration (WordPress routes)
+
+`POST /api/wordpress/generate` and `POST /api/wordpress/generate-from-pins` (TASK-028) declare `export const maxDuration = 180` — the outline + full-article generation pipeline (two sequential AI calls, the article one alone allowed up to 120s) plus image generation can run past Vercel's default function timeout.
+
+**Requires the Vercel Pro plan at minimum.** The Hobby plan hard-caps serverless function duration at 60s regardless of `maxDuration` — these routes will be killed mid-generation on Hobby. `maxDuration` has no effect in local dev (`next dev` has no such cap); this is purely a production/Vercel concern to have configured correctly before these routes are first deployed.
+
+---
+
 # Stripe Configuration
 
 ## Webhook Endpoint
