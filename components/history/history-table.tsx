@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { HistoryActions } from './history-actions';
+import { WordPressUsageBadge } from './wordpress-usage-badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
 import { statusToBadgeVariant } from '@/lib/utils/status';
+import type { GenerationWordPressUsage } from '@/lib/queries/wordpress-usage';
 
 interface GenerationRow {
   id: string;
@@ -18,15 +20,17 @@ interface GenerationRow {
 
 interface HistoryTableProps {
   generations: GenerationRow[];
+  wordpressUsage: Record<string, GenerationWordPressUsage>;
 }
 
-export function HistoryTable({ generations }: HistoryTableProps) {
+export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps) {
   return (
     <div className="space-y-3">
       {generations.map((gen) => {
         const projectName = Array.isArray(gen.projects)
           ? gen.projects[0]?.name
           : gen.projects?.name;
+        const usage = wordpressUsage[gen.id];
 
         return (
           <div
@@ -46,6 +50,13 @@ export function HistoryTable({ generations }: HistoryTableProps) {
                 <span>{timeAgo(gen.created_at)}</span>
               </div>
             </Link>
+            {usage && (
+              <WordPressUsageBadge
+                usedPinCount={usage.usedPinCount}
+                totalPinCount={usage.totalPinCount}
+                articles={usage.articles}
+              />
+            )}
             <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <HistoryActions generationId={gen.id} keyword={gen.keyword} />
             </div>

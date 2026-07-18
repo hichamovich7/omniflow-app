@@ -22,6 +22,34 @@ No planned changes.
 
 ---
 
+# [1.15.3] - 2026-07-18
+
+## Pin cards: full title/description/keywords/image prompt no longer hidden behind `line-clamp` truncation with no way to view them
+
+### Added
+
+* `components/pinterest/pin-detail-dialog.tsx` — shared, read-only `PinDetailDialog`: full-size image, untruncated title/description, keywords as tags, and the image prompt in a monospace block (scrollable independently via `overscroll-contain`, labeled "Internal use, not exported") with a Copy-to-clipboard button
+* `components/boards/board-pin-card.tsx` — client wrapper extracted from the previously inline pin card markup in `app/(dashboard)/boards/[id]/page.tsx`, so the Board Detail page (a Server Component) can open `PinDetailDialog` on click
+
+### Changed
+
+* `components/pinterest/pin-table.tsx`: pin cards are now clickable (`cursor-pointer`, hover state) and open `PinDetailDialog`; the checkbox, image link, Regenerate button, and Versions button all `stopPropagation()` so their own actions still fire instead of opening the dialog
+* `app/(dashboard)/boards/[id]/page.tsx`: inline pin card markup replaced by `<BoardPinCard>` — same click-to-detail behavior as the Results page, no duplicated logic
+* `PinDetailDialog`'s `DialogContent` gets `max-h-[90vh] overflow-y-auto` — without it, a pin with a long image prompt made the dialog taller than the viewport with no way to scroll to the cut-off content (the dialog is `position: fixed`, so page scroll can't reveal what's clipped)
+* `docs/UI_UX.md`: "Pins Table"/"Pin Card View"/"Character Counters" sections (describing inline-editable fields and per-field copy buttons that were never built) replaced with "Pin Grid" and "Pin Detail Dialog", matching the actual read-only, click-to-expand behavior; `lib/guide/content.ts` "Editorial Review" section gets a point about clicking a card for full details
+
+### Verified
+
+* `lib/csv/pinterest.ts` (`generatePinterestCsv`, the only CSV export path, also used by `history-actions.tsx`) never included `image_prompt` — confirmed by reading the full column list: Title, Media URL, Pinterest board, Description, Link, Publish date, Keywords or tags. Nothing to remove.
+
+### Decisions
+
+* No Dialog/Sheet for pin detail existed to reuse — built new, modeled structurally on `ImageVersionsDialog` (controlled `open`/`onClose` state) but read-only, no duplicated card actions
+* No ScrollArea component exists in the project (`components/ui/scroll-area.tsx` absent, not in `docs/COMPONENT_STANDARDS.md`) — the scroll fix uses plain Tailwind `overflow-y-auto`, consistent with the only other scrollable text block in the app (`research-form.tsx`)
+* `line-clamp-2`/`line-clamp-3` intentionally kept in both grid views — the fix adds a way to see full content, it doesn't remove the density-oriented truncation in list view
+
+---
+
 # [1.15.2] - 2026-07-18
 
 ## TASK-028: fix "Article generation failed" on the WordPress article-writing step — per-call OpenRouter timeout instead of one fixed 60s/90s for every call

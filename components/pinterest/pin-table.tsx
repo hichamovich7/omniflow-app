@@ -3,17 +3,24 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Sparkles, RefreshCw, Layers, Loader2 } from 'lucide-react';
+import { Sparkles, RefreshCw, Layers, Loader2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { ImageVersionsDialog } from './image-versions-dialog';
 import { PinDetailDialog } from './pin-detail-dialog';
 import type { Pin } from '@/types/database';
+import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
 interface PinTableProps {
   pins: Pin[];
   generationId: string;
   imageVersionCounts: Record<string, number>;
+  pinsWordPressUsage: Record<string, WordPressUsageArticle[]>;
+}
+
+function usageTooltip(articles: WordPressUsageArticle[]): string {
+  if (articles.length === 1) return `Used in: ${articles[0].title}`;
+  return `Used in ${articles.length} articles`;
 }
 
 function formatDate(dateString: string): string {
@@ -25,7 +32,7 @@ function formatDate(dateString: string): string {
   );
 }
 
-export function PinTable({ pins, generationId, imageVersionCounts }: PinTableProps) {
+export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPressUsage }: PinTableProps) {
   const { isSelected, toggle } = useSelection();
   const router = useRouter();
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
@@ -61,6 +68,7 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
           const selected = isSelected(pin.id);
           const versionCount = imageVersionCounts[pin.id] ?? 0;
           const isRegenerating = regeneratingId === pin.id;
+          const usage = pinsWordPressUsage[pin.id] ?? [];
 
           return (
             <div
@@ -104,66 +112,81 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
               </label>
 
               {/* Image area */}
-              {pin.media_url ? (
-                <div className="relative">
-                  <a
-                    href={pin.media_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="relative aspect-2/3 max-h-56 w-full overflow-hidden bg-muted">
-                      <Image
-                        src={pin.media_url}
-                        alt={pin.title}
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                      />
-                    </div>
-                  </a>
-
-                  {/* Image action overlay */}
-                  <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRegenerate(pin.id);
-                      }}
-                      disabled={isRegenerating}
-                      className="flex h-7 w-7 items-center justify-center rounded-md bg-card/90 border border-border/80 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
-                      aria-label={`Regenerate image for: ${pin.title}`}
+              <div className="relative">
+                {pin.media_url ? (
+                  <div className="relative">
+                    <a
+                      href={pin.media_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {isRegenerating ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                    {versionCount > 1 && (
+                      <div className="relative aspect-2/3 max-h-56 w-full overflow-hidden bg-muted">
+                        <Image
+                          src={pin.media_url}
+                          alt={pin.title}
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                        />
+                      </div>
+                    </a>
+
+                    {/* Image action overlay */}
+                    <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setVersionsPin({ id: pin.id, title: pin.title });
+                          handleRegenerate(pin.id);
                         }}
-                        className="flex h-7 items-center gap-1 rounded-md bg-card/90 border border-border/80 px-1.5 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
-                        aria-label={`View ${versionCount} image versions`}
+                        disabled={isRegenerating}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-card/90 border border-border/80 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+                        aria-label={`Regenerate image for: ${pin.title}`}
                       >
-                        <Layers className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-medium">{versionCount}</span>
+                        {isRegenerating ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
                       </button>
+                      {versionCount > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVersionsPin({ id: pin.id, title: pin.title });
+                          }}
+                          className="flex h-7 items-center gap-1 rounded-md bg-card/90 border border-border/80 px-1.5 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+                          aria-label={`View ${versionCount} image versions`}
+                        >
+                          <Layers className="h-3.5 w-3.5" />
+                          <span className="text-[10px] font-medium">{versionCount}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex aspect-2/3 max-h-56 w-full items-center justify-center bg-muted/50">
+                    <div className="text-center">
+                      <Sparkles className="mx-auto h-5 w-5 text-muted-foreground/30" />
+                      <p className="mt-1.5 text-[10px] text-muted-foreground/40">AI Generated</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* WordPress usage indicator */}
+                {usage.length > 0 && (
+                  <div
+                    className="absolute bottom-2 left-2 z-10 flex h-6 items-center gap-1 rounded-md bg-card/90 border border-border/80 px-1.5 text-muted-foreground"
+                    title={usageTooltip(usage)}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {usage.length > 1 && (
+                      <span className="text-[10px] font-medium">{usage.length}</span>
                     )}
                   </div>
-                </div>
-              ) : (
-                <div className="flex aspect-2/3 max-h-56 w-full items-center justify-center bg-muted/50">
-                  <div className="text-center">
-                    <Sparkles className="mx-auto h-5 w-5 text-muted-foreground/30" />
-                    <p className="mt-1.5 text-[10px] text-muted-foreground/40">AI Generated</p>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Content */}
               <div className="p-4 space-y-2.5">
@@ -203,7 +226,11 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
       )}
 
       {detailPin && (
-        <PinDetailDialog pin={detailPin} onClose={() => setDetailPin(null)} />
+        <PinDetailDialog
+          pin={detailPin}
+          onClose={() => setDetailPin(null)}
+          usage={pinsWordPressUsage[detailPin.id] ?? []}
+        />
       )}
     </>
   );

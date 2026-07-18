@@ -74,6 +74,7 @@ export const guideSections: GuideSection[] = [
     points: [
       'Use Select All / Select None / Invert to build a selection, or click individual pins.',
       'Actions like Regenerate, Export, and Schedule apply only to your selection — or to everything if nothing is selected.',
+      'Click anywhere on a pin card (outside the checkbox and image actions) to open its full details — untruncated title and description, keywords, and the image prompt used for generation, with a Copy button to reuse it elsewhere.',
     ],
   },
   {

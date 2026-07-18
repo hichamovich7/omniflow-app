@@ -10,6 +10,7 @@ import { GenerateImagesButton } from '@/components/pinterest/generate-images-but
 import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
 import { GenerateWordPressButton } from '@/components/pinterest/generate-wordpress-button';
 import type { Pin, ImageStatus } from '@/types/database';
+import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
 interface EditorialWorkspaceProps {
   pins: Pin[];
@@ -20,6 +21,7 @@ interface EditorialWorkspaceProps {
   keyword: string;
   isCompleted: boolean;
   imageVersionCounts: Record<string, number>;
+  pinsWordPressUsage: Record<string, WordPressUsageArticle[]>;
 }
 
 export function EditorialWorkspace(props: EditorialWorkspaceProps) {
@@ -39,6 +41,7 @@ function EditorialWorkspaceContent({
   keyword,
   isCompleted,
   imageVersionCounts,
+  pinsWordPressUsage,
 }: EditorialWorkspaceProps) {
   const { selectedIds, selectedCount } = useSelection();
   const allIds = useMemo(() => pins.map(p => p.id), [pins]);
@@ -104,6 +107,7 @@ function EditorialWorkspaceContent({
             pins={pins}
             generationId={generationId}
             imageVersionCounts={imageVersionCounts}
+            pinsWordPressUsage={pinsWordPressUsage}
           />
         </div>
       )}

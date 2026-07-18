@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getGenerationsWordPressUsage } from '@/lib/queries/wordpress-usage';
 import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { HistoryFilters } from '@/components/history/history-filters';
@@ -62,6 +63,8 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
 
   const { data: generations, count } = await query;
   const list = generations ?? [];
+  const wordpressUsageMap = await getGenerationsWordPressUsage(supabase, list.map((g) => g.id));
+  const wordpressUsage = Object.fromEntries(wordpressUsageMap);
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
   const hasFilters = !!(params.q || params.project || params.language || params.status || params.board);
 
@@ -103,7 +106,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         </EmptyState>
       ) : (
         <>
-          <HistoryTable generations={list} />
+          <HistoryTable generations={list} wordpressUsage={wordpressUsage} />
           <HistoryPagination currentPage={currentPage} totalPages={totalPages} searchParams={params} />
         </>
       )}

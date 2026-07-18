@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getGenerationWithPins } from '@/lib/queries/generations';
+import { getPinsWordPressUsage } from '@/lib/queries/wordpress-usage';
 import { PageContainer } from '@/components/ui/page-container';
 import { EditorialWorkspace } from '@/components/editorial/editorial-workspace';
 import { RegenerateGenerationButton } from '@/components/pinterest/regenerate-generation-button';
@@ -31,6 +32,8 @@ export default async function GenerationResultsPage({
   const pinsWithoutImages = pins.filter((p) => !p.media_url).length;
   const hasSchedule = pins.some((p) => p.publish_date);
   const isPartial = pins.length < generation.pins_requested;
+  const wordpressUsageMap = await getPinsWordPressUsage(supabase, pins.map((p) => p.id));
+  const pinsWordPressUsage = Object.fromEntries(wordpressUsageMap);
 
   return (
     <PageContainer>
@@ -78,6 +81,7 @@ export default async function GenerationResultsPage({
           keyword={generation.keyword}
           isCompleted={generation.status === 'completed'}
           imageVersionCounts={imageVersionCounts}
+          pinsWordPressUsage={pinsWordPressUsage}
         />
       ) : (
         <div className="rounded-xl border border-dashed border-border/60 py-20 text-center">

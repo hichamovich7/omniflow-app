@@ -462,57 +462,41 @@ Model Used
 
 ---
 
-## Pins Table
+## Pin Grid
 
-One row per generated pin.
+Grid of cards, one per generated pin (responsive: 1/2/3 columns). Used on the Results page (`pin-table.tsx`) and on the Board Detail page (`board-pin-card.tsx`) — same visual pattern in both places.
 
-Columns:
+Each card displays, read-only:
 
-| Column       |
-| ------------ |
-| Title        |
-| Description  |
-| Keywords     |
-| Board        |
-| Image Prompt |
+* Image (or "AI Generated" placeholder while no image exists yet)
+* Title, truncated to 2 lines (`line-clamp-2`)
+* Description, truncated to 3 lines (`line-clamp-3`)
+* Board badge
+* Publish date (if scheduled)
 
-All fields editable.
+Results page only, hover-revealed:
 
----
+* Selection checkbox (top-left)
+* Regenerate image button
+* View image versions button (only shown when more than 1 version exists)
 
-## Pin Card View
-
-Alternative view.
-
-Each card displays:
-
-* Title
-* Description
-* Keywords
-* Board
-* Image Prompt
-
-Actions:
-
-* Copy Title
-* Copy Description
-* Copy Prompt
+Fields are not editable inline — no character counters, no per-field inputs. Clicking the card anywhere outside the checkbox/image/action buttons opens the **Pin Detail Dialog** below (`cursor-pointer` + hover state signal this). Clicks on the checkbox, the image, or an image action button are stopped from bubbling up, so they trigger their own action instead of opening the dialog.
 
 ---
 
-## Character Counters
+## Pin Detail Dialog
 
-Title:
+`components/pinterest/pin-detail-dialog.tsx` — shared between the Results page and the Board Detail page. Opened by clicking a pin card; read-only, does not duplicate card actions (Regenerate, selection).
 
-```txt
-0 / 100
-```
+Shows the full, untruncated pin content:
 
-Description:
+* Full-size image
+* Full title
+* Full description
+* Keywords, as tags
+* Image Prompt — monospace block, scrollable independently of the dialog, labeled "Internal use, not exported" so it's unambiguous this field never appears in CSV export. A Copy button copies it to the clipboard.
 
-```txt
-0 / 500
-```
+The dialog itself scrolls (`max-h-[90vh] overflow-y-auto`) if its content is taller than the viewport.
 
 ---
 

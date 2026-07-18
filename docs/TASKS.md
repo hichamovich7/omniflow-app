@@ -276,6 +276,18 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-FIX-005] Pin Detail Dialog — full content no longer hidden behind line-clamp truncation — 2026-07-18
+
+* New `components/pinterest/pin-detail-dialog.tsx` — shared, read-only dialog (full image, untruncated title/description, keywords as tags, image prompt) opened by clicking a pin card; modeled structurally on `ImageVersionsDialog` (controlled `open`/`onClose`) but view-only, no duplicated card actions
+* `components/pinterest/pin-table.tsx` (Results page) and new `components/boards/board-pin-card.tsx` (Board Detail page, extracted from previously inline card markup) both wire the same dialog — checkbox/image/Regenerate/Versions clicks `stopPropagation()` so the card click doesn't fight with their own actions
+* Image prompt shown in a monospace block labeled "Internal use, not exported", with a Copy-to-clipboard button — confirmed via full read of `lib/csv/pinterest.ts` (`generatePinterestCsv`, the only CSV export path) that `image_prompt` was never and is still not one of the exported CSV columns
+* Fixed a follow-up bug: `DialogContent` had no `max-height`, so a long image prompt could push the dialog taller than the viewport with no way to scroll to the cut-off part (dialog is `position: fixed`, page scroll doesn't help) — added `max-h-[90vh] overflow-y-auto` on the dialog and `overscroll-contain` on the inner prompt block so scrolling it doesn't chain to the dialog behind it
+* `docs/UI_UX.md`: replaced the stale "Pins Table"/"Pin Card View"/"Character Counters" sections (described inline-editable fields and per-field copy buttons that were never built) with "Pin Grid" and "Pin Detail Dialog", matching actual behavior; `lib/guide/content.ts` "Editorial Review" section updated with a point about the click-to-expand behavior
+* `line-clamp-2`/`line-clamp-3` kept as-is in both grid views — this only adds a way to reach the full content, it doesn't touch list-view density
+* Zero changes to selection, image regeneration/versions, scheduling, or CSV export logic
+
+---
+
 ## [TASK-029] Rate Limit Bypass Admin Panel — 2026-07-14
 
 * New `rate_limit_bypass` table (migration 011) — `email`, `added_at`, RLS enabled with **no policies** (deny-all for the normal anon/authenticated client, matching the requested "deny all direct access")

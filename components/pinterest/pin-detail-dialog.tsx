@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import Image from 'next/image';
-import { Copy, Sparkles } from 'lucide-react';
+import { Copy, FileText, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,13 +13,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { Pin } from '@/types/database';
+import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
 interface PinDetailDialogProps {
   pin: Pin;
   onClose: () => void;
+  usage?: WordPressUsageArticle[];
 }
 
-export function PinDetailDialog({ pin, onClose }: PinDetailDialogProps) {
+export function PinDetailDialog({ pin, onClose, usage = [] }: PinDetailDialogProps) {
   const keywords = pin.keywords
     .split(',')
     .map((k) => k.trim())
@@ -71,6 +74,24 @@ export function PinDetailDialog({ pin, onClose }: PinDetailDialogProps) {
                   {keyword}
                 </Badge>
               ))}
+            </div>
+          )}
+
+          {usage.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Used in</span>
+              <div className="space-y-1">
+                {usage.map((article) => (
+                  <Link
+                    key={article.generationId}
+                    href={`/wordpress/${article.generationId}`}
+                    className="flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-sm text-foreground hover:bg-muted/70 transition-colors"
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{article.title}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
 
