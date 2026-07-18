@@ -7,6 +7,7 @@ import { Sparkles, RefreshCw, Layers, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { ImageVersionsDialog } from './image-versions-dialog';
+import { PinDetailDialog } from './pin-detail-dialog';
 import type { Pin } from '@/types/database';
 
 interface PinTableProps {
@@ -29,6 +30,7 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
   const router = useRouter();
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [versionsPin, setVersionsPin] = useState<{ id: string; title: string } | null>(null);
+  const [detailPin, setDetailPin] = useState<Pin | null>(null);
 
   async function handleRegenerate(pinId: string) {
     setRegeneratingId(pinId);
@@ -63,7 +65,16 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
           return (
             <div
               key={pin.id}
-              className={`group relative rounded-xl border bg-card overflow-hidden transition-all hover:shadow-sm ${
+              role="button"
+              tabIndex={0}
+              onClick={() => setDetailPin(pin)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setDetailPin(pin);
+                }
+              }}
+              className={`group relative rounded-xl border bg-card overflow-hidden transition-all cursor-pointer hover:shadow-sm ${
                 selected
                   ? 'border-primary/40 ring-1 ring-primary/20'
                   : 'border-border/60 hover:border-border'
@@ -71,6 +82,7 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
             >
               {/* Selection checkbox */}
               <label
+                onClick={(e) => e.stopPropagation()}
                 className={`absolute left-3 top-3 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded border transition-all ${
                   selected
                     ? 'border-primary bg-primary text-primary-foreground'
@@ -94,7 +106,13 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
               {/* Image area */}
               {pin.media_url ? (
                 <div className="relative">
-                  <a href={pin.media_url} target="_blank" rel="noopener noreferrer" className="block">
+                  <a
+                    href={pin.media_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="relative aspect-2/3 max-h-56 w-full overflow-hidden bg-muted">
                       <Image
                         src={pin.media_url}
@@ -109,7 +127,10 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
                   {/* Image action overlay */}
                   <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => handleRegenerate(pin.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegenerate(pin.id);
+                      }}
                       disabled={isRegenerating}
                       className="flex h-7 w-7 items-center justify-center rounded-md bg-card/90 border border-border/80 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
                       aria-label={`Regenerate image for: ${pin.title}`}
@@ -122,7 +143,10 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
                     </button>
                     {versionCount > 1 && (
                       <button
-                        onClick={() => setVersionsPin({ id: pin.id, title: pin.title })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVersionsPin({ id: pin.id, title: pin.title });
+                        }}
                         className="flex h-7 items-center gap-1 rounded-md bg-card/90 border border-border/80 px-1.5 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
                         aria-label={`View ${versionCount} image versions`}
                       >
@@ -176,6 +200,10 @@ export function PinTable({ pins, generationId, imageVersionCounts }: PinTablePro
           pinTitle={versionsPin.title}
           onClose={() => setVersionsPin(null)}
         />
+      )}
+
+      {detailPin && (
+        <PinDetailDialog pin={detailPin} onClose={() => setDetailPin(null)} />
       )}
     </>
   );

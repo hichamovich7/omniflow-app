@@ -1,13 +1,13 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBoardWithPins } from '@/lib/queries/boards';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { BoardActions } from '@/components/boards/board-actions';
+import { BoardPinCard } from '@/components/boards/board-pin-card';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
-import { ArrowLeft, LayoutGrid, Sparkles } from 'lucide-react';
+import { ArrowLeft, LayoutGrid } from 'lucide-react';
 
 export default async function BoardDetailPage({
   params,
@@ -55,32 +55,7 @@ export default async function BoardDetailPage({
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {pins.map((pin) => (
-            <div
-              key={pin.id}
-              className="rounded-xl border border-border/60 bg-card overflow-hidden"
-            >
-              {pin.media_url ? (
-                <div className="relative aspect-2/3 max-h-56 w-full overflow-hidden bg-muted">
-                  <Image
-                    src={pin.media_url}
-                    alt={pin.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex aspect-2/3 max-h-56 w-full items-center justify-center bg-muted/50">
-                  <Sparkles className="h-5 w-5 text-muted-foreground/30" />
-                </div>
-              )}
-              <div className="p-4 space-y-2">
-                <h3 className="text-[13px] font-medium leading-snug line-clamp-2">{pin.title}</h3>
-                <p className="text-[12px] leading-relaxed text-muted-foreground line-clamp-3">
-                  {pin.description}
-                </p>
-              </div>
-            </div>
+            <BoardPinCard key={pin.id} pin={pin} />
           ))}
         </div>
       )}

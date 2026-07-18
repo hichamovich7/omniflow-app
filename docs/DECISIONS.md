@@ -659,3 +659,15 @@ En préparation du déploiement Vercel (pas encore effectif, aucun effet en dev 
 
 * Le pipeline Option 4 "10 pins Küchen" testé de bout en bout à nouveau après ce correctif — voir résultat du test dans la conversation
 * Ce n'est qu'un sursis, pas une solution durable : `addExternalLink()` (recherche web, actuellement désactivé pour Option 4, en attente de réactivation) ajoutera un appel AI de plus sur ce même pipeline synchrone, et chaque futur ajout rapprochera la durée totale du plafond de 180s. Empiler des timeouts de plus en plus généreux n'est pas extensible indéfiniment — un passage à un traitement asynchrone (Inngest, déjà réservé dans `.env.local` mais non connecté à ce pipeline) sera nécessaire à terme. Noté comme dette technique, pas comme correctif immédiat — voir TECHNICAL_DEBT.md
+
+---
+
+# Idées futures
+
+Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.
+
+## Platform Output Presets
+
+Système de sélection Platform → Output Preset (dimensions, aspect ratio, safe area, prompt rules) pour adapter la génération d'image à chaque réseau social. Architecture proposée : `config/platform-presets.ts` centralisé, un preset contient plus qu'une taille (safe area, export format, prompt rules spécifiques).
+
+**Statut** : idée non urgente, à reconsidérer une fois qu'un deuxième générateur social (au-delà de Pinterest) sera réellement construit — éviter de deviner les règles de composition de plateformes non encore développées (même logique que la décision TASK-027 du 2026-07-15).
