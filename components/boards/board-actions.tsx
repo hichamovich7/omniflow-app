@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { DeleteBoardDialog } from './delete-board-dialog';
+import { DeleteBoardsDialog } from './delete-boards-dialog';
 
 interface BoardActionsProps {
   boardId: string;
@@ -46,9 +46,8 @@ export function BoardActions({ boardId, boardName, redirectAfterDelete }: BoardA
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <DeleteBoardDialog
-        boardId={boardId}
-        boardName={boardName}
+      <DeleteBoardsDialog
+        boards={[{ id: boardId, name: boardName }]}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         redirectTo={redirectAfterDelete}

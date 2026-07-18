@@ -4,9 +4,10 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
-import { BoardActions } from '@/components/boards/board-actions';
+import { BoardCard } from '@/components/boards/board-card';
+import { BoardsBulkBar } from '@/components/boards/boards-bulk-bar';
+import { EditorialSelectionProvider } from '@/components/editorial/selection-provider';
 import { Plus, LayoutGrid, FolderOpen } from 'lucide-react';
-import { timeAgo } from '@/lib/utils/format-date';
 
 export default async function BoardsPage() {
   const supabase = await createClient();
@@ -56,41 +57,28 @@ export default async function BoardsPage() {
           </Link>
         </EmptyState>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((board) => {
-            const projectName = Array.isArray(board.projects)
-              ? board.projects[0]?.name
-              : board.projects?.name;
-            const pinCount = Array.isArray(board.pins) ? board.pins.length : 0;
+        <EditorialSelectionProvider>
+          <BoardsBulkBar boards={list.map((board) => ({ id: board.id, name: board.name }))} />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {list.map((board) => {
+              const projectName = Array.isArray(board.projects)
+                ? board.projects[0]?.name
+                : board.projects?.name;
+              const pinCount = Array.isArray(board.pins) ? board.pins.length : 0;
 
-            return (
-              <div
-                key={board.id}
-                className="group relative rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-border"
-              >
-                <div className="absolute right-3 top-3">
-                  <BoardActions boardId={board.id} boardName={board.name} redirectAfterDelete="/boards" />
-                </div>
-                <Link href={`/boards/${board.id}`} className="flex items-start gap-3 pr-6">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{board.name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                      {projectName ?? 'No project'}
-                    </p>
-                  </div>
-                </Link>
-                <div className="mt-4 flex items-center gap-3 text-[11px] text-muted-foreground">
-                  <span>{pinCount} pin{pinCount !== 1 ? 's' : ''}</span>
-                  <span>·</span>
-                  <span>{timeAgo(board.created_at)}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              return (
+                <BoardCard
+                  key={board.id}
+                  boardId={board.id}
+                  boardName={board.name}
+                  projectName={projectName ?? null}
+                  pinCount={pinCount}
+                  createdAt={board.created_at}
+                />
+              );
+            })}
+          </div>
+        </EditorialSelectionProvider>
       )}
     </PageContainer>
   );

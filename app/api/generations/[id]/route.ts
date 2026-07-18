@@ -95,6 +95,53 @@ export async function DELETE(
     );
   }
 
+  // Storage cleanup — best-effort, never blocks the DB delete below. Unlike
+  // WordPress images (one shared folder per generation), pin images are
+  // stored one folder per pin (see app/api/pinterest/generate-images/route.ts:
+  // `${userId}/${pinId}/${version}.png`), so each pin's folder must be listed
+  // separately before a single batched remove() call.
+  try {
+    const { data: pinRows, error: pinsError } = await supabase
+      .from('pins')
+      .select('id')
+      .eq('generation_id', id);
+
+    if (pinsError) {
+      console.error(`[generation delete] Failed to list pins for ${id}:`, pinsError);
+    } else if (pinRows && pinRows.length > 0) {
+      const listResults = await Promise.all(
+        pinRows.map((pin) =>
+          supabase.storage.from('generated-images').list(`${user.id}/${pin.id}`)
+        )
+      );
+
+      const filePaths: string[] = [];
+      listResults.forEach((result, index) => {
+        if (result.error) {
+          console.error(
+            `[generation delete] Failed to list storage files for pin ${pinRows[index].id}:`,
+            result.error
+          );
+          return;
+        }
+        for (const file of result.data ?? []) {
+          filePaths.push(`${user.id}/${pinRows[index].id}/${file.name}`);
+        }
+      });
+
+      if (filePaths.length > 0) {
+        const { error: removeError } = await supabase.storage.from('generated-images').remove(filePaths);
+        if (removeError) {
+          console.error(`[generation delete] Failed to remove storage files for ${id}:`, removeError);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[generation delete] Unexpected storage cleanup error for ${id}:`, err);
+  }
+
+  // pins and pin_images both have ON DELETE CASCADE to generations/pins
+  // (migrations 001, 005) — deleting the generation row is enough.
   const { error: dbError } = await supabase
     .from('generations')
     .delete()

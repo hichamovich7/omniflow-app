@@ -5,8 +5,10 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { WordPressHistoryFilters } from '@/components/wordpress/wordpress-history-filters';
 import { WordPressHistoryTable } from '@/components/wordpress/wordpress-history-table';
+import { WordPressHistoryBulkBar } from '@/components/wordpress/wordpress-history-bulk-bar';
 import { WordPressHistoryPagination } from '@/components/wordpress/wordpress-history-pagination';
 import { EmptyState } from '@/components/empty-state';
+import { EditorialSelectionProvider } from '@/components/editorial/selection-provider';
 import { buttonVariants } from '@/components/ui/button';
 import { Clock, Search } from 'lucide-react';
 
@@ -92,10 +94,16 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
           )}
         </EmptyState>
       ) : (
-        <>
+        <EditorialSelectionProvider>
+          <WordPressHistoryBulkBar
+            articles={list.map((g) => {
+              const article = Array.isArray(g.wordpress_articles) ? g.wordpress_articles[0] : g.wordpress_articles;
+              return { generationId: g.id, title: article?.title ?? g.keyword };
+            })}
+          />
           <WordPressHistoryTable generations={list} />
           <WordPressHistoryPagination currentPage={currentPage} totalPages={totalPages} searchParams={params} />
-        </>
+        </EditorialSelectionProvider>
       )}
     </PageContainer>
   );

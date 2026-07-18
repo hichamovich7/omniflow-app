@@ -12,15 +12,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { generatePinterestCsv, downloadCsv } from '@/lib/csv/pinterest';
-import { DeleteGenerationDialog } from './delete-generation-dialog';
+import { DeleteGenerationsDialog } from './delete-generations-dialog';
 import type { Pin } from '@/types/database';
+import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
 interface HistoryActionsProps {
   generationId: string;
   keyword: string;
+  wordpressArticles?: WordPressUsageArticle[];
 }
 
-export function HistoryActions({ generationId, keyword }: HistoryActionsProps) {
+export function HistoryActions({ generationId, keyword, wordpressArticles }: HistoryActionsProps) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -80,9 +82,8 @@ export function HistoryActions({ generationId, keyword }: HistoryActionsProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <DeleteGenerationDialog
-        generationId={generationId}
-        keyword={keyword}
+      <DeleteGenerationsDialog
+        generations={[{ id: generationId, keyword, wordpressArticles }]}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
       />

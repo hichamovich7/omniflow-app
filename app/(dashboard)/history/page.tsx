@@ -6,8 +6,10 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { HistoryFilters } from '@/components/history/history-filters';
 import { HistoryTable } from '@/components/history/history-table';
+import { HistoryBulkBar } from '@/components/history/history-bulk-bar';
 import { HistoryPagination } from '@/components/history/history-pagination';
 import { EmptyState } from '@/components/empty-state';
+import { EditorialSelectionProvider } from '@/components/editorial/selection-provider';
 import { buttonVariants } from '@/components/ui/button';
 import { Clock, Search } from 'lucide-react';
 
@@ -105,10 +107,17 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           )}
         </EmptyState>
       ) : (
-        <>
+        <EditorialSelectionProvider>
+          <HistoryBulkBar
+            generations={list.map((g) => ({
+              id: g.id,
+              keyword: g.keyword,
+              wordpressArticles: wordpressUsage[g.id]?.articles,
+            }))}
+          />
           <HistoryTable generations={list} wordpressUsage={wordpressUsage} />
           <HistoryPagination currentPage={currentPage} totalPages={totalPages} searchParams={params} />
-        </>
+        </EditorialSelectionProvider>
       )}
     </PageContainer>
   );
