@@ -1,8 +1,10 @@
 'use client';
 
 import Image from 'next/image';
-import { Sparkles } from 'lucide-react';
+import { Copy, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -22,9 +24,18 @@ export function PinDetailDialog({ pin, onClose }: PinDetailDialogProps) {
     .map((k) => k.trim())
     .filter(Boolean);
 
+  async function copyImagePrompt() {
+    try {
+      await navigator.clipboard.writeText(pin.image_prompt);
+      toast.success('Image prompt copied to clipboard');
+    } catch {
+      toast.error('Failed to copy image prompt');
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Pin Details</DialogTitle>
         </DialogHeader>
@@ -62,6 +73,21 @@ export function PinDetailDialog({ pin, onClose }: PinDetailDialogProps) {
               ))}
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Image Prompt <span className="text-muted-foreground/60">— Internal use, not exported</span>
+              </span>
+              <Button variant="outline" size="xs" onClick={copyImagePrompt}>
+                <Copy className="mr-1 h-3 w-3" />
+                Copy
+              </Button>
+            </div>
+            <pre className="max-h-40 overflow-y-auto overscroll-contain whitespace-pre-wrap rounded-lg bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+              {pin.image_prompt}
+            </pre>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
