@@ -289,7 +289,6 @@ interface GenerateArticleFromPinsParams {
  * - internal images are the pins' own already-generated images, copied as-is
  *   (no generateImage() call, no storage upload — just their existing public URL)
  * - only the featured image is newly generated, from the outline's unified-theme prompt
- * - no addExternalLink() call yet (TASK-028: pending the external-link 404 fix)
  */
 export async function generateArticleFromPins(
   params: GenerateArticleFromPinsParams
@@ -371,6 +370,13 @@ export async function generateArticleFromPins(
     throw new Error('AI returned an invalid article format. Try again.');
   }
   let content = articleValidated.data.content;
+
+  // Step 2b: best-effort single external link (real, web-search-verified source).
+  // Runs before image marker resolution so it never has to reason about
+  // {{IMAGE_N}} markers — see lib/ai/services/external-link.ts for the
+  // no-link-found / provider-error fallback (article is simply returned as-is).
+  const externalLink = await addExternalLink(content, outline.title, language);
+  content = externalLink.content;
 
   // Step 3: featured image only — generated fresh from the unified-theme prompt.
   // Unlike Option 1 (which routes all image generation through promisePool so a

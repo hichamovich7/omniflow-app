@@ -662,6 +662,27 @@ En préparation du déploiement Vercel (pas encore effectif, aucun effet en dev 
 
 ---
 
+## 2026-07-19
+
+### Decision
+
+TASK-028 : réactivation d'`addExternalLink()` sur Option 4 (`generateArticleFromPins`)
+
+### Context
+
+Complète l'entrée du 2026-07-15 ci-dessus. Ce correctif (vérification HTTP réelle avant insertion du lien, cf. "Correctif 2026-07-17" dans cette même entrée) avait volontairement été laissé hors de l'Option 4 — `generateArticleFromPins()` n'appelait pas `addExternalLink()`, avec un commentaire explicite dans le code renvoyant au correctif en cours, précisément pour ne pas mélanger un correctif encore récent avec la nouvelle fonctionnalité Option 4. Le commentaire n'a jamais été retiré une fois le correctif stabilisé, laissant Option 4 sans lien externe alors que plus rien ne s'y opposait.
+
+### Decision Taken
+
+`addExternalLink()` est désormais appelée dans `generateArticleFromPins()` au même point du pipeline que dans l'Option 1 : après validation de l'article, avant la résolution des marqueurs `{{IMAGE_N}}`. Le commentaire obsolète de la docstring de la fonction est retiré. `docs/TASKS.md` mis à jour en conséquence.
+
+### Consequences
+
+* Option 4 gagne le même lien externe best-effort que l'Option 1, avec le même comportement en cas d'échec (article retourné inchangé, aucun blocage du pipeline)
+* Ajoute un appel AI supplémentaire (recherche web) au pipeline synchrone d'Option 4 — le risque anticipé dans l'entrée du 2026-07-18 ("chaque futur ajout rapprochera la durée totale du plafond de 180s") se matérialise concrètement ici. Voir TECHNICAL_DEBT.md pour la réévaluation de priorité qui en découle, à confirmer par les temps réels du prochain test bout-en-bout d'Option 4
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

@@ -134,7 +134,7 @@ Project and Language are derived server-side from the selected pins (their share
 Generation: outline synthesized from the pins' combined theme (lib/ai/prompts/wordpress-from-pins-prompt.ts) — one cohesive article, not a concatenation — then the full article is written from that outline using the exact same 10-block article prompt as Option 1 (lib/ai/prompts/wordpress-article-prompt.ts), unchanged.
 Featured image: newly generated via generateImage() (role IMAGE), from a prompt describing the article's unified theme — never a reused pin image.
 Internal images (up to 3): the active pin_images image of up to 3 of the selected pins, copied by URL as-is — no generateImage() call, no re-upload. See DECISIONS.md 2026-07-17 for why this split (fresh featured image, reused internal images).
-No addExternalLink() call yet — pending the external-link 404 fix (tracked separately, out of scope for this option).
+addExternalLink() runs the same as Option 1: best-effort single external link, inserted after the article is written and before image marker resolution.
 < 3 pins selected: allowed, but the UI warns before navigating ("may lack enough source material") and the API logs a warning; not a hard block.
 source_type: 'pins', source_pin_ids: uuid[] on wordpress_generations records provenance.
 Route: POST /api/wordpress/generate-from-pins (separate from Option 1's /api/wordpress/generate — different input shape, ownership check is pins-based instead of project-based).

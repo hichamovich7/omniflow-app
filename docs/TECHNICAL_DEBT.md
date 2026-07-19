@@ -133,7 +133,7 @@ Eliminar cuando se implemente el logger centralizado.
 
 ## Motivo por el que es deuda, no bug
 
-180s es suficiente hoy, pero el pipeline solo va a crecer: `addExternalLink()` (búsqueda web, ya diferida para Option 4, pendiente de reactivar) añade otra llamada AI con su propio timeout; cualquier paso futuro (más research, más imágenes, un segundo pase de calidad) se apila sobre el mismo request síncrono. Cada vez que un timeout se queda corto, la solución fácil es subirlo — pero eso no escala indefinidamente, y en algún punto la duración total choca con límites de plataforma (Vercel Pro tope real) o con la experiencia de usuario (una request de 2-3 minutos sin feedback intermedio).
+180s es suficiente hoy, pero el pipeline solo va a crecer: `addExternalLink()` (búsqueda web) añade otra llamada AI con su propio timeout; cualquier paso futuro (más research, más imágenes, un segundo pase de calidad) se apila sobre el mismo request síncrono. Cada vez que un timeout se queda corto, la solución fácil es subirlo — pero eso no escala indefinidamente, y en algún punto la duración total choca con límites de plataforma (Vercel Pro tope real) o con la experiencia de usuario (una request de 2-3 minutos sin feedback intermedio).
 
 Inngest ya está reservado en `.env.local` (`docs/DEPLOYMENT.md` § Inngest Configuration) pero no está conectado a este pipeline.
 
@@ -143,7 +143,7 @@ Mover la generación WordPress a un job asíncrono (Inngest): la request HTTP so
 
 ## Prioridad
 
-Baja — no implementar hasta que un timeout real se dispare en producción con el pipeline actual, o hasta que se añada una etapa (ej. `addExternalLink()`) que empuje la duración total cerca del límite de 180s.
+Baja, pendiente de confirmación por medición real. El disparador que esta sección anticipaba ya no es hipotético: `addExternalLink()` fue conectada a Option 4 el 2026-07-19 (ver DECISIONS.md), añadiendo una llamada AI más al mismo request síncrono. Eso por sí solo no justifica subir la prioridad — falta el dato que importa: el tiempo total real del pipeline completo (outline + artículo + enlace externo + imagen) en el próximo test end-to-end de Option 4. Si ese total queda lejos de 180s, la prioridad se mantiene Baja; si se acerca al límite (o un timeout llega a dispararse), subir a Media y registrar el resultado aquí.
 
 ---
 
