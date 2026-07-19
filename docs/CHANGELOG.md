@@ -22,6 +22,22 @@ No planned changes.
 
 ---
 
+# [1.15.4] - 2026-07-19
+
+## Dashboard scroll structure fixed; Pinterest Generator header spacing tightened
+
+### Fixed
+
+* `app/(dashboard)/layout.tsx`: the sidebar and top bar used to scroll away with the page — a wheel event starting outside `<main>` (over the sidebar or top bar) bubbled up and scrolled the whole document. Root cause: viewport scrollability is governed by `<body>`'s own `overflow` value (CSS overflow-propagation rule), not a descendant div's `overflow-hidden`. Verified visually with a Playwright-driven browser before and after (real wheel events, not just programmatic `scrollTop`) at 1440×900, 1366×768, and 768px width.
+* `components/layout/scroll-lock.tsx` (new): `<ScrollLock />` client component, mounted in the dashboard layout, locks `overflow: hidden` on `html`/`body` for as long as the dashboard is mounted and restores the previous value on unmount, so `/login` and other routes outside `(dashboard)` keep normal document scroll.
+* `components/pinterest/pin-form.tsx`: Pinterest Generator hero (icon + title + description) was tall enough that the full form (Keyword, Board, Project/Language/Pins) didn't reliably fit above the fold on smaller viewports. Tightened top padding, icon size, and margins (~215px → ~140px); form now fits without scrolling at 1440×900 and 1366×768.
+
+### Docs
+
+* `docs/UI_UX.md`: new "Scroll Containment" section under Layout Structure explaining the fixed dashboard shell and why `ScrollLock` is needed.
+
+---
+
 # [1.15.3] - 2026-07-18
 
 ## Pin cards: full title/description/keywords/image prompt no longer hidden behind `line-clamp` truncation with no way to view them

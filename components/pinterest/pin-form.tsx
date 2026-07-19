@@ -103,14 +103,14 @@ export function PinForm({ projects, boards }: PinFormProps) {
   }
 
   return (
-    <div className="pt-8 sm:pt-16">
+    <div className="pt-4 sm:pt-6">
       {/* Hero */}
-      <div className="mb-10 text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <Sparkles className="h-6 w-6 text-primary" />
+      <div className="mb-6 text-center">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+          <Sparkles className="h-5 w-5 text-primary" />
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Pinterest Generator</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">Pinterest Generator</h1>
+        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
           Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts.
         </p>
       </div>
