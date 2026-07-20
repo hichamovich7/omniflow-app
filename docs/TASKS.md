@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20.
 
 ---
 
@@ -275,6 +275,20 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-031] Dashboard Multi-Platform Restructure — 2026-07-20
+
+* Dashboard (`app/(dashboard)/dashboard/page.tsx`) now reflects both Pinterest and WordPress instead of Pinterest only
+* "Generate Content" primary CTA replaced by a `DropdownMenu`-based button (new `components/dashboard/generate-content-menu.tsx`, Client Component — justified per Rule #29) with two options: "Pinterest Pins" (→ `/pinterest`) and "WordPress Article" (→ `/wordpress`); remains the only solid/primary button on the screen
+* Quick Actions grid: single "View History" card replaced by "Pinterest History" (→ `/history`) and "WordPress History" (→ `/wordpress/history`), alongside unchanged "New Project"; grid reflows from 2 to 3 cards (`sm:grid-cols-3`)
+* New "Articles Generated" stat card counts `wordpress_articles` (RLS-scoped to the user, same pattern as the existing `generations`/`pins` counts — no explicit `user_id` filter needed); stats grid now 5 cards (`sm:grid-cols-3 lg:grid-cols-5`), verified not to overflow at 1366×768
+* "Projects" stat card is now a `Link` to `/projects` (previously a static div)
+* Recent Activity merges Pinterest `generations` and WordPress `wordpress_generations` into one list, sorted by `created_at` descending, top 5 — two grouped queries (one per table), not N+1; each row shows a platform icon (Sparkles for Pinterest, FileText for WordPress, matching existing sidebar/history icon conventions) next to the status dot, and links to `/pinterest/[id]` or `/wordpress/[id]` accordingly
+* Visually verified with a Playwright-driven headless browser (real login, not a static check) at 1440×900 and 1366×768 — no overflow, dropdown opens correctly, Projects tile navigates, zero console errors
+* `docs/UI_UX.md` Dashboard section rewritten to describe the two-platform structure
+* No database schema changes (reused existing `wordpress_articles` table), no API changes, no new dependencies — `lib/guide/content.ts` not touched since Dashboard was never a documented guide section (it's a navigation hub over already-documented features, not a new capability)
+
+---
 
 ## [TASK-FIX-005] Pin Detail Dialog — full content no longer hidden behind line-clamp truncation — 2026-07-18
 

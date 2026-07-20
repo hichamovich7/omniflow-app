@@ -22,6 +22,24 @@ No planned changes.
 
 ---
 
+# [1.15.5] - 2026-07-20
+
+## Dashboard restructured to reflect Pinterest + WordPress
+
+### Changed
+
+* `app/(dashboard)/dashboard/page.tsx`: "Generate Content" is now a dropdown button (Pinterest Pins / WordPress Article) instead of a single link to `/pinterest`; new `components/dashboard/generate-content-menu.tsx`.
+* Quick Actions: "View History" split into separate "Pinterest History" and "WordPress History" cards (grid now 3 cards); "New Project" unchanged.
+* Stats: new "Articles Generated" card (`wordpress_articles` count); "Projects" card is now a link to `/projects`.
+* Recent Activity now merges Pinterest and WordPress generations, sorted together by date, with a per-row platform icon and type-correct link.
+
+### Docs
+
+* `docs/UI_UX.md`: Dashboard section rewritten for the two-platform structure.
+* `docs/TASKS.md`: TASK-031 added and marked completed.
+
+---
+
 # [1.15.4] - 2026-07-19
 
 ## Dashboard scroll structure fixed; Pinterest Generator header spacing tightened

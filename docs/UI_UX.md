@@ -143,22 +143,30 @@ Route:
 
 Purpose:
 
-Resumen rápido del uso.
+Resumen rápido del uso, reflejando ambas plataformas (Pinterest + WordPress), no solo Pinterest.
 
-Cards:
+Primary Action:
 
-* Total Generations
-* Total Pins Generated
-* Available Credits
-* Active Project
+* "Generate Content ▾" — único botón sólido de la pantalla, con menú desplegable: "Pinterest Pins" (→ `/pinterest`) y "WordPress Article" (→ `/wordpress`)
+
+Quick Actions (3 cards):
+
+* New Project (→ `/projects/new`, transversal a ambas plataformas)
+* Pinterest History (→ `/history`)
+* WordPress History (→ `/wordpress/history`)
+
+Stats (5 cards):
+
+* Generations (Pinterest)
+* Pins Created
+* Articles Generated (WordPress, cuenta `wordpress_articles` scopeada al usuario vía RLS)
+* Projects — clicable, enlaza a `/projects`
+* Credits
 
 Recent Activity:
 
-* Last Generations
-
-Quick Actions:
-
-* New Generation
+* Combina generaciones Pinterest y WordPress, ordenadas juntas por fecha descendente (top 5)
+* Cada fila muestra un icono de plataforma (Pinterest vs WordPress) junto al status dot, y enlaza a `/pinterest/[id]` o `/wordpress/[id]` según su tipo
 
 ---
 
