@@ -106,7 +106,9 @@ Logical container for generations.
 | id          | uuid PK               |                      |
 | user_id     | uuid FK → profiles.id | Owner                |
 | name        | text                  | Project name         |
-| description | text nullable         | Optional description |
+| description | text nullable         | Brand Profile — used as AI context for all generations in this project. No length limit at the DB layer; app-layer cap is 10,000 chars (migration 001 predates this column, cap enforced in `lib/validations/project.ts` only, migration 017 changed nothing at the DB level) |
+| niche       | text nullable         | Free text, UI-only suggestion list (`components/projects/project-form.tsx`), never DB-constrained. Storage only — no prompt/AI logic reads this yet (TASK-033; see DECISIONS.md for why this stays a flat convention, not per-niche prompt branching) |
+| default_language | text nullable   | One of `en`/`de`/`es`/`fr` (validated at the Zod layer against `SUPPORTED_LANGUAGES`, not a DB enum/CHECK — same convention as `generations.language`). Pre-fills, never forces, the Language field on the Pinterest and WordPress generation forms (migration 017) |
 | is_default  | boolean               | Default false        |
 | created_at  | timestamptz           |                      |
 | updated_at  | timestamptz           |                      |

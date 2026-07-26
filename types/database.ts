@@ -16,6 +16,8 @@ export interface Project {
   user_id: string;
   name: string;
   description: string | null;
+  niche: string | null;
+  default_language: string | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;

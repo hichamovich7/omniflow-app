@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, description } = parsed.data;
+  const { name, description, niche, default_language } = parsed.data;
 
   const { count } = await supabase
     .from('projects')
@@ -49,6 +49,8 @@ export async function POST(request: Request) {
       user_id: user.id,
       name,
       description,
+      niche,
+      default_language,
       is_default: isFirst,
     })
     .select()

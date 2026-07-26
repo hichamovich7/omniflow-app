@@ -22,6 +22,7 @@ interface ProjectOption {
   id: string;
   name: string;
   is_default: boolean;
+  default_language: string | null;
 }
 
 interface BoardOption {
@@ -54,10 +55,20 @@ export function PinForm({ projects, boards }: PinFormProps) {
   );
   const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
   const [board, setBoard] = useState('');
-  const [language, setLanguage] = useState<SupportedLanguage>('en');
+  const [language, setLanguage] = useState<SupportedLanguage>(
+    (defaultProject?.default_language as SupportedLanguage) ?? 'en'
+  );
   const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function handleProjectChange(nextProjectId: string) {
+    setProjectId(nextProjectId);
+    const next = projects.find((p) => p.id === nextProjectId);
+    if (next?.default_language) {
+      setLanguage(next.default_language as SupportedLanguage);
+    }
+  }
 
   const boardOptions = boards.filter((b) => b.project_id === projectId);
 
@@ -169,7 +180,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
             <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
               Project
             </Label>
-            <Select value={projectId} onValueChange={(v) => v && setProjectId(v)}>
+            <Select value={projectId} onValueChange={(v) => v && handleProjectChange(v)}>
               <SelectTrigger id="project">
                 <span className="truncate text-sm">
                   {projects.find((p) => p.id === projectId)?.name ?? 'Select'}

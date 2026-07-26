@@ -22,6 +22,26 @@ No planned changes.
 
 ---
 
+# [1.17.0] - 2026-07-26
+
+## Projects: Brand Profile truncation fix, Niche field, Default Language
+
+### Fixed
+
+* Brand Profile (`projects.description`) was silently capped at 500 characters by a Zod `.max(500)` and a matching `<Textarea maxLength={500}>` — the DB column itself (`text`) had no limit. Both raised to 10,000.
+
+### Added
+
+* `projects.niche` (nullable text, migration 017) — free text, no DB constraint. New `components/ui/combobox.tsx` (wraps `@base-ui/react/combobox`, no new dependency) offers a curated 20-item suggestion list in the Project form, but any typed value is accepted and stored as-is. Storage only for now — no prompt logic reads it yet.
+* `projects.default_language` (nullable text, migration 017) — one of en/de/es/fr. Set via a Select in the Project form; pre-fills (never forces) the Language field on both the Pinterest and WordPress generation forms when that project is selected.
+
+### Docs
+
+* `docs/DATABASE.md`: `projects` table columns updated.
+* `docs/TASKS.md`: TASK-033 added and marked completed.
+
+---
+
 # [1.16.0] - 2026-07-26
 
 ## WordPress Categories (manual, project-scoped)

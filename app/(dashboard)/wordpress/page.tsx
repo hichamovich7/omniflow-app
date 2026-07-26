@@ -75,7 +75,7 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
 
   const { data: projects } = await supabase
     .from('projects')
-    .select('id, name, is_default')
+    .select('id, name, is_default, default_language')
     .order('created_at', { ascending: false });
 
   const list = projects ?? [];

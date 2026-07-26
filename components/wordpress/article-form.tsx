@@ -24,6 +24,7 @@ interface ProjectOption {
   id: string;
   name: string;
   is_default: boolean;
+  default_language: string | null;
 }
 
 interface ArticleFormProps {
@@ -37,7 +38,9 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
 
   const [projectId, setProjectId] = useState(defaultProject?.id ?? '');
   const [keyword, setKeyword] = useState('');
-  const [language, setLanguage] = useState<SupportedLanguage>('en');
+  const [language, setLanguage] = useState<SupportedLanguage>(
+    (defaultProject?.default_language as SupportedLanguage) ?? 'en'
+  );
   const [researchNotes, setResearchNotes] = useState('');
   const [categories, setCategories] = useState(initialCategories);
   const [categoryId, setCategoryId] = useState('');
@@ -49,6 +52,10 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
   function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
     setCategoryId('');
+    const next = projects.find((p) => p.id === nextProjectId);
+    if (next?.default_language) {
+      setLanguage(next.default_language as SupportedLanguage);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

@@ -30,6 +30,8 @@ export default async function EditProjectPage({
         defaultValues={{
           name: project.name,
           description: project.description,
+          niche: project.niche,
+          default_language: project.default_language,
         }}
       />
     </PageContainer>

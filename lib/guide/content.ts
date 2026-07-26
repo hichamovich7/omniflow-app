@@ -28,8 +28,10 @@ export const guideSections: GuideSection[] = [
     summary: 'Everything you generate belongs to a Project. A Project also holds your Brand Profile, which every generator uses as context.',
     points: [
       'Create a Project before generating any content.',
-      'The Brand Profile field (in the Project form) describes your brand, tone, and audience — it is automatically injected into every AI generation for that project.',
+      'The Brand Profile field (in the Project form) describes your brand, tone, and audience — it is automatically injected into every AI generation for that project. Up to 10,000 characters.',
       'One Project can be marked as default, used to pre-fill the Project selector across the app.',
+      'Niche (optional) is a free-text label for the project — pick from suggestions or type your own. It\'s stored for your own organization only; it doesn\'t change how content is generated yet.',
+      'Default Language (optional) pre-fills the Language field on the Pinterest and WordPress generation forms when this project is selected — you can always change it before generating.',
     ],
   },
   {

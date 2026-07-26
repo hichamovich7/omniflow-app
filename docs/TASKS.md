@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26.
 
 ---
 
@@ -304,6 +304,19 @@ Stripe Working                  ⬚ TASK-012
 * WordPress History: category badge (`outline` variant, "Uncategorized" fallback) added next to the existing status badge on each card; new Category filter alongside Project/Language/Status, using the same two-step "query child table for generation_ids, then `.in('id', ...)`" pattern already used for the Pinterest board filter
 * New `/wordpress/categories` page (mirrors `/boards` for parity) + sidebar entry (`components/layout/sidebar.tsx`) under the WordPress group, between Generate and History. One section per project listing its categories with inline rename/delete and a "New Category" button — reuses `CategoryManagerList`/`CreateCategoryDialog`, extracted as named exports from `category-select.tsx` so the same rename/delete logic isn't duplicated between the in-form Manage dialog and this standalone page
 * `docs/DATABASE.md`, `docs/DECISIONS.md` (2026-07-26 entry), `docs/CHANGELOG.md`, `docs/UI_UX.md` updated
+
+---
+
+## [TASK-033] Projects: Brand Profile truncation fix, Niche field, Default Language — 2026-07-26
+
+* **Truncation fix**: diagnosed before coding — `projects.description` (DB `text`) has no limit; the real cap was a Zod `.max(500)` (`lib/validations/project.ts`, both create/update schemas) stacked with `maxLength={500}` on the Brand Profile `<Textarea>` (`components/projects/project-form.tsx`). `rows={3}` was ruled out — display-only, doesn't truncate data. Both raised to 10,000 rather than removed, as a real (not functional) abuse ceiling
+* Migration 017 adds `projects.niche` and `projects.default_language`, both nullable `text`, no DB constraint — validated at the Zod layer only (`default_language` against the existing `SUPPORTED_LANGUAGES` enum from `types/pinterest.ts`, not redeclared)
+* New `components/ui/combobox.tsx` wraps `@base-ui/react/combobox` (already a dependency, `^1.6.0` — same library every other `components/ui/` primitive wraps). **No new npm dependency** — confirmed during planning that `cmdk` isn't present anywhere in this codebase and isn't needed; base-ui's `combobox` subpath already provides live-filtered list + free-text input natively
+* Niche field: `components/projects/project-form.tsx` uses the new Combobox with a fixed 20-item suggestion list (Insurance, Mortgages & Home Loans, ... Food & Recipes), but any typed value is stored as-is — no enum, no validation against the list. Storage only: no prompt/AI logic branches on this field yet (see `docs/DECISIONS.md`, 2026-07-26 "(3)" entry — home decor cadrage convention is not universal; the future extension point for a real second niche is enriching the Brand Profile, not this field)
+* Default Language field: a `Select` (same `SUPPORTED_LANGUAGES`/`LANGUAGE_LABELS` source as the generation forms) with a "None" option, since it's optional
+* `app/api/projects/route.ts` (POST) explicitly destructures/inserts `niche`/`default_language` (this route builds its insert object field-by-field, not a spread); `app/api/projects/[id]/route.ts` (PATCH) needed no change — it already spreads all non-`is_default` parsed fields into `.update()`
+* Pre-fill wiring: `components/pinterest/pin-form.tsx` and `components/wordpress/article-form.tsx` seed initial `language` state from the default project's `default_language`, and a `handleProjectChange` (new in `pin-form.tsx`, extended in `article-form.tsx` where it already existed for category-reset) sets `language` on project switch — but only when the newly selected project actually has a `default_language`; otherwise the current language selection is left untouched, never forced. Both `app/(dashboard)/pinterest/page.tsx` and `app/(dashboard)/wordpress/page.tsx` project queries extended to select `default_language`
+* `docs/DATABASE.md`, `docs/CHANGELOG.md`, `lib/guide/content.ts` updated
 
 ---
 
