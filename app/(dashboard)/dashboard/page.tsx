@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageContainer } from '@/components/ui/page-container';
 import { StatusDot } from '@/components/ui/status-dot';
-import { GenerateContentMenu } from '@/components/dashboard/generate-content-menu';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { ArrowRight, FolderOpen, FileText, Sparkles } from 'lucide-react';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -104,7 +105,7 @@ export default async function DashboardPage() {
 
   return (
     <PageContainer>
-      {/* Greeting + Primary CTA */}
+      {/* Greeting + Primary CTAs */}
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-0.5">
           <h1 className="text-xl font-semibold tracking-tight">
@@ -114,10 +115,25 @@ export default async function DashboardPage() {
             Your AI content workspace is ready.
           </p>
         </div>
-        <GenerateContentMenu />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/wordpress"
+            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'px-5')}
+          >
+            <FileText className="h-4 w-4" />
+            Generate WordPress Article
+          </Link>
+          <Link
+            href="/pinterest"
+            className={cn(buttonVariants({ size: 'lg' }), 'px-5')}
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Pinterest Pins
+          </Link>
+        </div>
       </div>
 
-      {/* Quick Actions — secondary shortcuts (Generate Content above is the one primary action) */}
+      {/* Quick Actions — secondary shortcuts (Generate Pinterest/WordPress above are the primary actions) */}
       <div className="grid gap-6 sm:grid-cols-3">
         <Link
           href="/projects/new"

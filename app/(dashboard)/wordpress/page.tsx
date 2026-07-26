@@ -6,6 +6,7 @@ import { PinsSourceArticleForm } from '@/components/wordpress/pins-source-articl
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Plus, FileText, ImageOff } from 'lucide-react';
 import type { Pin } from '@/types/database';
 
@@ -36,7 +37,7 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
             description="The selected pins couldn't be loaded. Go back to your Pinterest generation and select pins again."
             icon={ImageOff}
           >
-            <Link href="/pinterest" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <Link href="/pinterest" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Back to Pinterest
             </Link>
           </EmptyState>
@@ -74,7 +75,7 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
           description="Create a project before generating an article. Projects help you organize your content."
           icon={FileText}
         >
-          <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href="/projects/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Project
           </Link>

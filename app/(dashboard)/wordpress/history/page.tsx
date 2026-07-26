@@ -10,6 +10,7 @@ import { WordPressHistoryPagination } from '@/components/wordpress/wordpress-his
 import { EmptyState } from '@/components/empty-state';
 import { EditorialSelectionProvider } from '@/components/editorial/selection-provider';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Clock, Search } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -84,11 +85,11 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
           icon={hasFilters ? Search : Clock}
         >
           {hasFilters ? (
-            <Link href="/wordpress/history" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <Link href="/wordpress/history" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Clear filters
             </Link>
           ) : (
-            <Link href="/wordpress" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <Link href="/wordpress" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Go to Generator
             </Link>
           )}

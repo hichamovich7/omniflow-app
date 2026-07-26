@@ -11,6 +11,7 @@ import { HistoryPagination } from '@/components/history/history-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { EditorialSelectionProvider } from '@/components/editorial/selection-provider';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Clock, Search } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -97,11 +98,11 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           icon={hasFilters ? Search : Clock}
         >
           {hasFilters ? (
-            <Link href="/history" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <Link href="/history" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Clear filters
             </Link>
           ) : (
-            <Link href="/pinterest" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <Link href="/pinterest" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Go to Generator
             </Link>
           )}

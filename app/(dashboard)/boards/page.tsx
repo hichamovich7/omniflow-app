@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { BoardCard } from '@/components/boards/board-card';
 import { BoardsBulkBar } from '@/components/boards/boards-bulk-bar';
 import { EditorialSelectionProvider } from '@/components/editorial/selection-provider';
@@ -27,7 +28,7 @@ export default async function BoardsPage() {
     <PageContainer>
       <PageHeader title="Boards" description="Organize your generated pins by Pinterest board">
         {hasProjects && (
-          <Link href="/boards/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href="/boards/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             New Board
           </Link>
@@ -40,7 +41,7 @@ export default async function BoardsPage() {
           description="Boards belong to a project. Create a project before creating a board."
           icon={FolderOpen}
         >
-          <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href="/projects/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Project
           </Link>
@@ -51,7 +52,7 @@ export default async function BoardsPage() {
           description="Boards are created automatically when you generate pins, or you can create one manually."
           icon={LayoutGrid}
         >
-          <Link href="/boards/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href="/boards/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             New Board
           </Link>

@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { ProjectActions } from '@/components/projects/project-actions';
 import { Plus, FolderOpen } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
@@ -21,7 +22,7 @@ export default async function ProjectsPage() {
   return (
     <PageContainer>
       <PageHeader title="Projects" description="Organize your content by project">
-        <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+        <Link href="/projects/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           New Project
         </Link>

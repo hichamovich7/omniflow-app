@@ -5,6 +5,7 @@ import { PageContainer } from '@/components/ui/page-container';
 import { ResearchForm } from '@/components/research/research-form';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Plus, Search } from 'lucide-react';
 
 export default async function ResearchPage() {
@@ -33,7 +34,7 @@ export default async function ResearchPage() {
           description="Research belongs to a project. Create a project before researching a source."
           icon={Search}
         >
-          <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href="/projects/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Project
           </Link>

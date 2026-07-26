@@ -4,6 +4,7 @@ import { PageContainer } from '@/components/ui/page-container';
 import { PinForm } from '@/components/pinterest/pin-form';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Plus, Sparkles } from 'lucide-react';
 
 export default async function PinterestPage() {
@@ -28,7 +29,7 @@ export default async function PinterestPage() {
           description="Create a project before generating pins. Projects help you organize your content."
           icon={Sparkles}
         >
-          <Link href="/projects/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href="/projects/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create Project
           </Link>
