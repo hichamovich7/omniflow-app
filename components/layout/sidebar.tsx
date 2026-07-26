@@ -16,6 +16,7 @@ import {
   Briefcase,
   PenSquare,
   BookOpen,
+  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +53,7 @@ const navGroups: NavGroup[] = [
     label: 'WordPress',
     items: [
       { href: '/wordpress', label: 'Generate', icon: FileText },
+      { href: '/wordpress/categories', label: 'Categories', icon: Tag },
       { href: '/wordpress/history', label: 'History', icon: Clock },
     ],
   },

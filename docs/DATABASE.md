@@ -44,9 +44,11 @@ auth.users
 ```
   └── wordpress_generations (TASK-028, independent from generations/pins)
 
-        └── wordpress_articles
+        └── wordpress_articles (category_id references wordpress_categories, nullable)
 
               └── wordpress_article_images
+
+  └── wordpress_categories (TASK-032, scoped to project like boards)
 ```
 
 ---
@@ -447,6 +449,7 @@ The generated article for a `wordpress_generations` row. One-to-one in practice 
 | featured_image_prompt  | text nullable                      | AI-generated scene description for the featured image |
 | featured_image_url     | text nullable                      | Public Supabase Storage URL, null if generation failed |
 | status                 | text                                | `pending` / `processing` / `completed` / `failed` |
+| category_id            | uuid FK → wordpress_categories.id, nullable | ON DELETE SET NULL — deleting a category never deletes its articles (migration 016, TASK-032). Null = "Uncategorized" |
 | created_at             | timestamptz                        |                                            |
 
 ## Purpose
@@ -500,6 +503,38 @@ article_id in (
 
 ```sql
 (article_id)
+```
+
+---
+
+# wordpress_categories
+
+Project-scoped categories for organizing WordPress articles (TASK-032). Assignment
+is always manual — there is no AI suggestion anywhere in either generation flow,
+unlike `boards`, whose `findOrCreateBoardIds` auto-links AI-suggested names.
+
+## Columns
+
+| Column     | Type                   | Description                       |
+| ---------- | ---------------------- | ----------------------------------- |
+| id         | uuid PK                |                                      |
+| project_id | uuid FK → projects.id  | ON DELETE CASCADE                   |
+| user_id    | uuid FK → profiles.id  | ON DELETE CASCADE                   |
+| name       | text                   | Unique per project                  |
+| slug       | text                   | Derived from `name`, not unique across projects |
+| created_at | timestamptz            |                                      |
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+## Indexes
+
+```sql
+unique (project_id, name)
+(project_id)
 ```
 
 ---

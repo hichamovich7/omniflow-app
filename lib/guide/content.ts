@@ -139,6 +139,7 @@ export const guideSections: GuideSection[] = [
       'Or generate from pins: select 1 or more pins on a Pinterest generation page and use "Generate WordPress Article" in the selection toolbar. AI identifies the pins\' common theme and writes one unified article — Project and language are taken from the pins automatically. Fewer than 3 pins still works, with a warning that the result may be thin.',
       'From pins, the featured image is always freshly generated for the article\'s unified theme; internal images (up to 3) reuse the pins\' own already-generated images instead of creating new ones.',
       'Generation runs in one request and can take up to a minute (outline, full article, then all images).',
+      'Optionally assign a Category (scoped to the Project) on either flow — this is always a manual choice, never AI-suggested. Pick "+ New Category" in the selector to create one inline, or use the small gear icon next to it to rename or delete existing categories. Leaving it unset files the article under "Uncategorized". WordPress History lets you filter by category and shows a category badge on each article.',
       'The article is stored as Markdown — use Copy Markdown, Copy HTML, or Download .md to take it to WordPress or anywhere else. There is no direct WordPress publishing yet.',
     ],
   },

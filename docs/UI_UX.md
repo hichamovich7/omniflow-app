@@ -60,8 +60,12 @@ Pinterest
   Boards
   History
 
+WordPress
+  Generate
+  Categories (TASK-032)
+  History
+
 Platforms (disabled — coming soon)
-  WordPress
   Facebook
   LinkedIn
   Medium
@@ -556,6 +560,26 @@ Displayed after generation. Header mirrors the Pinterest Results page (back link
 * Rendered article (Markdown → HTML via `marked`, styled with Tailwind child-selector utilities — no typography plugin, see RULES.md Rule #30)
 
 No Editorial Workflow selection UI here — a single generated article has nothing to multi-select, unlike Pinterest's batch of pins.
+
+---
+
+# WordPress Categories (TASK-032)
+
+Route:
+
+```txt
+/wordpress/categories
+```
+
+Purpose:
+
+Manage WordPress categories as real entities, scoped per project — same purpose as Boards for Pinterest, but for WordPress articles. Assignment is always manual on both generation flows (keyword and pins); there is no AI suggestion anywhere.
+
+One section per project, each listing that project's categories with inline rename and two-step confirm delete, plus a "New Category" button. Deleting a category never deletes its articles — they fall back to "Uncategorized" (`category_id` is nullable, `ON DELETE SET NULL`).
+
+The same category picker (`components/wordpress/category-select.tsx`) is also embedded directly in both generation forms, with its own lightweight "+ New Category" quick-create and a "Manage" shortcut — this page is the fuller standalone view, reachable from the sidebar.
+
+Empty state: no projects yet → prompt to create a project first (a category must belong to a project).
 
 ---
 

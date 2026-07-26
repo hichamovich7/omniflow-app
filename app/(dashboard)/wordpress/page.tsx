@@ -4,6 +4,7 @@ import { PageContainer } from '@/components/ui/page-container';
 import { ArticleForm } from '@/components/wordpress/article-form';
 import { PinsSourceArticleForm } from '@/components/wordpress/pins-source-article-form';
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
+import { listWordPressCategories } from '@/lib/queries/wordpress-categories';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,16 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
 
     const imageUrlByPinId = await getActivePinImageUrls(supabase, pins.map((p) => p.id));
 
+    const { data: sourceGeneration } = await supabase
+      .from('generations')
+      .select('project_id')
+      .eq('id', pins[0].generation_id)
+      .single();
+
+    const categories = sourceGeneration
+      ? await listWordPressCategories(supabase, sourceGeneration.project_id)
+      : [];
+
     return (
       <PageContainer narrow>
         <PinsSourceArticleForm
@@ -55,6 +66,8 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
             title: p.title,
             imageUrl: imageUrlByPinId.get(p.id) ?? p.media_url,
           }))}
+          projectId={sourceGeneration?.project_id ?? ''}
+          categories={categories}
         />
       </PageContainer>
     );
@@ -66,6 +79,15 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
     .order('created_at', { ascending: false });
 
   const list = projects ?? [];
+
+  const { data: categoriesData } =
+    list.length > 0
+      ? await supabase
+          .from('wordpress_categories')
+          .select('*')
+          .in('project_id', list.map((p) => p.id))
+          .order('name')
+      : { data: [] };
 
   return (
     <PageContainer narrow>
@@ -81,7 +103,7 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
           </Link>
         </EmptyState>
       ) : (
-        <ArticleForm projects={list} />
+        <ArticleForm projects={list} categories={categoriesData ?? []} />
       )}
     </PageContainer>
   );

@@ -35,16 +35,31 @@ export interface WordPressArticle {
   featured_image_prompt: string | null;
   featured_image_url: string | null;
   status: WordPressArticleStatus;
+  category_id: string | null;
   created_at: string;
 }
 
-export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'meta_title' | 'featured_image_prompt' | 'featured_image_url'> & {
+export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'meta_title' | 'featured_image_prompt' | 'featured_image_url' | 'category_id'> & {
   id?: string;
   word_count?: number;
   status?: WordPressArticleStatus;
   meta_title?: string | null;
   featured_image_prompt?: string | null;
   featured_image_url?: string | null;
+  category_id?: string | null;
+};
+
+export interface WordPressCategory {
+  id: string;
+  project_id: string;
+  user_id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+
+export type WordPressCategoryInsert = Omit<WordPressCategory, 'id' | 'created_at'> & {
+  id?: string;
 };
 
 export interface WordPressArticleImage {

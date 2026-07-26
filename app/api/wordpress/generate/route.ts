@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, researchNotes } = parsed.data;
+  const { projectId, keyword, language, researchNotes, categoryId } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -108,6 +108,21 @@ export async function POST(request: Request) {
       { data: null, error: { message: 'You do not have access to this project', code: 'forbidden' } },
       { status: 403 }
     );
+  }
+
+  if (categoryId) {
+    const { data: category } = await supabase
+      .from('wordpress_categories')
+      .select('id, project_id')
+      .eq('id', categoryId)
+      .single();
+
+    if (!category || category.project_id !== projectId) {
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: 'Category does not belong to this project', code: 'invalid_category' } },
+        { status: 400 }
+      );
+    }
   }
 
   const { data: generation, error: genError } = await supabase
@@ -156,6 +171,7 @@ export async function POST(request: Request) {
         featured_image_prompt: result.featuredImagePrompt,
         featured_image_url: result.featuredImageUrl,
         status: 'completed',
+        category_id: categoryId ?? null,
       })
       .select()
       .single();

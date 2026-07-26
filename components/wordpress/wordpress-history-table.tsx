@@ -12,6 +12,7 @@ import { statusToBadgeVariant } from '@/lib/utils/status';
 interface ArticleSummary {
   title: string;
   word_count: number;
+  wordpress_categories: { name: string }[] | { name: string } | null;
 }
 
 interface GenerationRow {
@@ -39,6 +40,8 @@ export function WordPressHistoryTable({ generations }: WordPressHistoryTableProp
           ? gen.wordpress_articles[0]
           : gen.wordpress_articles;
         const displayTitle = article?.title ?? gen.keyword;
+        const categoryRel = article?.wordpress_categories ?? null;
+        const categoryName = Array.isArray(categoryRel) ? categoryRel[0]?.name : categoryRel?.name;
         const selected = isSelected(gen.id);
 
         return (
@@ -65,6 +68,7 @@ export function WordPressHistoryTable({ generations }: WordPressHistoryTableProp
               )}
             </label>
             <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
+            <Badge variant="outline">{categoryName ?? 'Uncategorized'}</Badge>
             <Link href={`/wordpress/${gen.id}`} className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{displayTitle}</p>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">

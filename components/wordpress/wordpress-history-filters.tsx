@@ -18,13 +18,19 @@ interface ProjectOption {
   name: string;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 interface WordPressHistoryFiltersProps {
   projects: ProjectOption[];
+  categories: CategoryOption[];
 }
 
 const STATUS_OPTIONS = ['completed', 'processing', 'failed', 'pending'] as const;
 
-export function WordPressHistoryFilters({ projects }: WordPressHistoryFiltersProps) {
+export function WordPressHistoryFilters({ projects, categories }: WordPressHistoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -115,6 +121,27 @@ export function WordPressHistoryFilters({ projects }: WordPressHistoryFiltersPro
             {STATUS_OPTIONS.map((s) => (
               <SelectItem key={s} value={s}>
                 {s.charAt(0).toUpperCase() + s.slice(1)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={searchParams.get('category') ?? 'all'}
+          onValueChange={(v) => v && updateParam('category', v)}
+        >
+          <SelectTrigger className="h-9 w-32 text-sm">
+            <span className="truncate">
+              {searchParams.get('category')
+                ? categories.find((c) => c.id === searchParams.get('category'))?.name ?? 'Category'
+                : 'Category'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
               </SelectItem>
             ))}
           </SelectContent>

@@ -683,6 +683,28 @@ Complète l'entrée du 2026-07-15 ci-dessus. Ce correctif (vérification HTTP r�
 
 ---
 
+## 2026-07-26
+
+### Decision
+
+TASK-032 : Catégories WordPress — assignation toujours manuelle, aucune suggestion IA
+
+### Context
+
+Les deux flux de génération WordPress (Option 1 keyword, Option 4 pins) manquaient d'un moyen d'organiser les articles par sujet. Contrairement aux boards Pinterest (`findOrCreateBoardIds` auto-lie des noms suggérés par l'IA), l'utilisateur a explicitement demandé qu'aucune IA n'intervienne dans l'assignation de catégorie, sur aucun des deux flux — un choix de curation délibéré, pas une automatisation.
+
+### Decision Taken
+
+`wordpress_categories` est une table scopée par `project_id` (même pattern RLS que `boards` : colonne `user_id` dénormalisée, policy `user_id = auth.uid()`). `wordpress_articles.category_id` est nullable avec `ON DELETE SET NULL` — supprimer une catégorie ne supprime jamais les articles qui l'utilisaient, ils retombent sur "Uncategorized". Le sélecteur de catégorie (`components/wordpress/category-select.tsx`) est un simple champ de formulaire manuel, au même niveau que Project/Language — aucun appel OpenRouter, aucune suggestion, aucun préremplissage automatique. La création/renommage/suppression de catégorie se fait via un petit Dialog accessible depuis le sélecteur lui-même (pas de page dédiée), cohérent avec le principe de changements minimaux du projet.
+
+### Consequences
+
+* Deux nouvelles routes API (`/api/wordpress/categories`, `/api/wordpress/categories/[id]`) suivant le pattern de vérification d'ownership inline établi par TASK-018 (`select('id, user_id') → 404 → 403`), sans introduire de helper partagé — cohérent avec le choix déjà fait pour `boards`/`projects`
+* Le flux pins (`pins-source-article-form.tsx`) n'a pas de champ Project explicite — le project est résolu côté serveur depuis la génération source des pins pour scoper la liste de catégories, sans ajouter de champ superflu au formulaire
+* Aucun changement à `buildWordPressFromPinsPrompt` ni aux schémas d'outline — la catégorie ne touche jamais le pipeline IA
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

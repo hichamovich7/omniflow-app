@@ -29,10 +29,19 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
     .select('id, name')
     .order('name');
 
+  const { data: categories } =
+    projects && projects.length > 0
+      ? await supabase
+          .from('wordpress_categories')
+          .select('id, name')
+          .in('project_id', projects.map((p) => p.id))
+          .order('name')
+      : { data: [] };
+
   let query = supabase
     .from('wordpress_generations')
     .select(
-      'id, keyword, language, status, created_at, projects(name), wordpress_articles(title, word_count)',
+      'id, keyword, language, status, created_at, projects(name), wordpress_articles(title, word_count, wordpress_categories(name))',
       { count: 'exact' }
     )
     .order('created_at', { ascending: false });
@@ -49,6 +58,14 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
   if (params.status) {
     query = query.eq('status', params.status);
   }
+  if (params.category) {
+    const { data: articlesInCategory } = await supabase
+      .from('wordpress_articles')
+      .select('generation_id')
+      .eq('category_id', params.category);
+    const generationIds = Array.from(new Set((articlesInCategory ?? []).map((a) => a.generation_id)));
+    query = query.in('id', generationIds.length > 0 ? generationIds : ['00000000-0000-0000-0000-000000000000']);
+  }
 
   const rangeStart = (currentPage - 1) * PAGE_SIZE;
   query = query.range(rangeStart, rangeStart + PAGE_SIZE - 1);
@@ -56,7 +73,7 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
   const { data: generations, count } = await query;
   const list = generations ?? [];
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
-  const hasFilters = !!(params.q || params.project || params.language || params.status);
+  const hasFilters = !!(params.q || params.project || params.language || params.status || params.category);
 
   if (list.length === 0 && currentPage > totalPages) {
     const clamped = new URLSearchParams();
@@ -72,7 +89,7 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
     <PageContainer>
       <PageHeader title="WordPress History" description="Browse your generated articles" />
 
-      <WordPressHistoryFilters projects={projects ?? []} />
+      <WordPressHistoryFilters projects={projects ?? []} categories={categories ?? []} />
 
       {list.length === 0 ? (
         <EmptyState

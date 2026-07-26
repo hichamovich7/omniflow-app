@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CategorySelect, type CategoryOption } from '@/components/wordpress/category-select';
 
 interface ProjectOption {
   id: string;
@@ -27,9 +28,10 @@ interface ProjectOption {
 
 interface ArticleFormProps {
   projects: ProjectOption[];
+  categories: CategoryOption[];
 }
 
-export function ArticleForm({ projects }: ArticleFormProps) {
+export function ArticleForm({ projects, categories: initialCategories }: ArticleFormProps) {
   const router = useRouter();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
 
@@ -37,8 +39,17 @@ export function ArticleForm({ projects }: ArticleFormProps) {
   const [keyword, setKeyword] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [researchNotes, setResearchNotes] = useState('');
+  const [categories, setCategories] = useState(initialCategories);
+  const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const categoryOptions = categories.filter((c) => c.project_id === projectId);
+
+  function handleProjectChange(nextProjectId: string) {
+    setProjectId(nextProjectId);
+    setCategoryId('');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +60,7 @@ export function ArticleForm({ projects }: ArticleFormProps) {
       keyword,
       language,
       researchNotes: researchNotes.trim() || undefined,
+      categoryId: categoryId || undefined,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
@@ -126,12 +138,12 @@ export function ArticleForm({ projects }: ArticleFormProps) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
               Project
             </Label>
-            <Select value={projectId} onValueChange={(v) => v && setProjectId(v)}>
+            <Select value={projectId} onValueChange={(v) => v && handleProjectChange(v)}>
               <SelectTrigger id="project">
                 <span className="truncate text-sm">
                   {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
@@ -163,6 +175,21 @@ export function ArticleForm({ projects }: ArticleFormProps) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="category" className="text-xs font-medium text-muted-foreground">
+              Category
+            </Label>
+            <CategorySelect
+              projectId={projectId}
+              categories={categoryOptions}
+              value={categoryId}
+              onChange={setCategoryId}
+              onCategoriesChange={(next) => {
+                setCategories((all) => [...all.filter((c) => c.project_id !== projectId), ...next]);
+              }}
+            />
           </div>
         </div>
 

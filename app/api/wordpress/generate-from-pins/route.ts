@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { pinIds, researchNotes } = parsed.data;
+  const { pinIds, researchNotes, categoryId } = parsed.data;
 
   if (pinIds.length < 3) {
     console.warn(`[wordpress-from-pins] Only ${pinIds.length} pin(s) selected — article may lack source material.`);
@@ -152,6 +152,21 @@ export async function POST(request: Request) {
 
   const projectId = generationRef.project_id;
   const language = pins[0].language as SupportedLanguage;
+
+  if (categoryId) {
+    const { data: category } = await supabase
+      .from('wordpress_categories')
+      .select('id, project_id')
+      .eq('id', categoryId)
+      .single();
+
+    if (!category || category.project_id !== projectId) {
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: 'Category does not belong to this project', code: 'invalid_category' } },
+        { status: 400 }
+      );
+    }
+  }
 
   const { data: project } = await supabase
     .from('projects')
@@ -225,6 +240,7 @@ export async function POST(request: Request) {
         featured_image_prompt: result.featuredImagePrompt,
         featured_image_url: result.featuredImageUrl,
         status: 'completed',
+        category_id: categoryId ?? null,
       })
       .select()
       .single();

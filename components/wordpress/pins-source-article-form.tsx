@@ -9,6 +9,7 @@ import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { CategorySelect, type CategoryOption } from '@/components/wordpress/category-select';
 
 interface PinPreview {
   id: string;
@@ -18,11 +19,15 @@ interface PinPreview {
 
 interface PinsSourceArticleFormProps {
   pins: PinPreview[];
+  projectId: string;
+  categories: CategoryOption[];
 }
 
-export function PinsSourceArticleForm({ pins }: PinsSourceArticleFormProps) {
+export function PinsSourceArticleForm({ pins, projectId, categories: initialCategories }: PinsSourceArticleFormProps) {
   const router = useRouter();
   const [researchNotes, setResearchNotes] = useState('');
+  const [categories, setCategories] = useState(initialCategories);
+  const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,6 +38,7 @@ export function PinsSourceArticleForm({ pins }: PinsSourceArticleFormProps) {
     const parsed = generateArticleFromPinsSchema.safeParse({
       pinIds: pins.map((p) => p.id),
       researchNotes: researchNotes.trim() || undefined,
+      categoryId: categoryId || undefined,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
@@ -111,6 +117,19 @@ export function PinsSourceArticleForm({ pins }: PinsSourceArticleFormProps) {
             maxLength={2000}
             disabled={loading}
             className="min-h-20 text-sm placeholder:text-muted-foreground/40"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="category" className="text-xs font-medium text-muted-foreground">
+            Category
+          </Label>
+          <CategorySelect
+            projectId={projectId}
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+            onCategoriesChange={setCategories}
           />
         </div>
 

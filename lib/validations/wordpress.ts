@@ -6,6 +6,7 @@ export const generateArticleSchema = z.object({
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
   language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
   researchNotes: z.string().trim().max(2000, 'Research notes are too long').optional(),
+  categoryId: z.string().uuid('Invalid category ID').optional(),
 });
 
 export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;
@@ -13,6 +14,7 @@ export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;
 export const generateArticleFromPinsSchema = z.object({
   pinIds: z.array(z.string().uuid()).min(1, 'Select at least one pin').max(20, 'Too many pins selected'),
   researchNotes: z.string().trim().max(2000, 'Research notes are too long').optional(),
+  categoryId: z.string().uuid('Invalid category ID').optional(),
 });
 
 export type GenerateArticleFromPinsInput = z.infer<typeof generateArticleFromPinsSchema>;

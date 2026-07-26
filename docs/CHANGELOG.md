@@ -22,6 +22,29 @@ No planned changes.
 
 ---
 
+# [1.16.0] - 2026-07-26
+
+## WordPress Categories (manual, project-scoped)
+
+### Added
+
+* `wordpress_categories` table (migration 016), scoped by `project_id`, RLS via `user_id = auth.uid()` — same pattern as `boards`.
+* `wordpress_articles.category_id` (nullable, `ON DELETE SET NULL`) — deleting a category never deletes its articles.
+* `components/wordpress/category-select.tsx`: manual category picker with inline "+ New Category" creation and a Manage dialog (rename/delete) — no AI suggestion anywhere.
+* Both generation flows (`article-form.tsx` keyword, `pins-source-article-form.tsx` pins) now have a Category field, optional, defaulting to "Uncategorized".
+* `app/api/wordpress/categories/route.ts` and `.../categories/[id]/route.ts`: create/rename/delete, ownership-checked per TASK-018's established inline pattern.
+* WordPress History: category badge on each card, and a Category filter alongside Project/Language/Status.
+* New `/wordpress/categories` page and sidebar entry (WordPress → Categories) — manage all categories per project, mirroring the existing Pinterest Boards page.
+
+### Docs
+
+* `docs/DATABASE.md`: new `wordpress_categories` section, `category_id` added to `wordpress_articles`.
+* `docs/DECISIONS.md`: 2026-07-26 entry — manual-only assignment rationale.
+* `docs/TASKS.md`: TASK-032 added and marked completed.
+* `docs/UI_UX.md`: Sidebar diagram corrected (WordPress was stale, still listed under "Platforms — disabled"), new "WordPress Categories" section added.
+
+---
+
 # [1.15.5] - 2026-07-20
 
 ## Dashboard restructured to reflect Pinterest + WordPress

@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26.
 
 ---
 
@@ -287,6 +287,23 @@ Stripe Working                  ⬚ TASK-012
 * Visually verified with a Playwright-driven headless browser (real login, not a static check) at 1440×900 and 1366×768 — no overflow, dropdown opens correctly, Projects tile navigates, zero console errors
 * `docs/UI_UX.md` Dashboard section rewritten to describe the two-platform structure
 * No database schema changes (reused existing `wordpress_articles` table), no API changes, no new dependencies — `lib/guide/content.ts` not touched since Dashboard was never a documented guide section (it's a navigation hub over already-documented features, not a new capability)
+
+---
+
+## [TASK-032] WordPress Categories (manual, project-scoped) — 2026-07-26
+
+* New `wordpress_categories` table (migration 016) scoped by `project_id`, RLS via denormalized `user_id = auth.uid()` — same shape as `boards` (unique `(project_id, name)` index, no `updated_at` trigger since renames are infrequent)
+* `wordpress_articles.category_id` added (nullable, `ON DELETE SET NULL`) — deleting a category never deletes the articles that used it, they fall back to "Uncategorized"
+* Assignment is **always manual on both generation flows, no AI suggestion anywhere** — explicit requirement, unlike `boards`' `findOrCreateBoardIds` auto-linking
+* New `components/wordpress/category-select.tsx` — built from existing `Select`/`Dialog`/`Button`/`Input` primitives only (no Combobox/Popover exists in this codebase): a Select with "Uncategorized" + existing categories + a "+ New Category" item that opens a quick-create Dialog, plus a small gear-icon button opening a Manage dialog (inline rename, two-step confirm delete)
+* `components/wordpress/article-form.tsx` (keyword flow): Project/Language 2-column row becomes a 3-column row with Category; category options are client-filtered by the selected project (same pattern as the existing board-filtered-by-project logic in `history-filters.tsx`); switching project resets the selected category
+* `components/wordpress/pins-source-article-form.tsx` (pins flow): this form has no Project field at all — project is resolved server-side in `app/(dashboard)/wordpress/page.tsx` from the selected pins' generation, and categories are fetched pre-scoped to that project; Category field placed directly below Research Notes
+* `lib/validations/wordpress.ts`: `categoryId` (optional uuid) added to both `generateArticleSchema` and `generateArticleFromPinsSchema`; new `lib/validations/wordpress-category.ts` for the category CRUD schemas
+* New `app/api/wordpress/categories/route.ts` (POST) and `.../categories/[id]/route.ts` (PATCH/DELETE) — ownership checks copied verbatim from the `boards` routes' established inline pattern (`select('id, user_id') → 404 → 403`), no shared helper introduced, consistent with TASK-018
+* `app/api/wordpress/generate/route.ts` and `.../generate-from-pins/route.ts`: validate that a submitted `categoryId` belongs to the resolved `projectId` before writing it onto the `wordpress_articles` insert (data-integrity guard; RLS already scopes the row to the requesting user) — **`buildWordPressFromPinsPrompt` and the outline schemas are untouched**, category never reaches AI input
+* WordPress History: category badge (`outline` variant, "Uncategorized" fallback) added next to the existing status badge on each card; new Category filter alongside Project/Language/Status, using the same two-step "query child table for generation_ids, then `.in('id', ...)`" pattern already used for the Pinterest board filter
+* New `/wordpress/categories` page (mirrors `/boards` for parity) + sidebar entry (`components/layout/sidebar.tsx`) under the WordPress group, between Generate and History. One section per project listing its categories with inline rename/delete and a "New Category" button — reuses `CategoryManagerList`/`CreateCategoryDialog`, extracted as named exports from `category-select.tsx` so the same rename/delete logic isn't duplicated between the in-form Manage dialog and this standalone page
+* `docs/DATABASE.md`, `docs/DECISIONS.md` (2026-07-26 entry), `docs/CHANGELOG.md`, `docs/UI_UX.md` updated
 
 ---
 
