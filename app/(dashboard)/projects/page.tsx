@@ -4,10 +4,13 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ProjectActions } from '@/components/projects/project-actions';
 import { Plus, FolderOpen } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
+import { LANGUAGE_LABELS } from '@/types/pinterest';
+import type { SupportedLanguage } from '@/types/pinterest';
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
@@ -63,8 +66,13 @@ export default async function ProjectsPage() {
                   </div>
                   <div className="min-w-0 pr-6">
                     <p className="text-sm font-medium truncate">{project.name}</p>
+                    {project.niche && (
+                      <Badge variant="outline" className="mt-1">
+                        {project.niche}
+                      </Badge>
+                    )}
                     {project.description && (
-                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                      <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
                         {project.description}
                       </p>
                     )}
@@ -74,6 +82,14 @@ export default async function ProjectsPage() {
                   <span>{generationCount} generation{generationCount !== 1 ? 's' : ''}</span>
                   <span>·</span>
                   <span>{timeAgo(project.created_at)}</span>
+                  {project.default_language && (
+                    <>
+                      <span>·</span>
+                      <span>
+                        {LANGUAGE_LABELS[project.default_language as SupportedLanguage] ?? project.default_language}
+                      </span>
+                    </>
+                  )}
                   {project.is_default && (
                     <>
                       <span>·</span>
