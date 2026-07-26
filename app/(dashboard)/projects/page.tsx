@@ -4,7 +4,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ProjectActions } from '@/components/projects/project-actions';
 import { Plus, FolderOpen } from 'lucide-react';
@@ -43,7 +42,7 @@ export default async function ProjectsPage() {
           </Link>
         </EmptyState>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((project) => {
             const generationCount = Array.isArray(project.generations)
               ? project.generations.length
@@ -51,40 +50,40 @@ export default async function ProjectsPage() {
             return (
               <div
                 key={project.id}
-                className="group relative rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-border"
+                className="group relative rounded-2xl border border-border/60 bg-card p-6 transition-colors hover:border-border"
               >
-                <div className="absolute right-3 top-3">
+                <div className="absolute right-4 top-4">
                   <ProjectActions
                     projectId={project.id}
                     projectName={project.name}
                     isDefault={project.is_default}
                   />
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-start gap-3.5">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
+                    <FolderOpen className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <div className="min-w-0 pr-6">
-                    <p className="text-sm font-medium truncate">{project.name}</p>
+                  <div className="min-w-0 flex-1 pr-8">
+                    <p className="truncate text-base font-semibold tracking-tight">{project.name}</p>
                     {project.niche && (
-                      <Badge variant="outline" className="mt-1">
+                      <span className="mt-1.5 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                         {project.niche}
-                      </Badge>
-                    )}
-                    {project.description && (
-                      <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
-                        {project.description}
-                      </p>
+                      </span>
                     )}
                   </div>
                 </div>
-                <div className="mt-4 flex items-center gap-3 text-[11px] text-muted-foreground">
+                {project.description && (
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground line-clamp-2">
+                    {project.description}
+                  </p>
+                )}
+                <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
                   <span>{generationCount} generation{generationCount !== 1 ? 's' : ''}</span>
-                  <span>·</span>
+                  <span className="text-border">·</span>
                   <span>{timeAgo(project.created_at)}</span>
                   {project.default_language && (
                     <>
-                      <span>·</span>
+                      <span className="text-border">·</span>
                       <span>
                         {LANGUAGE_LABELS[project.default_language as SupportedLanguage] ?? project.default_language}
                       </span>
@@ -92,8 +91,8 @@ export default async function ProjectsPage() {
                   )}
                   {project.is_default && (
                     <>
-                      <span>·</span>
-                      <span className="text-primary font-medium">Default</span>
+                      <span className="text-border">·</span>
+                      <span className="font-medium text-primary">Default</span>
                     </>
                   )}
                 </div>
