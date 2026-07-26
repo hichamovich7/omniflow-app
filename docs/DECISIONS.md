@@ -705,6 +705,55 @@ Les deux flux de génération WordPress (Option 1 keyword, Option 4 pins) manqua
 
 ---
 
+## 2026-07-26 (2)
+
+### Decision
+
+Cadrage conditionnel des `image_prompt` Pinterest selon le type de mot-clé (espace/pièce vs objet/détail)
+
+### Context
+
+Les mots-clés de type "inspiration [pièce]" (ex: "Küchen Inspiration modern") produisaient systématiquement des images en gros plan/nature morte sur un détail (plan de travail, évier, objets) plutôt qu'une vue d'ensemble de la pièce — alors que le mot-clé et le contexte (Pinterest, inspiration déco) appellent clairement un plan large. Cause identifiée dans `lib/prompts/pinterest-pins.ts` : l'instruction `image_prompt` demandait "the main subject front and center" + "3-5 supporting objects or details" sans jamais distinguer si le sujet est une pièce entière ou un objet, et la liste d'angles de caméra autorisés incluait `close-up` sans condition.
+
+### Decision Taken
+
+`lib/prompts/pinterest-pins.ts` classifie désormais le `keyword` avant construction du prompt via une règle déterministe (`classifyPinComposition`, pas d'appel IA supplémentaire) : présence d'un nom de pièce **ET** d'un mot d'intention design ("inspiration"/"ideen"/"design"/"style"/...) dans les 4 langues supportées (en/de/es/fr) → mode `space`. Sinon → mode `object` (comportement inchangé, `close-up` reste disponible).
+
+En mode `space` : instruction stricte ajoutée à l'`image_prompt` (montrer la pièce entière comme environnement cohérent — murs, sol, mobilier/agencement, plafond en contexte ; l'élément mentionné dans le titre/description doit apparaître comme détail visible dans la pièce, jamais comme sujet unique d'un gros plan) et la liste d'angles de caméra autorisés retire `close-up` (`overhead, eye-level, 45-degree, wide shot`). La règle de variation d'angle entre pins est conservée mais restreinte à cet ensemble.
+
+`PROMPT_ID` passe de `pinterest-pins-v2` à `pinterest-pins-v3`.
+
+### Consequences
+
+* Aucune image existante régénérée — le changement ne s'applique qu'aux nouvelles générations
+* Classification par substring matching (pas de NLP) : limitation connue sur les mots composés allemands (ex: un mot-clé contenant "Küchenschrank" matcherait "küche" alors qu'il s'agit d'un objet, pas de la pièce) — acceptée comme compromis simplicité/robustesse, à surveiller en usage réel
+* Voir note ci-dessous sur la portée de cette convention (home decor uniquement)
+
+---
+
+## 2026-07-26 (3)
+
+### Decision
+
+Note de portée : la classification "espace/pièce entière vs objet/détail" est une convention home decor, pas une règle universelle
+
+### Context
+
+Suite à la décision précédente : le pattern déterministe (nom de pièce + mot d'intention design) ne fonctionne que parce que la niche actuelle du produit est le home decor, où "vue d'ensemble vs gros plan" est effectivement le bon axe de décision de cadrage.
+
+### Decision Taken
+
+Ne pas dupliquer cette règle conditionnelle mot-clé par mot-clé pour de futures niches. Chaque niche a sa propre convention de cadrage légitime — gros plan désiré pour recipes/tatoo (le `close-up` y est le cadrage correct, pas une erreur à corriger), portrait pour outfit, plan large pour real estate/architecture, etc. Reproduire la logique `classifyPinComposition` pour chaque nouvelle niche accumulerait des règles mot-clé par mot-clé spécifiques à chaque domaine, dans un fichier de prompt déjà générique.
+
+La bonne extension le moment venu : enrichir le Brand Profile (déjà injecté dans le `system` prompt via `ctx.brandProfile`) avec une convention visuelle par niche, pour que le cadrage attendu soit déclaré une fois par Brand Profile/niche plutôt que redérivé du texte du mot-clé à chaque génération.
+
+### Consequences
+
+* `classifyPinComposition` reste scopé au home decor — ne pas l'étendre avec des listes de mots-clés pour d'autres domaines
+* Toute nouvelle niche avec des besoins de cadrage différents doit passer par une extension du Brand Profile, pas par une nouvelle branche de classification déterministe dans ce fichier
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.
