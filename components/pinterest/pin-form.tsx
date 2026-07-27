@@ -17,6 +17,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Combobox,
+  ComboboxInputGroup,
+  ComboboxInput,
+  ComboboxIcon,
+  ComboboxPopup,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from '@/components/ui/combobox';
 
 interface ProjectOption {
   id: string;
@@ -158,21 +168,34 @@ export function PinForm({ projects, boards }: PinFormProps) {
           <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
             Board (optional)
           </Label>
-          <Input
-            id="board"
-            list="board-options"
-            placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
-            value={board}
-            onChange={(e) => setBoard(e.target.value)}
-            maxLength={100}
-            disabled={loading}
-            className="h-12 text-sm placeholder:text-muted-foreground/40"
-          />
-          <datalist id="board-options">
-            {boardOptions.map((b) => (
-              <option key={b.id} value={b.name} />
-            ))}
-          </datalist>
+          <Combobox
+            items={boardOptions.map((b) => b.name)}
+            inputValue={board}
+            onInputValueChange={(value) => setBoard(value)}
+          >
+            <ComboboxInputGroup className="h-12">
+              <ComboboxInput
+                id="board"
+                placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
+                maxLength={100}
+                disabled={loading}
+                className="text-sm placeholder:text-muted-foreground/40"
+              />
+              <ComboboxIcon />
+            </ComboboxInputGroup>
+            <ComboboxPopup>
+              <ComboboxEmpty>
+                {board.trim() ? `Create "${board.trim()}"` : 'No boards yet — type to create one'}
+              </ComboboxEmpty>
+              <ComboboxList>
+                {(item) => (
+                  <ComboboxItem key={item as string} value={item}>
+                    {item as string}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxPopup>
+          </Combobox>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_auto] gap-4">
