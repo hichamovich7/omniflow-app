@@ -30,7 +30,7 @@ export const guideSections: GuideSection[] = [
       'Create a Project before generating any content.',
       'The Brand Profile field (in the Project form) describes your brand, tone, and audience — it is automatically injected into every AI generation for that project. Up to 10,000 characters.',
       'One Project can be marked as default, used to pre-fill the Project selector across the app.',
-      'Niche (optional) is a free-text label for the project — pick from suggestions or type your own. It\'s stored for your own organization only; it doesn\'t change how content is generated yet.',
+      'Niche (optional) is a free-text label for the project — pick from suggestions or type your own. For a handful of supported niches (Home Organization & Decor, Personal Finance / Budgeting, Food & Recipes, Travel) it also sets the visual convention AI images follow for that project — framing (full scene vs. close-up object) and, for niches where it fits, whether pin images can include on-image text. Any other niche (or none) keeps the previous conservative default.',
       'Default Language (optional) pre-fills the Language field on the Pinterest and WordPress generation forms when this project is selected — you can always change it before generating.',
     ],
   },
@@ -66,6 +66,7 @@ export const guideSections: GuideSection[] = [
       'Enter a keyword, choose a language and how many pins to generate (1 to 30).',
       'Optionally set a Board — leave it blank to let the AI suggest a board per pin.',
       'If you arrived from Research → Analyze, you\'ll see a "Using content analysis from Research" indicator confirming that context is active.',
+      'For Projects whose Niche supports it (e.g. Personal Finance / Budgeting), a "Text in Images" selector appears: Auto lets the AI decide per pin whether its image should carry a short text overlay or stay a plain photo, Always/Never force one or the other for the whole batch.',
     ],
   },
   {

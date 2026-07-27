@@ -89,7 +89,8 @@ Creates one generation request and produces Pinterest content using AI.
   "board": "Boho Bathroom Ideas",
   "websiteUrl": "https://example.com",
   "pinterestUrl": "",
-  "analysisId": "uuid"
+  "analysisId": "uuid",
+  "textOverlayMode": "auto"
 }
 ```
 
@@ -98,6 +99,8 @@ Creates one generation request and produces Pinterest content using AI.
 `websiteUrl`/`pinterestUrl` are optional (TASK-023). Normally carried over silently from a Research result via "Continue to Generate" — recorded on the generation for provenance only, not injected into the AI prompt.
 
 `analysisId` is optional (TASK-024). When provided, it must reference a `content_analyses` row owned by the caller; its theme/audience/tone/category/summary are injected into the AI system prompt via `buildAnalysisContext()`, alongside Brand Profile. Carried over from a Research result's "Analyze" step, same query-param handoff as `websiteUrl`/`pinterestUrl`.
+
+`textOverlayMode` is optional, defaults to `auto` (TASK-034). One of `auto` (the AI decides `photo` vs `text-overlay` per pin), `always` (every pin forced to `text-overlay`), `never` (every pin forced to `photo`). Only meaningful for projects whose `niche` allows text overlay (`lib/ai/niche-visual-conventions.ts`) — for any other niche the server ignores the submitted value and always uses `never`. Each generated pin stores the resolved `visual_format` (`photo` / `text-overlay`) and, when applicable, `overlay_text` — both consumed by `POST /api/pinterest/generate-images` to route the image call and build its prompt.
 
 `generations.reference_image_url` exists in the database schema but has no corresponding request field yet — deferred to TASK-013 (Image Analysis).
 
@@ -155,7 +158,7 @@ Generate images for all pins in a generation.
 
 ## Description
 
-Batch generates Pinterest-optimized images using OpenAI (gpt-image-1). Processes up to 10 pins per batch with max 3 concurrent requests. Supports image versioning — each call creates a new version without overwriting existing images.
+Batch generates Pinterest-optimized images. Processes up to 10 pins per batch with max 3 concurrent requests. Supports image versioning — each call creates a new version without overwriting existing images. Pins with `visual_format = photo` use OpenAI (gpt-image-1, or `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL`); pins with `visual_format = text-overlay` always route through OpenRouter to `AI_IMAGE_MODEL_TEXT` instead, with `overlay_text` rendered explicitly in the prompt (TASK-034).
 
 ## Request
 

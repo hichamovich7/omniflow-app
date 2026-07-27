@@ -1,5 +1,11 @@
 import { inferPhotographyStyle } from './templates/photography-styles';
-import { QUALITY_DIRECTIVES, NEGATIVE_CONSTRAINTS, buildVariationDirective, IMAGE_PROMPT_ID } from './presets';
+import {
+  QUALITY_DIRECTIVES,
+  NEGATIVE_CONSTRAINTS,
+  NEGATIVE_CONSTRAINTS_TEXT_OVERLAY,
+  buildVariationDirective,
+  IMAGE_PROMPT_ID,
+} from './presets';
 
 export { IMAGE_PROMPT_ID };
 
@@ -14,10 +20,13 @@ export interface PinterestPackage {
   keywords: string;
   board: string;
   image_prompt: string;
+  visual_format: 'photo' | 'text-overlay';
+  overlay_text: string | null;
 }
 
 export function buildImagePrompt(pkg: PinterestPackage, version = 1): string {
   const photographyStyle = inferPhotographyStyle(pkg.board);
+  const isTextOverlay = pkg.visual_format === 'text-overlay' && !!pkg.overlay_text;
 
   const lines = [
     pkg.image_prompt,
@@ -26,11 +35,18 @@ export function buildImagePrompt(pkg: PinterestPackage, version = 1): string {
     ...QUALITY_DIRECTIVES,
   ];
 
+  if (isTextOverlay) {
+    lines.push(
+      '',
+      `Render this exact text clearly and legibly on top of the image, well-composed within the frame: "${pkg.overlay_text}"`
+    );
+  }
+
   if (version > 1) {
     lines.push('', buildVariationDirective(version));
   }
 
-  lines.push('', NEGATIVE_CONSTRAINTS);
+  lines.push('', isTextOverlay ? NEGATIVE_CONSTRAINTS_TEXT_OVERLAY : NEGATIVE_CONSTRAINTS);
 
   return lines.join('\n');
 }

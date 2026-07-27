@@ -11,7 +11,7 @@ export default async function PinterestPage() {
   const supabase = await createClient();
   const { data: projects } = await supabase
     .from('projects')
-    .select('id, name, is_default, default_language')
+    .select('id, name, is_default, default_language, niche')
     .order('created_at', { ascending: false });
 
   const { data: boards } = await supabase

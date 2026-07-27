@@ -140,6 +140,8 @@ El AI Engine expone cuatro roles. Un rol representa una capacidad de negocio, nu
 
 Cada rol se configura de forma independiente vía variables de entorno (`AI_<ROLE>_PROVIDER`, `AI_<ROLE>_MODEL`), con valores por defecto en `lib/ai/config.ts`. Cambiar de proveedor o modelo es un cambio de configuración, no de código.
 
+**Excepción IMAGE (TASK-034)**: cuando un pin tiene `visual_format = 'text-overlay'`, `lib/ai/services/image.ts` ignora `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL` y fuerza el provider `openrouter` con el modelo `AI_IMAGE_MODEL_TEXT` (por defecto `google/gemini-3.1-flash-image`), reutilizando `OPENROUTER_IMAGE_API_KEY` — gpt-image-1 (OpenAI) no es fiable para texto legible en la imagen. Sigue siendo la única puerta de entrada IA (Rule #10): la decisión de routing vive dentro de `lib/ai/services/image.ts`, ninguna ruta ni componente la conoce.
+
 ### Provider Abstraction
 
 ```txt
@@ -147,6 +149,7 @@ lib/ai/
   types.ts            AIRole, AIProvider, AIRoleConfig, ChatMessage
   config.ts            getRoleConfig(role) — resuelve provider/modelo por rol
   engine.ts             facade: generateText, analyzeImage, generateImage
+  niche-visual-conventions.ts   getNicheVisualConvention(niche) — framingMode/allowTextOverlay/styleGuidance por niche (TASK-034)
   providers/
     openrouter.ts       chatCompletion(), visionCompletion()
     openai.ts           generateImage()
@@ -165,7 +168,15 @@ Providers no usados hoy (FAL, Highfield, Anthropic, Gemini, Ollama) pueden añad
 
 ### Pinterest Package
 
-El Pinterest Package es la salida estructurada del rol FAST para cada pin: `title`, `description`, `keywords`, `board`, `image_prompt`. Es el mismo shape que ya devuelve `lib/prompts/pinterest-pins.ts` — no introduce columnas ni campos nuevos. El Prompt Engine transforma el Pinterest Package en un prompt optimizado para el rol IMAGE; nunca conoce al proveedor final.
+El Pinterest Package es la salida estructurada del rol FAST para cada pin: `title`, `description`, `keywords`, `board`, `image_prompt`, `visual_format` (`photo` / `text-overlay`, TASK-034), `overlay_text` (nullable, solo cuando `visual_format = text-overlay`). Es el mismo shape que ya devuelve `lib/prompts/pinterest-pins.ts`. El Prompt Engine transforma el Pinterest Package en un prompt optimizado para el rol IMAGE; nunca conoce al proveedor final. Cuando `visual_format = text-overlay`, el Prompt Engine añade una instrucción explícita para renderizar `overlay_text` sobre la imagen y sustituye `NEGATIVE_CONSTRAINTS` (que prohíbe todo texto) por `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` (permite únicamente ese texto solicitado).
+
+### Niche Visual Conventions (TASK-034)
+
+`lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.
+
+`lib/prompts/pinterest-pins.ts` (`buildPinterestPinsPrompt`) es el único consumidor: prioriza la convención del niche cuando existe; si no, cae en `classifyPinComposition(keyword)` (heurística mot-clé, ver decisión 2026-07-26 (2)/(3)) solo para `framingMode` — `allowTextOverlay` sin convención de niche es siempre `false`. Esto evita romper proyectos Home Decor existentes creados antes de que `niche` existiera o que lo dejaron vacío.
+
+`allowTextOverlay` también controla `textOverlayMode` (`auto` / `always` / `never`, `lib/validations/pinterest.ts`): un niche con `allowTextOverlay: false` fuerza `textOverlayMode` a `never` server-side, incluso si el cliente envía otro valor (defensa en profundidad — la UI ya oculta el selector en este caso, `components/pinterest/pin-form.tsx`).
 
 ### Prompt Engine
 
@@ -544,7 +555,7 @@ providers/firecrawl.ts          — scrapeUrl(), searchWeb()
 /prompts
 
 ```
-pinterest-pins.ts  — pinterest-pins-v4 prompt (Pinterest Package / FAST role)
+pinterest-pins.ts  — pinterest-pins-v5 prompt (Pinterest Package / FAST role)
 image-generator.ts — IMAGE_CONFIG (batch size, concurrency, output size)
 index.ts           — barrel export
 ```

@@ -22,6 +22,48 @@ No planned changes.
 
 ---
 
+# [1.18.1] - 2026-07-27
+
+## Fixed: `middleware.ts` → `proxy.ts` migration (Next.js 16.2.9 deprecation)
+
+### Fixed
+
+* `middleware.ts` file convention is deprecated as of Next.js 16.2.x and renamed to `proxy.ts` (`middleware` export renamed to `proxy`); the build log showed the deprecation warning and `/dashboard`, `/projects` were 404'ing unexpectedly. Migrated via the official codemod (`npx @next/codemod@latest middleware-to-proxy .`) rather than a manual rename.
+* Codemod's own `jscodeshift` runner hung indefinitely under this shell (multi-process worker forking); ran `jscodeshift --run-in-band` directly with the same transform to work around it. Result identical to what the wrapper would have produced: `middleware.ts` deleted, `proxy.ts` created, `middleware` function renamed to `proxy`, `config`/`matcher` untouched.
+* `lib/supabase/middleware.ts` (`updateSession()` — the actual Supabase cookie-refresh/session logic `proxy.ts` delegates to) was not touched by the codemod and needed no change: it only uses runtime-agnostic `NextRequest`/`NextResponse` cookie APIs, so the `edge` → `nodejs` runtime change between `middleware` and `proxy` does not affect it. No `runtime: 'edge'` was configured anywhere in this project.
+* Verified via `next build` (deprecation warning gone, footer now reports `ƒ Proxy (Middleware)`) and via `next start` + unauthenticated `curl` against `/dashboard` and `/projects`: both now return `307` → `/login` instead of a 404 or an unguarded pass-through, confirming the proxy's auth-gating actually executes.
+
+### Docs
+
+* `docs/DECISIONS.md`: 2026-07-27 (3) entry.
+
+---
+
+# [1.18.0] - 2026-07-27
+
+## TASK-034: Niche Visual Conventions + Text Overlay Routing
+
+### Added
+
+* `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)`, a static table of `{ framingMode, allowTextOverlay, styleGuidance }` keyed by the curated niche labels from `components/projects/project-form.tsx`. Covers Home Organization & Decor (migrated from keyword-based classification), Personal Finance / Budgeting, Food & Recipes, Travel. Unrecognized/empty niche returns `null` — caller decides the conservative default.
+* `textOverlayMode` (`auto` / `always` / `never`, default `auto`) on `POST /api/pinterest/generate` (`lib/validations/pinterest.ts`). Each generated pin now stores a resolved `visualFormat`/`overlayText` decided by the AI in the same generation call (no separate outline step).
+* `pins.visual_format` and `pins.overlay_text` columns (migration 018).
+* `components/pinterest/pin-form.tsx`: "Text in Images" selector, shown only when the selected Project's niche allows text overlay.
+* `AI_IMAGE_MODEL_TEXT` env var (default `google/gemini-3.1-flash-image`) — `lib/ai/services/image.ts` routes `visualFormat: 'text-overlay'` pins through OpenRouter to this model instead of the IMAGE role's configured provider/model, reusing the existing `OPENROUTER_IMAGE_API_KEY`. gpt-image-1 is not reliable at legible on-image text.
+* `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` preset (`lib/ai/prompt-engine/presets.ts`) — replaces the blanket "no text" constraint for text-overlay pins, which would otherwise contradict the explicit render-this-text instruction `buildImagePrompt()` now adds.
+
+### Changed
+
+* `lib/prompts/pinterest-pins.ts`: `classifyPinComposition` (keyword heuristic) is now a fallback only, used solely when the project's niche has no entry in `niche-visual-conventions.ts` — preserves existing behavior for Home Decor projects created before `projects.niche` existed. `PROMPT_ID`: `pinterest-pins-v4` → `pinterest-pins-v5`.
+* Server clamps `textOverlayMode` to `never` whenever the resolved niche convention doesn't allow text overlay, regardless of the submitted value.
+
+### Docs
+
+* `docs/DECISIONS.md`: 2026-07-27 (2) entry.
+* `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/UI_UX.md`, `.env.example`, `lib/guide/content.ts` updated.
+
+---
+
 # [1.17.1] - 2026-07-27
 
 ## Pinterest `image_prompt` aligned to FLUX.2 official prompting framework

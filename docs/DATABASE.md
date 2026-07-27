@@ -202,6 +202,8 @@ Stores generated Pinterest pins.
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
 | link_url       | text nullable            | Website destination        |
 | publish_date   | timestamptz nullable     | Schedule date              |
+| visual_format  | text                     | `photo` / `text-overlay` (TASK-034). NOT NULL DEFAULT `photo`. Validated in application layer, not a DB enum/CHECK |
+| overlay_text   | text nullable            | On-image hook text (5-8 words), set only when `visual_format = text-overlay` (TASK-034) |
 | created_at     | timestamptz              |                            |
 | updated_at     | timestamptz              |                            |
 

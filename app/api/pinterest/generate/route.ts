@@ -83,11 +83,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, pinsRequested, board, websiteUrl, pinterestUrl, analysisId } = parsed.data;
+  const { projectId, keyword, language, pinsRequested, board, websiteUrl, pinterestUrl, analysisId, textOverlayMode } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id, description, user_id')
+    .select('id, description, niche, user_id')
     .eq('id', projectId)
     .single();
 
@@ -163,6 +163,8 @@ export async function POST(request: Request) {
       keyword,
       language,
       pinsRequested,
+      niche: project.niche,
+      textOverlayMode,
       brandProfile: buildBrandProfileContext(project.description),
       analysisContext: analysisContext ?? undefined,
     });
@@ -212,6 +214,8 @@ export async function POST(request: Request) {
       board: boardNames[i],
       board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
       image_prompt: pin.image_prompt,
+      visual_format: pin.visualFormat,
+      overlay_text: pin.overlayText ?? null,
     }));
 
     const { error: pinsError } = await supabase.from('pins').insert(pinsToInsert);

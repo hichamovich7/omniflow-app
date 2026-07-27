@@ -129,6 +129,7 @@ export async function POST(request: Request) {
       const imageBuffer = await generateImage({
         prompt: buildImagePrompt(pin, nextVersion),
         size: IMAGE_CONFIG.size,
+        visualFormat: pin.visual_format,
       });
 
       const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;

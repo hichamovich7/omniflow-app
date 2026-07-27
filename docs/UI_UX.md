@@ -371,6 +371,24 @@ Default:
 
 ---
 
+### Text in Images
+
+Type:
+
+```txt
+Select (Auto / Always / Never)
+```
+
+Required:
+
+```txt
+No — default Auto
+```
+
+Visible only when the selected Project's Niche has a text-overlay-capable visual convention (`lib/ai/niche-visual-conventions.ts`, TASK-034 — currently Personal Finance / Budgeting). Hidden entirely for any other Niche, including no Niche set. Auto lets the AI decide per pin (list/tip/checklist content gets a text overlay, concept/scene content stays a plain photo); Always forces every pin in the generation to a text overlay; Never forces every pin to a plain photo regardless of the Niche's default.
+
+---
+
 ### Website URL
 
 Type:

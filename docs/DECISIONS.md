@@ -781,6 +781,65 @@ La bonne extension le moment venu : enrichir le Brand Profile (déjà injecté d
 
 ---
 
+## 2026-07-27 (2)
+
+### Decision
+
+TASK-034 — Convention visuelle par niche (`lib/ai/niche-visual-conventions.ts`) + routing de modèle image selon `visualFormat` par pin
+
+### Context
+
+La décision 2026-07-26 (3) anticipait déjà ce point d'extension : "enrichir le Brand Profile avec une convention visuelle par niche, pour que le cadrage attendu soit déclaré une fois par Brand Profile/niche plutôt que redérivé du texte du mot-clé à chaque génération." `projects.niche` existe depuis TASK-033 (2026-07-26), rendant cette extension possible sans nouvelle table.
+
+Un deuxième besoin, indépendant mais lié, motive ce même chantier : certaines niches (ex. Personal Finance / Budgeting) bénéficient d'un format "text overlay" — un court texte accrocheur rendu directement sur l'image — mais gpt-image-1 (OpenAI, provider IMAGE par défaut) n'est pas fiable pour du texte lisible sur image. Une discussion préalable a comparé FLUX.2 (déjà la référence de prompting pour `image_prompt`, voir décision 2026-07-27 ci-dessus) à des modèles orientés texte-sur-image (Ideogram, Google "Nano Banana"/Gemini image) : FLUX.2 reste le choix pour la photographie de scène, mais un modèle distinct est nécessaire spécifiquement pour le rendu de texte.
+
+### Decision Taken
+
+**Convention par niche** — `lib/ai/niche-visual-conventions.ts` expose `getNicheVisualConvention(niche)`, une table statique `{ framingMode: 'space' | 'object', allowTextOverlay: boolean, styleGuidance: string }` indexée sur les libellés exacts de `NICHE_SUGGESTIONS` (`components/projects/project-form.tsx`). Quatre entrées pour cette itération : `Home Organization & Decor` (migration du mode `space` — voir ci-dessous), `Personal Finance / Budgeting` (`object`, `allowTextOverlay: true`, flat-lay/bureau stylisé), `Food & Recipes` (`object`, styling culinaire), `Travel` (`space`, plans larges golden hour). Toute niche sans entrée retombe sur `DEFAULT_NICHE_CONVENTION` (`object`, `allowTextOverlay: false`) — comportement conservateur par défaut, pas une erreur.
+
+**Migration de `classifyPinComposition`** — `lib/prompts/pinterest-pins.ts` priorise désormais la convention du niche quand elle existe. `classifyPinComposition` (heuristique mot-clé, décision 2026-07-26 (2)) est conservée mais dégradée en **fallback uniquement** : elle ne s'applique que lorsque `getNicheVisualConvention` ne trouve pas d'entrée (niche vide ou non reconnu) — y compris pour les projets Home Decor créés avant TASK-033 qui n'ont pas encore renseigné `niche`. Sans ce fallback, tous les projets Home Decor existants sans `niche` renseigné auraient silencieusement perdu le cadrage plein-pièce dès la prochaine génération ; option validée explicitement avec l'utilisateur avant implémentation plutôt que la migration stricte initialement décrite. `allowTextOverlay` n'a pas d'équivalent heuristique : sans convention de niche, il est toujours `false`.
+
+**Contrôle utilisateur `textOverlayMode`** — nouveau champ optionnel (`auto` par défaut) sur `POST /api/pinterest/generate` (`lib/validations/pinterest.ts`). `auto` : l'IA décide `visualFormat` par pin (liste/astuce/checklist → `text-overlay`, concept/scène → `photo`) dans le même appel JSON que le reste du Pinterest Package — pas d'étape outline séparée, contrairement à WordPress, puisque Pinterest reste une génération en un seul appel. `always`/`never` forcent uniformément. Défense en profondeur côté serveur : si `getNicheVisualConvention(project.niche)?.allowTextOverlay` est `false`, `textOverlayMode` est clampé à `never` avant construction du prompt, quelle que soit la valeur envoyée par le client — le formulaire (`components/pinterest/pin-form.tsx`) masque déjà le sélecteur dans ce cas, mais le serveur ne fait pas confiance à l'UI seule (Rule #6).
+
+**Persistance et routing image** — migration 018 ajoute `pins.visual_format` (`text NOT NULL DEFAULT 'photo'`, validé côté Zod, pas de CHECK DB — même convention que `generations.status`) et `pins.overlay_text` (nullable). `lib/ai/services/image.ts` route selon `visualFormat` : `text-overlay` force le provider `openrouter` avec le modèle `AI_IMAGE_MODEL_TEXT` (nouvelle variable d'env, défaut `google/gemini-3.1-flash-image`), en réutilisant la clé `OPENROUTER_IMAGE_API_KEY` déjà existante dans `lib/ai/providers/openrouter.ts` — aucune nouvelle clé. `photo` garde le comportement `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL` inchangé (Rule #10/#11 respectées : le choix reste entièrement dans `lib/ai/`, jamais dans une route ou un composant). `lib/ai/prompt-engine/engine.ts` (`buildImagePrompt`) ajoute une instruction explicite de rendu du texte et substitue `NEGATIVE_CONSTRAINTS` par `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` (nouveau preset) pour ce cas — l'interdiction générale de tout texte contredirait sinon directement la demande.
+
+`PROMPT_ID` passe de `pinterest-pins-v4` à `pinterest-pins-v5`.
+
+### Consequences
+
+* Aucune image existante régénérée, aucun pin existant réécrit — `visual_format` par défaut `photo` pour toutes les lignes déjà en base (migration 018 backfill implicite via `DEFAULT`)
+* Beauty & Personal Care, Pets, Parenting & Baby, et Health & Wellness (medical) sont volontairement exclus de cette itération — aucune entrée dans `niche-visual-conventions.ts`, retombent sur le défaut conservateur (`object`, pas de texte). Périmètre limité à Home Decor (migration), Personal Finance, Food & Recipes, Travel, comme demandé
+* `classifyPinComposition` reste dans `lib/prompts/pinterest-pins.ts` (pas déplacé) — c'est un fallback de compatibilité, pas une convention de niche ; ne pas l'étendre à de nouvelles niches, toute nouvelle niche passe par `niche-visual-conventions.ts`
+* Le mode `object` sans `styleGuidance` (niche non reconnue) n'ajoute aucune instruction de style additionnelle — comportement identique à avant TASK-034
+* `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/UI_UX.md`, `.env.example`, `lib/guide/content.ts` mis à jour
+
+---
+
+## 2026-07-27 (3)
+
+### Decision
+
+Migration `middleware.ts` → `proxy.ts` (Next.js 16.2.x)
+
+### Context
+
+`middleware.ts` est déprécié depuis Next.js 16.2.x, renommé `proxy.ts` (export `middleware` → `proxy`) ; confirmé dans la documentation embarquée du package `next` installé (`node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`, `.../file-conventions/proxy.md`). Le build affichait le warning de dépréciation, et `/dashboard`/`/projects` renvoyaient des 404 inattendus. L'hypothèse initiale ("middleware.ts n'est plus du tout exécuté sur 16.2.4+, pas juste déprécié en apparence") n'a pas pu être confirmée telle quelle dans la documentation officielle — celle-ci ne dit que "déprécié et renommé" — mais la migration reste la bonne action : le fichier est de toute façon obsolète sur la version installée (16.2.9), qu'il soit encore exécuté ou non.
+
+### Decision Taken
+
+Migration via le codemod officiel (`npx @next/codemod@latest middleware-to-proxy .`), pas de renommage manuel. Le lanceur du codemod (`jscodeshift` multi-process) restait bloqué indéfiniment sous ce shell — contournement : exécution directe de `jscodeshift --run-in-band` (mono-processus) avec le même transform déjà résolu par le wrapper. Résultat identique à celui attendu du codemod : `middleware.ts` supprimé, `proxy.ts` créé, fonction exportée renommée `middleware` → `proxy`, `config`/`matcher` inchangés.
+
+`lib/supabase/middleware.ts` (`updateSession()`, la logique réelle de refresh de session/cookies Supabase que `proxy.ts` délègue) n'a nécessité aucun changement et n'a pas été touché par le codemod : elle n'utilise que les API `NextRequest`/`NextResponse.cookies` — identiques entre le runtime `edge` (middleware) et `nodejs` (proxy, seul runtime supporté). Aucun `runtime: 'edge'` n'était configuré dans le projet, donc le changement de runtime imposé par `proxy` n'a aucun impact fonctionnel ici.
+
+### Consequences
+
+* Vérifié par `next build` (warning de dépréciation disparu, footer `ƒ Proxy (Middleware)` au lieu de l'ancien `ƒ Middleware`) et par `next start` + `curl` non authentifié sur `/dashboard` et `/projects` : `307` → `/login` dans les deux cas (au lieu d'un 404 ou d'un passage sans garde), confirmant que la logique d'auth-gating de `proxy.ts` s'exécute réellement — pas seulement que le 404 a disparu
+* Cycle complet connexion → accès dashboard/projects → déconnexion → reconnexion non testé par l'agent (nécessite des identifiants réels) — laissé à l'utilisateur, comme demandé explicitement
+* Aucun changement de logique métier, seulement le nom de fichier/fonction et le runtime sous-jacent (imposé par Next.js, non choisi)
+* `docs/CHANGELOG.md` mis à jour
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

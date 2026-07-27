@@ -58,6 +58,8 @@ export type BoardInsert = Omit<Board, 'id' | 'created_at' | 'updated_at'> & {
   id?: string;
 };
 
+export type PinVisualFormat = 'photo' | 'text-overlay';
+
 export interface Pin {
   id: string;
   generation_id: string;
@@ -72,6 +74,8 @@ export interface Pin {
   media_url: string | null;
   link_url: string | null;
   publish_date: string | null;
+  visual_format: PinVisualFormat;
+  overlay_text: string | null;
   created_at: string;
   updated_at: string;
 }

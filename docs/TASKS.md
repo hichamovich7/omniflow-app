@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27.
 
 ---
 
@@ -275,6 +275,19 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-034] Niche Visual Conventions + Text Overlay Routing — 2026-07-27
+
+* New `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` maps a project's `niche` (TASK-033, free text) to `{ framingMode: 'space' | 'object', allowTextOverlay: boolean, styleGuidance: string }`. Four entries for this iteration: `Home Organization & Decor` (migrated from the old keyword-based classification), `Personal Finance / Budgeting`, `Food & Recipes`, `Travel`. Unrecognized/empty niche → `null`, caller applies the conservative default. Beauty & Personal Care, Pets, Parenting & Baby, Health & Wellness (medical) deliberately excluded from this iteration
+* `lib/prompts/pinterest-pins.ts`: niche convention now takes priority for `framingMode`; the old keyword heuristic (`classifyPinComposition`) is kept only as a fallback for niches with no entry — including Home Decor projects that predate `projects.niche` or left it blank, so no existing project silently loses its full-room framing. `allowTextOverlay` has no keyword fallback (always `false` without a matched niche). `PROMPT_ID`: `pinterest-pins-v4` → `pinterest-pins-v5`
+* New `textOverlayMode` (`auto` default / `always` / `never`) on `POST /api/pinterest/generate` (`lib/validations/pinterest.ts`); each pin's `visualFormat`/`overlayText` is decided by the AI in the same single generation call (no separate outline step, unlike WordPress). Server clamps to `never` whenever the resolved niche doesn't allow text overlay, regardless of the submitted value — the form (`components/pinterest/pin-form.tsx`) already hides the selector in that case, but the server doesn't trust the client alone (Rule #6)
+* Migration 018: `pins.visual_format` (`text NOT NULL DEFAULT 'photo'`), `pins.overlay_text` (nullable) — validated at the Zod layer, no DB CHECK, same convention as other status-like text columns in this schema
+* `lib/ai/services/image.ts`: pins with `visualFormat: 'text-overlay'` route through OpenRouter to a new `AI_IMAGE_MODEL_TEXT` env var (default `google/gemini-3.1-flash-image`), reusing the existing `OPENROUTER_IMAGE_API_KEY` — no new provider key. `photo` pins keep the existing `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL` behavior unchanged. Routing decision lives entirely inside `lib/ai/` (Rule #10/#11)
+* `lib/ai/prompt-engine/engine.ts` (`buildImagePrompt`): text-overlay pins get an explicit "render this exact text" instruction and swap `NEGATIVE_CONSTRAINTS` for a new `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` preset (`presets.ts`) that permits the one requested text instead of banning all text
+* Zero images regenerated, zero pins backfilled — `visual_format` defaults to `photo` for all existing rows
+* `docs/DECISIONS.md`, `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/UI_UX.md`, `.env.example`, `lib/guide/content.ts` updated
+
+---
 
 ## [TASK-031] Dashboard Multi-Platform Restructure — 2026-07-20
 

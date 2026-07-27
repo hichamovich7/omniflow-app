@@ -4,9 +4,12 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, Sparkles, Sparkle } from 'lucide-react';
-import { generatePinsSchema } from '@/lib/validations/pinterest';
+import { generatePinsSchema, TEXT_OVERLAY_MODES } from '@/lib/validations/pinterest';
+import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, PINS_OPTIONS } from '@/types/pinterest';
 import type { SupportedLanguage, PinsOption } from '@/types/pinterest';
+import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,7 +36,14 @@ interface ProjectOption {
   name: string;
   is_default: boolean;
   default_language: string | null;
+  niche: string | null;
 }
+
+const TEXT_OVERLAY_LABELS: Record<TextOverlayMode, string> = {
+  auto: 'Auto',
+  always: 'Always',
+  never: 'Never',
+};
 
 interface BoardOption {
   id: string;
@@ -69,14 +79,22 @@ export function PinForm({ projects, boards }: PinFormProps) {
     (defaultProject?.default_language as SupportedLanguage) ?? 'en'
   );
   const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
+  const [textOverlayMode, setTextOverlayMode] = useState<TextOverlayMode>('auto');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const selectedProject = projects.find((p) => p.id === projectId);
+  const nicheConvention = getNicheVisualConvention(selectedProject?.niche);
+  const showTextOverlayMode = nicheConvention?.allowTextOverlay ?? false;
 
   function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
     const next = projects.find((p) => p.id === nextProjectId);
     if (next?.default_language) {
       setLanguage(next.default_language as SupportedLanguage);
+    }
+    if (!getNicheVisualConvention(next?.niche)?.allowTextOverlay) {
+      setTextOverlayMode('auto');
     }
   }
 
@@ -95,6 +113,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
       websiteUrl,
       pinterestUrl,
       analysisId,
+      textOverlayMode: showTextOverlayMode ? textOverlayMode : 'auto',
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
@@ -198,7 +217,12 @@ export function PinForm({ projects, boards }: PinFormProps) {
           </Combobox>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_auto] gap-4">
+        <div
+          className={cn(
+            'grid gap-4',
+            showTextOverlayMode ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto]'
+          )}
+        >
           <div className="space-y-1.5">
             <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
               Project
@@ -257,6 +281,29 @@ export function PinForm({ projects, boards }: PinFormProps) {
               </SelectContent>
             </Select>
           </div>
+
+          {showTextOverlayMode && (
+            <div className="space-y-1.5">
+              <Label htmlFor="text-overlay-mode" className="text-xs font-medium text-muted-foreground">
+                Text in Images
+              </Label>
+              <Select
+                value={textOverlayMode}
+                onValueChange={(v) => v && setTextOverlayMode(v as TextOverlayMode)}
+              >
+                <SelectTrigger id="text-overlay-mode" className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEXT_OVERLAY_MODES.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {TEXT_OVERLAY_LABELS[mode]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {error && (
