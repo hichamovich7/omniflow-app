@@ -731,6 +731,33 @@ En mode `space` : instruction stricte ajoutée à l'`image_prompt` (montrer la p
 
 ---
 
+## 2026-07-27
+
+### Decision
+
+Alignement des `image_prompt` Pinterest sur le framework officiel FLUX.2 (Subject + Action + Style + Context)
+
+### Context
+
+`lib/prompts/pinterest-pins.ts` interdisait explicitement tout "style keyword" ou "quality modifier" dans l'`image_prompt`, et pour les mots-clés classifiés `space` (décision 2026-07-26 (2) ci-dessus), la formulation "the main subject front and center" laissait le modèle libre de choisir quel élément ouvre la phrase — en pratique souvent un objet/détail du titre du pin plutôt que la pièce entière. Le guide de prompting officiel Black Forest Labs pour FLUX.2 documente un framework en quatre composants (Subject + Action + Style + Context) où le composant Style (registre photographique, niveau de réalisme, qualité) fait partie intégrante d'un prompt bien formé, et où le Subject doit être établi sans ambiguïté avant les détails secondaires. Les deux écarts identifiés ne sont donc pas des préférences esthétiques mais des désalignements avec le framework de prompting du modèle réellement utilisé.
+
+### Decision Taken
+
+Deux changements dans `lib/prompts/pinterest-pins.ts` :
+1. **Réintroduction du composant Style** — l'interdiction ("do not include style keywords... quality modifiers") est remplacée par une instruction d'ajouter 2-4 mots-clés de style concrets en clause finale du prompt (jamais en ouverture, pour ne pas diluer le sujet principal) : un registre photographique (ex. "architectural photography", "editorial interior photography"), un niveau de réalisme (ex. "photorealistic"), un modificateur de qualité (ex. "highly detailed"). La règle existante contre les mots vagues ("beautiful", "stunning", ...) s'étend explicitement à ces mots-clés de style. Les instructions caméra/lighting restent interdites dans l'`image_prompt` (angle géré séparément via `cameraAngles`).
+2. **Sujet principal forcé en première position (mode `space` uniquement)** — la clause d'ouverture du prompt doit désormais toujours nommer la pièce entière comme sujet grammatical (ex. "A modern kitchen featuring..." / "An open-plan kitchen and dining area with..."), jamais un objet/zone spécifique. Les éléments du titre/description du pin (matériau, îlot, séparateur, etc.) deviennent des détails énumérés *après* cette clause d'ouverture, jamais le sujet grammatical de la première clause.
+
+`PROMPT_ID` passe de `pinterest-pins-v3` à `pinterest-pins-v4`. Le mode `object` (pas de contrainte de sujet imposée) n'est pas affecté par le changement n°2 — seule sa liste de mots-clés de style suit le changement n°1, comme le mode `space`.
+
+### Consequences
+
+* Aucune image existante régénérée — le changement ne s'applique qu'aux nouvelles générations
+* `docs/ARCHITECTURE.md` mis à jour (référence `pinterest-pins-v2` obsolète corrigée en `pinterest-pins-v4` au passage)
+* Le mode `object` gagne aussi les mots-clés de style (changement n°1, commun aux deux modes) sans hériter de la contrainte de sujet du mode `space` (changement n°2, spécifique à `space`)
+* La classification `classifyPinComposition` (home decor uniquement, voir décision 2026-07-26 (3)) et sa portée ne changent pas
+
+---
+
 ## 2026-07-26 (3)
 
 ### Decision

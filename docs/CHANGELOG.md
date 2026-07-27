@@ -22,6 +22,23 @@ No planned changes.
 
 ---
 
+# [1.17.1] - 2026-07-27
+
+## Pinterest `image_prompt` aligned to FLUX.2 official prompting framework
+
+### Fixed
+
+* `lib/prompts/pinterest-pins.ts`: the prompt used to explicitly ban style keywords and quality modifiers from `image_prompt`, contradicting Black Forest Labs' documented FLUX.2 prompting framework (Subject + Action + Style + Context), which treats Style as one of the four required components. Now instructs 2-4 concrete style keywords (photography genre, realism level, quality modifier) appended as the prompt's closing clause, never at the start.
+* Same file, `space` composition mode (see 2026-07-26 (2) decision): the opening clause of the prompt could still be led by a specific object/detail from the pin's title rather than the room itself. Now forces the whole room as the grammatical subject of the first clause (e.g. "A modern kitchen featuring..."); title/description details are listed afterward, never as the opening subject.
+* `PROMPT_ID`: `pinterest-pins-v3` → `pinterest-pins-v4`.
+
+### Docs
+
+* `docs/DECISIONS.md`: 2026-07-27 entry with FLUX.2 framework rationale.
+* `docs/ARCHITECTURE.md`: stale `pinterest-pins-v2` reference corrected to `pinterest-pins-v4`.
+
+---
+
 # [1.17.0] - 2026-07-26
 
 ## Projects: Brand Profile truncation fix, Niche field, Default Language

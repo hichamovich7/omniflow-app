@@ -544,7 +544,7 @@ providers/firecrawl.ts          — scrapeUrl(), searchWeb()
 /prompts
 
 ```
-pinterest-pins.ts  — pinterest-pins-v2 prompt (Pinterest Package / FAST role)
+pinterest-pins.ts  — pinterest-pins-v4 prompt (Pinterest Package / FAST role)
 image-generator.ts — IMAGE_CONFIG (batch size, concurrency, output size)
 index.ts           — barrel export
 ```

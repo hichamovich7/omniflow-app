@@ -1,7 +1,7 @@
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 
-export const PROMPT_ID = 'pinterest-pins-v3';
+export const PROMPT_ID = 'pinterest-pins-v4';
 
 interface PromptContext {
   keyword: string;
@@ -72,7 +72,7 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
 
   const compositionInstruction =
     compositionMode === 'space'
-      ? ` This keyword calls for a full-room view: every image_prompt must show the entire space as one coherent, real environment — walls, floor, visible furniture or layout, and ceiling in context. Never isolate a single object, surface, or detail in a tight close-up shot. Any specific material, color, or decor accent referenced in the pin's title or description must appear as a visible detail *within* that full room, never as the sole subject of the frame.`
+      ? ` This keyword calls for a full-room view: every image_prompt must show the entire space as one coherent, real environment — walls, floor, visible furniture or layout, and ceiling in context. Never isolate a single object, surface, or detail in a tight close-up shot. The prompt's opening clause must always name the whole room as its grammatical subject (e.g. "A modern kitchen featuring..." or "An open-plan kitchen and dining area with..."), never a specific object, material, or zone. Any specific material, color, or decor accent referenced in the pin's title or description must appear as a detail listed *after* that opening clause, describing the room — never as the grammatical subject of the first clause or the sole subject of the frame.`
       : '';
 
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
@@ -84,7 +84,7 @@ For each pin, provide:
 - description: SEO-optimized Pinterest description with call to action (max 500 characters)
 - keywords: 10 to 15 relevant Pinterest keywords, comma separated, no hashtags
 - board: suggested Pinterest board name that accurately reflects the content niche
-- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write as a single flowing descriptive paragraph. Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details. Focus only on describing the physical scene — do not include style keywords, camera settings, lighting instructions, or quality modifiers.${compositionInstruction}
+- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre (e.g. "architectural photography", "editorial interior photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include camera settings or lighting instructions.${compositionInstruction}
 
 Rules:
 - Each pin must be unique. Do not repeat titles, descriptions, or image scenes.
