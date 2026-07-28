@@ -69,9 +69,11 @@ export async function PATCH(
     );
   }
 
+  const { wpCategoryId, ...rest } = parsed.data;
   const update = {
-    ...parsed.data,
+    ...rest,
     ...(parsed.data.name ? { slug: slugify(parsed.data.name) } : {}),
+    ...(wpCategoryId !== undefined ? { wp_category_id: wpCategoryId } : {}),
   };
 
   const { data: category, error: dbError } = await supabase

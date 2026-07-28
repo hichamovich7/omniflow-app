@@ -22,10 +22,22 @@ export default async function WordPressCategoriesPage() {
     list.length > 0
       ? await supabase
           .from('wordpress_categories')
-          .select('id, project_id, name')
+          .select('id, project_id, name, wp_category_id')
           .in('project_id', list.map((p) => p.id))
           .order('name')
       : { data: [] };
+
+  const { data: sites } =
+    list.length > 0
+      ? await supabase
+          .from('wordpress_sites')
+          .select('id, project_id, site_url')
+          .in('project_id', list.map((p) => p.id))
+      : { data: [] };
+
+  const wordpressSites = Object.fromEntries(
+    (sites ?? []).map((s) => [s.project_id, { id: s.id, site_url: s.site_url }])
+  );
 
   return (
     <PageContainer>
@@ -46,7 +58,7 @@ export default async function WordPressCategoriesPage() {
           </Link>
         </EmptyState>
       ) : (
-        <CategoriesManager projects={list} categories={categories ?? []} />
+        <CategoriesManager projects={list} categories={categories ?? []} wordpressSites={wordpressSites} />
       )}
     </PageContainer>
   );

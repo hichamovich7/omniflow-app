@@ -8,18 +8,25 @@ import {
   CreateCategoryDialog,
   type CategoryOption,
 } from '@/components/wordpress/category-select';
+import { WpCategoryMapping } from '@/components/wordpress/wp-category-mapping';
 
 interface ProjectOption {
   id: string;
   name: string;
 }
 
+interface WordPressSiteRef {
+  id: string;
+  site_url: string;
+}
+
 interface CategoriesManagerProps {
   projects: ProjectOption[];
   categories: CategoryOption[];
+  wordpressSites?: Record<string, WordPressSiteRef>;
 }
 
-export function CategoriesManager({ projects, categories: initialCategories }: CategoriesManagerProps) {
+export function CategoriesManager({ projects, categories: initialCategories, wordpressSites = {} }: CategoriesManagerProps) {
   const [categories, setCategories] = useState(initialCategories);
   const [createForProjectId, setCreateForProjectId] = useState<string | null>(null);
 
@@ -27,6 +34,7 @@ export function CategoriesManager({ projects, categories: initialCategories }: C
     <div className="space-y-4">
       {projects.map((project) => {
         const projectCategories = categories.filter((c) => c.project_id === project.id);
+        const site = wordpressSites[project.id];
 
         return (
           <div key={project.id} className="rounded-xl border border-border/60 bg-card p-4">
@@ -48,6 +56,15 @@ export function CategoriesManager({ projects, categories: initialCategories }: C
                   }}
                 />
               </div>
+            )}
+            {site && projectCategories.length > 0 && (
+              <WpCategoryMapping
+                siteId={site.id}
+                categories={projectCategories}
+                onCategoriesChange={(next) => {
+                  setCategories((all) => [...all.filter((c) => c.project_id !== project.id), ...next]);
+                }}
+              />
             )}
           </div>
         );

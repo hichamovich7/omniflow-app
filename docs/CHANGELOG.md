@@ -22,6 +22,32 @@ No planned changes.
 
 ---
 
+# [1.19.0] - 2026-07-28
+
+## TASK-035: WordPress REST API Publishing
+
+### Added
+
+* Direct WordPress publishing via the REST API — one WordPress connection per Project (Application Password, encrypted at rest), with Draft / Publish Now / Schedule on the article page.
+* New `wordpress_sites` table (migration 019, TASK-035) — `site_url`, `wp_username`, `encrypted_application_password` (AES-256-GCM via new `lib/wordpress/crypto.ts`, no external dependency).
+* New `lib/wordpress/rest-client.ts` — native `fetch`-based WordPress REST API client: `testConnection()`, `fetchCategories()`, `uploadMedia()` (raw binary upload to the media library), `upsertPost()`.
+* New API routes: `POST /api/wordpress/sites/test`, `POST /api/wordpress/sites`, `PATCH`/`DELETE /api/wordpress/sites/[id]`, `GET /api/wordpress/sites/[id]/categories`, `POST /api/wordpress/[id]/publish`.
+* "WordPress Connection" section added to the existing Project form (`components/projects/project-form.tsx`) — Site URL / WP Username / Application Password, "Test Connection" before save, "Connected to [site]" state with Disconnect/Change.
+* Category mapping UI on `/wordpress/categories` — maps each OmniFlow category to a real WordPress category, auto-suggested by name match, editable.
+* Publish control on the article page (`/wordpress/[id]`), replacing the export buttons when a WordPress connection is active; export buttons unchanged when there is none.
+
+### Changed
+
+* `wordpress_categories` gains `wp_category_id` (nullable), `wordpress_articles` gains `wp_post_id` / `publish_status` / `published_at` / `publish_error`.
+* Rate limiting extended to `wordpress/sites/test` (30/hour) and `wordpress/publish` (15/hour) — the first non-AI endpoints rate-limited, since both make real external requests to a third-party WordPress host with real side effects.
+
+### Docs
+
+* `docs/DECISIONS.md`: 2026-07-28 entry.
+* `docs/DATABASE.md`, `docs/API.md`, `docs/TASKS.md`, `lib/guide/content.ts`, `.env.example` updated.
+
+---
+
 # [1.18.1] - 2026-07-27
 
 ## Fixed: `middleware.ts` → `proxy.ts` migration (Next.js 16.2.9 deprecation)

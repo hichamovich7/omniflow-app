@@ -455,6 +455,10 @@ The generated article for a `wordpress_generations` row. One-to-one in practice 
 | status                 | text                                | `pending` / `processing` / `completed` / `failed` |
 | category_id            | uuid FK → wordpress_categories.id, nullable | ON DELETE SET NULL — deleting a category never deletes its articles (migration 016, TASK-032). Null = "Uncategorized" |
 | created_at             | timestamptz                        |                                            |
+| wp_post_id             | integer nullable                   | The remote WordPress post ID once published/scheduled/drafted via REST API (migration 019, TASK-035). Set on every successful `POST /api/wordpress/[id]/publish` call; subsequent calls update this same WP post instead of creating a duplicate |
+| publish_status          | text, default `'draft'`            | `draft` / `scheduled` / `published` / `failed` — not a DB enum/CHECK, validated at the Zod layer (`lib/validations/wordpress-publish.ts`), same convention as `generations.language`/`pins.visual_format`. Independent of the generation-time `status` column above (that one tracks AI generation, this one tracks WordPress publishing) |
+| published_at           | timestamptz nullable                | Set only when `publish_status` transitions to `published` (immediate publish). Left null for `scheduled` — OmniFlow does not poll WordPress to learn when a scheduled post actually goes live (WP-Cron handles that independently) |
+| publish_error           | text nullable                       | Set when `publish_status = 'failed'`; the exact reason is always surfaced to the user, never a silent failure |
 
 ## Purpose
 
@@ -527,6 +531,7 @@ unlike `boards`, whose `findOrCreateBoardIds` auto-links AI-suggested names.
 | name       | text                   | Unique per project                  |
 | slug       | text                   | Derived from `name`, not unique across projects |
 | created_at | timestamptz            |                                      |
+| wp_category_id | integer nullable   | Maps this OmniFlow category to a real WordPress category term id, fetched via `GET /wp-json/wp/v2/categories` (migration 019, TASK-035). Null = unmapped; publishing an article with an unmapped category omits `categories` from the WP payload, WordPress defaults to "Uncategorized" |
 
 ## RLS
 
@@ -540,6 +545,63 @@ user_id = auth.uid()
 unique (project_id, name)
 (project_id)
 ```
+
+---
+
+# wordpress_sites
+
+One WordPress REST API connection per Project (TASK-035). Credentials are a
+WordPress Application Password (core-native since WP 5.6, no OAuth
+registration/redirect flow needed) — validated via `testConnection()`
+(`GET /wp-json/wp/v2/users/me`) before every insert/update, never trusted
+from a prior client-side test alone.
+
+## Columns
+
+| Column                          | Type                   | Description                       |
+| -------------------------------- | ---------------------- | ------------------------------------ |
+| id                               | uuid PK                |                                      |
+| project_id                       | uuid FK → projects.id, UNIQUE | ON DELETE CASCADE — one connection per project |
+| user_id                          | uuid FK → profiles.id  | ON DELETE CASCADE. Denormalized (see RLS) |
+| site_url                         | text                    | Normalized (trailing slash stripped) at write time |
+| wp_username                      | text                    |                                      |
+| encrypted_application_password   | text                    | AES-256-GCM via `lib/wordpress/crypto.ts` (`encryptSecret`/`decryptSecret`), key from `WORDPRESS_ENCRYPTION_KEY`. Never selected into an API response — `getWordPressSiteByProjectId()` explicitly excludes this column; only the two server-side routes that must call the WP REST API select it |
+| created_at                       | timestamptz             |                                      |
+
+## Purpose
+
+`site_url`/`wp_username`/`encrypted_application_password` are always edited
+together (full replace, no partial `PATCH`) — WordPress auth validity is a
+property of the whole credential triple, and the triple is always re-tested
+server-side before any write, so a partial update could silently persist a
+URL/username change without re-validating the resulting combination.
+
+Disconnecting (`DELETE /api/wordpress/sites/[id]`) resets any of the
+project's `wordpress_articles` rows with `publish_status in ('scheduled',
+'published')` back to `draft`/`wp_post_id = null` first — otherwise a stale
+`wp_post_id` could collide with an unrelated post if the user later connects
+a *different* WordPress site to the same project.
+
+## RLS
+
+```sql
+user_id = auth.uid()
+```
+
+`user_id` is denormalized here (same choice as `wordpress_categories`)
+rather than reached via a subquery (as `wordpress_articles` does), because
+every route that creates/edits a `wordpress_sites` row already has the
+parent `project` row in hand to perform the ownership check — denormalizing
+costs nothing and keeps the RLS policy a plain indexed equality check.
+
+## Indexes
+
+```sql
+unique (project_id)
+```
+
+No separate index needed — the UNIQUE constraint on `project_id` already
+provides a single-column unique btree index for exact lookups.
 
 ---
 
@@ -778,7 +840,6 @@ using (user_id = auth.uid());
 Do NOT create yet.
 
 * pinterest_accounts
-* wordpress_sites
 * organizations
 * team_members
 * ai_provider_logs

@@ -27,6 +27,7 @@ export interface CategoryOption {
   id: string;
   project_id: string;
   name: string;
+  wp_category_id?: number | null;
 }
 
 const CREATE_SENTINEL = '__create__';

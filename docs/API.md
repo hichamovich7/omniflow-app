@@ -65,8 +65,10 @@ Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit(
 | POST /api/research                    | 60 / hour  |
 | POST /api/analyze                     | 60 / hour  |
 | POST /api/wordpress/generate          | 20 / hour  |
+| POST /api/wordpress/sites/test        | 30 / hour  |
+| POST /api/wordpress/[id]/publish      | 15 / hour  |
 
-Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider.
+Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider. `wordpress/sites/test` and `wordpress/publish` are the exception among non-AI endpoints: both make real external HTTP requests to a third-party WordPress host OmniFlow doesn't control, with real side effects (a live post appearing/updating on the user's site), so they're rate-limited like the AI endpoints — `publish` deliberately below `wordpress/generate`'s 20/hour since a single publish can fan out into up to ~5 sequential WordPress requests (image uploads + post create/update).
 
 ---
 
@@ -252,6 +254,250 @@ server_error
 ```
 
 If image generation partially fails, the article still completes — failed markers are stripped from the content rather than left as raw `{{IMAGE_N}}` text, and `wordpress_article_images.url` / `wordpress_articles.featured_image_url` are `null` for the images that failed.
+
+---
+
+# POST /api/wordpress/sites/test
+
+Validate a WordPress Application Password before it is stored (TASK-035). No resource is created — this is a pure credential check via `GET /wp-json/wp/v2/users/me`.
+
+## Description
+
+Called from the "Test Connection" button in the Project form's WordPress Connection section, and re-run server-side (never trusted from the client alone) by `POST /api/wordpress/sites` and `PATCH /api/wordpress/sites/[id]` before any write.
+
+## Request
+
+```json
+{
+  "siteUrl": "https://example.com",
+  "wpUsername": "admin",
+  "applicationPassword": "xxxx xxxx xxxx xxxx xxxx xxxx"
+}
+```
+
+## Response
+
+```json
+{
+  "data": { "connected": true, "displayName": "admin" },
+  "error": null
+}
+```
+
+## Credits
+
+Not applicable.
+
+## Possible Errors
+
+```txt
+unauthorized
+rate_limited
+invalid_json
+invalid_request
+connection_failed
+```
+
+---
+
+# POST /api/wordpress/sites
+
+Create the WordPress connection for a Project (TASK-035). One connection per project — `project_id` is unique on `wordpress_sites`.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "siteUrl": "https://example.com",
+  "wpUsername": "admin",
+  "applicationPassword": "xxxx xxxx xxxx xxxx xxxx xxxx"
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "site": {
+      "id": "uuid",
+      "project_id": "uuid",
+      "user_id": "uuid",
+      "site_url": "https://example.com",
+      "wp_username": "admin",
+      "created_at": "2026-07-28T00:00:00.000Z"
+    }
+  },
+  "error": null
+}
+```
+
+`encrypted_application_password` is never included in the response — the returned shape is always `WordPressSitePublic`.
+
+## Credits
+
+Not applicable.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_json
+invalid_request
+invalid_project
+forbidden
+connection_failed
+server_error
+```
+
+`invalid_request` (400) is also returned if the project already has a connection (unique constraint on `project_id`) — disconnect it first.
+
+---
+
+# PATCH /api/wordpress/sites/[id]
+
+Replace an existing WordPress connection's credentials (TASK-035). Full replace only — all 3 fields (`siteUrl`, `wpUsername`, `applicationPassword`) are required on every call, no partial update, since WordPress auth validity is a property of the whole triple and it is always re-tested server-side before the write.
+
+## Request
+
+```json
+{
+  "siteUrl": "https://example.com",
+  "wpUsername": "admin",
+  "applicationPassword": "xxxx xxxx xxxx xxxx xxxx xxxx"
+}
+```
+
+## Response
+
+Same shape as `POST /api/wordpress/sites`.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+forbidden
+connection_failed
+server_error
+```
+
+---
+
+# DELETE /api/wordpress/sites/[id]
+
+Disconnect a Project's WordPress site (TASK-035). Before deleting, resets any of the project's `wordpress_articles` rows with `publish_status in ('scheduled', 'published')` back to `draft` / `wp_post_id = null` — prevents a stale `wp_post_id` from colliding with an unrelated post if the user later connects a different WordPress site to the same project.
+
+## Response
+
+```json
+{ "data": { "success": true }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+server_error
+```
+
+---
+
+# GET /api/wordpress/sites/[id]/categories
+
+Fetch the connected WordPress site's real categories, for the category-mapping UI at `/wordpress/categories` (TASK-035).
+
+## Response
+
+```json
+{
+  "data": {
+    "categories": [
+      { "id": 12, "name": "Home Decor", "slug": "home-decor" }
+    ]
+  },
+  "error": null
+}
+```
+
+Capped at 100 categories (`per_page=100`, WordPress's REST API maximum) — a known limitation for sites with more, see DECISIONS.md.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+connection_failed
+```
+
+---
+
+# POST /api/wordpress/[id]/publish
+
+Publish an article to its project's connected WordPress site via the REST API (TASK-035). `[id]` is the `wordpress_generations.id`, matching the existing `DELETE /api/wordpress/[id]`.
+
+## Description
+
+1. Uploads the featured image (if any) to the WP media library — a failure here is fatal, `featured_media` has no URL-fallback on the WP side.
+2. Uploads internal/body images to the WP media library, rewriting their URLs in the post content on success — a failure on any individual internal image is non-fatal, the original (already public) Supabase Storage URL is kept in the content instead.
+3. Resolves the article's mapped WordPress category (`wp_category_id`); an unmapped category is omitted from the payload (WordPress defaults to "Uncategorized"), non-fatal.
+4. Computes `status`/`date` from `mode` and calls `POST /wp-json/wp/v2/posts` (or `POST /wp-json/wp/v2/posts/{id}` to update, if `wp_post_id` is already set — falling back to create on a 404).
+5. Persists `wp_post_id` / `publish_status` / `published_at`, or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
+
+## Request
+
+```json
+{
+  "mode": "draft",
+  "scheduledDate": "2026-08-01",
+  "scheduledTime": "09:00"
+}
+```
+
+`scheduledDate`/`scheduledTime` are required (and validated to be in the future) only when `mode` is `"schedule"`. `mode: "schedule"` maps to WordPress `status: "future"` with `date` formatted as `YYYY-MM-DDTHH:MM:SS` (no timezone suffix — WordPress interprets this as site-local time and auto-publishes via WP-Cron with zero further action from OmniFlow).
+
+## Response
+
+```json
+{
+  "data": {
+    "wpPostId": 42,
+    "publishStatus": "scheduled",
+    "publishedAt": null,
+    "viewUrl": "https://example.com/?p=42"
+  },
+  "error": null
+}
+```
+
+## Credits
+
+Not applicable.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+forbidden
+rate_limited
+no_connection
+publish_failed
+```
+
+On `publish_failed`, the error message is surfaced verbatim to the user and also persisted to `wordpress_articles.publish_error`; a 401/403 from WordPress specifically yields "WordPress rejected the connection credentials — reconnect in Project settings" rather than a generic message.
 
 ---
 
@@ -875,7 +1121,7 @@ POST /api/pinterest/publish
 
 POST /api/images/generate
 
-POST /api/wordpress/publish
-
 POST /api/team/invite
 ```
+
+WordPress publishing (previously listed here as `POST /api/wordpress/publish`) was implemented as `POST /api/wordpress/[id]/publish` under TASK-035 — see that section above and DECISIONS.md for the path-naming rationale.

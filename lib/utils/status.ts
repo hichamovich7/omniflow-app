@@ -15,3 +15,12 @@ export function statusToBadgeVariant(status: string) {
     default: return 'secondary' as const;
   }
 }
+
+export function publishStatusToBadgeVariant(status: string) {
+  switch (status) {
+    case 'published': return 'success' as const;
+    case 'scheduled': return 'warning' as const;
+    case 'failed': return 'destructive' as const;
+    default: return 'secondary' as const;
+  }
+}

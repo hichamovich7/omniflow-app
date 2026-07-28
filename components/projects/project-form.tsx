@@ -6,10 +6,12 @@ import { toast } from 'sonner';
 import { createProjectSchema, updateProjectSchema } from '@/lib/validations/project';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
+import type { WordPressSitePublic } from '@/types/wordpress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -26,6 +28,14 @@ import {
   ComboboxItem,
   ComboboxEmpty,
 } from '@/components/ui/combobox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 // Curated suggestions only — free text is always accepted, nothing here is
 // enforced in the database. See docs/DECISIONS.md for why this stays a flat
@@ -64,9 +74,10 @@ interface ProjectFormProps {
     niche: string | null;
     default_language: string | null;
   };
+  wordpressSite?: WordPressSitePublic | null;
 }
 
-export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps) {
+export function ProjectForm({ mode, projectId, defaultValues, wordpressSite }: ProjectFormProps) {
   const router = useRouter();
   const [name, setName] = useState(defaultValues?.name ?? '');
   const [description, setDescription] = useState(defaultValues?.description ?? '');
@@ -74,6 +85,83 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
   const [defaultLanguage, setDefaultLanguage] = useState(defaultValues?.default_language ?? '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // WordPress Connection
+  const [wpSite, setWpSite] = useState<WordPressSitePublic | null>(wordpressSite ?? null);
+  const [wpEditing, setWpEditing] = useState(!wpSite);
+  const [wpSiteUrl, setWpSiteUrl] = useState('');
+  const [wpUsername, setWpUsername] = useState('');
+  const [wpPassword, setWpPassword] = useState('');
+  const [wpTestStatus, setWpTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [wpTestMessage, setWpTestMessage] = useState<string | null>(null);
+  const [wpSaving, setWpSaving] = useState(false);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  function resetWpFields() {
+    setWpSiteUrl('');
+    setWpUsername('');
+    setWpPassword('');
+    setWpTestStatus('idle');
+    setWpTestMessage(null);
+  }
+
+  function handleChangeConnection() {
+    setWpEditing(true);
+    setWpSiteUrl(wpSite?.site_url ?? '');
+    setWpUsername(wpSite?.wp_username ?? '');
+    setWpPassword('');
+    setWpTestStatus('idle');
+    setWpTestMessage(null);
+  }
+
+  function handleCancelWpEdit() {
+    setWpEditing(false);
+    resetWpFields();
+  }
+
+  async function handleTestConnection() {
+    setWpTestStatus('testing');
+    setWpTestMessage(null);
+
+    const res = await fetch('/api/wordpress/sites/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteUrl: wpSiteUrl, wpUsername, applicationPassword: wpPassword }),
+    });
+    const json = await res.json();
+
+    if (!res.ok || json.error) {
+      setWpTestStatus('error');
+      setWpTestMessage(json.error?.message ?? 'Connection failed');
+      return;
+    }
+
+    setWpTestStatus('success');
+    setWpTestMessage(`Connected as ${json.data.displayName}`);
+  }
+
+  async function handleDisconnect() {
+    if (!wpSite) return;
+    setDisconnecting(true);
+
+    const res = await fetch(`/api/wordpress/sites/${wpSite.id}`, { method: 'DELETE' });
+    const json = await res.json();
+
+    if (!res.ok || json.error) {
+      toast.error(json.error?.message ?? 'Failed to disconnect WordPress');
+      setDisconnecting(false);
+      return;
+    }
+
+    toast.success('WordPress disconnected');
+    setWpSite(null);
+    setWpEditing(true);
+    resetWpFields();
+    setDisconnecting(false);
+    setDisconnectOpen(false);
+    router.refresh();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -114,6 +202,38 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
     }
 
     toast.success(mode === 'create' ? 'Project created' : 'Project updated');
+
+    const savedProjectId: string = mode === 'create' ? json.data.projectId : (projectId as string);
+
+    const hasWpInput = Boolean(wpSiteUrl.trim() || wpUsername.trim() || wpPassword.trim());
+
+    if (wpEditing && hasWpInput) {
+      if (wpTestStatus !== 'success') {
+        toast.error('Test the WordPress connection before saving it — the project itself was saved.');
+      } else {
+        setWpSaving(true);
+        const wpUrl = wpSite ? `/api/wordpress/sites/${wpSite.id}` : '/api/wordpress/sites';
+        const wpMethod = wpSite ? 'PATCH' : 'POST';
+        const wpBody = wpSite
+          ? { siteUrl: wpSiteUrl, wpUsername, applicationPassword: wpPassword }
+          : { projectId: savedProjectId, siteUrl: wpSiteUrl, wpUsername, applicationPassword: wpPassword };
+
+        const wpRes = await fetch(wpUrl, {
+          method: wpMethod,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(wpBody),
+        });
+        const wpJson = await wpRes.json();
+
+        if (!wpRes.ok || wpJson.error) {
+          toast.error(wpJson.error?.message ?? 'Failed to save the WordPress connection');
+        } else {
+          toast.success('WordPress connection saved');
+        }
+        setWpSaving(false);
+      }
+    }
+
     router.push('/projects');
     router.refresh();
   }
@@ -198,6 +318,101 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
           </p>
         </div>
       </div>
+
+      <div className="space-y-2 rounded-xl border border-border/60 p-4">
+        <Label>WordPress Connection (optional)</Label>
+
+        {!wpEditing && wpSite ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="success">Connected to {wpSite.site_url}</Badge>
+            <Button type="button" variant="outline" size="sm" onClick={handleChangeConnection} disabled={loading}>
+              Change connection
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDisconnectOpen(true)}
+              disabled={loading}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="wp-site-url">Site URL</Label>
+              <Input
+                id="wp-site-url"
+                type="url"
+                placeholder="https://example.com"
+                value={wpSiteUrl}
+                onChange={(e) => {
+                  setWpSiteUrl(e.target.value);
+                  setWpTestStatus('idle');
+                }}
+                disabled={loading || wpSaving}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="wp-username">WP Username</Label>
+                <Input
+                  id="wp-username"
+                  value={wpUsername}
+                  onChange={(e) => {
+                    setWpUsername(e.target.value);
+                    setWpTestStatus('idle');
+                  }}
+                  disabled={loading || wpSaving}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="wp-password">Application Password</Label>
+                <Input
+                  id="wp-password"
+                  type="password"
+                  autoComplete="off"
+                  value={wpPassword}
+                  onChange={(e) => {
+                    setWpPassword(e.target.value);
+                    setWpTestStatus('idle');
+                  }}
+                  disabled={loading || wpSaving}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Generate an Application Password in WordPress under Users → Profile → Application Passwords. It is
+              encrypted before storage and never shown again after saving.
+            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTestConnection}
+                disabled={
+                  loading || wpSaving || wpTestStatus === 'testing' || !wpSiteUrl || !wpUsername || !wpPassword
+                }
+              >
+                {wpTestStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+              </Button>
+              {wpSite && (
+                <Button type="button" variant="ghost" size="sm" onClick={handleCancelWpEdit} disabled={loading || wpSaving}>
+                  Cancel
+                </Button>
+              )}
+              {wpTestMessage && (
+                <p className={wpTestStatus === 'success' ? 'text-sm text-success' : 'text-sm text-destructive'}>
+                  {wpTestMessage}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-3">
         <Button
@@ -218,6 +433,26 @@ export function ProjectForm({ mode, projectId, defaultValues }: ProjectFormProps
               : 'Save Changes'}
         </Button>
       </div>
+
+      <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disconnect WordPress</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect {wpSite?.site_url}? Scheduled or published articles for this
+              project will revert to Draft in OmniFlow — nothing changes on your WordPress site itself.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDisconnectOpen(false)} disabled={disconnecting}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDisconnect} disabled={disconnecting}>
+              {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

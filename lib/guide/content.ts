@@ -10,6 +10,7 @@ import {
   Download,
   Clock,
   FileText,
+  UploadCloud,
 } from 'lucide-react';
 
 export interface GuideSection {
@@ -143,7 +144,22 @@ export const guideSections: GuideSection[] = [
       'From pins, the featured image is always freshly generated for the article\'s unified theme; internal images (up to 3) reuse the pins\' own already-generated images instead of creating new ones.',
       'Generation runs in one request and can take up to a minute (outline, full article, then all images).',
       'Optionally assign a Category (scoped to the Project) on either flow — this is always a manual choice, never AI-suggested. Pick "+ New Category" in the selector to create one inline, or use the small gear icon next to it to rename or delete existing categories. Leaving it unset files the article under "Uncategorized". WordPress History lets you filter by category and shows a category badge on each article.',
-      'The article is stored as Markdown — use Copy Markdown, Copy HTML, or Download .md to take it to WordPress or anywhere else. There is no direct WordPress publishing yet.',
+      'The article is stored as Markdown. If the Project has no WordPress connection, use Copy Markdown, Copy HTML, or Download .md to take it anywhere else. If it does, a Publish control replaces those buttons — see "WordPress Publishing" below.',
+    ],
+  },
+  {
+    id: 'wordpress-publish',
+    title: 'WordPress Publishing',
+    icon: UploadCloud,
+    summary: 'Connect a Project to a real WordPress site and publish generated articles directly, without leaving OmniFlow.',
+    points: [
+      'Connect a site from the Project form (Projects → Edit): Site URL, WP Username, and an Application Password — generate one in WordPress under Users → Profile → Application Passwords, it is not your regular login password.',
+      'Use "Test Connection" before saving — the credentials are validated against your site before anything is stored. The Application Password is encrypted and never shown again after saving; to change it, use "Change connection" and re-enter it (WordPress credentials are always replaced as a whole, not edited field by field).',
+      'One WordPress connection per Project. Disconnecting reverts that project\'s scheduled or published articles back to Draft in OmniFlow — nothing changes on the WordPress site itself.',
+      'Once connected, map your OmniFlow categories to real WordPress categories on the WordPress Categories page — matching names are suggested automatically, and you can change any of them.',
+      'On an article page, use the Publish control: Save as Draft (default), Publish Now, or Schedule (pick a date and time). Featured and internal images are uploaded to your WordPress media library as part of publishing.',
+      'A scheduled post is handed to WordPress itself to publish automatically at the chosen time (via WordPress\'s own cron system) — OmniFlow does not need to be open, but the exact timing depends on your site receiving traffic around that time, so it is not always publish-to-the-second.',
+      'If a publish attempt fails (e.g. revoked credentials, unreachable site), the exact reason is always shown on the article page — never a silent failure. Republishing after fixing the issue updates the same WordPress post rather than creating a duplicate.',
     ],
   },
 ];

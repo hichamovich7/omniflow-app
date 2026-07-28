@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
+import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { createClient } from '@/lib/supabase/server';
 import { exportToMarkdown, exportToHtml, getMetaTitle } from '@/lib/wordpress/export';
 import { PageContainer } from '@/components/ui/page-container';
 import { ArticleContent } from '@/components/wordpress/article-content';
 import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
+import { PublishControl } from '@/components/wordpress/publish-control';
 import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -25,6 +27,8 @@ export default async function WordPressArticlePage({
   if (!generation) {
     redirect('/wordpress');
   }
+
+  const wordpressSite = await getWordPressSiteByProjectId(supabase, generation.project_id);
 
   const langLabel = LANGUAGE_LABELS[generation.language as SupportedLanguage] ?? generation.language;
 
@@ -63,11 +67,15 @@ export default async function WordPressArticlePage({
       {/* Article */}
       {article ? (
         <div className="space-y-6">
-          <CopyExportButtons
-            markdown={exportToMarkdown(article)}
-            html={exportToHtml(article)}
-            filename={`${article.slug}.md`}
-          />
+          {wordpressSite ? (
+            <PublishControl generationId={id} article={article} wordpressSite={wordpressSite} />
+          ) : (
+            <CopyExportButtons
+              markdown={exportToMarkdown(article)}
+              html={exportToHtml(article)}
+              filename={`${article.slug}.md`}
+            />
+          )}
 
           {article.featured_image_url && (
             // eslint-disable-next-line @next/next/no-img-element

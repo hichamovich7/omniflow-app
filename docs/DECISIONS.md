@@ -840,6 +840,48 @@ Migration via le codemod officiel (`npx @next/codemod@latest middleware-to-proxy
 
 ---
 
+## 2026-07-28
+
+### Decision
+
+TASK-035 : Publication WordPress directe via REST API — Application Passwords + chiffrement AES natif, namespace `/api/wordpress/...` à plat, statut par défaut Draft
+
+### Context
+
+Le produit avait déjà un générateur d'articles WordPress (TASK-028) et des catégories locales (TASK-032), mais aucune publication réelle — seulement export Markdown/HTML. `docs/API.md` listait `POST /api/wordpress/publish` sous "Future Endpoints (Not MVP)" et `docs/DATABASE.md` listait `wordpress_sites` sous "Future Tables (Not MVP)". Le propriétaire du produit a explicitement spécifié cette fonctionnalité avec toutes les décisions déjà tranchées, ouvrant TASK-035 comme tâche active (RULES.md Rule #25) plutôt que de rester dans le backlog.
+
+### Decision Taken
+
+**Application Passwords plutôt qu'OAuth** : natif à WordPress depuis la 5.6, aucun flux d'enregistrement d'application/redirection nécessaire — adapté à un modèle une-connexion-par-projet, contrairement à OAuth qui suppose un provider tiers enregistré.
+
+**AES-256-GCM via le module `crypto` natif de Node plutôt qu'une librairie** : zéro nouvelle dépendance (aucune librairie HTTP externe n'existe déjà dans le projet non plus — `fetch` natif utilisé partout, y compris pour ce nouveau client REST). GCM fournit une authentification intégrée (auth tag) : toute altération du ciphertext est détectée au déchiffrement plutôt que de produire silencieusement un mot de passe corrompu.
+
+**Statut de publication par défaut = Draft** : une connexion mal configurée ou un mapping de catégorie erroné ne doit jamais publier silencieusement en direct — l'utilisateur doit choisir explicitement "Publish Now" ou "Schedule".
+
+**Pas de helper d'ownership partagé** : cohérence avec le précédent établi par TASK-018/TASK-032 — chaque route refait la vérification `user_id === auth.uid()` inline (`select('id, user_id') → 404 → 403`), copiée-collée, pas de fonction partagée introduite.
+
+**Namespace `/api/wordpress/...` à plat plutôt que `/api/projects/[id]/...`** : aucun précédent de route imbriquée sous `/api/projects/[id]/` n'existe dans le projet — `wordpress_categories`, le précédent le plus proche d'une ressource scopée par projet, vit déjà à `/api/wordpress/categories`, jamais sous `/api/projects/[id]/categories`. Imbriquer n'aurait apporté aucune réutilisation de code puisque chaque route refait sa propre vérification d'ownership indépendamment de la forme de l'URL.
+
+**RLS `wordpress_sites` : `user_id` dénormalisé, pas de sous-requête** : contrairement à `wordpress_articles` (migration 012, aucune colonne `project_id`/`user_id` directe, sous-requête `IN (SELECT ... WHERE user_id = auth.uid())` obligatoire), `wordpress_sites` est créée par une route qui a déjà la ligne `project` parente en main pour la vérification d'ownership — dénormaliser ne coûte rien et garde la policy RLS une simple égalité indexée, comme `wordpress_categories` (migration 016).
+
+**Reset de `wp_post_id` à la déconnexion** : sans ce reset, un `wp_post_id` obsolète pourrait entrer en collision avec un post sans rapport si l'utilisateur reconnecte un site WordPress *différent* au même projet. `DELETE /api/wordpress/sites/[id]` remet `publish_status='draft', wp_post_id=null, published_at=null` pour les articles `scheduled`/`published` du projet avant de supprimer la connexion.
+
+**Risque résiduel accepté — double publication concurrente** : le statut `publish_status` a 4 valeurs fixes (`draft|scheduled|published|failed`, imposées par la spec), sans état "en cours". Deux clics quasi simultanés (ou deux onglets) pourraient tous deux lire `wp_post_id = null` et créer deux posts WordPress distincts. Seule mitigation : désactivation du bouton côté client pendant la requête (`loading`), qui couvre le double-clic dans un même onglet mais pas une vraie course entre deux onglets. Pas de verrou serveur ajouté — ajouter un 5ème statut "en cours" non documenté par la spec aurait été une extension de périmètre non demandée.
+
+**Limite connue — `fetchCategories` non paginé** : plafonné à `per_page=100` (maximum WordPress), pas de pagination au-delà. Acceptable pour cette itération.
+
+**Endpoint réel** : `POST /api/wordpress/[id]/publish` (`[id]` = `wordpress_generations.id`, comme `DELETE /api/wordpress/[id]` déjà existant) plutôt que le chemin `POST /api/wordpress/publish` initialement esquissé dans `docs/API.md` sous "Future Endpoints" — corrigé dans cette même mise à jour de la documentation.
+
+### Consequences
+
+* Nouvelle table `wordpress_sites` (migration 019), colonnes `wp_post_id`/`publish_status`/`published_at`/`publish_error` sur `wordpress_articles`, `wp_category_id` sur `wordpress_categories`
+* `lib/wordpress/crypto.ts`, `lib/wordpress/rest-client.ts` — aucun précédent de chiffrement dans le projet avant cette tâche, premier module de ce type
+* Nouvelle variable d'environnement serveur-only `WORDPRESS_ENCRYPTION_KEY` (32 bytes hex) — sa rotation invalide toutes les connexions WordPress stockées (déconnexion/reconnexion nécessaire par les utilisateurs concernés)
+* `docs/DATABASE.md`, `docs/API.md`, `docs/CHANGELOG.md`, `docs/TASKS.md`, `lib/guide/content.ts`, `.env.example` mis à jour
+* Non testé avec un vrai site WordPress par l'agent — laissé explicitement à l'utilisateur, comme pour la décision du 2026-07-27 (3) ci-dessus
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

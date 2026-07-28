@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { ProjectForm } from '@/components/projects/project-form';
@@ -21,6 +22,8 @@ export default async function EditProjectPage({
     redirect('/projects');
   }
 
+  const wordpressSite = await getWordPressSiteByProjectId(supabase, project.id);
+
   return (
     <PageContainer narrow>
       <PageHeader title="Edit Project" description="Update project details" />
@@ -33,6 +36,7 @@ export default async function EditProjectPage({
           niche: project.niche,
           default_language: project.default_language,
         }}
+        wordpressSite={wordpressSite}
       />
     </PageContainer>
   );
