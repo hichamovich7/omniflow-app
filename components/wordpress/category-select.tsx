@@ -64,10 +64,10 @@ export function CategorySelect({
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5">
         <Select value={value || NONE_VALUE} onValueChange={handleValueChange}>
-          <SelectTrigger id="category" className="w-full">
-            <span className="truncate text-sm">{selected?.name ?? 'Uncategorized'}</span>
+          <SelectTrigger id="category" className="w-full min-w-0">
+            <span className="min-w-0 truncate text-sm">{selected?.name ?? 'Uncategorized'}</span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE_VALUE}>Uncategorized</SelectItem>

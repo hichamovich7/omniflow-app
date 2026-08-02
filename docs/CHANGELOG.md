@@ -22,6 +22,19 @@ No planned changes.
 
 ---
 
+# [1.19.6] - 2026-08-02
+
+## TASK-FIX-011: Fix Project/Language overlap on the WordPress Generate form
+
+### Fixed
+
+* `components/wordpress/article-form.tsx`: the Project/Language/Category row (`grid grid-cols-3 gap-4`) let the Project `SelectTrigger` overflow its column and visually cover the Language select whenever the project name was long (e.g. "Blog_Home_Decor_Germany") — `SelectTrigger` defaults to `w-fit` (shrink-to-content) unless overridden, and CSS Grid items default to `min-width: auto`, so neither the trigger nor its grid cell was actually constrained to the track's `1fr` share. Fixed with `min-w-0` on each grid cell plus `w-full min-w-0` on the Project/Language triggers (matching the `w-full` convention already used elsewhere, e.g. `wp-category-mapping.tsx`) and `min-w-0` on the truncating `<span>` inside the Project trigger, which as a flex child needed it to actually engage `truncate` instead of stretching its parent.
+* `components/wordpress/category-select.tsx` (shared `CategorySelect`, also used by `pins-source-article-form.tsx`): same `min-w-0` hardening applied for a long category name, for parity — not the reported symptom, but the same class of bug.
+* Verified visually with a local Playwright install (Playwright MCP isn't connected in this environment) at 1440×900 and 1366×768, selecting "Blog_Home_Decor_Germany" as the Project: before, the Project trigger rendered ~290px wide inside a 170px track, fully covering the Language trigger; after, both measure exactly 170px with clean ellipsis truncation, zero overlap at either resolution (measured via `getBoundingClientRect()` on the trigger elements, not just eyeballed).
+* `playwright` added as a devDependency (kept, per request, for future visual verification — not wired into any test script/CI yet).
+
+---
+
 # [1.19.5] - 2026-08-02
 
 ## TASK-FIX-010: Scope the WordPress History Category filter to the selected Project

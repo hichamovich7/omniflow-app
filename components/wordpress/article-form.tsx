@@ -146,13 +146,13 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
               Project
             </Label>
             <Select value={projectId} onValueChange={(v) => v && handleProjectChange(v)}>
-              <SelectTrigger id="project">
-                <span className="truncate text-sm">
+              <SelectTrigger id="project" className="w-full min-w-0">
+                <span className="min-w-0 truncate text-sm">
                   {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
                 </span>
               </SelectTrigger>
@@ -166,12 +166,12 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
             </Select>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
               Language
             </Label>
             <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
-              <SelectTrigger id="language">
+              <SelectTrigger id="language" className="w-full min-w-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -184,7 +184,7 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
             </Select>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <Label htmlFor="category" className="text-xs font-medium text-muted-foreground">
               Category
             </Label>
