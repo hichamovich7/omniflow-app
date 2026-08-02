@@ -68,6 +68,7 @@ Structure — write the "content" field as Markdown, in this exact order:
 Other rules:
 - Insert each of these image placement markers, on its own line, at the point in the body (steps 2, 5, or 6 above) where that image is most relevant to the surrounding content:
 ${imageMarkersList}
+- If there are more image markers than Main Content sections, place more than one marker within the same section rather than skipping, merging, or forcing an unrelated match — every marker listed above must appear exactly once somewhere in the body.
 - The "(shows: ...)" text next to each marker above is context for you only, so you place the marker in the right spot — it is not caption text. Never print any alt text, image description, or a "shows:" phrase as visible content anywhere in the article body. Do not add a caption, list, or summary of the images (in any language, under any heading such as "Bildunterschriften", "Image captions", "Alt text", or similar) at the end of the article or anywhere else — alt text exists only in the outline's JSON data, never as visible article text.
 - Do not invent additional image markers and do not omit any of the ones listed above. Do not include the featured image — it is handled separately, outside this content.
 - Do not repeat the meta description verbatim in the body.

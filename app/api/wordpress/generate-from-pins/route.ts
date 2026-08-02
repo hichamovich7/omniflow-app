@@ -9,7 +9,10 @@ import type { Pin } from '@/types/database';
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import type { SupportedLanguage } from '@/types/pinterest';
 
-const MAX_INTERNAL_IMAGES = 3;
+// Only used to keep the synthesized `keyword` label readable — internal
+// image count is no longer capped (TASK-FIX-009), every selected pin with an
+// active image is reused.
+const MAX_KEYWORD_PIN_TITLES = 3;
 const MAX_KEYWORD_LENGTH = 200;
 
 // Outline + full-article generation (up to ARTICLE_GENERATION_TIMEOUT_MS =
@@ -175,7 +178,7 @@ export async function POST(request: Request) {
     .single();
 
   const imageUrlByPinId = await getActivePinImageUrls(supabase, pinIds);
-  const pinsWithImage = pins.filter((p) => imageUrlByPinId.has(p.id)).slice(0, MAX_INTERNAL_IMAGES);
+  const pinsWithImage = pins.filter((p) => imageUrlByPinId.has(p.id));
   const pinsWithoutImage = pins.filter((p) => !pinsWithImage.includes(p));
   const orderedPins = [...pinsWithImage, ...pinsWithoutImage];
 
@@ -187,7 +190,7 @@ export async function POST(request: Request) {
   }));
 
   const keyword = pins
-    .slice(0, MAX_INTERNAL_IMAGES)
+    .slice(0, MAX_KEYWORD_PIN_TITLES)
     .map((p) => p.title)
     .join(' + ')
     .slice(0, MAX_KEYWORD_LENGTH);

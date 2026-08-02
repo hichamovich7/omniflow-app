@@ -61,9 +61,10 @@ export type WordPressOutline = z.infer<typeof wordpressOutlineSchema>;
 
 /**
  * Same shape as wordpressOutlineSchema, except `images` length is pinned to
- * however many internal images are actually available to reuse (0-3 selected
- * pins with an active image) instead of Option 1's fixed 2-3 — the pins flow
- * never generates internal images, it only has as many as pins supply.
+ * however many internal images are actually available to reuse — every
+ * selected pin with an active image, uncapped (TASK-FIX-009) — instead of
+ * Option 1's fixed 2-3. The pins flow never generates internal images, it
+ * only has as many as pins supply.
  */
 export function buildWordpressPinsOutlineSchema(imageCount: number) {
   return wordpressOutlineSchema.extend({

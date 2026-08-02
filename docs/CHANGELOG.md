@@ -22,6 +22,19 @@ No planned changes.
 
 ---
 
+# [1.19.4] - 2026-08-02
+
+## TASK-FIX-009: Remove the 3-internal-image cap on the pins→article flow
+
+### Changed
+
+* `app/api/wordpress/generate-from-pins/route.ts`: `pinsWithImage` no longer `.slice(0, 3)`s — every selected pin with an active image is now reused as an internal image (was hard-capped at 3 regardless of how many pins were selected). The unrelated `keyword` label (a short "Pin A + Pin B + Pin C" display string, capped separately for readability) keeps its own 3-title cap, now under its own `MAX_KEYWORD_PIN_TITLES` constant instead of incidentally sharing the removed image cap's name.
+* `lib/ai/prompts/wordpress-from-pins-prompt.ts`: the outline prompt's image-marker instruction listed literal marker names only up to `"IMAGE_3"` — harmless while the route capped at 3, but would have under-instructed the model for any higher count. Now builds the full `"IMAGE_1", "IMAGE_2", ..., "IMAGE_N"` list dynamically from the actual count.
+* `lib/ai/prompts/wordpress-article-prompt.ts` (shared by both Option 1 and the pins flow): added one clarifying rule — when there are more image markers than Main Content sections, more than one marker may land in the same section rather than being skipped or forced into an unrelated spot. Dormant for Option 1 (always ≤3 images against 8-10 sections), only reachable from the pins flow with >8-10 images with active pins.
+* Option 1 (keyword flow) untouched — still exactly 1 featured + 2-3 freshly-generated internal images, independent schema (`wordpressOutlineSchema`, fixed `.min(2).max(3)`), independent prompt (`wordpress-outline-prompt.ts`).
+
+---
+
 # [1.19.3] - 2026-08-02
 
 ## TASK-FIX-008: Remove duplicate H1 on WordPress-published articles

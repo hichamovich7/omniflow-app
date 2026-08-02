@@ -275,7 +275,10 @@ interface GenerateArticleFromPinsParams {
    * outline prompt maps "image slot N" to "pin N" in this list.
    */
   pins: PinSummary[];
-  /** Active pin_images URLs to reuse as internal images, already capped to at most 3. */
+  /**
+   * Active pin_images URLs to reuse as internal images — every selected pin
+   * with an active image, uncapped (TASK-FIX-009).
+   */
   internalImageUrls: string[];
   language: SupportedLanguage;
   brandProfileDescription: string | null;
