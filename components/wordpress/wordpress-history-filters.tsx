@@ -58,6 +58,24 @@ export function WordPressHistoryFilters({ projects, categories }: WordPressHisto
     router.replace(`/wordpress/history?${params.toString()}`);
   }
 
+  // A category id only means something within its own Project — changing
+  // (or clearing) the Project filter always drops any selected Category
+  // rather than risk keeping one that belongs to a different project.
+  function handleProjectChange(value: string) {
+    if (!value) return;
+    const params = new URLSearchParams(searchParams.toString());
+    if (value !== 'all') {
+      params.set('project', value);
+    } else {
+      params.delete('project');
+    }
+    params.delete('category');
+    params.delete('page');
+    router.replace(`/wordpress/history?${params.toString()}`);
+  }
+
+  const selectedProjectId = searchParams.get('project');
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <div className="relative flex-1 sm:max-w-xs">
@@ -73,7 +91,7 @@ export function WordPressHistoryFilters({ projects, categories }: WordPressHisto
       <div className="flex gap-2">
         <Select
           value={searchParams.get('project') ?? 'all'}
-          onValueChange={(v) => v && updateParam('project', v)}
+          onValueChange={(v) => v && handleProjectChange(v)}
         >
           <SelectTrigger className="h-9 w-36 text-sm">
             <span className="truncate">
@@ -129,12 +147,15 @@ export function WordPressHistoryFilters({ projects, categories }: WordPressHisto
         <Select
           value={searchParams.get('category') ?? 'all'}
           onValueChange={(v) => v && updateParam('category', v)}
+          disabled={!selectedProjectId}
         >
-          <SelectTrigger className="h-9 w-32 text-sm">
+          <SelectTrigger className="h-9 w-32 text-sm" disabled={!selectedProjectId} title={!selectedProjectId ? 'Select a Project first' : undefined}>
             <span className="truncate">
-              {searchParams.get('category')
-                ? categories.find((c) => c.id === searchParams.get('category'))?.name ?? 'Category'
-                : 'Category'}
+              {!selectedProjectId
+                ? 'Select a Project'
+                : searchParams.get('category')
+                  ? categories.find((c) => c.id === searchParams.get('category'))?.name ?? 'Category'
+                  : 'Category'}
             </span>
           </SelectTrigger>
           <SelectContent>

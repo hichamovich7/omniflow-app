@@ -29,12 +29,18 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
     .select('id, name')
     .order('name');
 
+  // Scoped to the selected Project filter, if any — a category id is only
+  // meaningful within its own project, so mixing in every other project's
+  // categories once a specific Project is already chosen is just noise (and
+  // ambiguous when two projects happen to share a category name).
+  const categoryProjectIds = params.project ? [params.project] : (projects ?? []).map((p) => p.id);
+
   const { data: categories } =
-    projects && projects.length > 0
+    categoryProjectIds.length > 0
       ? await supabase
           .from('wordpress_categories')
           .select('id, name')
-          .in('project_id', projects.map((p) => p.id))
+          .in('project_id', categoryProjectIds)
           .order('name')
       : { data: [] };
 

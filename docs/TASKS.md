@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02. TASK-FIX-008 (Remove duplicate H1 on WordPress-published articles) completed 2026-08-02. TASK-FIX-009 (Remove the 3-internal-image cap on the pins→article flow) completed 2026-08-02.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02. TASK-FIX-008 (Remove duplicate H1 on WordPress-published articles) completed 2026-08-02. TASK-FIX-009 (Remove the 3-internal-image cap on the pins→article flow) completed 2026-08-02. TASK-FIX-010 (Scope the WordPress History Category filter to the selected Project) completed 2026-08-02.
 
 ---
 
@@ -275,6 +275,17 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-010] Scope the WordPress History Category filter to the selected Project — 2026-08-02
+
+* Root cause: `app/(dashboard)/wordpress/history/page.tsx` always queried `wordpress_categories` scoped to every project the user owns (`.in('project_id', projects.map(p => p.id))`), independent of whatever the Project filter's `searchParams.project` was already set to — so the Category dropdown never actually reflected the active Project filter
+* Fixed by deriving the categories query's project scope from `params.project` when present (`[params.project]`), falling back to all owned projects only when Project is unset/"All Projects" — the existing generations query already had this same `params.project` conditional, categories now mirrors it
+* Chose "disable Category when Project = All Projects" over the alternative (suffixing every category name with its project) — explicitly the simpler option per the task, and it sidesteps the ambiguity case entirely rather than just labeling it. Trigger text reads "Select a Project" while disabled instead of a dead-looking "Category" placeholder
+* `components/wordpress/wordpress-history-filters.tsx`: new `handleProjectChange()` (Project select's `onValueChange`) clears the `category` URL param in the same `router.replace()` call as the project change — a category id from the previous Project scope is never left selected against a new (or no) Project
+* No DB/schema change — pure query-scoping + URL-state fix
+* `docs/CHANGELOG.md` updated. No `lib/guide/content.ts` change — filter-scoping correctness, not a new capability
+
+---
 
 ## [TASK-FIX-009] Remove the 3-internal-image cap on the pins→article flow — 2026-08-02
 

@@ -22,6 +22,18 @@ No planned changes.
 
 ---
 
+# [1.19.5] - 2026-08-02
+
+## TASK-FIX-010: Scope the WordPress History Category filter to the selected Project
+
+### Fixed
+
+* `/wordpress/history`'s Category filter listed every project's categories mixed together regardless of the Project filter already selected — picking a Project like "Personal Finance" still offered categories from unrelated projects (e.g. "Badezimmer Ideen"). `app/(dashboard)/wordpress/history/page.tsx` now scopes the `wordpress_categories` query to `params.project` when set, falling back to every project's categories only when Project is "All Projects" (unchanged behavior for that case).
+* Category filter is disabled (trigger reads "Select a Project") whenever Project is "All Projects" — the simpler of the two options given, since a category id is only unambiguous within its own project.
+* `components/wordpress/wordpress-history-filters.tsx`: changing (or clearing) the Project filter now always drops any selected Category in the same URL update, rather than leaving a Category selection that no longer belongs to the newly selected Project's scope.
+
+---
+
 # [1.19.4] - 2026-08-02
 
 ## TASK-FIX-009: Remove the 3-internal-image cap on the pins→article flow
