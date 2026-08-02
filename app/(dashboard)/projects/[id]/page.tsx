@@ -9,7 +9,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
-import { ArrowLeft, Pencil, Sparkles, FileText } from 'lucide-react';
+import { ArrowLeft, Pencil, Sparkles, FileText, Tag, Globe, Star } from 'lucide-react';
 
 export default async function ProjectDetailPage({
   params,
@@ -55,19 +55,36 @@ export default async function ProjectDetailPage({
         >
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
         </Link>
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <h1 className="truncate text-xl font-semibold tracking-tight">{project.name}</h1>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-            {project.niche && <span>{project.niche}</span>}
-            {project.niche && langLabel && <span className="text-border">·</span>}
-            {langLabel && <span>{langLabel}</span>}
-            {project.is_default && (
-              <>
-                <span className="text-border">·</span>
-                <span className="font-medium text-primary">Default</span>
-              </>
-            )}
-          </div>
+          {(project.niche || langLabel || project.is_default) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {project.niche && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                  <Tag className="h-3 w-3" />
+                  {project.niche}
+                </span>
+              )}
+              {langLabel && (
+                <Badge variant="outline">
+                  <Globe />
+                  {langLabel}
+                </Badge>
+              )}
+              {project.is_default && (
+                <>
+                  {/* Status, not a content attribute like Niche/Language — no pill
+                      background, separated by a divider so it doesn't read as a
+                      third attribute of the same kind. */}
+                  {(project.niche || langLabel) && <span aria-hidden="true" className="h-3.5 w-px bg-border" />}
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                    <Star className="h-3 w-3 fill-primary" />
+                    Default
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <Link
           href={`/projects/${project.id}/edit`}
