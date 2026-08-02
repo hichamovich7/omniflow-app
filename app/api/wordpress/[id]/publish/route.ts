@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { publishArticleSchema } from '@/lib/validations/wordpress-publish';
 import { getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
 import { getWordPressSiteWithSecretByProjectId } from '@/lib/queries/wordpress-sites';
-import { exportToHtml, getMetaTitle } from '@/lib/wordpress/export';
+import { exportToHtmlForWordPress, getMetaTitle } from '@/lib/wordpress/export';
 import { decryptSecret } from '@/lib/wordpress/crypto';
 import {
   uploadMedia,
@@ -185,7 +185,7 @@ export async function POST(
   try {
     postResult = await upsertPost(credentials, article.wp_post_id, {
       title: getMetaTitle(article),
-      content: exportToHtml({ content }),
+      content: exportToHtmlForWordPress({ content }),
       status: wpStatus,
       date,
       categoryIds,
@@ -198,7 +198,7 @@ export async function POST(
       try {
         postResult = await upsertPost(credentials, null, {
           title: getMetaTitle(article),
-          content: exportToHtml({ content }),
+          content: exportToHtmlForWordPress({ content }),
           status: wpStatus,
           date,
           categoryIds,

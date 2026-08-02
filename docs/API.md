@@ -531,7 +531,7 @@ Publish an article to its project's connected WordPress site via the REST API (T
 1. Uploads the featured image (if any) to the WP media library — a failure here is fatal, `featured_media` has no URL-fallback on the WP side.
 2. Uploads internal/body images to the WP media library, rewriting their URLs in the post content on success — a failure on any individual internal image is non-fatal, the original (already public) Supabase Storage URL is kept in the content instead.
 3. Resolves the article's mapped WordPress category (`wp_category_id`); an unmapped category is omitted from the payload (WordPress defaults to "Uncategorized"), non-fatal.
-4. Computes `status`/`date` from `mode` and calls `POST /wp-json/wp/v2/posts` (or `POST /wp-json/wp/v2/posts/{id}` to update, if `wp_post_id` is already set — falling back to create on a 404).
+4. Computes `status`/`date` from `mode` and calls `POST /wp-json/wp/v2/posts` (or `POST /wp-json/wp/v2/posts/{id}` to update, if `wp_post_id` is already set — falling back to create on a 404). The post body is `exportToHtmlForWordPress()` (TASK-FIX-008), not the plain `exportToHtml()` used for OmniFlow's own reading view — it strips the leading `# {title}` line from `content` first, since the post's `title` field (rendered as an H1 by the WP theme) already carries it; sending both stacked two H1s on the published page.
 5. Persists `wp_post_id` / `publish_status` / `published_at` / `scheduled_at` (migration 020, TASK-FIX-007 — the WP-side target datetime, only set for `mode: "schedule"`, cleared otherwise), or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
 
 ## Request

@@ -463,7 +463,7 @@ The generated article for a `wordpress_generations` row. One-to-one in practice 
 
 ## Purpose
 
-Content is stored as Markdown, not HTML — HTML is derived at export time via `exportToHtml()` (`lib/wordpress/export.ts`, using `marked`), never persisted.
+Content is stored as Markdown, not HTML — HTML is derived at export time via `exportToHtml()` (`lib/wordpress/export.ts`, using `marked`), never persisted. `content` always starts with a `# {title}` H1 line (see the article-writing prompt) — deliberately kept as stored, in case of a future export destination with no separate title field. `exportToHtmlForWordPress()`/`exportToMarkdownForWordPress()` (TASK-FIX-008) strip that leading H1 via `stripLeadingH1()` before use — every consumer that already transmits the title through its own channel (WordPress's `title` post field, or Copy Markdown/HTML/Download since both are meant to be pasted into WordPress) would otherwise show it twice, stacked. OmniFlow's own reading view (`ArticleContent` on `/wordpress/[id]`) intentionally keeps calling the raw `exportToHtml()` — that page has no other element displaying the title, so content's own H1 is the only title shown there, not a duplicate.
 
 ## RLS
 

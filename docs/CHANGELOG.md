@@ -22,6 +22,19 @@ No planned changes.
 
 ---
 
+# [1.19.3] - 2026-08-02
+
+## TASK-FIX-008: Remove duplicate H1 on WordPress-published articles
+
+### Fixed
+
+* Articles published to WordPress showed two stacked titles: the post's `title` field (rendered as H1 by the WP theme) and the `# {title}` line the article-writing prompt always puts first in `content` (rendered again inside the post body). `lib/wordpress/export.ts` gains `stripLeadingH1()` plus `exportToMarkdownForWordPress()`/`exportToHtmlForWordPress()`, used by `POST /api/wordpress/[id]/publish`'s post body and by the "Copy Markdown"/"Copy HTML"/"Download .md" buttons (`CopyExportButtons`, shown when a project has no WordPress connection — flagged as the same risk since they're meant to be pasted into WordPress too, per TASKS.md).
+* Checked first, per the task's own instruction: `/wordpress/[id]` (OmniFlow's own reading view) does **not** have the same bug. Its page `<h1>` shows `generation.keyword`, not `article.title`; `article.title` is only ever used as the featured image's `alt` text, never rendered as a second heading. The article body's own H1 (from `content`) is the only title shown in that view, so it was left on the raw (non-stripping) `exportToHtml()` — stripping it there would have deleted the only visible title, a regression, not a fix.
+* `content` itself is never modified — `wordpress_articles.content` keeps its H1 exactly as generated (useful for a future export destination with no separate title field). Stripping happens only at export/publish time.
+* `exportToMarkdown()` (the old raw passthrough) removed — its only caller was the now-replaced `CopyExportButtons` markdown prop, so it had zero remaining callers after this change.
+
+---
+
 # [1.19.2] - 2026-08-02
 
 ## TASK-FIX-007: WordPress send status clarity + post-hoc category assignment

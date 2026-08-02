@@ -5,12 +5,21 @@ import type { WordPressArticle } from '@/types/wordpress';
 const META_TITLE_MAX_LENGTH = 70;
 
 /**
- * `content` is already the source of truth (Markdown, image markers already
- * resolved to real URLs at generation time) — this is a passthrough, kept as
- * a named export so callers don't reach into the article shape directly.
+ * `content` always starts with "# {title}" (see the article-writing prompt)
+ * — the stored source of truth deliberately keeps it, useful for a future
+ * destination with no separate "title" field. Every consumer that transmits
+ * the title through its own channel instead (WordPress's `title` post field,
+ * or a user pasting the title into WordPress's Title field after Copy
+ * Markdown/HTML — both flows land on the same site, TASK-FIX-008) would
+ * otherwise render it twice, stacked. No-op if `content` doesn't start with
+ * an H1.
  */
-export function exportToMarkdown(article: Pick<WordPressArticle, 'content'>): string {
-  return article.content;
+export function stripLeadingH1(markdown: string): string {
+  return markdown.replace(/^#[ \t]+[^\r\n]*(\r?\n)+/, '');
+}
+
+export function exportToMarkdownForWordPress(article: Pick<WordPressArticle, 'content'>): string {
+  return stripLeadingH1(article.content);
 }
 
 /**
@@ -24,4 +33,8 @@ export function getMetaTitle(article: Pick<WordPressArticle, 'title' | 'meta_tit
 
 export function exportToHtml(article: Pick<WordPressArticle, 'content'>): string {
   return marked.parse(article.content, { async: false }) as string;
+}
+
+export function exportToHtmlForWordPress(article: Pick<WordPressArticle, 'content'>): string {
+  return marked.parse(stripLeadingH1(article.content), { async: false }) as string;
 }

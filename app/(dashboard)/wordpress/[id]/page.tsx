@@ -3,7 +3,12 @@ import { redirect } from 'next/navigation';
 import { getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { createClient } from '@/lib/supabase/server';
-import { exportToMarkdown, exportToHtml, getMetaTitle } from '@/lib/wordpress/export';
+import {
+  exportToHtml,
+  exportToMarkdownForWordPress,
+  exportToHtmlForWordPress,
+  getMetaTitle,
+} from '@/lib/wordpress/export';
 import { PageContainer } from '@/components/ui/page-container';
 import { ArticleContent } from '@/components/wordpress/article-content';
 import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
@@ -80,8 +85,8 @@ export default async function WordPressArticlePage({
             <PublishControl generationId={id} article={article} wordpressSite={wordpressSite} />
           ) : (
             <CopyExportButtons
-              markdown={exportToMarkdown(article)}
-              html={exportToHtml(article)}
+              markdown={exportToMarkdownForWordPress(article)}
+              html={exportToHtmlForWordPress(article)}
               filename={`${article.slug}.md`}
             />
           )}
