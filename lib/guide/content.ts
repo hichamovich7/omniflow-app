@@ -69,6 +69,7 @@ export const guideSections: GuideSection[] = [
       'Optionally set a Board — leave it blank to let the AI suggest a board per pin.',
       'If you arrived from Research → Analyze, you\'ll see a "Using content analysis from Research" indicator confirming that context is active.',
       'For Projects whose Niche supports it (e.g. Personal Finance / Budgeting), a "Text in Images" selector appears: Auto lets the AI decide per pin whether its image should carry a short text overlay or stay a plain photo, Always/Never force one or the other for the whole batch.',
+      'Optionally upload a Reference Image (JPG/PNG/WebP, 5MB max) to steer the visual style: the AI analyzes only its color palette, materials, mood, and lighting — never its composition or layout — and applies those as style guidance on top of (not instead of) your Project\'s Niche convention.',
     ],
   },
   {

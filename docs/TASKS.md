@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02. TASK-FIX-008 (Remove duplicate H1 on WordPress-published articles) completed 2026-08-02. TASK-FIX-009 (Remove the 3-internal-image cap on the pins→article flow) completed 2026-08-02. TASK-FIX-010 (Scope the WordPress History Category filter to the selected Project) completed 2026-08-02. TASK-FIX-011 (Fix Project/Language overlap on the WordPress Generate form) completed 2026-08-02. TASK-036 (Project Detail Page + clickable Project cards + expandable Brand Profile) completed 2026-08-02.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02. TASK-FIX-008 (Remove duplicate H1 on WordPress-published articles) completed 2026-08-02. TASK-FIX-009 (Remove the 3-internal-image cap on the pins→article flow) completed 2026-08-02. TASK-FIX-010 (Scope the WordPress History Category filter to the selected Project) completed 2026-08-02. TASK-FIX-011 (Fix Project/Language overlap on the WordPress Generate form) completed 2026-08-02. TASK-036 (Project Detail Page + clickable Project cards + expandable Brand Profile) completed 2026-08-02. TASK-013 (Image Analysis — reference image style extraction) completed 2026-08-02, out of DEFERRED.
 
 ---
 
@@ -212,19 +212,7 @@ Compra real funcionando.
 
 ## [TASK-013] Image Analysis
 
-### Status: DEFERRED
-
-### Goal
-
-Analizar imágenes de referencia subidas por el usuario para generar prompts mas precisos.
-
-### Note
-
-La generacion de image prompts se implemento en TASK-014 (AI Image Generation). El analisis de imagenes de referencia mediante vision models queda pendiente para una futura iteracion.
-
-### Success Criteria
-
-Generacion consistente de prompts Pinterest basados en imagen de referencia.
+TASK-013 completed — see Completed Tasks below.
 
 ---
 
@@ -275,6 +263,24 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-013] Image Analysis — 2026-08-02
+
+* Out of DEFERRED — reused existing infrastructure rather than inventing new mechanisms: the VISION role and `analyzeImage()` (`lib/ai/services/vision.ts`) already existed since the AI Engine refactor, fully implemented but never called from any route; `generations.reference_image_url` / `pins.image_analysis` already existed since migration 001, never populated. A prior state-of-the-art report (same day) confirmed all of this before implementation started
+* **Anti-copyright guardrail, structural not just instructional**: `imageStyleAnalysisSchema` (`lib/validations/vision.ts`) allows exactly 4 abstract fields — `colorPalette` (2-4 named colors), `materials` (2-4 materials/textures), `mood` (one short phrase), `lightingStyle` (one short phrase). No free-text `description`/`scene` field exists in the schema at all, so a response describing composition or object layout has nowhere valid to land — it fails `.safeParse()` before it can influence the Pinterest prompt, regardless of whether the model followed the prompt instructions. See `docs/DECISIONS.md` 2026-08-02 (4) for the full reasoning
+* `lib/ai/prompts/vision-style-analysis.ts`: `buildVisionStyleAnalysisPrompt()` — instructions reinforcing the same intent in natural language ("Do NOT describe the composition... Do NOT describe this as a scene to recreate")
+* `lib/vision/context.ts`: `buildImageAnalysisContext()` — deliberately the same shape as `buildAnalysisContext()` (TASK-024, Content Analyzer): pure `analysis | null → string`, empty string when null, safe to concatenate directly
+* `lib/prompts/pinterest-pins.ts`: new optional `referenceStyleGuidance` on `PromptContext`, concatenated immediately after the niche's `styleGuidanceInstruction` (TASK-034) — additive, never a replacement; a generation can have both a niche art-direction convention and a reference image's style attributes at once
+* Orchestration lives in `app/api/pinterest/generate/route.ts`, at the exact same spot `analysisContext` (TASK-024) is already built — same file, same pattern, right next to it. Best-effort: if `analyzeImage()` throws or the response fails schema validation, the error is logged and generation proceeds without `referenceStyleGuidance` — a reference image is a style enhancement, never a required input, and a VISION provider hiccup must not block the whole generation
+* New upload path (no prior pattern existed in the app — every existing Storage upload was server-side from AI-generated buffers, never a user-submitted file): `components/pinterest/reference-image-upload.tsx` (drag-drop or click, JPG/PNG/WebP, 5MB max, preview + remove) → `POST /api/pinterest/reference-image` (auth required — 401 if no session, no separate ownership check needed since this creates a new object rather than modifying an existing one; 30/hour rate limit, its own since the VISION call itself already inherits `generate`'s existing 60/hour limit by living inside that route) → new `reference-images` Storage bucket (migration 021, same public/broad-authenticated-policy shape as `generated-images`/`wordpress-images`, no per-object RLS — consistent with every existing bucket), path `${user.id}/{uuid}.{ext}`, returns the public URL
+* Optional field in `components/pinterest/pin-form.tsx`, under Board — `generatePinsSchema.referenceImageUrl` (URL, optional)
+* **Empirical fix during verification**: `google/gemini-2.5-flash` (VISION role default) spends part of its token budget on internal reasoning before emitting visible JSON. The initially chosen `maxTokens: 400` reliably returned an empty response ("OpenRouter returned empty vision response"); reproduced at 600 and 800 too. Fixed at `maxTokens: 1200` after confirming 1000 was the empirical threshold across several real test images
+* Verified: `analyzeImage()` exercised end-to-end (temporary debug route, removed after) against two real existing generated-image URLs already in this project's Storage — both produced valid, schema-passing, purely abstract JSON. Upload route tested end-to-end with a real file POST, correctly failed with "Bucket not found" since migration 021 isn't applied yet (expected — confirms the code path itself is correct)
+* Migration 021 not applied by the agent — no DDL access (recurring constraint this session), user applies manually
+* Known accepted gap: no delete route for an uploaded-then-removed reference image before generation — the component's remove button only clears local state, the Storage object stays orphaned. Documented as accepted minor debt in `docs/DECISIONS.md` rather than building a dedicated DELETE flow for this one case
+* `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/CHANGELOG.md` updated
+
+---
 
 ## [TASK-036] Project Detail Page + clickable Project cards + expandable Brand Profile — 2026-08-02
 

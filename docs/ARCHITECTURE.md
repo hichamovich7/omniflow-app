@@ -135,7 +135,7 @@ El AI Engine expone cuatro roles. Un rol representa una capacidad de negocio, nu
 | ------ | -------------------------------------------------------------- | ---------------- | ------------------------ |
 | FAST   | Generación de contenido (mayoría de las llamadas IA). Produce el Pinterest Package. | openrouter | google/gemini-2.5-flash |
 | SMART  | Reservado para funcionalidades futuras: SEO Articles, AI Agents, Content Research, razonamiento complejo. Sin uso en el MVP Pinterest. | openrouter | google/gemini-2.5-flash |
-| VISION | Análisis de una imagen de referencia cuando el usuario la proporciona. No se usa para generar imágenes. Implementado en el engine, sin ninguna ruta que lo invoque todavía (ver TASK-013, deferred). | openrouter | google/gemini-2.5-flash |
+| VISION | Análisis de una imagen de referencia cuando el usuario la proporciona (TASK-013). No se usa para generar imágenes. Invocado desde `app/api/pinterest/generate/route.ts` cuando `referenceImageUrl` está presente. | openrouter | google/gemini-2.5-flash |
 | IMAGE  | Generación de imágenes Pinterest. Nunca recibe un keyword directamente, solo el prompt ya construido por el Prompt Engine. | openai | gpt-image-1 |
 
 Cada rol se configura de forma independiente vía variables de entorno (`AI_<ROLE>_PROVIDER`, `AI_<ROLE>_MODEL`), con valores por defecto en `lib/ai/config.ts`. Cambiar de proveedor o modelo es un cambio de configuración, no de código.
@@ -150,6 +150,9 @@ lib/ai/
   config.ts            getRoleConfig(role) — resuelve provider/modelo por rol
   engine.ts             facade: generateText, analyzeImage, generateImage
   niche-visual-conventions.ts   getNicheVisualConvention(niche) — framingMode/allowTextOverlay/styleGuidance por niche (TASK-034)
+  prompts/
+    vision-style-analysis.ts   buildVisionStyleAnalysisPrompt() — instrucciones VISION para TASK-013 (solo estilo, nunca composición)
+    wordpress-*.ts       prompts del generador WordPress (TASK-035+)
   providers/
     openrouter.ts       chatCompletion(), visionCompletion()
     openai.ts           generateImage()
@@ -162,6 +165,9 @@ lib/ai/
     presets.ts           directivas de calidad, constraints negativos, variation directive
     templates/
       photography-styles.ts   estilo fotográfico inferido por categoría/nicho
+
+lib/vision/
+  context.ts             buildImageAnalysisContext(analysis) — mismo shape que lib/analyzer/context.ts::buildAnalysisContext() (TASK-024)
 ```
 
 Providers no usados hoy (FAL, Highfield, Anthropic, Gemini, Ollama) pueden añadirse implementando un nuevo archivo en `providers/` y registrándolo en el `switch` del service correspondiente — sin tocar rutas ni componentes.
@@ -177,6 +183,14 @@ El Pinterest Package es la salida estructurada del rol FAST para cada pin: `titl
 `lib/prompts/pinterest-pins.ts` (`buildPinterestPinsPrompt`) es el único consumidor: prioriza la convención del niche cuando existe; si no, cae en `classifyPinComposition(keyword)` (heurística mot-clé, ver decisión 2026-07-26 (2)/(3)) solo para `framingMode` — `allowTextOverlay` sin convención de niche es siempre `false`. Esto evita romper proyectos Home Decor existentes creados antes de que `niche` existiera o que lo dejaron vacío.
 
 `allowTextOverlay` también controla `textOverlayMode` (`auto` / `always` / `never`, `lib/validations/pinterest.ts`): un niche con `allowTextOverlay: false` fuerza `textOverlayMode` a `never` server-side, incluso si el cliente envía otro valor (defensa en profundidad — la UI ya oculta el selector en este caso, `components/pinterest/pin-form.tsx`).
+
+### Reference Image Style Analysis (TASK-013)
+
+Flujo: `components/pinterest/reference-image-upload.tsx` sube el archivo a `POST /api/pinterest/reference-image` (bucket `reference-images`, path `${user.id}/{uuid}.{ext}`) → la URL pública se envía como `referenceImageUrl` en `generatePinsSchema` → `app/api/pinterest/generate/route.ts` llama `analyzeImage()` (rol VISION) con las instrucciones de `lib/ai/prompts/vision-style-analysis.ts` → la respuesta se valida contra `imageStyleAnalysisSchema` (`lib/validations/vision.ts`, exactamente 4 campos: `colorPalette`, `materials`, `mood`, `lightingStyle` — sin campo libre "description"/"scene", ver decisión 2026-08-02) → `buildImageAnalysisContext()` (`lib/vision/context.ts`, mismo shape que `buildAnalysisContext` de TASK-024) transforma el JSON validado en una frase de contexto → se pasa como `referenceStyleGuidance` a `buildPinterestPinsPrompt()`, concatenado *junto a* `styleGuidanceInstruction` (la convención de niche), nunca en su lugar — ambos coexisten.
+
+Best-effort: si `analyzeImage()` falla o la respuesta no valida contra el schema, se loguea el error y la generación continúa sin `referenceStyleGuidance` — una imagen de referencia es una mejora de estilo opcional, nunca un requisito bloqueante.
+
+Trazabilidad: `generations.reference_image_url` (URL subida) y `pins.image_analysis` (JSON validado, replicado en cada pin de la generación) — columnas ya existentes desde la migración inicial (001), nunca usadas hasta esta tarea.
 
 ### Prompt Engine
 
@@ -450,11 +464,11 @@ Supported Columns:
 
 ---
 
-# Image Analysis (Deferred — TASK-013)
+# Image Analysis (TASK-013)
 
-Not wired into any route or UI yet. Planned flow (the AI Engine's VISION role already implements the provider call — see "AI Engine" above — it is simply not invoked by TASK-013's product feature yet):
+Implemented — see "Reference Image Style Analysis (TASK-013)" under AI Roles above for the full flow and schema. Summary:
 
-Reference Image → Upload → AI Engine (VISION role) → Image Analysis (JSON) → FAST role → Pinterest Package → Prompt Engine → IMAGE role
+Reference Image → Upload (Supabase Storage, `reference-images` bucket) → AI Engine (VISION role) → Image Style Analysis (JSON, 4 abstract fields only) → referenceStyleGuidance → FAST role → Pinterest Package → Prompt Engine → IMAGE role
 
 ---
 

@@ -151,7 +151,7 @@ Represents one Pinterest generation request.
 | pins_requested      | integer               | CHECK > 0. Validated in application layer  |
 | website_url         | text nullable         | Set when carried over from a Research result (TASK-023); provenance only, not used in the AI prompt |
 | pinterest_url       | text nullable         | Set when carried over from a Research result (TASK-023); provenance only, not used in the AI prompt |
-| reference_image_url | text nullable         | Supabase Storage URL. Not yet populated — deferred to TASK-013 (Image Analysis) |
+| reference_image_url | text nullable         | Supabase Storage URL (`reference-images` bucket), set when the user attaches a reference image (TASK-013) |
 | model_used          | text                  | Validated in application layer            |
 | credits_used        | integer               | Credits consumed                          |
 | status              | text                  | pending / processing / completed / failed |
@@ -198,7 +198,7 @@ Stores generated Pinterest pins.
 | board          | text                     | Suggested board (AI free text, denormalized) |
 | board_id       | uuid nullable FK → boards.id | Real board entity, auto-linked at generation time (TASK-025). ON DELETE SET NULL |
 | image_prompt   | text                     | Prompt for image generation |
-| image_analysis | text nullable            | Vision analysis            |
+| image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` (colorPalette/materials/mood/lightingStyle) from the VISION role, when `generations.reference_image_url` was set (TASK-013). Same value replicated on every pin of the generation |
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
 | link_url       | text nullable            | Website destination        |
 | publish_date   | timestamptz nullable     | Schedule date              |
@@ -754,15 +754,19 @@ user_id = auth.uid()
 
 ## reference-images
 
+Status: Active (created in TASK-013, migration 021).
+
 Purpose:
 
-User uploaded inspiration images.
+User-uploaded reference images for style analysis (never composition/layout — see `imageStyleAnalysisSchema`, `lib/validations/vision.ts`).
 
 Examples:
 
 ```txt
-reference-images/user-id/image.jpg
+reference-images/user-id/uuid.jpg
 ```
+
+Path pattern: `{user_id}/{uuid}.{ext}`. One file per upload, no versioning. Public bucket, broad `authenticated` INSERT/DELETE + public SELECT — same shape as `generated-images`/`wordpress-images`, no per-object RLS.
 
 ---
 

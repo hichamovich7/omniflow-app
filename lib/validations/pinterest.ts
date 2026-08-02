@@ -16,6 +16,9 @@ export const generatePinsSchema = z.object({
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),
   pinterestUrl: z.string().trim().url('Invalid Pinterest URL').optional(),
   analysisId: z.string().uuid('Invalid analysis ID').optional(),
+  // Supabase Storage public URL from POST /api/pinterest/reference-image —
+  // see app/api/pinterest/generate/route.ts for the VISION analysis step.
+  referenceImageUrl: z.string().trim().url('Invalid reference image URL').optional(),
   // Whether the AI decides photo vs. text-overlay per pin ('auto'), or it's
   // forced uniformly across the whole generation. Server clamps this to
   // 'never' when the project's niche doesn't allow text overlay at all —

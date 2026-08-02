@@ -22,6 +22,37 @@ No planned changes.
 
 ---
 
+# [1.21.0] - 2026-08-02
+
+## TASK-013: Image Analysis (reference image style extraction)
+
+### Added
+
+* Reference image upload: `components/pinterest/reference-image-upload.tsx` (drag-drop or click, JPG/PNG/WebP, 5MB max) → `POST /api/pinterest/reference-image` (auth required, 30/hour rate limit, uploads to new `reference-images` Supabase Storage bucket under `${user.id}/{uuid}.{ext}`, returns the public URL). Optional field in `components/pinterest/pin-form.tsx`, under Board — preview thumbnail + remove button.
+* `lib/validations/vision.ts`: `imageStyleAnalysisSchema` — exactly 4 abstract fields (`colorPalette`, `materials`, `mood`, `lightingStyle`), no free-text `description`/`scene` field. This is a structural anti-copyright guardrail, not just a prompt instruction: a vision response that describes composition/layout has nowhere valid to go, it fails `.safeParse()` before it can reach the Pinterest prompt. See `docs/DECISIONS.md` 2026-08-02 (4).
+* `lib/ai/prompts/vision-style-analysis.ts`: `buildVisionStyleAnalysisPrompt()` — explicit instructions to the VISION role to extract only transferable style attributes, never composition, layout, or "a scene to recreate".
+* `lib/vision/context.ts`: `buildImageAnalysisContext()` — same shape as `buildAnalysisContext()` (TASK-024): pure `ImageStyleAnalysis | null → string`.
+* `lib/prompts/pinterest-pins.ts`: new optional `referenceStyleGuidance` on `PromptContext`, concatenated right next to the niche's `styleGuidanceInstruction` — additive, never a replacement; both can be present on the same generation.
+* Orchestration in `app/api/pinterest/generate/route.ts`, at the same spot `analysisContext` (TASK-024) is already built: when `referenceImageUrl` is present, calls `analyzeImage()` (VISION role), validates against `imageStyleAnalysisSchema`, builds `referenceStyleGuidance`, passes it into the prompt. Best-effort — a VISION failure or invalid response is logged and generation continues without it, never blocks the request.
+* Traceability via the columns that already existed for this, unused since migration 001: `generations.reference_image_url` (the uploaded URL) and `pins.image_analysis` (the validated JSON, replicated on every pin of the generation).
+* Migration 021 (`reference-images` bucket + storage policies, same shape as `generated-images`/`wordpress-images`) — not applied by the agent (no DDL access), apply manually.
+
+### Fixed (found during verification)
+
+* `google/gemini-2.5-flash` (VISION role default) spends part of its token budget on internal reasoning before emitting visible JSON — `maxTokens: 400` reliably returned an empty response ("OpenRouter returned empty vision response"), reproduced at 600 and 800 too. Fixed at `maxTokens: 1200`, confirmed reliable across multiple real test images (threshold empirically found at ~1000).
+
+### Verified
+
+* `analyzeImage()` exercised end-to-end against two real existing generated-image URLs via a temporary debug route (removed afterward) — both produced valid, schema-passing JSON with plausible, purely abstract attributes (e.g. `{"colorPalette":["warm beige","soft white","light oak","leafy green"],"materials":["matte plaster","natural wood","smooth ceramic","brushed metal"],"mood":"calm, warm, spa-like minimalism","lightingStyle":"soft, diffused natural daylight"}`).
+* Upload route tested end-to-end with a real file POST — correctly failed with a clear "Bucket not found" error since migration 021 isn't applied yet in the live DB (expected, confirms the code path is correct; user applies the migration before testing the full flow).
+* `tsc --noEmit` and `eslint` clean on all touched/new files.
+
+### Docs
+
+* `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/TASKS.md` updated.
+
+---
+
 # [1.20.0] - 2026-08-02
 
 ## TASK-036: Project Detail Page + clickable Project cards + expandable Brand Profile

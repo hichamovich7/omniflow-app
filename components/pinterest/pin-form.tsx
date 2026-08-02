@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ReferenceImageUpload } from '@/components/pinterest/reference-image-upload';
 import {
   Select,
   SelectContent,
@@ -80,6 +81,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
   );
   const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
   const [textOverlayMode, setTextOverlayMode] = useState<TextOverlayMode>('auto');
+  const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -114,6 +116,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
       pinterestUrl,
       analysisId,
       textOverlayMode: showTextOverlayMode ? textOverlayMode : 'auto',
+      referenceImageUrl: referenceImageUrl ?? undefined,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
@@ -215,6 +218,14 @@ export function PinForm({ projects, boards }: PinFormProps) {
               </ComboboxList>
             </ComboboxPopup>
           </Combobox>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-muted-foreground">Reference Image (optional)</Label>
+          <ReferenceImageUpload value={referenceImageUrl} onChange={setReferenceImageUrl} disabled={loading} />
+          <p className="text-xs text-muted-foreground">
+            Analyzed for style only (color palette, materials, mood, lighting) — never copied as a composition.
+          </p>
         </div>
 
         <div

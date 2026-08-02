@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { generateText } from '@/lib/ai/engine';
+import { generateText, analyzeImage } from '@/lib/ai/engine';
 import { getRoleConfig } from '@/lib/ai/config';
 import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
+import { imageStyleAnalysisSchema } from '@/lib/validations/vision';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
+import { buildVisionStyleAnalysisPrompt } from '@/lib/ai/prompts/vision-style-analysis';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
+import { buildImageAnalysisContext } from '@/lib/vision/context';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
@@ -83,7 +86,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, pinsRequested, board, websiteUrl, pinterestUrl, analysisId, textOverlayMode } = parsed.data;
+  const {
+    projectId,
+    keyword,
+    language,
+    pinsRequested,
+    board,
+    websiteUrl,
+    pinterestUrl,
+    analysisId,
+    textOverlayMode,
+    referenceImageUrl,
+  } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -131,6 +145,32 @@ export async function POST(request: Request) {
     analysisContext = buildAnalysisContext(analysis);
   }
 
+  let referenceStyleGuidance: string | undefined;
+  let imageAnalysisJson: string | null = null;
+
+  if (referenceImageUrl) {
+    try {
+      const { instructions } = buildVisionStyleAnalysisPrompt();
+      // gemini-2.5-flash spends a chunk of the budget on internal reasoning
+      // tokens before emitting the visible JSON — empirically needs ~1000+ to
+      // avoid returning empty content (see docs/DECISIONS.md 2026-08-02).
+      const raw = await analyzeImage({ imageUrl: referenceImageUrl, instructions, maxTokens: 1200 });
+      const parsedAnalysis = imageStyleAnalysisSchema.safeParse(JSON.parse(raw));
+
+      if (parsedAnalysis.success) {
+        referenceStyleGuidance = buildImageAnalysisContext(parsedAnalysis.data);
+        imageAnalysisJson = JSON.stringify(parsedAnalysis.data);
+      } else {
+        console.error('[vision-style-analysis] Response validation failed:', parsedAnalysis.error.issues);
+      }
+    } catch (err) {
+      // Best-effort: the reference image is a style enhancement, not a
+      // required input — a VISION provider hiccup must never block the whole
+      // generation, it just falls back to no reference style guidance.
+      console.error('[vision-style-analysis] analyzeImage failed:', err);
+    }
+  }
+
   const model = getRoleConfig('FAST').model;
 
   const { data: generation, error: genError } = await supabase
@@ -143,6 +183,7 @@ export async function POST(request: Request) {
       pins_requested: pinsRequested,
       website_url: websiteUrl ?? null,
       pinterest_url: pinterestUrl ?? null,
+      reference_image_url: referenceImageUrl ?? null,
       model_used: model,
       credits_used: 0,
       status: 'processing',
@@ -167,6 +208,7 @@ export async function POST(request: Request) {
       textOverlayMode,
       brandProfile: buildBrandProfileContext(project.description),
       analysisContext: analysisContext ?? undefined,
+      referenceStyleGuidance,
     });
 
     const content = await generateText({
@@ -216,6 +258,7 @@ export async function POST(request: Request) {
       image_prompt: pin.image_prompt,
       visual_format: pin.visualFormat,
       overlay_text: pin.overlayText ?? null,
+      image_analysis: imageAnalysisJson,
     }));
 
     const { error: pinsError } = await supabase.from('pins').insert(pinsToInsert);

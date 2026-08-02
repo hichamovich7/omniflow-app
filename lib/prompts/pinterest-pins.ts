@@ -13,6 +13,9 @@ interface PromptContext {
   textOverlayMode: TextOverlayMode;
   brandProfile?: string;
   analysisContext?: string;
+  /** From buildImageAnalysisContext() (TASK-013) — additive to the niche's
+   * styleGuidance, never a replacement. Both can be present at once. */
+  referenceStyleGuidance?: string;
 }
 
 // Room/space nouns across the 4 supported content languages (en, de, es, fr).
@@ -92,6 +95,8 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
     ? ` Follow this niche-specific art direction: ${styleGuidance}`
     : '';
 
+  const referenceStyleInstruction = ctx.referenceStyleGuidance ? ` ${ctx.referenceStyleGuidance}` : '';
+
   const overlayFieldInstruction =
     effectiveTextOverlayMode === 'never'
       ? `- visualFormat: always set this to "photo". Do not include an overlayText field.`
@@ -112,7 +117,7 @@ For each pin, provide:
 - description: SEO-optimized Pinterest description with call to action (max 500 characters)
 - keywords: 10 to 15 relevant Pinterest keywords, comma separated, no hashtags
 - board: suggested Pinterest board name that accurately reflects the content niche
-- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre (e.g. "architectural photography", "editorial interior photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include camera settings or lighting instructions.${compositionInstruction}${styleGuidanceInstruction}
+- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre (e.g. "architectural photography", "editorial interior photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include camera settings or lighting instructions.${compositionInstruction}${styleGuidanceInstruction}${referenceStyleInstruction}
 ${overlayFieldInstruction}
 
 Rules:

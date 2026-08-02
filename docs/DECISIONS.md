@@ -882,6 +882,40 @@ Le produit avait déjà un générateur d'articles WordPress (TASK-028) et des c
 
 ---
 
+## 2026-08-02 (4)
+
+### Decision
+
+TASK-013 (Image Analysis) sort du statut DEFERRED — implémenté.
+
+### Context
+
+TASK-013 était en attente depuis le MVP initial : le rôle VISION et `analyzeImage()` (`lib/ai/services/vision.ts`) existaient déjà dans l'AI Engine (symétriques à FAST/SMART/IMAGE), documentés comme "implémenté mais jamais appelé" (voir décision du 2026-07-08 sur l'AI Engine Architecture Refactor). Un état des lieux préalable (même session) a confirmé : aucun appelant nulle part dans le code, aucun schéma de sortie, aucun prompt d'instructions, aucun composant d'upload, et que `generations.reference_image_url` / `pins.image_analysis` existaient déjà en base depuis la migration 001 sans jamais avoir été peuplés.
+
+Le risque produit principal d'une "analyse d'image de référence" est le copyright : si le modèle de vision décrit la composition/disposition d'une image existante (ex. "a white sofa on the left, a round rug in the center, a floor lamp in the corner") et que cette description est réinjectée telle quelle dans le prompt de génération d'image, le résultat peut être une reproduction quasi identique d'une photo protégée — bien au-delà d'une simple "inspiration de style".
+
+### Decision Taken
+
+Garde-fou structurel plutôt que consigne de prompt seule : le schéma Zod de sortie (`imageStyleAnalysisSchema`, `lib/validations/vision.ts`) n'autorise que 4 champs, tous des attributs abstraits — `colorPalette` (2-4 couleurs nommées), `materials` (2-4 matériaux/textures), `mood` (une phrase courte), `lightingStyle` (une phrase courte). Aucun champ libre `description`/`scene`/`layout` n'existe dans le schéma : même si le modèle de vision ignorait les instructions et décrivait la composition dans un tel champ, il n'y a nulle part où cette description pourrait atterrir — une réponse qui en contient une est structurellement invalidée par `.safeParse()` avant de pouvoir atteindre le prompt Pinterest. Le prompt d'instructions (`lib/ai/prompts/vision-style-analysis.ts`) renforce la même intention en langage naturel ("Do NOT describe the composition... Do NOT describe this as a scene to recreate"), mais c'est le schéma, pas le prompt, qui est la garantie réelle.
+
+Réutilisation d'infrastructure plutôt que nouveau mécanisme : `buildImageAnalysisContext()` (`lib/vision/context.ts`) reproduit exactement le shape de `buildAnalysisContext()` (TASK-024, Content Analyzer) — une fonction pure `data → string`, `''` si `null`. `referenceStyleGuidance` (nouveau champ optionnel de `PromptContext`, `lib/prompts/pinterest-pins.ts`) est concaténé juste à côté de `styleGuidanceInstruction` (la convention niche existante, TASK-034) — additif, jamais un remplacement ; les deux peuvent coexister pour une même génération.
+
+Best-effort, jamais bloquant : si `analyzeImage()` échoue ou si la réponse ne valide pas contre le schéma, l'erreur est loguée et la génération continue sans `referenceStyleGuidance` — l'image de référence est une amélioration de style optionnelle, pas une entrée requise. Un incident du provider VISION ne doit jamais faire échouer toute une génération de pins.
+
+### Finding empirique
+
+`google/gemini-2.5-flash` (le modèle VISION par défaut) consomme une partie du budget de tokens en raisonnement interne avant d'émettre le JSON visible — `maxTokens: 400` (valeur initialement choisie par analogie avec d'autres appels courts) retournait systématiquement une réponse vide ("OpenRouter returned empty vision response"), y compris à 600 et 800. Testé et confirmé fiable à partir de 1000 sur plusieurs images réelles ; fixé à `1200` en production pour une marge de sécurité.
+
+### Consequences
+
+* Nouveaux fichiers : `lib/validations/vision.ts`, `lib/ai/prompts/vision-style-analysis.ts`, `lib/vision/context.ts`, `components/pinterest/reference-image-upload.tsx`, `app/api/pinterest/reference-image/route.ts`
+* Migration 021 (`reference-images` bucket, public, mêmes policies larges que `generated-images`/`wordpress-images` — pas de scoping RLS par `auth.uid()`, cohérent avec les buckets existants) — non appliquée par l'agent (pas d'accès DDL, voir décisions précédentes sur cette contrainte), à appliquer manuellement par l'utilisateur
+* `generations.reference_image_url` et `pins.image_analysis` — colonnes déjà existantes depuis la migration 001, enfin peuplées
+* Aucune nouvelle route de suppression pour une image de référence uploadée puis retirée du formulaire avant génération — le bouton "supprimer" du composant d'upload ne fait que réinitialiser l'état local, le fichier reste en Storage. Accepté comme dette mineure (un seul petit fichier orphelin par abandon de formulaire) plutôt que de construire une route DELETE dédiée pour ce cas ; à reconsidérer si le volume devient un problème réel
+* `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.
