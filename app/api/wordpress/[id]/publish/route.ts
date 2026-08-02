@@ -231,6 +231,10 @@ export async function POST(
       wp_post_id: postResult.id,
       publish_status: publishStatus,
       published_at: publishedAt,
+      // Cleared on any non-schedule publish — a later "Publish Now"/"Save as
+      // Draft" on a previously-scheduled article should stop claiming a
+      // scheduled date that no longer applies.
+      scheduled_at: mode === 'schedule' && scheduledAt ? scheduledAt.toISOString() : null,
       publish_error: null,
     })
     .eq('id', article.id);

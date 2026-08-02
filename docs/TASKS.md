@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02.
 
 ---
 
@@ -275,6 +275,18 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-007] WordPress send status clarity + post-hoc category assignment — 2026-08-02
+
+* Two independent fixes on top of TASK-035. Neither touches the known-separate duplicate-H1-title or pins-image-limit issues — explicitly out of scope for this task.
+* **Send status clarity**: `wp_post_id`/`publish_status` already existed (TASK-035) but weren't visible enough to prevent an accidental duplicate send. New shared `components/wordpress/wp-send-status-badge.tsx` renders "Not sent to WordPress" (gray, no `wp_post_id`) vs "Sent as Draft"/"Published"/"Scheduled for [date]" (green, `wp_post_id` present) vs "Failed to send"/"Update failed" (red, `publish_status = 'failed'`) — shown prominently at the top of `/wordpress/[id]` and compact on every `/wordpress/history` row (query extended to select the needed columns)
+* "Scheduled for [date]" needed the actual WP-side target datetime, which was never persisted (`published_at` stays null for `scheduled` by design, migration 019). New migration 020 adds `wordpress_articles.scheduled_at` (nullable timestamptz), set by the publish route only on `mode: "schedule"`, cleared otherwise. Agent has no live DB access (service_role lacks table grants in this project, confirmed during TASK-FIX-006's diagnosis; no Supabase CLI access token either) — user applied migration 020 manually before testing
+* `publish-control.tsx`: clicking Save as Draft/Publish Now/Schedule when `article.wp_post_id` already exists now opens a confirmation dialog first ("already sent on [date] — this will update the existing post, not create a duplicate"), informational not blocking — `upsertPost()` already handles the update-not-duplicate case correctly, this is purely a UI safeguard
+* **Post-hoc category assignment**: verified first — `category_id` was only ever settable at generation time (`generate`/`generate-from-pins` routes), no edit path existed after. New `PATCH /api/wordpress/[id]` (`[id]` = generation id, alongside the existing `DELETE`) reassigns it, ownership-checked per TASK-018's inline pattern, plus an extra scope check that the category belongs to the generation's own `project_id` (cross-project assignment would silently produce a meaningless `wp_category_id` mapping)
+* New `components/wordpress/article-category-editor.tsx` reuses the exact `CategorySelect` component from generation time, immediate save on change. Changing the category never re-publishes automatically — if the article already has a `wp_post_id`, a note explains the change only takes effect on the next publish/update, matching how the mapped-category resolution already works in the publish route
+* `docs/DATABASE.md`, `docs/API.md`, `docs/CHANGELOG.md`, `lib/guide/content.ts` updated
+
+---
 
 ## [TASK-FIX-006] Import WordPress categories instead of requiring a manual one first — 2026-08-02
 

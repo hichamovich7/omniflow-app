@@ -489,6 +489,39 @@ Not rate-limited — a bounded, one-shot user action (not AI-cost-incurring, not
 
 ---
 
+# PATCH /api/wordpress/[id]
+
+Reassigns an already-generated article's category (TASK-FIX-007). `[id]` is the `wordpress_generations.id`, matching `DELETE /api/wordpress/[id]` and `POST /api/wordpress/[id]/publish`. The generation-time form was previously the only place `category_id` could be set.
+
+## Request
+
+```json
+{ "categoryId": "uuid-or-null" }
+```
+
+## Description
+
+`categoryId` must belong to a `wordpress_categories` row owned by the caller **and** scoped to this generation's own `project_id` — cross-project assignment is rejected (`invalid_request`), since a category's `wp_category_id` mapping is only meaningful for the WordPress site connected to its own project. Purely a local update: if the article already has a `wp_post_id`, the new category is not pushed to WordPress by this call — it only takes effect the next time `POST /api/wordpress/[id]/publish` runs.
+
+## Response
+
+```json
+{ "data": { "article": { "...": "full wordpress_articles row" } }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+forbidden
+```
+
+---
+
 # POST /api/wordpress/[id]/publish
 
 Publish an article to its project's connected WordPress site via the REST API (TASK-035). `[id]` is the `wordpress_generations.id`, matching the existing `DELETE /api/wordpress/[id]`.
@@ -499,7 +532,7 @@ Publish an article to its project's connected WordPress site via the REST API (T
 2. Uploads internal/body images to the WP media library, rewriting their URLs in the post content on success — a failure on any individual internal image is non-fatal, the original (already public) Supabase Storage URL is kept in the content instead.
 3. Resolves the article's mapped WordPress category (`wp_category_id`); an unmapped category is omitted from the payload (WordPress defaults to "Uncategorized"), non-fatal.
 4. Computes `status`/`date` from `mode` and calls `POST /wp-json/wp/v2/posts` (or `POST /wp-json/wp/v2/posts/{id}` to update, if `wp_post_id` is already set — falling back to create on a 404).
-5. Persists `wp_post_id` / `publish_status` / `published_at`, or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
+5. Persists `wp_post_id` / `publish_status` / `published_at` / `scheduled_at` (migration 020, TASK-FIX-007 — the WP-side target datetime, only set for `mode: "schedule"`, cleared otherwise), or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
 
 ## Request
 

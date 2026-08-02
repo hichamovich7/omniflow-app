@@ -8,6 +8,8 @@ import { PageContainer } from '@/components/ui/page-container';
 import { ArticleContent } from '@/components/wordpress/article-content';
 import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
 import { PublishControl } from '@/components/wordpress/publish-control';
+import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
+import { ArticleCategoryEditor } from '@/components/wordpress/article-category-editor';
 import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -29,6 +31,12 @@ export default async function WordPressArticlePage({
   }
 
   const wordpressSite = await getWordPressSiteByProjectId(supabase, generation.project_id);
+
+  const { data: categories } = await supabase
+    .from('wordpress_categories')
+    .select('id, project_id, name, wp_category_id')
+    .eq('project_id', generation.project_id)
+    .order('name');
 
   const langLabel = LANGUAGE_LABELS[generation.language as SupportedLanguage] ?? generation.language;
 
@@ -60,6 +68,7 @@ export default async function WordPressArticlePage({
                 {generation.status}
               </Badge>
             </div>
+            {article && <WpSendStatusBadge article={article} siteUrl={wordpressSite?.site_url} />}
           </div>
         </div>
       </div>
@@ -76,6 +85,14 @@ export default async function WordPressArticlePage({
               filename={`${article.slug}.md`}
             />
           )}
+
+          <ArticleCategoryEditor
+            generationId={id}
+            projectId={generation.project_id}
+            categories={categories ?? []}
+            initialCategoryId={article.category_id}
+            hasWpPostId={!!article.wp_post_id}
+          />
 
           {article.featured_image_url && (
             // eslint-disable-next-line @next/next/no-img-element

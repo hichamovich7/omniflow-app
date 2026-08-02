@@ -41,10 +41,11 @@ export interface WordPressArticle {
   wp_post_id: number | null;
   publish_status: WordPressPublishStatus;
   published_at: string | null;
+  scheduled_at: string | null;
   publish_error: string | null;
 }
 
-export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'meta_title' | 'featured_image_prompt' | 'featured_image_url' | 'category_id' | 'wp_post_id' | 'publish_status' | 'published_at' | 'publish_error'> & {
+export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'meta_title' | 'featured_image_prompt' | 'featured_image_url' | 'category_id' | 'wp_post_id' | 'publish_status' | 'published_at' | 'scheduled_at' | 'publish_error'> & {
   id?: string;
   word_count?: number;
   status?: WordPressArticleStatus;
@@ -55,6 +56,7 @@ export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' 
   wp_post_id?: number | null;
   publish_status?: WordPressPublishStatus;
   published_at?: string | null;
+  scheduled_at?: string | null;
   publish_error?: string | null;
 };
 

@@ -143,7 +143,7 @@ export const guideSections: GuideSection[] = [
       'Or generate from pins: select 1 or more pins on a Pinterest generation page and use "Generate WordPress Article" in the selection toolbar. AI identifies the pins\' common theme and writes one unified article — Project and language are taken from the pins automatically. Fewer than 3 pins still works, with a warning that the result may be thin.',
       'From pins, the featured image is always freshly generated for the article\'s unified theme; internal images (up to 3) reuse the pins\' own already-generated images instead of creating new ones.',
       'Generation runs in one request and can take up to a minute (outline, full article, then all images).',
-      'Optionally assign a Category (scoped to the Project) on either flow — this is always a manual choice, never AI-suggested. Pick "+ New Category" in the selector to create one inline, or use the small gear icon next to it to rename or delete existing categories. Leaving it unset files the article under "Uncategorized". WordPress History lets you filter by category and shows a category badge on each article.',
+      'Optionally assign a Category (scoped to the Project) on either flow — this is always a manual choice, never AI-suggested. Pick "+ New Category" in the selector to create one inline, or use the small gear icon next to it to rename or delete existing categories. Leaving it unset files the article under "Uncategorized". WordPress History lets you filter by category and shows a category badge on each article. The category can also be changed afterward, from the article page itself — useful for articles generated before a category existed yet.',
       'The article is stored as Markdown. If the Project has no WordPress connection, use Copy Markdown, Copy HTML, or Download .md to take it anywhere else. If it does, a Publish control replaces those buttons — see "WordPress Publishing" below.',
     ],
   },
@@ -160,6 +160,8 @@ export const guideSections: GuideSection[] = [
       'On an article page, use the Publish control: Save as Draft (default), Publish Now, or Schedule (pick a date and time). Featured and internal images are uploaded to your WordPress media library as part of publishing.',
       'A scheduled post is handed to WordPress itself to publish automatically at the chosen time (via WordPress\'s own cron system) — OmniFlow does not need to be open, but the exact timing depends on your site receiving traffic around that time, so it is not always publish-to-the-second.',
       'If a publish attempt fails (e.g. revoked credentials, unreachable site), the exact reason is always shown on the article page — never a silent failure. Republishing after fixing the issue updates the same WordPress post rather than creating a duplicate.',
+      'A status badge at the top of every article page — and a compact version on each WordPress History row — always shows whether it has been sent yet: "Not sent to WordPress", "Sent as Draft", "Published" (with a direct link to the live post), or "Scheduled for [date]". If you click Publish/Save as Draft/Schedule on an article that was already sent, a confirmation step reminds you when and warns that it will update the existing WordPress post rather than create a duplicate — informational, not a hard block.',
+      'Changing an article\'s category from its own page never re-publishes it automatically — if it was already sent to WordPress, the new category only takes effect the next time you publish or update it there.',
     ],
   },
 ];

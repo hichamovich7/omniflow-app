@@ -9,6 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { publishStatusToBadgeVariant } from '@/lib/utils/status';
 import type { PublishMode } from '@/lib/validations/wordpress-publish';
 import type { WordPressArticle } from '@/types/wordpress';
@@ -27,8 +35,23 @@ function getDefaultScheduledDate(): string {
 
 interface PublishControlProps {
   generationId: string;
-  article: Pick<WordPressArticle, 'id' | 'slug' | 'publish_status' | 'wp_post_id' | 'published_at' | 'publish_error'>;
+  article: Pick<
+    WordPressArticle,
+    'id' | 'slug' | 'publish_status' | 'wp_post_id' | 'published_at' | 'scheduled_at' | 'publish_error'
+  >;
   wordpressSite: { id: string; site_url: string };
+}
+
+function alreadySentMessage(
+  article: Pick<WordPressArticle, 'published_at' | 'scheduled_at'>
+): string {
+  if (article.published_at) {
+    return `This article was already sent on ${new Date(article.published_at).toLocaleString()} — this will update the existing WordPress post, not create a duplicate.`;
+  }
+  if (article.scheduled_at) {
+    return `This article is already scheduled for ${new Date(article.scheduled_at).toLocaleString()} on WordPress — this will update the existing scheduled post, not create a duplicate.`;
+  }
+  return 'This article was already sent to WordPress as a draft — this will update the existing post, not create a duplicate.';
 }
 
 export function PublishControl({ generationId, article, wordpressSite }: PublishControlProps) {
@@ -37,8 +60,18 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
   const [scheduledDate, setScheduledDate] = useState(getDefaultScheduledDate());
   const [scheduledTime, setScheduledTime] = useState('09:00');
   const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  function handleSubmitClick() {
+    if (article.wp_post_id) {
+      setConfirmOpen(true);
+      return;
+    }
+    handleSubmit();
+  }
 
   async function handleSubmit() {
+    setConfirmOpen(false);
     setLoading(true);
 
     const res = await fetch(`/api/wordpress/${generationId}/publish`, {
@@ -113,7 +146,7 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
           </div>
         )}
 
-        <Button type="button" onClick={handleSubmit} disabled={loading}>
+        <Button type="button" onClick={handleSubmitClick} disabled={loading}>
           <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
           {loading ? 'Publishing...' : MODE_LABELS[mode]}
         </Button>
@@ -138,6 +171,23 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
       {article.publish_status === 'failed' && article.publish_error && (
         <p className="text-sm text-destructive">{article.publish_error}</p>
       )}
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update the existing WordPress post?</DialogTitle>
+            <DialogDescription>{alreadySentMessage(article)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSubmit} disabled={loading}>
+              {loading ? 'Publishing...' : `Continue — ${MODE_LABELS[mode]}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

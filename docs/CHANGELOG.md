@@ -22,6 +22,25 @@ No planned changes.
 
 ---
 
+# [1.19.2] - 2026-08-02
+
+## TASK-FIX-007: WordPress send status clarity + post-hoc category assignment
+
+### Added
+
+* Migration 020 — `wordpress_articles.scheduled_at` (nullable timestamptz): the WP-side target datetime for a scheduled post, previously never persisted (`published_at` stays null for `scheduled`, by design). Set by `POST /api/wordpress/[id]/publish` on `mode: "schedule"`, cleared on any other mode.
+* New `components/wordpress/wp-send-status-badge.tsx` (`WpSendStatusBadge`) — a shared badge computing one of "Not sent to WordPress" (gray), "Sent as Draft" / "Published" / "Scheduled for [date]" (green), "Failed to send" / "Update failed" (red) from `wp_post_id`/`publish_status`/`scheduled_at`. Shown prominently at the top of `/wordpress/[id]` (with a "View on WordPress" link once `published_at` is set) and compact on every `/wordpress/history` row.
+* `components/wordpress/publish-control.tsx`: clicking Save as Draft/Publish Now/Schedule when the article already has a `wp_post_id` now opens a confirmation dialog ("This article was already sent on [date] — this will update the existing WordPress post, not create a duplicate") before submitting — informational, not blocking, since `upsertPost()` already updates cleanly rather than duplicating.
+* New `PATCH /api/wordpress/[id]` — reassigns `wordpress_articles.category_id` after generation (previously only settable at generation time). Validates the category belongs to the generation's own project (cross-project assignment rejected), ownership-checked per TASK-018's inline pattern. Purely local: if the article already has a `wp_post_id`, the new category is not pushed to WordPress until the next publish/update.
+* New `components/wordpress/article-category-editor.tsx` on `/wordpress/[id]` — the same `CategorySelect` used at generation time, editable after the fact, immediate save on change, with a note when the article was already sent that the change won't reach WordPress until the next publish.
+* `lib/validations/wordpress-article.ts`: new `updateArticleCategorySchema`.
+
+### Changed
+
+* `components/wordpress/wordpress-history-table.tsx` / `app/(dashboard)/wordpress/history/page.tsx`: the generations query now also selects `wp_post_id`/`publish_status`/`published_at`/`scheduled_at` to feed the compact send-status badge per row.
+
+---
+
 # [1.19.1] - 2026-08-02
 
 ## TASK-FIX-006: Import WordPress categories instead of requiring a manual one first

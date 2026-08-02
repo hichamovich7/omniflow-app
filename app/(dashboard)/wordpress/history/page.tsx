@@ -41,7 +41,7 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
   let query = supabase
     .from('wordpress_generations')
     .select(
-      'id, keyword, language, status, created_at, projects(name), wordpress_articles(title, word_count, wordpress_categories(name))',
+      'id, keyword, language, status, created_at, projects(name), wordpress_articles(title, word_count, wp_post_id, publish_status, published_at, scheduled_at, wordpress_categories(name))',
       { count: 'exact' }
     )
     .order('created_at', { ascending: false });

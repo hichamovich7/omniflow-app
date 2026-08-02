@@ -3,15 +3,21 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { WordPressHistoryRowActions } from './wordpress-history-row-actions';
+import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
 import { statusToBadgeVariant } from '@/lib/utils/status';
+import type { WordPressPublishStatus } from '@/types/wordpress';
 
 interface ArticleSummary {
   title: string;
   word_count: number;
+  wp_post_id: number | null;
+  publish_status: WordPressPublishStatus;
+  published_at: string | null;
+  scheduled_at: string | null;
   wordpress_categories: { name: string }[] | { name: string } | null;
 }
 
@@ -69,6 +75,7 @@ export function WordPressHistoryTable({ generations }: WordPressHistoryTableProp
             </label>
             <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
             <Badge variant="outline">{categoryName ?? 'Uncategorized'}</Badge>
+            {article && <WpSendStatusBadge article={article} compact />}
             <Link href={`/wordpress/${gen.id}`} className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{displayTitle}</p>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
