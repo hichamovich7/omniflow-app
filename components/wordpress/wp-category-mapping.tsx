@@ -115,6 +115,17 @@ export function WpCategoryMapping({
     return <p className="text-xs text-destructive">{loadError}</p>;
   }
 
+  if (categories.length === 0) {
+    return (
+      <div className="space-y-1.5 border-t border-border/60 pt-3">
+        <p className="text-xs font-medium text-muted-foreground">Map to WordPress category</p>
+        <p className="text-xs text-muted-foreground">
+          No categories yet — create one manually or import from WordPress.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1.5 border-t border-border/60 pt-3">
       <p className="text-xs font-medium text-muted-foreground">Map to WordPress category</p>

@@ -441,6 +441,54 @@ connection_failed
 
 ---
 
+# POST /api/wordpress/sites/[id]/categories/import
+
+Bulk-imports real WordPress categories as OmniFlow categories, already mapped (TASK-FIX-006). Fixes the sequencing bug where the mapping UI on `/wordpress/categories` never rendered for a project with zero OmniFlow categories — import no longer depends on one existing first.
+
+## Request
+
+```json
+{ "categoryIds": [4, 1, 5] }
+```
+
+`categoryIds` are WordPress term ids, as returned by `GET /api/wordpress/sites/[id]/categories`.
+
+## Description
+
+Re-fetches categories from the connected WordPress site server-side (never trusts client-supplied names) via the same `fetchCategories()` call as the GET endpoint, then for each selected id:
+
+* If an OmniFlow category with the same name (case-insensitive) already exists for the project, its `wp_category_id` is filled in only if it was previously unset — an existing mapping is never overwritten.
+* Otherwise, a new `wordpress_categories` row is created with `name` = the WordPress category's name and `wp_category_id` already set — no second manual mapping pass needed.
+
+## Response
+
+```json
+{
+  "data": {
+    "categories": [
+      { "id": "uuid", "project_id": "uuid", "name": "Home Decor", "wp_category_id": 4 }
+    ]
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+forbidden
+connection_failed
+```
+
+Not rate-limited — a bounded, one-shot user action (not AI-cost-incurring, not polled), same precedent as `GET /api/wordpress/sites/[id]/categories`.
+
+---
+
 # POST /api/wordpress/[id]/publish
 
 Publish an article to its project's connected WordPress site via the REST API (TASK-035). `[id]` is the `wordpress_generations.id`, matching the existing `DELETE /api/wordpress/[id]`.

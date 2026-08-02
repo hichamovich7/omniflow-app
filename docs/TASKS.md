@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02.
 
 ---
 
@@ -275,6 +275,18 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-006] Import WordPress categories instead of requiring a manual one first — 2026-08-02
+
+* Diagnosed (no fix applied in that pass): `/wordpress/categories` showed no real WordPress categories for a connected site even though "Test Connection" succeeded. Root cause traced with a throwaway script — `fetchCategories()` worked fine (HTTP 200, real categories returned); the actual bug was `components/wordpress/categories-manager.tsx` only mounting `WpCategoryMapping` when `projectCategories.length > 0` — a project with zero OmniFlow categories (the case here: none had ever been created) never rendered the mapping UI at all, so `wp_category_id` could never be set and publishing fell back to WordPress's default "Uncategorized"
+* Fix: `WpCategoryMapping` now renders whenever a site is connected, independent of category count (`categories-manager.tsx:70`, condition dropped). `wp-category-mapping.tsx` shows an explicit "No categories yet — create one manually or import from WordPress" empty state instead of an empty list under its "Map to WordPress category" header
+* New "Import from WordPress" button (next to "New Category", visible whenever a site is connected) opens `components/wordpress/wp-import-categories-dialog.tsx` — lists the site's real WordPress categories with checkboxes (all checked by default), and creates one OmniFlow category per one kept checked, `wp_category_id` already filled in — no second manual mapping pass required
+* New `POST /api/wordpress/sites/[id]/categories/import` — re-fetches categories from WordPress server-side rather than trusting client-supplied names (only the ids round-trip from the client), matches against the project's existing categories case-insensitively by name: fills in `wp_category_id` only if it was unset (an existing mapping is never overwritten), otherwise inserts a new category. Ownership check copied from the established inline pattern (TASK-018/TASK-032/TASK-035: `select → 404 → 403`), no shared helper. Not rate-limited — bounded one-shot action, same precedent as the existing `GET .../categories` endpoint, per user instruction
+* `lib/validations/wordpress-category.ts`: new `importWordPressCategoriesSchema`
+* No DB migration — reuses the existing `wordpress_categories.wp_category_id` column from TASK-035
+* `docs/API.md`, `docs/CHANGELOG.md`, `lib/guide/content.ts` updated
+
+---
 
 ## [TASK-035] WordPress REST API Publishing — 2026-07-28
 

@@ -22,6 +22,23 @@ No planned changes.
 
 ---
 
+# [1.19.1] - 2026-08-02
+
+## TASK-FIX-006: Import WordPress categories instead of requiring a manual one first
+
+### Fixed
+
+* `/wordpress/categories` never rendered the "Map to WordPress category" section for a project with zero OmniFlow categories — `components/wordpress/categories-manager.tsx` gated `WpCategoryMapping` behind `projectCategories.length > 0`, so a newly connected site with real WordPress categories (confirmed reachable via `fetchCategories()`, HTTP 200) showed nothing, and articles published without a category ended up "Uncategorized" on WordPress. `WpCategoryMapping` now renders whenever a site is connected, regardless of category count, with an explicit "No categories yet — create one manually or import from WordPress" empty state (`components/wordpress/wp-category-mapping.tsx`) instead of disappearing.
+
+### Added
+
+* "Import from WordPress" button on `/wordpress/categories`, next to "New Category", visible whenever the project has a connected site — opens a dialog listing the site's real WordPress categories (checkboxes, all checked by default), and creates a matching OmniFlow category per one kept checked, `wp_category_id` already filled in (no second manual mapping pass).
+* New `components/wordpress/wp-import-categories-dialog.tsx` (`WpImportCategoriesDialog`).
+* New `POST /api/wordpress/sites/[id]/categories/import` — re-fetches categories from WordPress server-side (never trusts client-supplied names, only the ids), matches by name (case-insensitive) against the project's existing OmniFlow categories: fills in `wp_category_id` only if it was unset (never overwrites an existing mapping), otherwise creates a new category. Ownership-checked per TASK-018's established inline pattern; not rate-limited — a bounded one-shot action, same precedent as the existing `GET .../categories` endpoint.
+* `lib/validations/wordpress-category.ts`: new `importWordPressCategoriesSchema` (`categoryIds: number[]`, min 1).
+
+---
+
 # [1.19.0] - 2026-07-28
 
 ## TASK-035: WordPress REST API Publishing
