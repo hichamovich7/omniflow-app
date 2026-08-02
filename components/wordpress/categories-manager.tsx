@@ -39,7 +39,11 @@ export function CategoriesManager({ projects, categories: initialCategories, wor
         const site = wordpressSites[project.id];
 
         return (
-          <div key={project.id} className="rounded-xl border border-border/60 bg-card p-4">
+          <div
+            key={project.id}
+            id={`project-${project.id}`}
+            className="scroll-mt-6 rounded-xl border border-border/60 bg-card p-4"
+          >
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium">{project.name}</h2>
               <div className="flex items-center gap-2">

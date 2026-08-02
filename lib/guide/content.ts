@@ -33,6 +33,7 @@ export const guideSections: GuideSection[] = [
       'One Project can be marked as default, used to pre-fill the Project selector across the app.',
       'Niche (optional) is a free-text label for the project — pick from suggestions or type your own. For a handful of supported niches (Home Organization & Decor, Personal Finance / Budgeting, Food & Recipes, Travel) it also sets the visual convention AI images follow for that project — framing (full scene vs. close-up object) and, for niches where it fits, whether pin images can include on-image text. Any other niche (or none) keeps the previous conservative default.',
       'Default Language (optional) pre-fills the Language field on the Pinterest and WordPress generation forms when this project is selected — you can always change it before generating.',
+      'Click a Project card to open its detail page: Brand Profile, WordPress connection status, quick stats (Pinterest generations, WordPress articles), and shortcuts to that Project\'s Pinterest History, WordPress History, and Categories. The "..." menu on the card still opens Edit/Delete directly, without navigating to the detail page.',
     ],
   },
   {

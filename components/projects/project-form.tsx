@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { ExpandableText } from '@/components/ui/expandable-text';
 import {
   Select,
   SelectContent,
@@ -81,6 +82,13 @@ export function ProjectForm({ mode, projectId, defaultValues, wordpressSite }: P
   const router = useRouter();
   const [name, setName] = useState(defaultValues?.name ?? '');
   const [description, setDescription] = useState(defaultValues?.description ?? '');
+  // Existing Brand Profile text starts collapsed (ExpandableText, "Read more"
+  // to expand) so a long profile doesn't dominate the form on load — clicking
+  // into it switches to the real Textarea. New/empty profiles skip this and
+  // are always directly editable.
+  const [descriptionEditing, setDescriptionEditing] = useState(
+    mode === 'create' || !defaultValues?.description
+  );
   const [niche, setNiche] = useState(defaultValues?.niche ?? '');
   const [defaultLanguage, setDefaultLanguage] = useState(defaultValues?.default_language ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -254,15 +262,33 @@ export function ProjectForm({ mode, projectId, defaultValues, wordpressSite }: P
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="description">Brand Profile (optional)</Label>
-        <Textarea
-          id="description"
-          placeholder="e.g. German Pinterest project for bathroom niche — friendly, cozy tone"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={10000}
-          rows={3}
-          disabled={loading}
-        />
+        {descriptionEditing ? (
+          <Textarea
+            id="description"
+            placeholder="e.g. German Pinterest project for bathroom niche — friendly, cozy tone"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={10000}
+            rows={3}
+            disabled={loading}
+            autoFocus={mode === 'edit'}
+          />
+        ) : (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setDescriptionEditing(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setDescriptionEditing(true);
+              }
+            }}
+            className="min-h-16 w-full cursor-text rounded-lg border border-input bg-transparent px-2.5 py-2 transition-colors hover:border-ring"
+          >
+            <ExpandableText text={description} className="text-sm" />
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           Used as context for all AI-generated content in this project.
         </p>

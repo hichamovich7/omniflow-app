@@ -200,6 +200,22 @@ Table:
 | Pins Generated |
 | Created Date   |
 
+Each Project card is a link to its detail page. The "..." menu (Edit/Delete) stays on the card and does not trigger this navigation.
+
+---
+
+## Project Detail
+
+Route:
+
+```txt
+/projects/[id]
+```
+
+Purpose:
+
+Read-only overview of a single Project: name, niche, default language, Brand Profile (truncated, expandable), WordPress connection status, quick stats (Pinterest generations, WordPress articles), and shortcut links to that Project's Pinterest History, WordPress History, and Categories (all pre-filtered to this Project). "Edit Project" links to the existing `/projects/[id]/edit` form.
+
 ---
 
 # Research

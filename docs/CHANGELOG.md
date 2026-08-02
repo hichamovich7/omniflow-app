@@ -22,6 +22,35 @@ No planned changes.
 
 ---
 
+# [1.20.0] - 2026-08-02
+
+## TASK-036: Project Detail Page + clickable Project cards + expandable Brand Profile
+
+### Added
+
+* New `app/(dashboard)/projects/[id]/page.tsx` — read-only detail page for a single Project: header (name, niche, default language, Default badge), Brand Profile (truncated via `ExpandableText`, "Edit Project" button to the existing `/projects/[id]/edit` form), WordPress connection status (connected site URL, or a "Connect WordPress" link to Edit when not connected), quick stats (Pinterest generations, WordPress articles — both scoped to this Project only), and Quick Links to `/history?project=[id]`, `/wordpress/history?project=[id]`, and `/wordpress/categories#project-[id]`.
+* New `components/ui/expandable-text.tsx` — reusable truncate-at-N-characters (default 200) text with a "Read more"/"Read less" toggle. Used on the new detail page and, in a second collapsed→editable mode, on the Brand Profile field in `project-form.tsx`.
+* New `components/projects/project-card.tsx` (`'use client'`, extracted from `app/(dashboard)/projects/page.tsx`) — the whole card is now a `Link` to `/projects/[id]`. The existing "..." actions menu (Edit/Delete) stops the click from bubbling to the card's own link (`preventDefault`/`stopPropagation` on its wrapper), so it still opens without navigating away.
+* `components/projects/project-form.tsx`: in edit mode, an existing Brand Profile starts collapsed as read-only `ExpandableText` instead of a full `Textarea` — clicking into it or its "Read more" link switches to the real, fully editable `Textarea` (auto-focused). Create mode, or an edit with no existing Brand Profile, always shows the editable `Textarea` directly — nothing to collapse.
+* `components/wordpress/categories-manager.tsx`: each project's section now has `id="project-{projectId}"` so the new detail page's "Manage Categories" link can deep-link and auto-scroll to the right project on `/wordpress/categories`.
+
+### Fixed (caught during verification, not part of the original request)
+
+* `project-card.tsx` initially shipped without `'use client'` — since it's rendered directly by the Server Component `app/(dashboard)/projects/page.tsx`, its `onClick` (the actions-menu-click guard) crashed the whole `/projects` page at runtime ("Event handlers cannot be passed to Client Component props"). Caught by the Playwright verification pass, not by `tsc`/`eslint` (neither flags this — it's a runtime RSC boundary error).
+
+### Verified
+
+* Local Playwright (Playwright MCP not connected in this environment, same substitute used in TASK-FIX-011), authenticated via the established magic-link + `verifyOtp` + session-cookie-injection technique. Confirmed: clicking a Project card navigates to its detail page; clicking its "..." menu opens Edit/Delete without navigating; the detail page's Brand Profile (3,296-char real profile) renders collapsed with "Read more", expands on click; the edit form's Brand Profile renders collapsed (not a `<textarea>`) on load and swaps to a real, focused `<textarea>` after clicking "Read more".
+* `tsc --noEmit` and `eslint` clean on all touched files.
+
+### Docs
+
+* `docs/UI_UX.md`: new "Project Detail" section under Projects; noted cards are now links.
+* `lib/guide/content.ts`: "Projects & Brand Profile" section updated with the new detail-page point.
+* `docs/TASKS.md`: TASK-036 added and marked completed.
+
+---
+
 # [1.19.6] - 2026-08-02
 
 ## TASK-FIX-011: Fix Project/Language overlap on the WordPress Generate form
