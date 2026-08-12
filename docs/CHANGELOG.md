@@ -22,6 +22,33 @@ No planned changes.
 
 ---
 
+# [1.22.0] - 2026-08-12
+
+## TASK-028 Option 3: External Source → SEO Article (research context only)
+
+### Added
+
+* Reframed before implementation: `docs/TASKS.md` Option 3 changed from "Blog URL → Rewritten/Optimized Article" to "External Source → Original SEO Article" — the source (scraped URL or pasted text) is now explicitly research context only, never text to rewrite/paraphrase closely. See `docs/DECISIONS.md` 2026-08-12 (same anti-copyright/near-duplicate-content rationale as the TASK-013 Image Analysis guardrail).
+* `lib/ai/prompts/source-context-summary.ts`: `buildSourceContextSummaryPrompt()` — extracts a structured `{ theme, topics, angles, keyPoints }` research index from raw source content, explicitly instructed to never reproduce the source's sentences, structure, or phrasing.
+* `lib/validations/wordpress.ts`: `sourceContextSummarySchema` — structural anti-reproduction guardrail (same philosophy as `imageStyleAnalysisSchema`, TASK-013): every field is a short-phrase array capped at 150 chars each, no free-text excerpt/summary field a copied sentence could land in. Also `generateArticleFromUrlSchema` (mutually-exclusive `sourceUrl` / `pastedContent`, `MAX_PASTED_CONTENT_LENGTH = 12000`).
+* `lib/wordpress/generate-article-from-url.ts`: `generateArticleFromUrl()` — scrapes a URL (reuses `scrapeUrl()`, `lib/research/providers/firecrawl.ts`, unchanged) or uses pasted text as-is, both capped at 12,000 chars; generates the source summary (FAST role); feeds it into the outline prompt as `researchNotes` — the exact same `buildWordPressOutlinePrompt`/`buildWordPressArticlePrompt` pipeline as Option 1, unchanged; generates featured + internal images fresh via `generateImage()`, never reusing source images; runs `addExternalLink()`. The source summary is never persisted, recomputed on every generation.
+* `app/api/wordpress/generate-from-url/route.ts` (`POST`, 20/hour rate limit): inserts a `wordpress_generations` row (`source_type: "url"`) with a placeholder `keyword` before generation starts, replaced with the AI-derived keyword (scraped title, or the summary's theme for pasted text) on success — keeps the stored record consistent with what was actually targeted.
+* Migration 022: `wordpress_generations.source_url` (text, nullable) — set only when the input was a link, null for pasted text. No new `source_type` enum value — `'url'` (already reserved by migration 012) covers both sub-cases.
+* `components/ui/checkbox.tsx` — new reusable Checkbox (wraps `@base-ui/react/checkbox`, same pattern as the existing Select/Input wrappers).
+* `components/wordpress/article-form.tsx`: new "Source" select (Keyword / External Source) with an "Input Type" sub-select (Link / Paste text) for External Source mode. A required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") gates the submit button in that mode. Research Notes stays Keyword-mode only.
+* `docs/DATABASE.md`, `docs/API.md`, `docs/UI_UX.md`, `docs/TASKS.md`, `lib/guide/content.ts` updated.
+
+### Changed
+
+* `lib/research/providers/firecrawl.ts`: `CONTENT_CHAR_CAP` exported (was module-private) — reused by the new generator for the pasted-text cap, single source of truth.
+* `lib/wordpress/generate-article.ts`: `TEXT_ROLE`, `WORDPRESS_IMAGE_CONFIG`, `OUTLINE_MAX_TOKENS`, `ARTICLE_MAX_TOKENS`, `ARTICLE_GENERATION_TIMEOUT_MS`, and `applyOutlineTextLimits()` exported (were module-private) — reused as-is by Option 3 rather than duplicated, since both must stay tuned identically (same prompts, same schemas). The outline/article generation logic itself is duplicated into the new file, not shared — same "reasonable duplication over premature shared abstraction" convention as Option 4 (`generateArticleFromPins`), see `docs/DECISIONS.md` 2026-07-15.
+
+### Not applied by the agent
+
+* Migration 022 — no DDL access, apply manually (same constraint as every prior migration in this project).
+
+---
+
 # [1.21.0] - 2026-08-02
 
 ## TASK-013: Image Analysis (reference image style extraction)

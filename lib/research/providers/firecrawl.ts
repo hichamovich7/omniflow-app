@@ -1,6 +1,9 @@
 import type { ResearchOutput } from '../types';
 
-const CONTENT_CHAR_CAP = 12000;
+// Exported for reuse by the WordPress "external source" generator (Option 3,
+// lib/wordpress/generate-article-from-url.ts) — pasted text is capped to the
+// exact same length Firecrawl itself already enforces on scraped content.
+export const CONTENT_CHAR_CAP = 12000;
 const SEARCH_RESULT_LIMIT = 3;
 
 interface FirecrawlScrapeResponse {

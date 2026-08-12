@@ -410,9 +410,10 @@ One row per WordPress article generation request (TASK-028, Option 1: keyword �
 | user_id     | uuid FK → profiles.id  | ON DELETE CASCADE                               |
 | keyword     | text                   |                                                  |
 | language    | text                   |                                                  |
-| source_type | text                   | `keyword` / `url` / `pins`. `keyword` (Option 1) and `pins` (Option 4) are implemented; `url` is reserved for Option 3 |
+| source_type | text                   | `keyword` / `url` / `pins`. `keyword` (Option 1), `url` (Option 3), and `pins` (Option 4) are implemented |
 | research_notes | text nullable       | Optional user-supplied SEO research, migration 013                |
 | source_pin_ids | uuid[] nullable     | Pinterest pin IDs this generation was built from (Option 4 only, migration 014). No FK on array elements — ownership of the referenced pins is validated at insert time in the API route, not enforced by the DB |
+| source_url  | text nullable          | Scraped source URL (Option 3 only, migration 022) — set only when the Option 3 input was a link; null when it was pasted text directly. Provenance only, mirrors `source_pin_ids`. The source content itself is never persisted — only a structured topics/angles/key-points summary is used, and only transiently (see `lib/wordpress/generate-article-from-url.ts`) |
 | status      | text                   | `pending` / `processing` / `completed` / `failed` |
 | created_at  | timestamptz            |                                                  |
 

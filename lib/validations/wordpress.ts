@@ -19,6 +19,44 @@ export const generateArticleFromPinsSchema = z.object({
 
 export type GenerateArticleFromPinsInput = z.infer<typeof generateArticleFromPinsSchema>;
 
+// Matches CONTENT_CHAR_CAP in lib/research/providers/firecrawl.ts — pasted
+// text is capped at the exact same length Firecrawl itself already enforces
+// on scraped content.
+export const MAX_PASTED_CONTENT_LENGTH = 12000;
+
+export const generateArticleFromUrlSchema = z
+  .object({
+    projectId: z.string().uuid('Invalid project ID'),
+    language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
+    categoryId: z.string().uuid('Invalid category ID').optional(),
+    sourceType: z.enum(['link', 'pasted'], { message: 'Invalid source type' }),
+    sourceUrl: z.string().trim().url('Invalid URL').max(2000, 'URL is too long').optional(),
+    pastedContent: z
+      .string()
+      .trim()
+      .min(1, 'Pasted content is required')
+      .max(MAX_PASTED_CONTENT_LENGTH, 'Pasted content is too long')
+      .optional(),
+  })
+  .refine((data) => data.sourceType !== 'link' || !!data.sourceUrl, {
+    message: 'A URL is required when source type is "link"',
+    path: ['sourceUrl'],
+  })
+  .refine((data) => data.sourceType !== 'pasted' || !!data.pastedContent, {
+    message: 'Pasted content is required when source type is "pasted"',
+    path: ['pastedContent'],
+  })
+  .refine((data) => !(data.sourceType === 'link' && data.pastedContent), {
+    message: 'Remove pasted content when using a URL source',
+    path: ['pastedContent'],
+  })
+  .refine((data) => !(data.sourceType === 'pasted' && data.sourceUrl), {
+    message: 'Remove the URL when using pasted content',
+    path: ['sourceUrl'],
+  });
+
+export type GenerateArticleFromUrlInput = z.infer<typeof generateArticleFromUrlSchema>;
+
 const outlineImageSchema = z.object({
   placementMarker: z.string().min(1),
   prompt: z.string().min(1),
@@ -92,3 +130,19 @@ export const wordpressArticleResponseSchema = z.object({
 });
 
 export type WordPressArticleResponse = z.infer<typeof wordpressArticleResponseSchema>;
+
+// TASK-028 Option 3 — structural anti-reproduction guardrail (same
+// philosophy as imageStyleAnalysisSchema, TASK-013): every field is a short
+// phrase array, capped at 150 chars each. There is no free-text
+// excerpt/summary field a full sentence copied from the source could land
+// in intact — see DECISIONS.md 2026-08-12.
+const sourceSummaryPhrase = z.string().min(1).max(150);
+
+export const sourceContextSummarySchema = z.object({
+  theme: sourceSummaryPhrase,
+  topics: z.array(sourceSummaryPhrase).min(4).max(8),
+  angles: z.array(sourceSummaryPhrase).min(2).max(6),
+  keyPoints: z.array(sourceSummaryPhrase).min(3).max(8),
+});
+
+export type SourceContextSummary = z.infer<typeof sourceContextSummarySchema>;

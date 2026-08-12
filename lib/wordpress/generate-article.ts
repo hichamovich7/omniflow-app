@@ -18,10 +18,13 @@ import type { SupportedLanguage } from '@/types/pinterest';
 // Centralizes the text-generation role for TASK-028 Option 1: FAST while the
 // feature is being tested for output quality. Bump to 'SMART' here alone if
 // FAST isn't good enough — every call site in this file reads this constant,
-// nothing else needs to change.
-const TEXT_ROLE: 'FAST' | 'SMART' = 'FAST';
+// nothing else needs to change. Exported: Option 3 (generate-article-from-url.ts)
+// reuses the exact same outline/article prompts and must stay on the same role.
+export const TEXT_ROLE: 'FAST' | 'SMART' = 'FAST';
 
-const WORDPRESS_IMAGE_CONFIG = {
+// Exported for reuse by Option 3 (generate-article-from-url.ts) — same image
+// pipeline, same config.
+export const WORDPRESS_IMAGE_CONFIG = {
   size: '1024x1024',
   concurrency: 3,
 } as const;
@@ -30,15 +33,17 @@ const WORDPRESS_IMAGE_CONFIG = {
 // 1800-2500 word target instead of 800-1200, plus Quick Answer/Key Takeaways/
 // Common Mistakes/FAQ as extra structured fields on the article response) —
 // the previous budgets were sized for the shorter structure and would truncate
-// the JSON response before it finished, breaking JSON.parse.
-const OUTLINE_MAX_TOKENS = 3000;
-const ARTICLE_MAX_TOKENS = 8000;
+// the JSON response before it finished, breaking JSON.parse. Exported: Option 3
+// (generate-article-from-url.ts) drives the exact same outline/article
+// generateText() calls and must stay sized identically.
+export const OUTLINE_MAX_TOKENS = 3000;
+export const ARTICLE_MAX_TOKENS = 8000;
 
 // The full-article write (10-block AEO structure, 1800-2500 words, 8000 max
 // tokens) routinely runs past the provider's default 60s fetch timeout —
 // measured at ~60-90s for this prompt, unlike the much lighter outline call
 // (~15-20s), which keeps the shared default. See DECISIONS.md 2026-07-18.
-const ARTICLE_GENERATION_TIMEOUT_MS = 120000;
+export const ARTICLE_GENERATION_TIMEOUT_MS = 120000;
 
 // Kept in sync with the max()s on wordpressOutlineSchema (lib/validations/wordpress.ts).
 const TITLE_MAX_LENGTH = 100;
@@ -62,8 +67,12 @@ interface RawOutlineTextFields {
  * `wordpressOutlineSchema.safeParse` only ever rejects genuine structural
  * problems (missing fields, wrong types) — never length overflow.
  * metaTitle falls back to a truncated `title` when the model omits it.
+ *
+ * Exported: Option 3 (generate-article-from-url.ts) validates its outline
+ * response against the same wordpressOutlineSchema and needs the identical
+ * pre-truncation step.
  */
-function applyOutlineTextLimits(raw: unknown): unknown {
+export function applyOutlineTextLimits(raw: unknown): unknown {
   if (typeof raw !== 'object' || raw === null) return raw;
   const outline = raw as RawOutlineTextFields;
 

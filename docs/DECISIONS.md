@@ -916,6 +916,34 @@ Best-effort, jamais bloquant : si `analyzeImage()` échoue ou si la réponse ne 
 
 ---
 
+## 2026-08-12
+
+### Decision
+
+TASK-028 Option 3 est reformulée avant implémentation : "Blog URL → Rewritten/Optimized Article" devient "External Source → Original SEO Article" — la source externe (lien scrapé ou texte collé) sert uniquement de contexte de recherche (sujets/angles/points couverts), jamais de texte à réécrire, optimiser ou paraphraser de près.
+
+### Context
+
+`docs/TASKS.md` documentait depuis la création de TASK-028 (migration 012) une Option 3 explicitement pensée comme une réécriture : *"existing blog post URL to rewrite or SEO-optimize"*. Un état des lieux préalable (même session) a confirmé que rien n'était implémenté (le CHECK constraint `source_type IN ('keyword', 'url', 'pins')` réserve `'url'` depuis la migration 012 mais zéro code ne l'utilise) — le cadrage était donc encore librement modifiable avant la première ligne de code.
+
+Réécrire un article à partir d'une source existante pose le même risque produit que l'analyse d'image de référence (TASK-013, décision du 2026-08-02 (4)) : plus la sortie de l'IA reste proche de la source (structure, enchaînement des idées, phrasing), plus le résultat final risque d'être une reproduction non autorisée du contenu d'un tiers. Pour du texte, ce risque a un second visage spécifique au SEO : Google pénalise le contenu proche-dupliqué ("near-duplicate content") — un article structurellement calqué sur sa source, même reformulé phrase à phrase, peut être déclassé ou considéré comme du contenu dupliqué à faible valeur ajoutée, ce qui va à l'encontre de l'objectif même du générateur WordPress (produire du contenu SEO qui se classe).
+
+### Decision Taken
+
+La source externe n'est plus jamais transmise telle quelle à l'IA de rédaction. Un prompt dédié (`lib/ai/prompts/source-context-summary.ts`) extrait d'abord un résumé structuré — `theme`, `topics`, `angles`, `keyPoints`, chaque champ une courte phrase, jamais une phrase entière recopiée de la source — avec instruction explicite : *"Extract only the topics, angles, and key points covered — NEVER reproduce sentences, structure, or phrasing from the source."* Ce résumé (jamais persisté, recalculé à chaque génération) alimente ensuite le pipeline outline → rédaction complète déjà utilisé par l'Option 1 (`wordpress-outline-prompt.ts`, `wordpress-article-prompt.ts`, structure à 10 blocs), exactement au même point d'injection que `researchNotes` (guidance libre, jamais un script rigide) — la source ne façonne donc jamais directement la structure ou le phrasing de l'article final, seulement les sujets qu'il couvre.
+
+Même philosophie que TASK-013 (garde-fou structurel plutôt que consigne de prompt seule) : le schéma Zod du résumé (`sourceContextSummarySchema`) plafonne chaque item à 150 caractères et n'autorise que des tableaux de phrases courtes — aucun champ libre `excerpt`/`summary` long où une phrase entière de la source pourrait atterrir intacte. Une réponse qui contiendrait un passage trop long échoue structurellement à `.safeParse()` avant de pouvoir atteindre le prompt de rédaction.
+
+Une confirmation utilisateur explicite est également requise côté UI avant de lancer la génération ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") — défense en profondeur, en plus du garde-fou de prompt/schéma, jamais un substitut à celui-ci.
+
+### Consequences
+
+* `docs/TASKS.md` Option 3 reformulée (ce changement) avant toute implémentation de TASK-028 Option 3
+* Nouveaux fichiers à venir dans la même session : `lib/ai/prompts/source-context-summary.ts`, `lib/wordpress/generate-article-from-url.ts`, `app/api/wordpress/generate-from-url/route.ts`, migration `source_url` sur `wordpress_generations`
+* Le Content Analyzer (TASK-024, `content-analysis-v1`) n'est pas réutilisé pour cette option — voir raison dans `docs/TASKS.md` ci-dessus — un prompt séparé est créé plutôt que d'étendre son schéma existant, pour ne pas mélanger deux objectifs différents (alignement de voix vs extraction anti-reproduction) dans un seul schéma
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

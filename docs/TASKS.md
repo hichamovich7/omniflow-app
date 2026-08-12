@@ -8,7 +8,7 @@
 
 No active task.
 
-All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02. TASK-FIX-008 (Remove duplicate H1 on WordPress-published articles) completed 2026-08-02. TASK-FIX-009 (Remove the 3-internal-image cap on the pins→article flow) completed 2026-08-02. TASK-FIX-010 (Scope the WordPress History Category filter to the selected Project) completed 2026-08-02. TASK-FIX-011 (Fix Project/Language overlap on the WordPress Generate form) completed 2026-08-02. TASK-036 (Project Detail Page + clickable Project cards + expandable Brand Profile) completed 2026-08-02. TASK-013 (Image Analysis — reference image style extraction) completed 2026-08-02, out of DEFERRED.
+All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed out of order (TASK-023 — Firecrawl was set up first, making it the natural next step; TASK-024 completed right after, closing the Research → Analyze → Generate loop). TASK-026 (Navigation Refactor) completed next, ahead of TASK-027, since it only touched the sidebar's data structure with zero route changes. TASK-029 (Rate Limit Bypass Admin Panel) completed 2026-07-14. TASK-027 (Multi-Generator Architecture) DEFERRED 2026-07-15 — see DECISIONS.md — TASK-028 built directly on top of the existing generic pieces instead. TASK-028 Option 1 (Keyword → SEO Article) completed 2026-07-15; Options 2/3 remain PLANNED. TASK-030 (Admin Dashboard) added to roadmap as PLANNED. TASK-031 (Dashboard Multi-Platform Restructure) completed 2026-07-20. TASK-032 (WordPress Categories) completed 2026-07-26. TASK-033 (Projects: truncation fix, Niche, Default Language) completed 2026-07-26. TASK-034 (Niche Visual Conventions + Text Overlay Routing) completed 2026-07-27. TASK-035 (WordPress REST API Publishing) completed 2026-07-28. TASK-FIX-006 (Import WordPress categories instead of requiring a manual one first) completed 2026-08-02. TASK-FIX-007 (WordPress send status clarity + post-hoc category assignment) completed 2026-08-02. TASK-FIX-008 (Remove duplicate H1 on WordPress-published articles) completed 2026-08-02. TASK-FIX-009 (Remove the 3-internal-image cap on the pins→article flow) completed 2026-08-02. TASK-FIX-010 (Scope the WordPress History Category filter to the selected Project) completed 2026-08-02. TASK-FIX-011 (Fix Project/Language overlap on the WordPress Generate form) completed 2026-08-02. TASK-036 (Project Detail Page + clickable Project cards + expandable Brand Profile) completed 2026-08-02. TASK-013 (Image Analysis — reference image style extraction) completed 2026-08-02, out of DEFERRED. TASK-037 (WordPress Generator Option 3: External Source → Original SEO Article — link or pasted text used as research context only, never rewritten/paraphrased closely) completed 2026-08-12, reframed from its original "rewrite a blog post" description before implementation (see DECISIONS.md).
 
 ---
 
@@ -93,7 +93,7 @@ Un nuevo generador puede añadirse reutilizando Brand Profile, Content Analyzer,
 
 ### [TASK-028] WordPress Generator
 
-#### Status: Options 1 and 4 completed (2026-07-15, 2026-07-17) — Options 2/3 PLANNED
+#### Status: Options 1 and 4 completed (2026-07-15, 2026-07-17) — Option 3 completed as TASK-037 (2026-08-12) — Option 2 PLANNED
 
 #### Note
 
@@ -119,11 +119,26 @@ Input: reference image instead of / alongside a keyword
 Depends on: TASK-013 (Image Analysis) — VISION role wiring
 ```
 
-#### Option 3 — Blog URL → Rewritten/Optimized Article (PLANNED, not implemented)
+#### Option 3 / TASK-037 — External Source → Original SEO Article (DONE 2026-08-12)
+
+Tracked as its own numbered task, TASK-037, same convention as TASK-032/TASK-035/TASK-036 (WordPress-related work that gets its own entry in Completed Tasks rather than staying folded only into this Option list) — full write-up under "[TASK-037]" in Completed Tasks below.
 
 ```txt
-Input: existing blog post URL to rewrite or SEO-optimize
-Could reuse Research (TASK-023) source_type: 'blog' fetching, and Content Analyzer (TASK-024)
+Input: an external source (a URL to scrape, or text pasted directly) used ONLY as
+research context — the topics, angles, and key points it covers, never as text to
+rewrite, optimize, or paraphrase closely. The generated article must be structurally
+and formally independent of the source (its own outline, its own wording, its own
+structure) — same guarantee as Option 1/4, just seeded by external research instead
+of a bare keyword or selected pins.
+Reframed 2026-08-12 (see DECISIONS.md) from the original "rewrite or SEO-optimize
+the blog post" framing — that framing risked unauthorized reproduction of the
+source and a near-duplicate-content SEO penalty. Same rationale as the Image
+Analysis anti-copyright guardrail (TASK-013, DECISIONS.md 2026-08-02 (4)).
+Could reuse Research (TASK-023) source_type: 'blog'/'website' fetching (the same
+Firecrawl scrape provider), but not the Content Analyzer (TASK-024) — that
+analyzer's output (theme/audience/tone/category/summary) is a voice-alignment
+classifier, not a topics/angles extractor, and carries no anti-reproduction
+instruction. A dedicated summary prompt is used instead.
 ```
 
 #### Option 4 — Selected Pins → Unified Article (DONE 2026-07-17)
@@ -279,6 +294,21 @@ Stripe Working                  ⬚ TASK-012
 * Migration 021 not applied by the agent — no DDL access (recurring constraint this session), user applies manually
 * Known accepted gap: no delete route for an uploaded-then-removed reference image before generation — the component's remove button only clears local state, the Storage object stays orphaned. Documented as accepted minor debt in `docs/DECISIONS.md` rather than building a dedicated DELETE flow for this one case
 * `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/CHANGELOG.md` updated
+
+---
+
+## [TASK-037] External Source → Original SEO Article (WordPress Generator Option 3) — 2026-08-12
+
+* Full detail lives under "[TASK-028] WordPress Generator → Option 3 / TASK-037" in the ROADMAP section above — this entry exists so the feature has its own numbered record in Completed Tasks, same convention as TASK-032/TASK-035/TASK-036 (WordPress-related work that isn't folded only into the Option list)
+* Reframed before implementation: `docs/TASKS.md` Option 3 changed from "Blog URL → Rewritten/Optimized Article" to "External Source → Original SEO Article" — the source (a scraped URL or pasted text) is research context only, never text to rewrite or paraphrase closely. See `docs/DECISIONS.md` 2026-08-12 (same anti-copyright/near-duplicate-content SEO rationale as the TASK-013 Image Analysis guardrail)
+* New `lib/ai/prompts/source-context-summary.ts` extracts a structured `{ theme, topics, angles, keyPoints }` research index — explicitly instructed to never reproduce the source's sentences, structure, or phrasing. `sourceContextSummarySchema` (`lib/validations/wordpress.ts`) is a structural anti-reproduction guardrail (same philosophy as `imageStyleAnalysisSchema`, TASK-013): every field is a short-phrase array capped at 150 chars, no free-text excerpt field a copied sentence could land in intact
+* New `lib/wordpress/generate-article-from-url.ts` reuses the exact same outline → full-article prompts/schemas/image pipeline as Option 1 (`generate-article.ts` — `TEXT_ROLE`, `WORDPRESS_IMAGE_CONFIG`, `OUTLINE_MAX_TOKENS`, `ARTICLE_MAX_TOKENS`, `ARTICLE_GENERATION_TIMEOUT_MS`, `applyOutlineTextLimits()` exported for reuse rather than duplicated) — only the `researchNotes` input differs: a generated source summary instead of user-typed notes. Orchestration itself is duplicated, not shared, matching the same "reasonable duplication over premature shared abstraction" convention already used for Option 4
+* New `POST /api/wordpress/generate-from-url` (20/hour) — inserts `wordpress_generations` (`source_type: "url"`) with a placeholder `keyword` before any scrape/AI call, replaced with the AI-derived keyword (scraped title, or the summary's theme for pasted text) once generation succeeds
+* Migration 022: `wordpress_generations.source_url` (nullable) — set only for link input, null for pasted text. No new `source_type` enum value, `'url'` already covers both sub-cases
+* New `components/ui/checkbox.tsx` (wraps `@base-ui/react/checkbox`, same pattern as the other `components/ui/` primitives). `components/wordpress/article-form.tsx` gained a Source select (Keyword / External Source) with a Link/Paste-text sub-select and a required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") gating submit
+* Verified: `tsc --noEmit`, `eslint`, and `next build` all pass. The source-summary prompt was also exercised live (throwaway script, deleted after use) against a hand-written test article — output validated against the schema and manually checked for zero verbatim sentence reuse from the source
+* Migration 022 not applied by the agent — no DDL access (recurring constraint this project), apply manually
+* `docs/DATABASE.md`, `docs/API.md`, `docs/UI_UX.md`, `docs/CHANGELOG.md`, `docs/DECISIONS.md`, `lib/guide/content.ts` updated
 
 ---
 

@@ -12,16 +12,19 @@ export interface WordPressGeneration {
   source_type: WordPressSourceType;
   research_notes: string | null;
   source_pin_ids: string[] | null;
+  /** Scraped source URL when source_type is 'url' and the input was a link — null for pasted text (migration 022). */
+  source_url: string | null;
   status: WordPressGenerationStatus;
   created_at: string;
 }
 
-export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids'> & {
+export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url'> & {
   id?: string;
   status?: WordPressGenerationStatus;
   source_type?: WordPressSourceType;
   research_notes?: string | null;
   source_pin_ids?: string[] | null;
+  source_url?: string | null;
 };
 
 export interface WordPressArticle {

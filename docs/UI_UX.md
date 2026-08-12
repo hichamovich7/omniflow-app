@@ -566,7 +566,7 @@ Downloads Pinterest-compatible CSV.
 
 ---
 
-# WordPress Generator (TASK-028, Option 1)
+# WordPress Generator (TASK-028, Options 1 and 3)
 
 Route:
 
@@ -574,7 +574,14 @@ Route:
 /wordpress
 ```
 
-Same page structure as the Pinterest Generator form. Fields: Keyword (text, required), Project (select), Language (select) — no Pins/Board fields, no Research/Analyze passthrough (Option 1 starts from a bare keyword). Submit button reads "Generate Article" and its loading label warns generation can take up to a minute (2 AI text calls + up to 4 image calls, synchronous).
+Same page structure as the Pinterest Generator form. A "Source" select at the top switches between two modes — no Pins/Board fields, no Research/Analyze passthrough in either mode (both start fresh, not from a Research result):
+
+* **Keyword** (Option 1, default): Keyword (text, required), Research Notes (textarea, optional, free-text SEO guidance), Project (select), Language (select).
+* **External Source** (Option 3): a second "Input Type" select — **Link** (URL field) or **Paste text** (textarea, 12,000-character cap shown live under the field) — followed by a short explanatory line ("Used only as research context...") and a required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") that gates the submit button. Research Notes is not shown in this mode — its role is filled by an AI-generated summary of the source instead. Project and Language selects are shared with Keyword mode.
+
+Submit button reads "Generate Article" and its loading label warns generation can take up to a minute (2-3 AI text calls + up to 4 image calls, synchronous) — an extra summary call for External Source mode.
+
+Selected-pins mode (Option 4) is a separate entry point (reached via "Generate WordPress Article" from a Pinterest generation's selection toolbar, `?pinIds=` query param), not part of this Source toggle.
 
 ---
 
@@ -1024,7 +1031,7 @@ Generation workflow optimized for desktop.
 
 ## Planned (in roadmap)
 
-* WordPress Generator — Options 2/3 (TASK-028, Option 1 implemented)
+* WordPress Generator — Option 2 (TASK-028, Options 1, 3, and 4 implemented)
 * Admin Dashboard — Users & Roles (TASK-030)
 
 ## Not MVP

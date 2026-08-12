@@ -65,6 +65,7 @@ Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit(
 | POST /api/research                    | 60 / hour  |
 | POST /api/analyze                     | 60 / hour  |
 | POST /api/wordpress/generate          | 20 / hour  |
+| POST /api/wordpress/generate-from-url | 20 / hour  |
 | POST /api/wordpress/sites/test        | 30 / hour  |
 | POST /api/wordpress/[id]/publish      | 15 / hour  |
 
@@ -210,7 +211,7 @@ Generate a WordPress SEO article (TASK-028, Option 1: keyword → article).
 
 Creates one `wordpress_generations` row and synchronously produces a full article: an outline is planned first (title, slug, meta description, H2 sections, featured + 2-3 internal image prompts), then the full Markdown body is written from that outline, then all images are generated and their `{{IMAGE_N}}` markers resolved into the Markdown before the `wordpress_articles` row is written. A single request can take up to ~60 seconds (2 text calls + up to 4 image calls, no async job queue — see RULES.md Rule #15, deferred).
 
-Options 2 (reference image) and 3 (rewrite from a blog URL) are not implemented — only `source_type: "keyword"` is accepted.
+Option 2 (reference image) is not implemented. Option 3 (external source → article) is implemented as a separate route, `POST /api/wordpress/generate-from-url` (see below) — this route only ever accepts `source_type: "keyword"`.
 
 ## Request
 
@@ -254,6 +255,79 @@ server_error
 ```
 
 If image generation partially fails, the article still completes — failed markers are stripped from the content rather than left as raw `{{IMAGE_N}}` text, and `wordpress_article_images.url` / `wordpress_articles.featured_image_url` are `null` for the images that failed.
+
+---
+
+# POST /api/wordpress/generate-from-url
+
+Generate a WordPress SEO article from an external source (TASK-028, Option 3: URL or pasted text → article, DECISIONS.md 2026-08-12).
+
+## Description
+
+The external source (a scraped URL, or text pasted directly) is used **only as research context** — a structured summary of its topics, angles, and key points, extracted by a dedicated prompt (`lib/ai/prompts/source-context-summary.ts`) explicitly instructed to never reproduce the source's sentences, structure, or phrasing. That summary feeds into the exact same outline → full-article pipeline as `POST /api/wordpress/generate` (Option 1) — same prompts, same 10-block AEO structure, same image generation. The source content itself is never persisted, and the generated article is never a rewrite or close paraphrase of it.
+
+Creates one `wordpress_generations` row (`source_type: "url"`) immediately, before any scrape/AI call, with a placeholder `keyword` (the raw URL, or the first line of the pasted text) — replaced with an AI-derived keyword (from the scraped page title, or the summary's own theme for pasted text) once generation succeeds, so the stored record matches what was actually targeted.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "language": "en",
+  "categoryId": "uuid",
+  "sourceType": "link",
+  "sourceUrl": "https://example.com/blog/post-title"
+}
+```
+
+Or, for pasted text:
+
+```json
+{
+  "projectId": "uuid",
+  "language": "en",
+  "sourceType": "pasted",
+  "pastedContent": "..."
+}
+```
+
+`categoryId` is optional. `sourceType` is `"link"` or `"pasted"` — exactly one of `sourceUrl` (required for `"link"`, max 2000 chars) / `pastedContent` (required for `"pasted"`, max 12000 chars — same cap the Firecrawl scrape provider already enforces) must be present, never both.
+
+There is no `keyword` or `researchNotes` field — both Option 1 fields are inapplicable here (the keyword is derived server-side, and the "research notes" fed into the outline prompt are the AI-generated source summary, not free user text).
+
+## Response
+
+Same shape as `POST /api/wordpress/generate`:
+
+```json
+{
+  "data": {
+    "generationId": "uuid",
+    "status": "completed"
+  },
+  "error": null
+}
+```
+
+## Credits
+
+Not yet enforced — same as `/api/wordpress/generate`.
+
+## Possible Errors
+
+```txt
+unauthorized
+forbidden
+rate_limited
+invalid_json
+invalid_request
+invalid_project
+invalid_category
+generation_failed
+server_error
+```
+
+`generation_failed` covers both scrape failures (e.g. the source site blocks automated access, returns no readable content, or isn't supported by the scrape provider — same classification as `POST /api/research`) and AI generation failures (same classification as `POST /api/wordpress/generate`).
 
 ---
 
