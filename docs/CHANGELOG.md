@@ -22,6 +22,35 @@ No planned changes.
 
 ---
 
+# [1.23.0] - 2026-08-28
+
+## TASK-FIX-013: Collapsible Pinterest/WordPress sidebar groups
+
+### Added
+
+* `components/ui/collapsible.tsx`: new reusable `Collapsible`/`CollapsibleTrigger`/`CollapsiblePanel` (wraps `@base-ui/react/collapsible`, same wrapper conventions as `dropdown-menu.tsx`) — no equivalent existed before, checked first per the task's instruction.
+* `components/layout/sidebar.tsx`: the Pinterest and WordPress sidebar sections are now independently collapsible (not an accordion — opening one never closes the other). Pinterest contains Generate/Boards/History; WordPress contains Generate/History/Categories (reordered from Generate/Categories/History). Research is pulled out of the Pinterest group and rendered as a standalone top-level link — see `docs/DECISIONS.md` (2026-08-28) for why (anticipates a future "SPY Tools" module). Dashboard/Projects, the disabled Platforms items, and Account remain flat, ungrouped.
+* Open/closed state persists to `localStorage` (`omniflow:sidebar-groups`, via `useSyncExternalStore`) and is restored on reload; whichever group contains the active route always renders open on load, independent of its stored/persisted state for the other group.
+
+---
+
+# [1.22.1] - 2026-08-28
+
+## TASK-FIX-012: User avatar dropdown menu — Settings link, Credits display, Sign Out
+
+### Changed
+
+* `components/layout/user-menu.tsx`: the avatar's `DropdownMenu` already existed (TASK-003) and was reused as-is. Added a Credits row (email → Credits → Settings → Sign Out), sourced from the same `creditsBalance` prop the Topbar already had — now also passed down into `UserMenu` (`components/layout/topbar.tsx`). Inline comment marks the Credits value as display-only/non-functional until TASK-011 (Credits System) is implemented.
+* "Settings" changed from a `disabled` dead item to `router.push('/settings')` (existing "Coming soon" placeholder page, not built out here).
+* Sign Out unchanged — already a real `supabase.auth.signOut()` + redirect to `/login`.
+* Playwright MCP not connected in this environment; user opted to verify manually rather than use a local Playwright substitute.
+
+### Fixed
+
+* `components/layout/user-menu.tsx`, `components/history/wordpress-usage-badge.tsx`: `DropdownMenuLabel` used without a parent `DropdownMenuGroup` threw `Base UI: MenuGroupContext is missing` at runtime — `Menu.GroupLabel` requires a `Menu.Group` ancestor. Fixed by wrapping each `DropdownMenuLabel` in a `DropdownMenuGroup`; the `wordpress-usage-badge.tsx` instance was an existing latent bug found by inspection, not a separate report.
+
+---
+
 # [1.22.0] - 2026-08-12
 
 ## TASK-028 Option 3: External Source → SEO Article (research context only)

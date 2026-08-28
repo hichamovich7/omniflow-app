@@ -18,7 +18,7 @@ export function Topbar({ email, creditsBalance }: TopbarProps) {
             {creditsBalance} credits
           </span>
         )}
-        <UserMenu email={email} />
+        <UserMenu email={email} creditsBalance={creditsBalance} />
       </div>
     </header>
   );

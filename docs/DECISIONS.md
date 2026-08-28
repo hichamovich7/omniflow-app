@@ -944,6 +944,28 @@ Une confirmation utilisateur explicite est également requise côté UI avant de
 
 ---
 
+## 2026-08-28
+
+### Decision
+
+En transformant les sections Pinterest et WordPress de la sidebar en groupes repliables (`components/layout/sidebar.tsx`), "Research" reste un item top-level, hors du groupe repliable Pinterest — il n'est pas imbriqué sous Generate/Boards/History.
+
+### Context
+
+Research est aujourd'hui fonctionnellement lié à Pinterest (c'est la première étape du flow Research → Analyze → Generate, TASK-023/TASK-024), donc l'imbriquer sous le groupe repliable Pinterest aurait été l'option la plus évidente. Mais Research est prévu pour rejoindre un futur module "SPY Tools" plus large (analyse concurrentielle, pas seulement un input pour la génération Pinterest) — ce module n'existe pas encore et n'est pas planifié en détail (pas d'entrée TASKS.md dédiée à ce stade), mais la structure de navigation ne doit pas présupposer qu'il restera un sous-item de Pinterest.
+
+### Decision Taken
+
+Research reste un lien plat, en dehors de tout groupe repliable, positionné entre la section Workspace et le groupe Pinterest. Si Research était imbriqué sous Pinterest maintenant, le sortir plus tard vers un module SPY Tools obligerait à casser l'emplacement que les utilisateurs ont appris (potentiellement en le faisant disparaître d'un groupe qu'ils ont l'habitude de replier), plutôt que de simplement lui donner sa propre section le moment venu.
+
+### Consequences
+
+* `components/layout/sidebar.tsx` : `researchItem` déclaré séparément de `collapsibleGroups`, rendu sans groupe/label au-dessus
+* Aucun module "SPY Tools" créé ou planifié ici — seule la position de Research dans la sidebar anticipe son futur déplacement, rien d'autre n'est implémenté ou promis
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

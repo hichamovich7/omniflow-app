@@ -5,6 +5,7 @@ import { FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -32,7 +33,9 @@ export function WordPressUsageBadge({ usedPinCount, totalPinCount, articles }: W
         {usedPinCount}/{totalPinCount} pins → WordPress
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Used in</DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Used in</DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {articles.map((article) => (
           <DropdownMenuItem
