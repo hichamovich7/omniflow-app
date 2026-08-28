@@ -966,6 +966,36 @@ Research reste un lien plat, en dehors de tout groupe repliable, positionné ent
 
 ---
 
+## 2026-08-28 (2)
+
+### Decision
+
+Un bandeau "Save the Pin!" (call-to-action incitant à enregistrer l'épingle) est ajouté à chaque image de pin générée, systématiquement, via une instruction dans le prompt image — pas via un calque graphique ajouté après génération.
+
+### Context
+
+Demande utilisateur, à partir d'un exemple visuel (ruban rose "Save the Pin! So you can make it later!"). Deux approches possibles :
+1. Calque fixe (PNG/SVG) composé après génération via un traitement d'image (`sharp`) — rendu identique et fiable à chaque fois, mais nécessite un nouvel asset/design et une nouvelle étape technique (aucune compositing d'image n'existe aujourd'hui dans le pipeline).
+2. Instruction dans le prompt image, comme le mécanisme existant `overlayText`/`visualFormat` (TASK-034) — rendu variable d'un pin à l'autre, mais zéro nouvelle infrastructure.
+
+L'utilisateur a choisi l'option 2 (IA), appliquée à tous les pins toujours (pas une option par génération).
+
+### Decision Taken
+
+`lib/ai/prompt-engine/engine.ts` (`buildImagePrompt()`) ajoute désormais, pour **tout** pin (indépendamment de `visual_format`), une instruction demandant à l'IA de rendre le texte exact du message "save the pin" en petit bandeau près du bas de l'image, sans couvrir le sujet principal. Le message est localisé dans la langue du pin (`lib/ai/prompt-engine/save-pin-message.ts`, en/de/es/fr, repli sur l'anglais), cohérent avec le reste du contenu déjà localisé par pin.
+
+Les deux presets `NEGATIVE_CONSTRAINTS`/`NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` (`presets.ts`) interdisaient auparavant tout texte (mode photo) ou tout texte au-delà du seul hook demandé (mode text-overlay) — les deux ont dû être ajustés pour autoriser explicitement ce nouveau bandeau (un seul texte en mode photo, deux textes nommément en mode text-overlay), sinon l'instruction se serait retrouvée en contradiction directe avec la contrainte négative juste en dessous d'elle dans le même prompt. `IMAGE_PROMPT_ID` passé à `v3` pour refléter ce changement de comportement.
+
+### Consequences
+
+* Nouveau fichier `lib/ai/prompt-engine/save-pin-message.ts`
+* `lib/ai/prompt-engine/engine.ts` : `PinterestPackage` gagne un champ `language: string` (déjà présent sur `Pin`, `types/database.ts` — aucun changement de schéma)
+* Comme pour le hook de titre existant, le rendu du bandeau (position, lisibilité, style exact du ruban) dépend du modèle d'image et n'est pas garanti pixel-parfait à chaque génération — accepté comme compromis du choix "IA plutôt que calque fixe"
+* Aucune nouvelle dépendance, aucune nouvelle étape de traitement d'image, aucun nouvel asset
+* `lib/guide/content.ts`, `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

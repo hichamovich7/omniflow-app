@@ -62,6 +62,7 @@ const NICHE_SUGGESTIONS = [
   'Pets',
   'Travel',
   'Food & Recipes',
+  'Crochet',
 ];
 
 const NO_DEFAULT_LANGUAGE = 'none';

@@ -49,6 +49,12 @@ export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
     styleGuidance:
       'Wide establishing shots of destinations, landscapes, or architecture shown in their real surrounding context. Golden hour or soft natural light.',
   },
+  Crochet: {
+    framingMode: 'object',
+    allowTextOverlay: true,
+    styleGuidance:
+      'Close-up craft photography of a finished crochet or knit piece — amigurumi, blanket, garment, or accessory — showing stitch texture and detail, optionally with yarn skeins or a hook nearby. Soft, warm, cozy lighting. Overhead or 45-degree framing only.',
+  },
 };
 
 export function getNicheVisualConvention(niche: string | null | undefined): NicheVisualConvention | null {

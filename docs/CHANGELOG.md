@@ -22,6 +22,30 @@ No planned changes.
 
 ---
 
+# [1.24.0] - 2026-08-28
+
+## TASK-FIX-014: "Save the Pin" call-to-action banner on every generated pin image
+
+### Added
+
+* Every generated pin image now includes a small "Save the Pin!" call-to-action banner near the bottom edge, localized to the pin's language (en/de/es/fr) — `lib/ai/prompt-engine/save-pin-message.ts`. Always on, not configurable per generation.
+* `lib/ai/prompt-engine/engine.ts` (`buildImagePrompt()`): the banner instruction is appended unconditionally (regardless of `visual_format`), alongside the pre-existing conditional title-hook overlay.
+* `lib/ai/prompt-engine/presets.ts`: `NEGATIVE_CONSTRAINTS` and `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` loosened to explicitly permit this one additional text element (they previously banned it outright). `IMAGE_PROMPT_ID` bumped to `v3`.
+* `lib/guide/content.ts` (Generate/Pinterest section) updated.
+
+---
+
+# [1.23.1] - 2026-08-28
+
+## Niche: Crochet
+
+### Added
+
+* `components/projects/project-form.tsx`: "Crochet" added to `NICHE_SUGGESTIONS` (curated autocomplete suggestions for the Project niche field — free text was already accepted regardless).
+* `lib/ai/niche-visual-conventions.ts`: matching `NICHE_VISUAL_CONVENTIONS` entry — `framingMode: 'object'`, `allowTextOverlay: true`, close-up craft photography guidance (finished piece, stitch texture, warm lighting) for Pinterest image generation.
+
+---
+
 # [1.23.0] - 2026-08-28
 
 ## TASK-FIX-013: Collapsible Pinterest/WordPress sidebar groups
