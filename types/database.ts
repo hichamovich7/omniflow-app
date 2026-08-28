@@ -7,6 +7,8 @@ export interface Profile {
   role: UserRole;
   credits_balance: number;
   plan: 'free' | 'starter' | 'pro';
+  /** Lifetime trial usage cap counter (migration 023) — distinct from credits_balance. */
+  total_generations_used: number;
   created_at: string;
   updated_at: string;
 }
@@ -80,10 +82,14 @@ export interface Pin {
   updated_at: string;
 }
 
-export type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at' | 'credits_balance' | 'plan' | 'role'> & {
+export type ProfileInsert = Omit<
+  Profile,
+  'created_at' | 'updated_at' | 'credits_balance' | 'plan' | 'role' | 'total_generations_used'
+> & {
   credits_balance?: number;
   plan?: Profile['plan'];
   role?: UserRole;
+  total_generations_used?: number;
 };
 
 export type ProjectInsert = Omit<Project, 'id' | 'created_at' | 'updated_at' | 'is_default'> & {

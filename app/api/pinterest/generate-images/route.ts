@@ -5,7 +5,7 @@ import { generateImage } from '@/lib/ai/engine';
 import { buildImagePrompt, IMAGE_PROMPT_ID } from '@/lib/ai/prompt-engine/engine';
 import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
 
@@ -27,12 +27,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/generate-images', 20, 3600);
+  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/generate-images', 20, 3600, {
+    enforceTrialLimit: true,
+  });
   if (!rateLimit.allowed) {
-    return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },
-      { status: 429 }
-    );
+    return rateLimitErrorResponse(rateLimit);
   }
 
   let body: unknown;

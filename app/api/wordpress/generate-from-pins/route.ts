@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromPins } from '@/lib/wordpress/generate-article';
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
@@ -89,12 +89,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'wordpress/generate-from-pins', 20, 3600);
+  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'wordpress/generate-from-pins', 20, 3600, {
+    enforceTrialLimit: true,
+  });
   if (!rateLimit.allowed) {
-    return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },
-      { status: 429 }
-    );
+    return rateLimitErrorResponse(rateLimit);
   }
 
   let body: unknown;

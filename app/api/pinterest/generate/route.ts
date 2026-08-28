@@ -10,7 +10,7 @@ import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { buildImageAnalysisContext } from '@/lib/vision/context';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 
 function classifyGenerationError(err: unknown): string {
@@ -59,12 +59,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/generate', 60, 3600);
+  const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/generate', 60, 3600, {
+    enforceTrialLimit: true,
+  });
   if (!rateLimit.allowed) {
-    return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: 'Rate limit exceeded. Try again later.', code: 'rate_limited' } },
-      { status: 429 }
-    );
+    return rateLimitErrorResponse(rateLimit);
   }
 
   let body: unknown;

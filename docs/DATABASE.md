@@ -59,16 +59,17 @@ Extends Supabase auth.users.
 
 ## Columns
 
-| Column          | Type          | Description                   |
-| --------------- | ------------- | ----------------------------- |
-| id              | uuid PK       | References auth.users.id      |
-| email           | text          | User email                    |
-| name            | text nullable | Display name                  |
-| role            | text          | user / admin / superadmin     |
-| credits_balance | integer       | Available credits             |
-| plan            | text          | free / starter / pro          |
-| created_at      | timestamptz   | Creation date                 |
-| updated_at      | timestamptz   | Last update                   |
+| Column                 | Type          | Description                   |
+| ---------------------- | ------------- | ----------------------------- |
+| id                     | uuid PK       | References auth.users.id      |
+| email                  | text          | User email                    |
+| name                   | text nullable | Display name                  |
+| role                   | text          | user / admin / superadmin     |
+| credits_balance        | integer       | Available credits             |
+| plan                   | text          | free / starter / pro          |
+| total_generations_used | integer       | Lifetime count of AI-cost-incurring generation calls (migration 023, default 0) — backs the lightweight trial usage cap, distinct from `credits_balance`/the future Credits System. See `api_rate_limits` below and `docs/DECISIONS.md` |
+| created_at             | timestamptz   | Creation date                 |
+| updated_at             | timestamptz   | Last update                   |
 
 ## Purpose
 
@@ -633,6 +634,10 @@ increment_rate_limit(p_user_id uuid, p_endpoint text, p_window_start timestamptz
 ```
 
 Upserts the counter row for `(user_id, endpoint, window_start)` and returns the new count.
+
+### Related: increment_trial_usage(p_user_id uuid) RETURNS integer
+
+Not on this table — increments `profiles.total_generations_used` directly (migration 023), same atomic-UPDATE-RETURNING pattern. Not `SECURITY DEFINER`; runs under the caller's own RLS via the existing `profiles` "Users access own profile" policy (`id = auth.uid()`, migration 001). Called by `checkRateLimit()` only when a call site opts in (`enforceTrialLimit: true`), after the hourly window check above has already passed — see `docs/DECISIONS.md` for why this is a separate, lighter mechanism than the future Credits System.
 
 ## RLS
 

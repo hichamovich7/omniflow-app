@@ -22,6 +22,19 @@ No planned changes.
 
 ---
 
+# [1.25.0] - 2026-08-28
+
+## TASK-FIX-015: Lifetime trial usage cap per account
+
+### Added
+
+* `profiles.total_generations_used` (migration 023, default 0) + `increment_trial_usage()` Postgres function — a lightweight lifetime cap per account, distinct from the future Credits System (TASK-011/012, still PLANNED). See `docs/DECISIONS.md` for the cost-math rationale behind the default and how it differs from `credits_balance`.
+* `lib/rate-limit.ts`: `checkRateLimit()` takes a new optional `{ enforceTrialLimit: true }` option (opt-in per call site). When set, checks the lifetime cap in addition to the existing hourly window — configurable via `TRIAL_GENERATION_LIMIT` (default 10). Exceeding it returns `403 trial_limit_reached`, distinct from the existing `429 rate_limited`. Same `ADMIN_EMAIL`/`rate_limit_bypass` bypass as the hourly check (TASK-029) applies first. New `getTrialGenerationLimit()` and `rateLimitErrorResponse()` exports.
+* Applied to `POST /api/pinterest/generate`, `/api/pinterest/generate-images`, `/api/wordpress/generate`, `/api/wordpress/generate-from-pins`.
+* Dashboard: new banner showing "X / Y free generations used" (or a blocked-state message with the admin contact email once reached), hidden for exempt accounts.
+
+---
+
 # [1.24.0] - 2026-08-28
 
 ## TASK-FIX-014: "Save the Pin" call-to-action banner on every generated pin image

@@ -71,6 +71,19 @@ Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit(
 
 Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider. `wordpress/sites/test` and `wordpress/publish` are the exception among non-AI endpoints: both make real external HTTP requests to a third-party WordPress host OmniFlow doesn't control, with real side effects (a live post appearing/updating on the user's site), so they're rate-limited like the AI endpoints — `publish` deliberately below `wordpress/generate`'s 20/hour since a single publish can fan out into up to ~5 sequential WordPress requests (image uploads + post create/update).
 
+## Trial Usage Cap
+
+A separate, lightweight **lifetime** cap (`profiles.total_generations_used`, migration 023) — distinct from the hourly window above and from the future Credits System (TASK-011/012, still PLANNED). Same `checkRateLimit()` call, opted into per endpoint via `{ enforceTrialLimit: true }`; checked (and incremented) only after the hourly window check has already passed. Returns `403` with code `trial_limit_reached` when exceeded — a different status than the hourly `429 rate_limited`, since this is a hard per-account ceiling rather than a "try again later" throttle. Configurable via `TRIAL_GENERATION_LIMIT` (default 10; see `docs/DECISIONS.md` for the cost math behind the default and the current production value). Bypassed by the same two mechanisms as the hourly check, in the same priority order: `ADMIN_EMAIL` first, then the `rate_limit_bypass` table.
+
+Applied to:
+
+| Endpoint                              |
+| -------------------------------------- |
+| POST /api/pinterest/generate           |
+| POST /api/pinterest/generate-images    |
+| POST /api/wordpress/generate           |
+| POST /api/wordpress/generate-from-pins |
+
 ---
 
 # POST /api/pinterest/generate

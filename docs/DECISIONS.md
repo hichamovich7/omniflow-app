@@ -996,6 +996,54 @@ Les deux presets `NEGATIVE_CONSTRAINTS`/`NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` (`pr
 
 ---
 
+## 2026-08-28 (3)
+
+### Decision
+
+Ajout d'un plafond d'utilisation total (lifetime) par compte — `profiles.total_generations_used`, appliqué en plus du rate limiting horaire existant (TASK-018) sur les endpoints de génération IA. Explicitement distinct et plus léger que le futur système Credits complet (TASK-011/012, toujours PLANNED, non construit ici).
+
+### Context
+
+Objectif : protéger contre l'accumulation de coûts sur des comptes de test/essai, pas remplacer la monétisation future. Le rate limiting horaire (TASK-018) borne le débit (X requêtes/heure) mais pas le total cumulé dans le temps — un compte peut rester sous la limite horaire indéfiniment et accumuler un coût réel non borné sur sa durée de vie. `credits_balance` existe déjà sur `profiles` mais n'est reliée à aucune logique de déduction/vérification (TASK-011 toujours PLANNED) — l'utiliser directement pour ce plafond aurait pré-empté cette future implémentation avec une sémantique différente (un plafond fixe et non-rechargeable n'est pas la même chose qu'un solde de crédits consommable et rechargeable).
+
+`profiles` existe déjà (vérifié avant de créer une nouvelle table `trial_usage`) — colonne ajoutée directement dessus (migration 023) plutôt qu'une table séparée, plus simple pour un compteur global unique par compte.
+
+#### Calcul de coût justifiant la valeur par défaut
+
+Estimation approximative du pire cas par pin Pinterest généré (pas une donnée tarifaire officielle citée telle quelle — un ordre de grandeur pour dimensionner un plafond de sécurité, à re-vérifier si les tarifs providers changent) :
+
+```txt
+IMAGE (gpt-image-1, 1024×1536, palier qualité "high")  ≈ $0.17–0.19 / image
+FAST  (texte du pin — titre, description, prompt image) ≈ $0.01–0.02 / pin (part amortie du batch)
+VISION (analyse d'image de référence, optionnelle)       ≈ $0.01–0.02 / génération quand utilisée
+Marge de régénération (TASK-021 — un pin peut être régénéré plusieurs fois, chaque régénération est un nouvel appel à generate-images, donc un nouveau coût image complet)
+──────────────────────────────────────────────────────────
+Pire cas retenu, arrondi                                 ≈ $0.40 / pin
+```
+
+`TRIAL_GENERATION_LIMIT` par défaut = 10 → exposition maximale ≈ $4.00 par compte avant blocage. Volontairement resserré en production pendant la phase de test initiale via la variable d'environnement (pas en dur dans le code) : `TRIAL_GENERATION_LIMIT=3` actuellement, soit ≈ $1.20 d'exposition maximale par compte — le temps de valider le mécanisme lui-même avant de l'ouvrir plus largement.
+
+### Decision Taken
+
+`lib/rate-limit.ts` (`checkRateLimit()`) reste le point d'entrée unique — un 6ème paramètre optionnel `{ enforceTrialLimit: true }` active la vérification supplémentaire, appelée seulement après que le check horaire existant a déjà été passé (une requête déjà rejetée par le rate limit horaire ne consomme jamais de budget trial). Compteur incrémenté atomiquement via `increment_trial_usage()` (migration 023), même pattern qu'`increment_rate_limit()` (UPDATE ... RETURNING, pas de lecture-puis-écriture).
+
+Les deux mécanismes de bypass déjà en place pour le rate limiting horaire (TASK-029 : `ADMIN_EMAIL` en priorité, puis la table `rate_limit_bypass` via `is_rate_limit_bypassed()`) s'appliquent identiquement et en premier au plafond trial — aucun nouveau mécanisme de bypass créé, réutilisation intégrale de l'existant.
+
+Appliqué uniquement aux 4 endpoints de génération IA réels correspondant à la demande : `pinterest/generate`, `pinterest/generate-images`, `wordpress/generate`, `wordpress/generate-from-pins`. Un 5ème endpoint demandé, `wordpress/[id]/translate`, n'existe pas dans le code actuel (vérifié — aucune route de traduction WordPress construite à ce jour) ; non inventé, signalé à l'utilisateur plutôt que deviné ou ignoré silencieusement.
+
+Dépassement → `403` avec `code: 'trial_limit_reached'` (nouveau, distinct du `429 rate_limited` existant) — un plafond dur par compte n'est pas un "réessaie plus tard".
+
+### Consequences
+
+* Migration 023 : `profiles.total_generations_used` (integer, default 0) + fonction `increment_trial_usage(p_user_id uuid)`
+* `lib/rate-limit.ts` : `RateLimitResult` gagne un champ `reason?: 'rate_limit' | 'trial_limit'` ; nouvel export `getTrialGenerationLimit()` (source unique pour la valeur configurée, utilisée à la fois par l'enforcement et par la bannière dashboard) et `rateLimitErrorResponse()` (réponse 403/429 partagée, élimine la duplication du bloc d'erreur répété identique dans les 4 routes)
+* Dashboard (`app/(dashboard)/dashboard/page.tsx`) : bannière "X / Y free generations used" (ou message de blocage si atteint), masquée pour les comptes exemptés (mêmes deux signaux que l'enforcement — `ADMIN_EMAIL`/`rate_limit_bypass` — pour que l'UI ne mente jamais par rapport à ce qui est réellement appliqué côté serveur)
+* `types/database.ts` : `Profile.total_generations_used`, `ProfileInsert` mis à jour en conséquence
+* Aucun changement à `credits_balance`, `api_rate_limits`, ou au comportement du rate limiting horaire existant — strictement additif
+* `docs/DATABASE.md`, `docs/API.md`, `docs/CHANGELOG.md`, `docs/TASKS.md`, `.env.example` mis à jour
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

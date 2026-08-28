@@ -4,11 +4,12 @@ import { PageContainer } from '@/components/ui/page-container';
 import { StatusDot } from '@/components/ui/status-dot';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ArrowRight, FolderOpen, FileText, Sparkles } from 'lucide-react';
+import { ArrowRight, FolderOpen, FileText, Sparkles, TriangleAlert } from 'lucide-react';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
 import { statusToVariant } from '@/lib/utils/status';
+import { getTrialGenerationLimit } from '@/lib/rate-limit';
 
 interface ActivityItem {
   id: string;
@@ -24,6 +25,9 @@ interface ActivityItem {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [
     generationsResult,
@@ -33,10 +37,11 @@ export default async function DashboardPage() {
     articlesResult,
     recentPinterestResult,
     recentWordPressResult,
+    bypassResult,
   ] = await Promise.all([
     supabase.from('generations').select('id', { count: 'exact', head: true }),
     supabase.from('pins').select('id', { count: 'exact', head: true }),
-    supabase.from('profiles').select('credits_balance, name').single(),
+    supabase.from('profiles').select('credits_balance, name, total_generations_used').single(),
     supabase.from('projects').select('id', { count: 'exact', head: true }),
     supabase.from('wordpress_articles').select('id', { count: 'exact', head: true }),
     supabase
@@ -49,6 +54,10 @@ export default async function DashboardPage() {
       .select('id, keyword, language, status, created_at, projects(name), wordpress_articles(title)')
       .order('created_at', { ascending: false })
       .limit(5),
+    // Same two signals checkRateLimit() itself uses (ADMIN_EMAIL + the
+    // rate_limit_bypass table) — keeps this banner's "am I exempt" answer
+    // consistent with what actually gets enforced server-side.
+    supabase.rpc('is_rate_limit_bypassed'),
   ]);
 
   const totalGenerations = generationsResult.count ?? 0;
@@ -57,6 +66,11 @@ export default async function DashboardPage() {
   const totalArticles = articlesResult.count ?? 0;
   const credits = profileResult.data?.credits_balance ?? 0;
   const userName = profileResult.data?.name;
+
+  const isTrialExempt = user?.email === process.env.ADMIN_EMAIL || bypassResult.data === true;
+  const trialLimit = getTrialGenerationLimit();
+  const trialUsed = profileResult.data?.total_generations_used ?? 0;
+  const trialLimitReached = trialUsed >= trialLimit;
 
   const pinterestActivity: ActivityItem[] = (recentPinterestResult.data ?? []).map((gen) => {
     const projects = gen.projects as { name: string }[] | { name: string } | null;
@@ -132,6 +146,44 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Trial usage banner — lightweight lifetime cap distinct from the future
+          Credits System (TASK-011/012, still PLANNED). Hidden for admin/bypassed
+          accounts, since the cap never applies to them. See docs/DECISIONS.md. */}
+      {!isTrialExempt && (
+        <div
+          className={cn(
+            'rounded-xl border px-4 py-3',
+            trialLimitReached
+              ? 'border-destructive/20 bg-destructive/5'
+              : 'border-border/60 bg-card'
+          )}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {trialLimitReached && <TriangleAlert className="h-4 w-4 shrink-0 text-destructive" />}
+              <p className={cn('text-sm font-medium', trialLimitReached && 'text-destructive')}>
+                {trialLimitReached
+                  ? 'Free trial limit reached'
+                  : `${Math.min(trialUsed, trialLimit)} / ${trialLimit} free generations used`}
+              </p>
+            </div>
+            {trialLimitReached && (
+              <p className="text-sm text-muted-foreground">
+                Contact {process.env.ADMIN_EMAIL ?? 'the site owner'} to continue.
+              </p>
+            )}
+          </div>
+          {!trialLimitReached && (
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, (trialUsed / trialLimit) * 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quick Actions — secondary shortcuts (Generate Pinterest/WordPress above are the primary actions) */}
       <div className="grid gap-6 sm:grid-cols-3">
