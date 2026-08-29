@@ -22,6 +22,32 @@ No planned changes.
 
 ---
 
+# [1.26.0] - 2026-08-29
+
+## TASK-FIX-016: Dark mode
+
+### Added
+
+* `components/providers/theme-provider.tsx` — thin `'use client'` wrapper around `next-themes`' `ThemeProvider`, mounted in `app/layout.tsx` (`attribute="class"`, `defaultTheme="system"`, `enableSystem`). The CSS variables (`:root`/`.dark` in `app/globals.css`) and the `next-themes` dependency already existed from earlier setup but were never wired together — no new design tokens, no new dependency, purely a connection task.
+* `components/layout/user-menu.tsx`: new "Theme" submenu (`DropdownMenuSub`, between Settings and Sign Out) with a `DropdownMenuRadioGroup` — Light / Dark / System, backed by `useTheme()` from `next-themes`.
+* `<html suppressHydrationWarning>` — required by `next-themes` because its inline script (auto-injected by `ThemeProvider`) sets the `class` attribute on `<html>` before React hydrates, which would otherwise be flagged as a hydration mismatch. Confirmed present and running pre-hydration by inspecting the rendered HTML of a production build (`next build && next start`): the script reads `localStorage.theme`, falls back to `matchMedia('(prefers-color-scheme: dark)')` for `"system"`, and applies the class synchronously — no flash of unstyled/wrong-theme content.
+
+### Changed
+
+* `app/layout.tsx`: `Toaster` now imported from `@/components/ui/sonner` (the existing wrapper that already called `useTheme()` but was never actually used) instead of directly from `sonner` — toasts now follow the active theme instead of always rendering light.
+
+### Verified
+
+* `npx tsc --noEmit`, `npx eslint .` (touched files), and `npm run build` (production build) all clean.
+* Production build's rendered HTML inspected directly (`curl` against `next start`) to confirm the `next-themes` anti-FOUC script is present and wired to the `theme` `localStorage` key.
+* Visual toggle (Light/Dark/System) and readability of toasts/dialogs in both themes left to the user to verify interactively, per their request.
+
+### Docs
+
+* `docs/TASKS.md`: TASK-FIX-016 added and marked completed. No `lib/guide/content.ts` change — same precedent as TASK-FIX-012/TASK-FIX-013 (avatar menu, sidebar groups): interface chrome/preference, not a documented product capability.
+
+---
+
 # [1.25.0] - 2026-08-28
 
 ## TASK-FIX-015: Lifetime trial usage cap per account

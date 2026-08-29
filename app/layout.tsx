@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk, DM_Sans, Geist_Mono } from 'next/font/google';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
+import { ThemeProvider } from '@/components/providers/theme-provider';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -29,15 +30,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${spaceGrotesk.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${spaceGrotesk.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-screen bg-background font-sans antialiased">
-        {children}
-        <Toaster
-          richColors
-          position="bottom-right"
-          toastOptions={{ className: 'text-sm' }}
-          visibleToasts={3}
-        />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+          <Toaster
+            richColors
+            position="bottom-right"
+            toastOptions={{ className: 'text-sm' }}
+            visibleToasts={3}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

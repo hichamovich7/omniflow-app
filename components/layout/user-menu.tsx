@@ -1,15 +1,21 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { createClient } from '@/lib/supabase/client';
-import { Coins, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { Coins, LogOut, Monitor, Moon, Settings as SettingsIcon, Sun, SunMoon } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -20,6 +26,7 @@ interface UserMenuProps {
 
 export function UserMenu({ email, creditsBalance }: UserMenuProps) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -64,6 +71,28 @@ export function UserMenu({ email, creditsBalance }: UserMenuProps) {
           <SettingsIcon className="mr-2 h-3.5 w-3.5" />
           Settings
         </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <SunMoon className="mr-2 h-3.5 w-3.5" />
+            Theme
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+              <DropdownMenuRadioItem value="light">
+                <Sun className="mr-2 h-3.5 w-3.5" />
+                Light
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="dark">
+                <Moon className="mr-2 h-3.5 w-3.5" />
+                Dark
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="system">
+                <Monitor className="mr-2 h-3.5 w-3.5" />
+                System
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-3.5 w-3.5" />
