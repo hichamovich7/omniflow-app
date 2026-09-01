@@ -71,6 +71,7 @@ export const guideSections: GuideSection[] = [
       'For Projects whose Niche supports it (e.g. Personal Finance / Budgeting), a "Text in Images" selector appears: Auto lets the AI decide per pin whether its image should carry a short text overlay or stay a plain photo, Always/Never force one or the other for the whole batch.',
       'Optionally upload a Reference Image (JPG/PNG/WebP, 5MB max) to steer the visual style: the AI analyzes only its color palette, materials, mood, and lighting — never its composition or layout — and applies those as style guidance on top of (not instead of) your Project\'s Niche convention.',
       'Every generated pin image includes a small "Save the Pin!" call-to-action banner near the bottom edge, in the pin\'s own language — this is always on and not configurable per pin.',
+      'Titles and descriptions are written to earn the click: each title uses one of five proven angles (curiosity, problem/solution, listicle, discovery, or a direct promise) and varies across the batch, while descriptions build interest without giving away the full answer — so there\'s still a reason to click through.',
     ],
   },
   {

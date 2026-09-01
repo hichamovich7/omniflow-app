@@ -3,7 +3,7 @@ import type { SupportedLanguage } from '@/types/pinterest';
 import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 
-export const PROMPT_ID = 'pinterest-pins-v5';
+export const PROMPT_ID = 'pinterest-pins-v6';
 
 interface PromptContext {
   keyword: string;
@@ -122,12 +122,19 @@ ${overlayFieldInstruction}
 
 Rules:
 - Each pin must be unique. Do not repeat titles, descriptions, or image scenes.
-- Titles must be compelling and include the main keyword naturally.
-- Descriptions must include a clear call to action and relevant keywords naturally woven in.
+- Titles must use one of these 5 angles, keeping the main keyword naturally included and staying within 100 characters:
+  - Curiosity: create an information gap (e.g. "7 Modern Living Room Ideas You'll Want to Copy")
+  - Problem → Solution: name a precise problem (e.g. "Small Living Room? Try These 7 Space-Saving Ideas")
+  - Listicle: promise multiple ideas without naming them (e.g. "7 Modern Living Room Ideas for a Stylish Home")
+  - Discovery: spark the urge to find out more (e.g. "These Modern Living Rooms Look More Expensive Than They Are")
+  - Article Promise: promise exactly what the article delivers without revealing it (e.g. "7 Modern Living Room Ideas + Easy Styling Tips")
+- Across the pins in this generation, vary the title angle — choose from Curiosity, Problem→Solution, Listicle, Discovery, Article Promise, using each angle no more than twice before repeating.
+- The description must give enough information to attract interest, but not enough to satisfy the curiosity created by the title — never state the specific technique, number, or answer that the article reveals. End on an open loop that only clicking through resolves. Keep the natural keyword integration and call to action, but the CTA must point toward discovering something ("see how", "find out which"), never restate the content itself. Stay within 500 characters.
 - Keywords must be relevant to the pin topic, no duplicates across pins.
 - Board name must be a real, specific Pinterest board category.
 - Image prompts must describe a single concrete visual scene that a photographer could set up and shoot. Every image prompt must vary the setting, objects, color palette, and camera angle across pins, choosing only from: ${cameraAngles}. Never describe the same scene twice. Never include text, typography, logos, watermarks, or graphic overlays in the scene description itself — any on-image text is handled separately via overlayText, not by describing it inside image_prompt.
 - All text content (title, description, keywords, board, overlayText) must be in ${langName}. Image prompts must always be in English regardless of the content language.
+- Before finalizing, verify that title and description together never fully answer the question or reveal the complete technique — if they do, rewrite the description to remove the giveaway detail while keeping it compelling.
 
 Respond with this exact JSON structure:
 {

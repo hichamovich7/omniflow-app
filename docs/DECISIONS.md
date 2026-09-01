@@ -10,6 +10,36 @@ Añadir nuevas entradas cronológicamente.
 
 ---
 
+## 2026-09-01
+
+### Decision
+
+TASK Pinterest : framework Impression → Curiosité → Promesse → Clic (ICPC) dans title/description (pinterest-pins-v5 → v6)
+
+### Context
+
+Constat sur les générations Pinterest existantes : des pins avec de bonnes impressions mais un clic sortant faible, parce que le title et la description répondaient déjà entièrement à leur propre promesse dans le texte (le numéro, la technique ou la réponse exacte étaient donnés avant même le clic) — rien ne restait à découvrir sur l'épingle elle-même, donc aucune raison de cliquer vers l'article. La règle title précédente ("must be compelling and include the main keyword naturally") ne structurait aucun angle rédactionnel ; la règle description précédente demandait un CTA générique sans contrainte anti-spoiler.
+
+### Decision Taken
+
+`lib/prompts/pinterest-pins.ts` passe de `pinterest-pins-v5` à `pinterest-pins-v6` :
+1. La règle title est remplacée par une instruction à 5 angles avec exemples concrets (Curiosity, Problem→Solution, Listicle, Discovery, Article Promise), en gardant le mot-clé principal inclus naturellement et la limite 100 caractères.
+2. Nouvelle règle de variation : l'angle de title doit varier à travers les pins d'une même génération (chaque angle utilisé au plus deux fois avant répétition), sur le même principe que la variation déjà en place pour l'image_prompt (setting/objets/palette/angle caméra).
+3. La règle description est remplacée par l'instruction ICPC complète : donner assez d'information pour susciter l'intérêt sans jamais révéler la technique/le chiffre/la réponse exacte de l'article, se terminer sur une boucle ouverte que seul le clic résout, CTA orienté découverte ("see how", "find out which") plutôt que réénoncé du contenu. Limite 500 caractères conservée.
+4. Garde-fou explicite ajouté en fin de Rules : vérification anti-fuite avant de finaliser la sortie — si title + description révèlent ensemble la réponse complète, réécrire la description pour retirer le détail qui spoile, sans perdre en accroche.
+
+Périmètre volontairement limité : aucune modification des règles niche (`framingMode`/`styleGuidance`, lignes ~77-96), du texte-overlay (~100-109), de la variation d'image_prompt (~129 avant patch), ni du champ `keywords` (spec du champ, règle no-duplicates, contrainte de langue, schéma JSON de sortie). Le référencement interne Pinterest (keywords) n'est pas affecté par ce changement — c'est un champ indépendant du title/description dans le prompt, non dérivé de leur contenu.
+
+### Consequences
+
+* `PROMPT_ID` passe à `pinterest-pins-v6` — traçabilité pour un futur A/B test ou rollback vers v5 si le taux de clic sortant ne s'améliore pas
+* Les titles doivent maintenant piocher parmi 5 angles nommés plutôt qu'une formule libre — attendu : plus de diversité stylistique visible à travers un batch de pins généré en une fois
+* Les descriptions ne doivent plus "spoiler" leur propre title — risque à surveiller : un modèle qui respecte mal la consigne anti-fuite pourrait produire des descriptions vagues au point de perdre en pertinence SEO ; le garde-fou de vérification en fin de prompt vise à limiter ce risque mais reste une instruction déclarative, pas un contrôle programmatique côté serveur
+* Keywords, board, image_prompt, niche conventions et texte-overlay : comportement inchangé, aucune régression attendue sur le référencement Pinterest interne
+* Checkpoint git avant ce changement : tag `20260901` sur `8dceaf7` (poussé sur origin)
+
+---
+
 ## 2026-06-23
 
 ### Decision

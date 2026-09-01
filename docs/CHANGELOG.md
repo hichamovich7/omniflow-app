@@ -22,6 +22,35 @@ No planned changes.
 
 ---
 
+# [1.27.0] - 2026-09-02
+
+## TASK-FIX-017: Pinterest ICPC framework for title/description (pinterest-pins-v5 → v6)
+
+### Changed
+
+* `lib/prompts/pinterest-pins.ts` (`PROMPT_ID` `pinterest-pins-v5` → `pinterest-pins-v6`): title generation now follows 5 named angles (Curiosity, Problem→Solution, Listicle, Discovery, Article Promise) instead of a free-form "compelling" instruction, with a new rule requiring the angle to vary across a generation's pins (each angle used at most twice before repeating). Description generation now follows the Impression → Curiosité → Promesse → Clic framework: enough information to attract interest, never the specific technique/number/answer, ending on an open loop only the click resolves. New anti-leak guardrail rule requires the model to verify, before finalizing, that title+description never together give away the full answer.
+* `lib/guide/content.ts` (Generate/Pinterest section): new bullet describing the title/description click framework for end users.
+
+### Scope
+
+* Explicitly untouched: niche `framingMode`/`styleGuidance`, text-overlay field instructions, image_prompt variation rule, and the entire `keywords` field (spec, no-duplicates rule, language rule, JSON schema) — Pinterest-internal keyword/SEO signal is unaffected by this change.
+* Character limits unchanged: title 100, description 500.
+
+### Verified
+
+* **Real generation, not a simulation**: authenticated as a real user via a Playwright-driven browser against the running app, submitted the actual Pinterest Generator form — genuine `POST /api/pinterest/generate` → `generateText({ role: 'FAST' })` → real OpenRouter call to real `gpt-5-mini`, real credits/generation/transaction flow.
+* One batch of 10 pins (keyword "modern kitchen ideas", generated in German per the test project's default language). Scraped all 10 rendered pins (not a sample) from the results page.
+* Result: **10/10 pins with no spoiler** — no description revealed the specific technique/material/number the article promises; every description ended on an open loop. All 5 title angles represented across the batch (distribution imperfect but no repeated formula). Main keyword concept present naturally in all 10 titles. Keywords field: 10-15 relevant, non-duplicated items per pin, language-correct — confirmed unaffected.
+* These 10/10 real-test numbers are the baseline to compare against if `pinterest-pins-v7` is ever considered.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-01): context, decision, and scope guardrail documented.
+* `docs/TASKS.md`: TASK-FIX-017 added and marked completed, including the full real-test verification detail.
+* `lib/guide/content.ts` updated (see Changed above) — this is a user-visible change in generated content quality, same precedent as TASK-FIX-014 (Save the Pin banner).
+
+---
+
 # [1.26.0] - 2026-08-29
 
 ## TASK-FIX-016: Dark mode
