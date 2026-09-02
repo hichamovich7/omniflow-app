@@ -1135,6 +1135,124 @@ Taux de réussite réel mesuré : **1/10**. Le mécanisme "always-on" introduit 
 
 ---
 
+## 2026-09-02 (3)
+
+### Decision
+
+TASK-FIX-020 : garde-fou contre le texte incident illisible sur les accessoires de décor (carnets, livres, étiquettes)
+
+### Context
+
+Distinct du texte explicite (titre, bandeau CTA) déjà réglé par TASK-FIX-018/019 : les images générées montraient régulièrement du pseudo-texte illisible sur des accessoires de scène jamais explicitement demandés comme porteurs de texte — ex. dos de livres ("EHIRIKGTUNA", "I-MASSOM"), étiquette de bocal — observés dans les tests précédents. Cause identifiée : l'instruction `image_prompt` ([pinterest-pins.ts:120](../lib/prompts/pinterest-pins.ts)) autorisait librement "3-5 supporting objects or details" sans jamais qualifier leur état, et la styleGuidance "Personal Finance / Budgeting" ([niche-visual-conventions.ts](../lib/ai/niche-visual-conventions.ts)) suggérait littéralement "a notebook, printed charts or graphs" — des objets qui, une fois décrits positivement comme porteurs de contenu ("des notes", "un graphique"), poussent le modèle à halluciner du texte dessus, même si la contrainte négative générale ("no text of any kind") l'interdit déjà en théorie. Un ban négatif seul ne suffit pas si le prompt positif décrit l'objet dans un état qui appelle du texte.
+
+### Decision Taken
+
+Nouvelle règle dans `Rules:` ([pinterest-pins.ts:136](../lib/prompts/pinterest-pins.ts)) : tout accessoire porteur de texte par nature (carnet, livre, magazine, étiquette, panneau, graphique, papier) doit être décrit dans un état qui **implique l'absence** de texte lisible ("carnet fermé", "livres à tranches vierges", "bocal sans étiquette") plutôt qu'un état qui l'implique ("carnet avec notes manuscrites", "graphique avec chiffres") — même sans jamais citer le texte lui-même. `PROMPT_ID` → `pinterest-pins-v7`.
+
+`NICHE_VISUAL_CONVENTIONS['Personal Finance / Budgeting'].styleGuidance` corrigée en cohérence : "notebook" → "closed notebook (cover only, no visible pages)", "printed charts or graphs" → "abstract bar-chart, no numbers or labels", "banknotes" retiré (une devise porte du texte/chiffres par nature, aucune formulation ne peut l'éviter).
+
+### Consequences
+
+* Aucun changement à `overlayText`, au compositing du bandeau CTA, aux règles niche/framing/variation d'angle — vérifié ligne par ligne avant modification
+* **Validé par un vrai test réel** (TASK-FIX-021 ci-dessous, même génération) : nette amélioration mais pas une élimination à 100% — sur 10 images photo réelles, 7 sans aucun texte incident, 3 avec des marques résiduelles mineures (dos de livre en arrière-plan, étiquette de bougie) nettement plus discrètes qu'avant le correctif (comparer aux "EHIRIKGTUNA"/"I-MASSOM" du test pré-correctif). Le modèle d'image reste capable d'halluciner un peu de pseudo-texte sur des surfaces plates même sans description positive l'appelant — limite connue et acceptée, à surveiller plutôt qu'un échec du correctif
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
+## 2026-09-02 (4)
+
+### Decision
+
+TASK-FIX-021 : couleur d'accent extraite automatiquement de l'image + généralisation du compositing au titre (bandeau haut)
+
+### Context
+
+Le bandeau CTA (TASK-FIX-019) utilisait un fond gris/noir semi-opaque fixe, indépendant de l'image — fonctionnel mais générique, pas vraiment "designé" pour chaque pin. Demande : dériver une couleur d'accent de l'image elle-même pour les deux bandeaux, et appliquer le même compositing déterministe au hook de titre (`overlayText`, mode `text-overlay`), qui restait jusqu'ici rendu par l'IA (`engine.ts`, ligne "Render this exact text... on top of the image") — donc exposé au même risque déjà mesuré à 1/10 pour le bandeau CTA (TASK-FIX-019).
+
+**Choix de librairie, vérifié avant codage** : `sharp` (déjà dépendance directe) expose `.stats().dominant`, testé sur les vraies images du dernier lot — résultat systématiquement un gris/beige neutre (`{r:152,g:152,b:152}`, `{r:232,g:232,b:232}`...), la couleur la plus fréquente de l'histogramme (généralement le mur), pas un accent vibrant. `node-vibrant` corrigerait ça mais son backend Node (`@vibrant/image-node`) dépend de `Jimp` uniquement pour décoder les pixels — dupliquant ce que `sharp` fait déjà nativement et plus vite, pour un objectif (lire des pixels) déjà couvert. Décision : écrire l'algorithme de quantification + score de vibrance directement sur la sortie brute de `sharp` (downsample 64×64, `.raw()`, buckets par quantification, score = saturation×0.6 + score de luminosité médiane×0.2 + score de population×0.2 — même logique que le scoring par cible d'Android Palette/Vibrant.js, sans leur dépendance). **Zéro nouvelle librairie ajoutée** — choix confirmé avec l'utilisateur avant implémentation.
+
+### Decision Taken
+
+1. **`lib/pinterest/color-extraction.ts`** (nouveau) — `extractAccentColor(imageBuffer)` : une extraction par image (sur le buffer brut, avant tout compositing — important, car les bandeaux déjà composités biaiseraient l'histogramme vers le gris foncé). Couleur de texte (`#ffffff` ou `#141414`) choisie par calcul de luminance relative WCAG 2.0 et ratio de contraste contre blanc/noir — jamais une devinette. Garde-fous de repli explicites : `accentColor: null` (→ style neutre gris/noir existant, comportement TASK-FIX-019 inchangé) si l'extraction échoue, si aucune couleur suffisamment saturée n'est trouvée (image trop désaturée pour un vrai accent), si la couleur est trop proche du blanc/noir pur (luminosité < 0.08 ou > 0.92), ou si le meilleur contraste possible (blanc ou noir) reste sous 3:1 (minimum WCAG AA texte large — notre bandeau est en gras/grande taille).
+2. **`compositeCtaBanner` → `compositeBanner(imageBuffer, text, position: 'top' | 'bottom', accentColor, textColor)`** ([compositing.ts](../lib/pinterest/compositing.ts)) — fonction unique partagée, même style de bandeau (hauteur, marge, police, anti-débordement), seule la position et la couleur changent.
+3. **`app/api/pinterest/generate-images/route.ts`** — une extraction par image générée, réutilisée pour les deux appels (`compositeBanner(..., 'bottom', ...)` pour le CTA, puis `compositeBanner(..., 'top', ...)` pour `pin.overlay_text` **uniquement si `visual_format === 'text-overlay'`** — même condition que l'ancien rendu IA qu'il remplace).
+4. **`lib/ai/prompt-engine/engine.ts`/`presets.ts`** — l'instruction de rendu du hook de titre retirée du prompt image (symétrique à TASK-FIX-019 pour le bandeau CTA). `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY`, devenue identique à `NEGATIVE_CONSTRAINTS` une fois les deux textes déplacés en code, supprimée (dead code) — un seul `NEGATIVE_CONSTRAINTS` ("no text at all") s'applique désormais quel que soit `visualFormat`. `IMAGE_PROMPT_ID` → `pinterest-image-v5`.
+
+### Consequences
+
+* **Validé par deux vrais tests réels**, pas de simulation :
+  1. 10 pins en mode `photo` pur (pas d'`overlay_text`, donc pas de bandeau haut) — bandeau bas 10/10 avec une couleur extraite à chaque fois (aucun repli neutre déclenché), couleurs cohérentes avec chaque photo (doré, olive, orange vif, brique, crème), contraste toujours excellent (>9:1 dans tous les cas observés)
+  2. 5 pins en mode `text-overlay` forcé (niche Crochet) — **5/5 avec les deux bandeaux** (haut : hook de titre ; bas : CTA), même couleur extraite réutilisée pour les deux, tous lisibles et corrects, aucune troncature, rotation des variantes CTA confirmée
+* Ce test a aussi revalidé TASK-FIX-020 (même génération) — voir résultat détaillé dans cette entrée ci-dessus
+* Coût marginal : une extraction `sharp` locale supplémentaire par image (downsample 64×64, quelques millisecondes) — négligeable
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
+## 2026-09-02 (5)
+
+### Decision
+
+TASK-FIX-022 : correction de deux bugs racines dans `extractAccentColor()` — un artefact de saturation près du noir gagnait la couleur d'accent au lieu d'une vraie couleur représentative
+
+### Context
+
+Retour utilisateur sur un pin réel ("Quick Crochet Secrets", lapin crocheté, projet Crochet Blog EN) : les deux bandeaux étaient rendus dans un brun-taupe terne qui se fondait avec le fond en bois, alors que l'image contenait des couleurs vives sur les pelotes de laine (vert menthe, rose poudré, crème).
+
+**Diagnostic mené avant tout correctif** (rejeu de l'algorithme exact sur ce pin précis, bucket par bucket) :
+- Le bucket gagnant était `rgb(51,28,8)` — un fragment sombre du grain du bois — avec saturation HSL = **0.744**, lightness = 0.116, population = **28 px sur 2752 échantillonnés (1.0%)**, score = 0.513.
+- Un bucket bois beaucoup plus représentatif, `rgb(120,93,70)`, 200 px (**7.3%** de l'image), ne scorait que 0.360 — perdant contre le fragment à 1% malgré 7× plus de pixels.
+- Cause racine n°1 : la saturation HSL est instable près du noir — un petit écart absolu entre canaux (51 vs 8) donne une saturation relative artificiellement élevée pour ce qui n'est perceptuellement qu'une ombre, pas une couleur vibrante. Le seuil `MIN_LIGHTNESS=0.08` de l'époque laissait passer l=0.116.
+- Cause racine n°2 : le poids de la saturation (0.6) dans le score dominait totalement le poids de la population (0.2) — sans plancher minimum, un fragment de quelques dizaines de pixels pouvait mathématiquement battre une zone couvrant 200+ pixels.
+- Cause racine n°3 (distincte, également identifiée) : l'échantillonnage passait par `sharp.resize(64, 64)` avant quantification — un flou qui diluait les petites zones saturées (une pelote de laine de ~150-200px dans une photo de 1696px de large ne survit qu'à 4-7 pixels après ce redimensionnement, mélangés au tissu neutre environnant par le noyau de lissage). Mesuré : saturation max observée pour le vert menthe = 0.18, pour le rose = 0.26 — bien en dessous du gagnant à 0.744, même avant tout correctif de pondération.
+
+### Decision Taken
+
+Trois correctifs cumulés dans [`lib/pinterest/color-extraction.ts`](../lib/pinterest/color-extraction.ts), aucun changement côté hauteur/position des bandeaux (hors scope, traité séparément) :
+
+1. **`MIN_LIGHTNESS` relevé de 0.08 à 0.15** — exclut plus franchement les fragments d'ombre avant même le calcul de score.
+2. **Score de saturation amorti par la confiance de luminosité** : `dampenedSaturation = s * lightnessConfidence` où `lightnessConfidence = 1 - |l - 0.5| × 2` (même facteur que le score de luminosité déjà existant, réutilisé). Un pixel quasi-noir ou quasi-blanc ne peut plus structurellement dominer même s'il franchit le seuil minimal — sa contribution de saturation est mécaniquement écrasée par sa faible confiance de luminosité.
+3. **Plancher de population strict** : `MIN_POPULATION_RATIO = 0.02` (2%) — tout bucket sous ce seuil est **exclu de la compétition avant notation**, pas seulement sous-pondéré. Confirmé sur ce test : 28/2752 = 1.02% < 2% → aurait été exclu net.
+4. **Échantillonnage par grille de points directs, sans resize flou** — remplacement du passage par `sharp.resize(64,64)` par une lecture ponctuelle sur le buffer brut pleine résolution (`sharp(buffer).removeAlpha().raw()`, sans `.resize()`), à une grille de `96×96` coordonnées régulièrement espacées (~9 200 échantillons, calcul négligeable). Chaque point lit un pixel réel, sans moyenne/interpolation — les petites zones saturées ne sont plus diluées avant d'être vues par l'algorithme.
+
+### Consequences
+
+* **Retesté sur le pin exact qui a motivé le correctif** (même fichier, `pin-5.png`, "Quick Crochet Secrets") :
+  - Nouveau gagnant : `rgb(164,127,95)` — un ton bois brun-chaud, **241 échantillons sur 9216 (2.6%)**, saturation 0.276, lightness 0.508 (quasi médiane), contraste avec noir 5.79:1 (texte `#141414` choisi). Le fragment `rgb(73,45,22)` (équivalent à l'ancien gagnant) ne score plus que 0.234, loin derrière.
+  - Les pelotes vives (vert menthe, rose) restent sous le plancher de 2% même avec l'échantillonnage ponctuel réel (mesuré : bucket vert le plus peuplé = 22/9216 = 0.24%) — ce n'était donc pas seulement un artefact de flou, ces objets occupent réellement une trop petite portion du cadre pour dominer un accent de bandeau pleine largeur. Le nouveau gagnant est une vraie zone de bois représentative (2.6%, luminosité médiane), conforme au critère de validation ("au minimum une zone de bois plus représentative").
+* Cas déjà validés (10 pins photo pur + 5 pins text-overlay, TASK-FIX-021) non re-testés en entier ici — seul le pin ayant motivé le signalement a été utilisé pour confirmer le correctif ; un nouveau lot de test est prévu avant validation finale.
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour.
+
+---
+
+## 2026-09-02 (6)
+
+### Decision
+
+TASK-FIX-023 : hauteur des bandeaux resserrée au texte réel + marge du bandeau haut réduite au minimum, pour éviter le chevauchement avec le sujet
+
+### Context
+
+Retour utilisateur, observation directe sur le pin "Quick Crochet Secrets" (lapin) : le bandeau du haut chevauchait partiellement les oreilles du lapin, et les deux bandeaux paraissaient disproportionnellement épais par rapport au texte affiché. Pas de détection de sujet demandée (jugée trop complexe pour le besoin) — la demande était de resserrer la hauteur autour du texte réel et de réduire la marge haute au strict minimum, en s'appuyant sur les conventions de cadrage déjà en place ([niche-visual-conventions.ts](../lib/ai/niche-visual-conventions.ts)) qui gardent l'extrême bord supérieur du cadre généralement libre de sujet.
+
+### Decision Taken
+
+Dans [`lib/pinterest/compositing.ts`](../lib/pinterest/compositing.ts) :
+
+1. **Hauteur dérivée du texte réel** : `bannerHeight` n'est plus une fraction fixe de l'image (`0.09 × height`) — elle est maintenant calculée à partir de la taille de police finale (après l'ajustement anti-débordement existant) : `bannerHeight = fontSize × LINE_HEIGHT_RATIO(1.1) + 2 × verticalPadding`, avec `verticalPadding = height × 0.012`. La taille de police elle-même est inchangée (même échelle déjà validée pour la lisibilité), seul l'espace mort autour du texte est resserré.
+2. **Marge du bandeau haut réduite au minimum** : `TOP_MARGIN_RATIO = 0.008` (au lieu de `0.035` partagé avec le bas) — quasi collé au bord supérieur. `BOTTOM_MARGIN_RATIO` reste `0.035`, inchangé (déjà validé sans chevauchement lors des tests précédents).
+3. Ordre de calcul important : la hauteur du bandeau suit la taille de police *finale* (après réduction éventuelle pour tenir dans la largeur), pas une valeur indépendante — un bandeau CTA court avec un texte réduit obtient aussi une bande plus fine.
+
+**Chiffres avant/après, sur une image réelle 1696×2528** (mêmes dimensions que le pin ayant motivé le signalement) : hauteur de bandeau 227px (8.9%) → ~166px (6.6%), soit une réduction d'environ 27%. Marge du bandeau haut : 88px → 20px, soit une réduction d'environ 77%.
+
+### Consequences
+
+* **Retesté en conditions réelles** : régénération du même projet/mot-clé ("Crochet Blog EN", "5 quick crochet stitch tips for beginners", text-overlay forcé, 5 pins). Le lapin exact n'a pas été reproduit (génération d'image non déterministe, sujet libre à chaque appel) — mais les 5 pins obtenus montrent tous des bandeaux nettement plus fins, quasi collés au bord supérieur, sans chevauchement d'aucun sujet (pelotes de laine, plaid, granny square, coasters). L'amélioration est structurelle (bande plus fine + marge quasi nulle), pas spécifique à un sujet — donc transférable au cas du lapin même sans l'avoir reproduit à l'identique.
+* Le bandeau bas (CTA) suit la même réduction de hauteur mais garde sa position actuelle — pas de régression attendue, à confirmer sur un lot plus large incluant le mode photo pur (déjà prévu comme prochaine étape).
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

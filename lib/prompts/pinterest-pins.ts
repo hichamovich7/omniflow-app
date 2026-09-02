@@ -3,7 +3,7 @@ import type { SupportedLanguage } from '@/types/pinterest';
 import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 
-export const PROMPT_ID = 'pinterest-pins-v6';
+export const PROMPT_ID = 'pinterest-pins-v7';
 
 interface PromptContext {
   keyword: string;
@@ -133,6 +133,7 @@ Rules:
 - Keywords must be relevant to the pin topic, no duplicates across pins.
 - Board name must be a real, specific Pinterest board category.
 - Image prompts must describe a single concrete visual scene that a photographer could set up and shoot. Every image prompt must vary the setting, objects, color palette, and camera angle across pins, choosing only from: ${cameraAngles}. Never describe the same scene twice. Never include text, typography, logos, watermarks, or graphic overlays in the scene description itself — any on-image text is handled separately via overlayText, not by describing it inside image_prompt.
+- Any supporting object that customarily carries writing — a notebook, book, journal, magazine, label, tag, sign, chart, graph, or piece of paper — must be described in a state that implies no legible text: closed, blank, turned away from camera, or described as an abstract/textural detail (e.g. "a closed leather notebook", "a stack of blank-spined books", "an unlabeled glass jar", "a sketch with no caption"). Never describe it in a state that implies readable content (e.g. "a notebook with handwritten notes", "an open book with visible text", "a labeled jar", "a chart with numbers"), even without quoting the text itself — describing the object that way is what causes illegible pseudo-text to render on it. This is separate from overlayText and the CTA banner, which remain the only places actual on-image text is ever intentionally rendered.
 - All text content (title, description, keywords, board, overlayText) must be in ${langName}. Image prompts must always be in English regardless of the content language.
 - Before finalizing, verify that title and description together never fully answer the question or reveal the complete technique — if they do, rewrite the description to remove the giveaway detail while keeping it compelling.
 

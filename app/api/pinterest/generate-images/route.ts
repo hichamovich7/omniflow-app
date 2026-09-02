@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { generateImage, resolveImageModel } from '@/lib/ai/engine';
 import { buildImagePrompt, IMAGE_PROMPT_ID } from '@/lib/ai/prompt-engine/engine';
-import { compositeCtaBanner } from '@/lib/pinterest/compositing';
+import { compositeBanner } from '@/lib/pinterest/compositing';
+import { extractAccentColor } from '@/lib/pinterest/color-extraction';
 import { pickCtaMessage } from '@/lib/pinterest/cta-messages';
 import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
@@ -135,11 +136,24 @@ export async function POST(request: Request) {
         visualFormat: pin.visual_format,
       });
 
+      // One accent-color extraction per image, reused for both banners
+      // (TASK-FIX-020) — accentColor is null when extraction fails or yields
+      // no usable color, in which case compositeBanner falls back to the
+      // original neutral dark style.
+      const { accentColor, textColor } = await extractAccentColor(rawImageBuffer);
+
       // Deterministic code-side "save this pin" banner (TASK-FIX-018) — always
       // applied, both visualFormat 'photo' and 'text-overlay', replacing the
       // old in-prompt instruction (1/10 measured success rate on the model).
       const ctaText = pickCtaMessage(pin.language, index);
-      const imageBuffer = await compositeCtaBanner(rawImageBuffer, ctaText);
+      let imageBuffer = await compositeBanner(rawImageBuffer, ctaText, 'bottom', accentColor, textColor);
+
+      // Deterministic code-side title hook, top of the image (TASK-FIX-020) —
+      // only for visualFormat 'text-overlay' pins, same condition the AI
+      // in-prompt rendering used to gate on before it was removed.
+      if (pin.visual_format === 'text-overlay' && pin.overlay_text) {
+        imageBuffer = await compositeBanner(imageBuffer, pin.overlay_text, 'top', accentColor, textColor);
+      }
 
       const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
 

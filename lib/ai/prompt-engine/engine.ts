@@ -2,7 +2,6 @@ import { inferPhotographyStyle } from './templates/photography-styles';
 import {
   QUALITY_DIRECTIVES,
   NEGATIVE_CONSTRAINTS,
-  NEGATIVE_CONSTRAINTS_TEXT_OVERLAY,
   buildVariationDirective,
   IMAGE_PROMPT_ID,
 } from './presets';
@@ -27,7 +26,6 @@ export interface PinterestPackage {
 
 export function buildImagePrompt(pkg: PinterestPackage, version = 1): string {
   const photographyStyle = inferPhotographyStyle(pkg.board);
-  const isTextOverlay = pkg.visual_format === 'text-overlay' && !!pkg.overlay_text;
 
   const lines = [
     pkg.image_prompt,
@@ -36,23 +34,19 @@ export function buildImagePrompt(pkg: PinterestPackage, version = 1): string {
     ...QUALITY_DIRECTIVES,
   ];
 
-  if (isTextOverlay) {
-    lines.push(
-      '',
-      `Render this exact text clearly and legibly on top of the image, well-composed within the frame: "${pkg.overlay_text}"`
-    );
-  }
-
-  // The "save this pin" banner used to be requested here (see docs/DECISIONS.md
-  // 2026-08-28 (2)) but is now composited deterministically in code after
-  // generation instead — see lib/pinterest/compositing.ts and DECISIONS.md
-  // TASK-FIX-018 for why (1/10 measured success rate asking the image model).
+  // Every on-image text element — the top title hook (visualFormat
+  // 'text-overlay') and the bottom "save this pin" banner (every pin) — is
+  // now composited deterministically in code after generation instead of
+  // asked from the image model. See lib/pinterest/compositing.ts and
+  // docs/DECISIONS.md TASK-FIX-018/019/020 for why (1/10 measured success
+  // rate asking flux.2-pro to render the CTA banner in-prompt). The model is
+  // therefore never asked to render any text, on any visualFormat.
 
   if (version > 1) {
     lines.push('', buildVariationDirective(version));
   }
 
-  lines.push('', isTextOverlay ? NEGATIVE_CONSTRAINTS_TEXT_OVERLAY : NEGATIVE_CONSTRAINTS);
+  lines.push('', NEGATIVE_CONSTRAINTS);
 
   return lines.join('\n');
 }

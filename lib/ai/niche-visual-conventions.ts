@@ -35,7 +35,7 @@ export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
     framingMode: 'object',
     allowTextOverlay: true,
     styleGuidance:
-      'Styled flat-lay or desk scene: a calculator, a notebook, printed charts or graphs, stylized coins or banknotes, a small potted plant growing out of a jar of coins, a set of keys. Never depict people. Overhead or 45-degree framing only.',
+      'Styled flat-lay or desk scene: a calculator, a closed notebook or journal (cover only, no visible pages or writing), an abstract bar-chart illustration shown as plain colored bars with no numbers or labels, stylized coins, a small potted plant growing out of a jar of coins, a set of keys. Never depict people. Never depict banknotes, printed charts with numbers, or any object showing legible text or writing. Overhead or 45-degree framing only.',
   },
   'Food & Recipes': {
     framingMode: 'object',

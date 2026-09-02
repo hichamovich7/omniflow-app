@@ -22,6 +22,88 @@ No planned changes.
 
 ---
 
+# [1.31.0] - 2026-09-02
+
+## TASK-FIX-023: Banner height tightened to actual text + top banner near-zero margin
+
+### Fixed
+
+* `lib/pinterest/compositing.ts`: the top banner could overlap the subject (observed: a rabbit plush's ears) because it sat at a fixed margin from the top, and both banners carried disproportionate dead space around their text.
+* Banner height now derives from the final rendered font size (`fontSize × 1.1 + 2 × verticalPadding`) instead of a fixed fraction of the image — measured ~27% thinner on a real 1696×2528 pin (227px → ~166px).
+* Top banner margin cut from `0.035×height` to `0.008×height` (near-flush with the top edge) — measured 88px → 20px on the same image. Bottom (CTA) margin unchanged, already validated with no overlap.
+
+### Verified
+
+* Real regeneration (same project/keyword as the bug report, 5 text-overlay pins): thinner, near-flush-top banners with zero subject overlap across all 5, though the exact reported pin (a rabbit) wasn't reproduced — image generation has no seed control.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-02 (6)), `docs/TASKS.md` updated.
+
+---
+
+# [1.30.0] - 2026-09-02
+
+## TASK-FIX-022: Fix two root-cause bugs in extractAccentColor()
+
+### Fixed
+
+* `lib/pinterest/color-extraction.ts`: the scoring algorithm could pick a near-black shadow fragment (measured: `rgb(51,28,8)`, saturation 0.744, only 1.0% of sampled pixels) over a far more representative color (a wood-tone bucket at 7.3% population scored lower, 0.360 vs 0.513) — HSL saturation is unstable near black/white, and the score had no population floor to counteract it.
+* `MIN_LIGHTNESS` raised 0.08 → 0.15; saturation now dampened by lightness-confidence before scoring (`s × (1 - |l-0.5|×2)`), so a near-black/white bucket can't structurally dominate even if it clears the floor.
+* New hard floor `MIN_POPULATION_RATIO = 0.02` — a bucket under 2% of sampled pixels is excluded from scoring entirely, not just down-weighted.
+* Sampling switched from `sharp.resize(64,64)` (blurred small saturated objects into a handful of blended pixels) to direct point-sampling on the full-resolution buffer — a 96×96 grid of real, unblurred pixels.
+
+### Verified
+
+* Re-tested on the exact pin that surfaced the bug ("Quick Crochet Secrets"): new winner `rgb(164,127,95)`, a warm wood-tone at 2.6% population, lightness 0.508 — the old near-black fragment's equivalent bucket now scores 0.234, far from winning.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-02 (5)) has the full bucket-by-bucket before/after numbers. `docs/TASKS.md` updated.
+
+---
+
+# [1.29.0] - 2026-09-02
+
+## TASK-FIX-021: Automatic accent-color extraction + deterministic top title banner
+
+### Changed
+
+* `compositeCtaBanner` generalized to `compositeBanner(imageBuffer, text, position, accentColor, textColor)` — one shared function for both the top title hook and the bottom CTA banner.
+* The title hook (`overlayText`) is no longer requested from the image model — composited in code, same as the CTA banner (TASK-FIX-019). `lib/ai/prompt-engine/presets.ts`: `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` removed as dead code (now identical to `NEGATIVE_CONSTRAINTS`). `IMAGE_PROMPT_ID` → `pinterest-image-v5`.
+* `app/api/pinterest/generate-images/route.ts`: one accent-color extraction per image, reused for both banners.
+
+### Added
+
+* `lib/pinterest/color-extraction.ts` — `extractAccentColor(imageBuffer)`: quantize-then-score-by-saturation color extraction built directly on `sharp` (already a dependency), no new library. Text color chosen via WCAG 2.0 contrast ratio, never a guess. Falls back to the existing neutral dark style when extraction fails, no color is saturated enough, or contrast would be poor either way.
+
+### Verified
+
+* **Two real end-to-end tests**: 10 pins in pure photo mode — bottom banner 10/10 with a real extracted color every time, always >9:1 contrast. 5 pins with text-overlay forced — 5/5 with both top and bottom banners, same color reused, all legible.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-02 (4)) has the full library-choice reasoning and test numbers. `docs/TASKS.md` updated.
+
+---
+
+## TASK-FIX-020: Guardrail against illegible incidental text on decor props
+
+### Changed
+
+* `lib/prompts/pinterest-pins.ts` (`PROMPT_ID` → `pinterest-pins-v7`): new rule — any prop that customarily carries writing (notebook, book, label, chart, paper) must be described in a state implying no legible text, never a state implying readable content, even without quoting text.
+* `lib/ai/niche-visual-conventions.ts`: "Personal Finance / Budgeting" styleGuidance corrected — "notebook" → closed/blank, "printed charts" → abstract/unlabeled, banknotes removed.
+
+### Verified
+
+* Real test (same generation as TASK-FIX-021): 7/10 images with no incidental text at all, 3/10 with minor residual marks — a clear improvement over the pre-fix baseline, not a full elimination.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-02 (3)), `docs/TASKS.md` updated.
+
+---
+
 # [1.28.0] - 2026-09-02
 
 ## TASK-FIX-019: Deterministic code-composited "Save the Pin" CTA banner
