@@ -157,6 +157,7 @@ export interface PinImage {
   url: string;
   is_active: boolean;
   version: number;
+  image_model: string | null;
   created_at: string;
 }
 

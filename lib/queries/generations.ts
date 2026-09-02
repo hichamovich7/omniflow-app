@@ -9,7 +9,12 @@ export async function getGenerationWithPins(supabase: SupabaseClient, generation
     .single();
 
   if (!generation) {
-    return { generation: null, pins: [] as Pin[], imageVersionCounts: {} as Record<string, number> };
+    return {
+      generation: null,
+      pins: [] as Pin[],
+      imageVersionCounts: {} as Record<string, number>,
+      activeImageModels: {} as Record<string, string | null>,
+    };
   }
 
   const { data: pins } = await supabase
@@ -21,21 +26,29 @@ export async function getGenerationWithPins(supabase: SupabaseClient, generation
   const pinList = (pins ?? []) as Pin[];
 
   const imageVersionCounts: Record<string, number> = {};
+  const activeImageModels: Record<string, string | null> = {};
 
   if (pinList.length > 0) {
     const pinIds = pinList.map(p => p.id);
     const { data: versionRows } = await supabase
       .from('pin_images')
-      .select('pin_id')
+      .select('pin_id, is_active, image_model')
       .in('pin_id', pinIds);
 
     if (versionRows) {
       for (const row of versionRows) {
-        const pinId = (row as { pin_id: string }).pin_id;
+        const { pin_id: pinId, is_active: isActive, image_model: imageModel } = row as {
+          pin_id: string;
+          is_active: boolean;
+          image_model: string | null;
+        };
         imageVersionCounts[pinId] = (imageVersionCounts[pinId] ?? 0) + 1;
+        if (isActive) {
+          activeImageModels[pinId] = imageModel;
+        }
       }
     }
   }
 
-  return { generation, pins: pinList, imageVersionCounts };
+  return { generation, pins: pinList, imageVersionCounts, activeImageModels };
 }

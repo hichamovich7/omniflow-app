@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { generateImage } from '@/lib/ai/engine';
+import { generateImage, resolveImageModel } from '@/lib/ai/engine';
 import { buildImagePrompt, IMAGE_PROMPT_ID } from '@/lib/ai/prompt-engine/engine';
+import { compositeCtaBanner } from '@/lib/pinterest/compositing';
+import { pickCtaMessage } from '@/lib/pinterest/cta-messages';
 import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
 
   const { successes, failures } = await promisePool(
     pinsToProcess,
-    async (pin) => {
+    async (pin, index) => {
       const { data: existingVersions } = await supabase
         .from('pin_images')
         .select('version')
@@ -125,11 +127,19 @@ export async function POST(request: Request) {
 
       const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
 
-      const imageBuffer = await generateImage({
+      const { model: imageModel } = resolveImageModel(pin.visual_format);
+
+      const rawImageBuffer = await generateImage({
         prompt: buildImagePrompt(pin, nextVersion),
         size: IMAGE_CONFIG.size,
         visualFormat: pin.visual_format,
       });
+
+      // Deterministic code-side "save this pin" banner (TASK-FIX-018) — always
+      // applied, both visualFormat 'photo' and 'text-overlay', replacing the
+      // old in-prompt instruction (1/10 measured success rate on the model).
+      const ctaText = pickCtaMessage(pin.language, index);
+      const imageBuffer = await compositeCtaBanner(rawImageBuffer, ctaText);
 
       const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
 
@@ -157,6 +167,7 @@ export async function POST(request: Request) {
         url: publicUrl.publicUrl,
         is_active: true,
         version: nextVersion,
+        image_model: imageModel,
       });
 
       await supabase

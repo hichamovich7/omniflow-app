@@ -22,6 +22,7 @@ interface EditorialWorkspaceProps {
   isCompleted: boolean;
   imageVersionCounts: Record<string, number>;
   pinsWordPressUsage: Record<string, WordPressUsageArticle[]>;
+  activeImageModels: Record<string, string | null>;
 }
 
 export function EditorialWorkspace(props: EditorialWorkspaceProps) {
@@ -42,6 +43,7 @@ function EditorialWorkspaceContent({
   isCompleted,
   imageVersionCounts,
   pinsWordPressUsage,
+  activeImageModels,
 }: EditorialWorkspaceProps) {
   const { selectedIds, selectedCount } = useSelection();
   const allIds = useMemo(() => pins.map(p => p.id), [pins]);
@@ -108,6 +110,7 @@ function EditorialWorkspaceContent({
             generationId={generationId}
             imageVersionCounts={imageVersionCounts}
             pinsWordPressUsage={pinsWordPressUsage}
+            activeImageModels={activeImageModels}
           />
         </div>
       )}

@@ -1,5 +1,4 @@
 import { inferPhotographyStyle } from './templates/photography-styles';
-import { getSavePinMessage } from './save-pin-message';
 import {
   QUALITY_DIRECTIVES,
   NEGATIVE_CONSTRAINTS,
@@ -29,7 +28,6 @@ export interface PinterestPackage {
 export function buildImagePrompt(pkg: PinterestPackage, version = 1): string {
   const photographyStyle = inferPhotographyStyle(pkg.board);
   const isTextOverlay = pkg.visual_format === 'text-overlay' && !!pkg.overlay_text;
-  const savePinMessage = getSavePinMessage(pkg.language);
 
   const lines = [
     pkg.image_prompt,
@@ -45,12 +43,10 @@ export function buildImagePrompt(pkg: PinterestPackage, version = 1): string {
     );
   }
 
-  // Always-on, every pin, regardless of visualFormat — see docs/DECISIONS.md
-  // 2026-08-28 (Save the Pin banner).
-  lines.push(
-    '',
-    `Render this exact short call-to-action text as a small, tasteful ribbon-style banner near the bottom edge of the image, clearly legible but never covering or distracting from the main subject: "${savePinMessage}"`
-  );
+  // The "save this pin" banner used to be requested here (see docs/DECISIONS.md
+  // 2026-08-28 (2)) but is now composited deterministically in code after
+  // generation instead — see lib/pinterest/compositing.ts and DECISIONS.md
+  // TASK-FIX-018 for why (1/10 measured success rate asking the image model).
 
   if (version > 1) {
     lines.push('', buildVariationDirective(version));

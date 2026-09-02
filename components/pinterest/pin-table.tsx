@@ -16,6 +16,7 @@ interface PinTableProps {
   generationId: string;
   imageVersionCounts: Record<string, number>;
   pinsWordPressUsage: Record<string, WordPressUsageArticle[]>;
+  activeImageModels: Record<string, string | null>;
 }
 
 function usageTooltip(articles: WordPressUsageArticle[]): string {
@@ -32,7 +33,7 @@ function formatDate(dateString: string): string {
   );
 }
 
-export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPressUsage }: PinTableProps) {
+export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPressUsage, activeImageModels }: PinTableProps) {
   const { isSelected, toggle } = useSelection();
   const router = useRouter();
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
@@ -211,6 +212,15 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                     </span>
                   )}
                 </div>
+
+                {activeImageModels[pin.id] && (
+                  <p
+                    className="truncate font-mono text-[10px] text-muted-foreground/50"
+                    title={`Generated with: ${activeImageModels[pin.id]}`}
+                  >
+                    {activeImageModels[pin.id]}
+                  </p>
+                )}
               </div>
             </div>
           );
@@ -230,6 +240,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
           pin={detailPin}
           onClose={() => setDetailPin(null)}
           usage={pinsWordPressUsage[detailPin.id] ?? []}
+          imageModel={activeImageModels[detailPin.id]}
         />
       )}
     </>

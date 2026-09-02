@@ -365,11 +365,12 @@ Stores image versions for each pin. Each pin can have multiple image versions; e
 | url          | text              | Public URL                     |
 | is_active    | boolean           | Only one active per pin        |
 | version      | integer           | Sequential version number      |
+| image_model  | text, nullable    | Exact AI model that generated this image (e.g. `black-forest-labs/flux.2-pro`), resolved via `resolveImageModel()` at call time — not inferred after the fact. Null on rows created before migration 024 |
 | created_at   | timestamptz       |                                |
 
 ## Purpose
 
-Enables image versioning and regeneration. Users can generate multiple image versions per pin, compare them, and choose which version to use for export.
+Enables image versioning and regeneration. Users can generate multiple image versions per pin, compare them, and choose which version to use for export. `image_model` (TASK-FIX-018) gives per-image traceability, since `AI_IMAGE_MODEL`/`AI_IMAGE_MODEL_TEXT` can change over time and `generations.model_used` only tracks the text model.
 
 ## Constraints
 

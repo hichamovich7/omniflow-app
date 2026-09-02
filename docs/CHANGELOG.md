@@ -22,6 +22,53 @@ No planned changes.
 
 ---
 
+# [1.28.0] - 2026-09-02
+
+## TASK-FIX-019: Deterministic code-composited "Save the Pin" CTA banner
+
+### Changed
+
+* The "Save the Pin" banner is no longer requested from the image model — it is composited in code with `sharp` after generation, applied to both `photo` and `text-overlay` pins, replacing the always-on in-prompt mechanism from 2026-08-28.
+* `lib/ai/prompt-engine/engine.ts`/`presets.ts`: banner instruction removed from the image prompt; negative constraints reverted to ban all unrequested text. `IMAGE_PROMPT_ID` → `pinterest-image-v4`.
+* `app/api/pinterest/generate-images/route.ts`: `compositeCtaBanner()` applied to every generated image before Storage upload.
+
+### Added
+
+* `lib/pinterest/compositing.ts` — `compositeCtaBanner(imageBuffer, text)`: SVG banner composited via `sharp`, position/size derived from the image's real dimensions, with automatic font-size shrinking to prevent text overflow.
+* `lib/pinterest/cta-messages.ts` — 4 static, human-translated CTA variants per language (en/de/es/fr), rotated across a generation's pins by batch position (`pickCtaMessage()`).
+* `sharp` added to direct dependencies (was only a transitive dependency of `next` until now).
+
+### Removed
+
+* `lib/ai/prompt-engine/save-pin-message.ts` (single fixed AI-prompt message) — superseded by `lib/pinterest/cta-messages.ts`.
+
+### Verified
+
+* **Real regeneration, not a synthetic test**: measured baseline was 1/10 banners legible and correct on 10 real `flux.2-pro` pins (7/10 missing, 2/10 corrupted/truncated — see TASK-FIX-018 below). Regenerated the same 10 pins through the real "Regenerate" flow with this fix: **10/10 banners present, legible, and textually correct**, all 4 CTA variants observed rotating across the batch.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-02 (2)), `docs/TASKS.md` (TASK-FIX-019) updated with the full measured before/after.
+
+---
+
+## TASK-FIX-018: Per-image AI model traceability
+
+### Added
+
+* `pin_images.image_model` (migration 024, nullable text) — the exact AI model that generated that specific image, resolved at call time via new `resolveImageModel()` export (`lib/ai/services/image.ts`), not inferred from current env vars after the fact.
+* Displayed in `PinDetailDialog` ("Generated with: {model}") and as a compact label on each card in `pin-table.tsx`.
+
+### Changed
+
+* `lib/queries/generations.ts` returns a new `activeImageModels` map, threaded through `EditorialWorkspace` to the pin components.
+
+### Docs
+
+* `docs/DATABASE.md`, `docs/DECISIONS.md`, `docs/TASKS.md` updated.
+
+---
+
 # [1.27.0] - 2026-09-02
 
 ## TASK-FIX-017: Pinterest ICPC framework for title/description (pinterest-pins-v5 → v6)

@@ -10,36 +10,6 @@ Añadir nuevas entradas cronológicamente.
 
 ---
 
-## 2026-09-01
-
-### Decision
-
-TASK Pinterest : framework Impression → Curiosité → Promesse → Clic (ICPC) dans title/description (pinterest-pins-v5 → v6)
-
-### Context
-
-Constat sur les générations Pinterest existantes : des pins avec de bonnes impressions mais un clic sortant faible, parce que le title et la description répondaient déjà entièrement à leur propre promesse dans le texte (le numéro, la technique ou la réponse exacte étaient donnés avant même le clic) — rien ne restait à découvrir sur l'épingle elle-même, donc aucune raison de cliquer vers l'article. La règle title précédente ("must be compelling and include the main keyword naturally") ne structurait aucun angle rédactionnel ; la règle description précédente demandait un CTA générique sans contrainte anti-spoiler.
-
-### Decision Taken
-
-`lib/prompts/pinterest-pins.ts` passe de `pinterest-pins-v5` à `pinterest-pins-v6` :
-1. La règle title est remplacée par une instruction à 5 angles avec exemples concrets (Curiosity, Problem→Solution, Listicle, Discovery, Article Promise), en gardant le mot-clé principal inclus naturellement et la limite 100 caractères.
-2. Nouvelle règle de variation : l'angle de title doit varier à travers les pins d'une même génération (chaque angle utilisé au plus deux fois avant répétition), sur le même principe que la variation déjà en place pour l'image_prompt (setting/objets/palette/angle caméra).
-3. La règle description est remplacée par l'instruction ICPC complète : donner assez d'information pour susciter l'intérêt sans jamais révéler la technique/le chiffre/la réponse exacte de l'article, se terminer sur une boucle ouverte que seul le clic résout, CTA orienté découverte ("see how", "find out which") plutôt que réénoncé du contenu. Limite 500 caractères conservée.
-4. Garde-fou explicite ajouté en fin de Rules : vérification anti-fuite avant de finaliser la sortie — si title + description révèlent ensemble la réponse complète, réécrire la description pour retirer le détail qui spoile, sans perdre en accroche.
-
-Périmètre volontairement limité : aucune modification des règles niche (`framingMode`/`styleGuidance`, lignes ~77-96), du texte-overlay (~100-109), de la variation d'image_prompt (~129 avant patch), ni du champ `keywords` (spec du champ, règle no-duplicates, contrainte de langue, schéma JSON de sortie). Le référencement interne Pinterest (keywords) n'est pas affecté par ce changement — c'est un champ indépendant du title/description dans le prompt, non dérivé de leur contenu.
-
-### Consequences
-
-* `PROMPT_ID` passe à `pinterest-pins-v6` — traçabilité pour un futur A/B test ou rollback vers v5 si le taux de clic sortant ne s'améliore pas
-* Les titles doivent maintenant piocher parmi 5 angles nommés plutôt qu'une formule libre — attendu : plus de diversité stylistique visible à travers un batch de pins généré en une fois
-* Les descriptions ne doivent plus "spoiler" leur propre title — risque à surveiller : un modèle qui respecte mal la consigne anti-fuite pourrait produire des descriptions vagues au point de perdre en pertinence SEO ; le garde-fou de vérification en fin de prompt vise à limiter ce risque mais reste une instruction déclarative, pas un contrôle programmatique côté serveur
-* Keywords, board, image_prompt, niche conventions et texte-overlay : comportement inchangé, aucune régression attendue sur le référencement Pinterest interne
-* Checkpoint git avant ce changement : tag `20260901` sur `8dceaf7` (poussé sur origin)
-
----
-
 ## 2026-06-23
 
 ### Decision
@@ -1071,6 +1041,97 @@ Dépassement → `403` avec `code: 'trial_limit_reached'` (nouveau, distinct du 
 * `types/database.ts` : `Profile.total_generations_used`, `ProfileInsert` mis à jour en conséquence
 * Aucun changement à `credits_balance`, `api_rate_limits`, ou au comportement du rate limiting horaire existant — strictement additif
 * `docs/DATABASE.md`, `docs/API.md`, `docs/CHANGELOG.md`, `docs/TASKS.md`, `.env.example` mis à jour
+
+---
+
+## 2026-09-01
+
+### Decision
+
+TASK Pinterest : framework Impression → Curiosité → Promesse → Clic (ICPC) dans title/description (pinterest-pins-v5 → v6)
+
+### Context
+
+Constat sur les générations Pinterest existantes : des pins avec de bonnes impressions mais un clic sortant faible, parce que le title et la description répondaient déjà entièrement à leur propre promesse dans le texte (le numéro, la technique ou la réponse exacte étaient donnés avant même le clic) — rien ne restait à découvrir sur l'épingle elle-même, donc aucune raison de cliquer vers l'article. La règle title précédente ("must be compelling and include the main keyword naturally") ne structurait aucun angle rédactionnel ; la règle description précédente demandait un CTA générique sans contrainte anti-spoiler.
+
+### Decision Taken
+
+`lib/prompts/pinterest-pins.ts` passe de `pinterest-pins-v5` à `pinterest-pins-v6` :
+1. La règle title est remplacée par une instruction à 5 angles avec exemples concrets (Curiosity, Problem→Solution, Listicle, Discovery, Article Promise), en gardant le mot-clé principal inclus naturellement et la limite 100 caractères.
+2. Nouvelle règle de variation : l'angle de title doit varier à travers les pins d'une même génération (chaque angle utilisé au plus deux fois avant répétition), sur le même principe que la variation déjà en place pour l'image_prompt (setting/objets/palette/angle caméra).
+3. La règle description est remplacée par l'instruction ICPC complète : donner assez d'information pour susciter l'intérêt sans jamais révéler la technique/le chiffre/la réponse exacte de l'article, se terminer sur une boucle ouverte que seul le clic résout, CTA orienté découverte ("see how", "find out which") plutôt que réénoncé du contenu. Limite 500 caractères conservée.
+4. Garde-fou explicite ajouté en fin de Rules : vérification anti-fuite avant de finaliser la sortie — si title + description révèlent ensemble la réponse complète, réécrire la description pour retirer le détail qui spoile, sans perdre en accroche.
+
+Périmètre volontairement limité : aucune modification des règles niche (`framingMode`/`styleGuidance`, lignes ~77-96), du texte-overlay (~100-109), de la variation d'image_prompt (~129 avant patch), ni du champ `keywords` (spec du champ, règle no-duplicates, contrainte de langue, schéma JSON de sortie). Le référencement interne Pinterest (keywords) n'est pas affecté par ce changement — c'est un champ indépendant du title/description dans le prompt, non dérivé de leur contenu.
+
+### Consequences
+
+* `PROMPT_ID` passe à `pinterest-pins-v6` — traçabilité pour un futur A/B test ou rollback vers v5 si le taux de clic sortant ne s'améliore pas
+* Les titles doivent maintenant piocher parmi 5 angles nommés plutôt qu'une formule libre — attendu : plus de diversité stylistique visible à travers un batch de pins généré en une fois
+* Les descriptions ne doivent plus "spoiler" leur propre title — risque à surveiller : un modèle qui respecte mal la consigne anti-fuite pourrait produire des descriptions vagues au point de perdre en pertinence SEO ; le garde-fou de vérification en fin de prompt vise à limiter ce risque mais reste une instruction déclarative, pas un contrôle programmatique côté serveur
+* Keywords, board, image_prompt, niche conventions et texte-overlay : comportement inchangé, aucune régression attendue sur le référencement Pinterest interne
+* Checkpoint git avant ce changement : tag `20260901` sur `8dceaf7` (poussé sur origin)
+
+---
+
+## 2026-09-02 (1)
+
+### Decision
+
+TASK-FIX-018 : traçabilité du modèle d'image réellement utilisé, par image (`pin_images.image_model`)
+
+### Context
+
+Aucune colonne n'existait pour savoir, après coup, quel modèle IA avait généré une image de pin précise. `generations.model_used` ne trace que le modèle **texte** (rôle FAST) pour toute la génération, pas le modèle image par pin. Besoin déclenché par un bandeau CTA "Save the Pin" illisible observé sur un pin en mode `photo` (censé passer par `AI_IMAGE_MODEL` = flux.2-pro) — impossible de confirmer avec certitude quel modèle avait produit cette image précise plutôt que de le déduire des variables d'environnement actuelles (qui peuvent avoir changé depuis).
+
+### Decision Taken
+
+Migration 024 : `pin_images.image_model text` (nullable, lignes existantes non rétro-remplies). `lib/ai/services/image.ts` : extraction de la logique de routage (`AI_IMAGE_MODEL` vs `AI_IMAGE_MODEL_TEXT` selon `visualFormat`) en fonction exportée `resolveImageModel(visualFormat)`, réutilisée en interne par `generateImage()` (comportement inchangé) et appelée séparément par `app/api/pinterest/generate-images/route.ts` juste avant `generateImage()` pour capturer la valeur exacte à persister. Fonction pure (uniquement `process.env` + `visualFormat`, aucun état externe) : les deux appels retournent nécessairement la même valeur pour les mêmes entrées — ce n'est pas une déduction a posteriori, c'est la même règle de résolution exécutée deux fois avec les mêmes arguments.
+
+Affiché dans `PinDetailDialog` ("Generated with: {model}") et en compact sur la carte de `pin-table.tsx` (avec tooltip natif).
+
+### Consequences
+
+* `types/database.ts` : `PinImage.image_model` ajouté
+* `lib/queries/generations.ts` : nouvelle map `activeImageModels` (jointure sur `pin_images.is_active`), remontée à travers `EditorialWorkspace` → `PinTable`/`PinDetailDialog`
+* Aucun autre point d'appel de `generateImage()` (WordPress, `lib/wordpress/generate-article*.ts`) touché — signature de `generateImage()` inchangée, seule une fonction d'aide est exportée en plus
+* Validé par un vrai test (TASK-FIX-019 ci-dessous) : les 10 images générées ont bien affiché `black-forest-labs/flux.2-pro`, confirmant le routage et servant justement à diagnostiquer le bug du bandeau CTA
+* `docs/DATABASE.md`, `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
+## 2026-09-02 (2)
+
+### Decision
+
+TASK-FIX-019 : le bandeau CTA "Save the Pin" est composité en code (sharp), plus jamais demandé au modèle d'image
+
+### Context
+
+Suite directe de TASK-FIX-018 : la traçabilité de modèle a permis un test réel chiffré plutôt qu'une impression subjective. Génération réelle de 10 pins en mode `photo` pur (niche sans texte-overlay, donc `AI_IMAGE_MODEL` = flux.2-pro à coup sûr sur les 10) :
+
+* **7/10** : bandeau totalement **absent** de l'image
+* **2/10** : bandeau présent mais **corrompu** (ex: "Reamene Soic" au lieu du texte attendu) ou **tronqué** (texte coupé aux deux bouts, accompagné d'un faux logo façon Pinterest halluciné malgré l'interdiction explicite)
+* **1/10** : bandeau lisible et quasi correct (une seule lettre altérée)
+
+Taux de réussite réel mesuré : **1/10**. Le mécanisme "always-on" introduit le 2026-08-28 (2) reposait entièrement sur l'obéissance du modèle d'image à une instruction textuelle, avec le risque déjà noté à l'époque ("rendu variable d'un pin à l'autre... non garanti pixel-parfait") — le test chiffré confirme que ce risque n'est pas marginal, c'est le comportement dominant. Même principe déjà appliqué ailleurs dans le projet pour un problème de fiabilité IA similaire : le lien externe WordPress (2026-07-15/17) est passé d'une simple déclaration du modèle à une vérification HTTP réelle côté serveur, parce qu'on ne peut pas garantir qu'un modèle respecte une instruction déclarative de façon fiable à 100%. Ici, la correction équivalente est de ne plus déléguer ce texte au modèle du tout.
+
+### Decision Taken
+
+1. **Prompt image** (`lib/ai/prompt-engine/engine.ts`) : la ligne demandant le bandeau CTA est retirée. `NEGATIVE_CONSTRAINTS`/`NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` (`presets.ts`) reviennent à interdire tout texte non explicitement demandé (photo : aucun texte du tout ; text-overlay : uniquement le hook de titre `overlayText`, inchangé). `IMAGE_PROMPT_ID` → `pinterest-image-v4`.
+2. **Nouveau `lib/pinterest/compositing.ts`** — `compositeCtaBanner(imageBuffer, text)` : lit les dimensions réelles de l'image via `sharp().metadata()`, compose un bandeau SVG (fond semi-opaque `rgba(17,17,17,0.62)`, texte blanc gras centré) à une position et une taille toujours dérivées des mêmes ratios — jamais laissé à l'interprétation d'un modèle. Choix délibéré d'un fond sombre semi-opaque plutôt que le ruban rose clair d'origine : garantit un contraste lisible quel que soit le fond photo (un ruban clair aurait pu se fondre dans un intérieur clair). Inclut une heuristique de réduction automatique de la taille de police si le texte estimé dépasse la largeur du bandeau — pour ne pas reproduire le défaut de troncature observé (2/10 du test).
+3. **Nouveau `lib/pinterest/cta-messages.ts`** — banque de 4 variantes par langue (en/de/es/fr), textes courts traduits une fois, jamais générés par l'IA. `pickCtaMessage(language, index)` fait tourner les variantes à travers les pins d'un même lot (même principe que la variation d'angle de title, v6), `index` étant la position du pin dans le batch (`promisePool` fournit déjà cet index, aucune nouvelle donnée requise). Ancien `lib/ai/prompt-engine/save-pin-message.ts` (message unique fixe par langue) supprimé — plus aucune référence, remplacé par cette banque.
+4. **`app/api/pinterest/generate-images/route.ts`** : `compositeCtaBanner()` appliqué systématiquement après `generateImage()` et avant l'upload Storage, pour `visualFormat` `photo` **et** `text-overlay` — remplace entièrement l'ancien mécanisme always-on en prompt, aucune exception.
+5. **`sharp`** ajouté aux dépendances directes (`package.json`) — était déjà présent dans `node_modules` uniquement en tant que dépendance transitive de `next` (son optimiseur d'image interne), jamais déclaré ni importé directement par le code applicatif jusqu'ici. Nécessaire de le déclarer explicitement puisqu'il est maintenant importé directement dans `lib/pinterest/compositing.ts` — s'appuyer sur une dépendance transitive d'un paquet tiers sans la déclarer est fragile (aucune garantie que `next` continue de l'embarquer, ni à quelle version).
+
+### Consequences
+
+* Le bandeau CTA est désormais garanti identique en placement/style à chaque génération, sur 100% des pins (photo et text-overlay), quel que soit le modèle d'image configuré
+* Coût marginal : un appel `sharp` local (pas d'appel réseau/IA supplémentaire) par image — négligeable face au coût de génération d'image lui-même
+* Revalidé par un vrai test end-to-end (mêmes 10 pins "cozy living room decor ideas" régénérés) — voir résultat dans `docs/TASKS.md` (TASK-FIX-019)
+* `overlayText` (hook de titre en mode text-overlay) reste géré par l'IA, inchangé — seul le bandeau CTA fixe est concerné par ce changement
+* `lib/ai/prompt-engine/save-pin-message.ts` supprimé ; toute niche/texte-overlay/variation d'image_prompt non touchée par ce changement, comme pour TASK-FIX-018
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
 
 ---
 

@@ -19,9 +19,10 @@ interface PinDetailDialogProps {
   pin: Pin;
   onClose: () => void;
   usage?: WordPressUsageArticle[];
+  imageModel?: string | null;
 }
 
-export function PinDetailDialog({ pin, onClose, usage = [] }: PinDetailDialogProps) {
+export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDetailDialogProps) {
   const keywords = pin.keywords
     .split(',')
     .map((k) => k.trim())
@@ -93,6 +94,12 @@ export function PinDetailDialog({ pin, onClose, usage = [] }: PinDetailDialogPro
                 ))}
               </div>
             </div>
+          )}
+
+          {imageModel && (
+            <p className="text-xs text-muted-foreground">
+              Generated with: <span className="font-mono">{imageModel}</span>
+            </p>
           )}
 
           <div className="space-y-1.5">
