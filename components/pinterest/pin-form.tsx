@@ -46,6 +46,12 @@ const TEXT_OVERLAY_LABELS: Record<TextOverlayMode, string> = {
   never: 'Never',
 };
 
+const TEXT_OVERLAY_DESCRIPTIONS: Record<TextOverlayMode, string> = {
+  auto: "AI decides per pin whether to add text overlay, based on the pin's content type.",
+  always: 'Every pin will have text overlay (title/hook) rendered directly on the image.',
+  never: 'All pins will be pure photography, no text rendered on the images.',
+};
+
 interface BoardOption {
   id: string;
   name: string;
@@ -316,6 +322,13 @@ export function PinForm({ projects, boards }: PinFormProps) {
             </div>
           )}
         </div>
+
+        {showTextOverlayMode && (
+          <p className="-mt-3 text-xs text-muted-foreground">
+            <span className="font-medium">{TEXT_OVERLAY_LABELS[textOverlayMode]}:</span>{' '}
+            {TEXT_OVERLAY_DESCRIPTIONS[textOverlayMode]}
+          </p>
+        )}
 
         {error && (
           <div className="rounded-lg bg-destructive/5 px-3 py-2">
