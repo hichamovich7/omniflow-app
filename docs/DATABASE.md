@@ -205,6 +205,8 @@ Stores generated Pinterest pins.
 | publish_date   | timestamptz nullable     | Schedule date              |
 | visual_format  | text                     | `photo` / `text-overlay` (TASK-034). NOT NULL DEFAULT `photo`. Validated in application layer, not a DB enum/CHECK |
 | overlay_text   | text nullable            | On-image hook text (5-8 words), set only when `visual_format = text-overlay` (TASK-034) |
+| title_banner_template | text nullable      | Static SVG shape (`lib/pinterest/banner-templates/`) for the top title-hook banner: `clean-band` / `ribbon` / `pill` / `torn-paper` / `corner-tag` (TASK-FIX-024). Set only when `visual_format = text-overlay`. Validated in application layer, not a DB enum/CHECK |
+| cta_banner_template   | text nullable      | Same shape enum as above, for the bottom "save this pin" CTA banner — set on every pin regardless of `visual_format` (TASK-FIX-024) |
 | created_at     | timestamptz              |                            |
 | updated_at     | timestamptz              |                            |
 

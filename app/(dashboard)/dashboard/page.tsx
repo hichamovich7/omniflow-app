@@ -3,8 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { PageContainer } from '@/components/ui/page-container';
 import { StatusDot } from '@/components/ui/status-dot';
 import { buttonVariants } from '@/components/ui/button';
+import { PageState } from '@/components/shared/page-state';
+import { ResourceHeader } from '@/components/shared/resource-header';
 import { cn } from '@/lib/utils';
-import { ArrowRight, FolderOpen, FileText, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Sparkles, TriangleAlert } from 'lucide-react';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
@@ -119,33 +121,29 @@ export default async function DashboardPage() {
 
   return (
     <PageContainer>
-      {/* Greeting + Primary CTAs */}
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-0.5">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {greeting}{userName ? `, ${userName}` : ''}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your AI content workspace is ready.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
+      <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-surface px-5 py-6 shadow-sm sm:px-7 sm:py-8">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+        <ResourceHeader
+          title={`${greeting}${userName ? `, ${userName}` : ''}`}
+          metadata={<span>Your AI content workspace is ready to create, review, and publish.</span>}
+          actions={<div className="flex flex-wrap gap-2">
           <Link
             href="/wordpress"
-            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'px-5')}
+            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'min-h-11 px-4')}
           >
             <FileText className="h-4 w-4" />
             Generate WordPress Article
           </Link>
           <Link
             href="/pinterest"
-            className={cn(buttonVariants({ size: 'lg' }), 'px-5')}
+            className={cn(buttonVariants({ size: 'lg' }), 'min-h-11 px-4')}
           >
             <Sparkles className="h-4 w-4" />
             Generate Pinterest Pins
           </Link>
-        </div>
-      </div>
+          </div>}
+        />
+      </section>
 
       {/* Trial usage banner — lightweight lifetime cap distinct from the future
           Credits System (TASK-011/012, still PLANNED). Hidden for admin/bypassed
@@ -189,7 +187,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 sm:grid-cols-3">
         <Link
           href="/projects/new"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-border hover:bg-muted/30"
+          className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -200,11 +198,11 @@ export default async function DashboardPage() {
               <p className="text-xs text-muted-foreground">Organize your content</p>
             </div>
           </div>
-          <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 transition-transform group-hover:translate-x-0.5" />
+          <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </Link>
         <Link
           href="/history"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-border hover:bg-muted/30"
+          className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -215,11 +213,11 @@ export default async function DashboardPage() {
               <p className="text-xs text-muted-foreground">Browse past pin generations</p>
             </div>
           </div>
-          <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 transition-transform group-hover:translate-x-0.5" />
+          <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </Link>
         <Link
           href="/wordpress/history"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-border hover:bg-muted/30"
+          className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -230,12 +228,12 @@ export default async function DashboardPage() {
               <p className="text-xs text-muted-foreground">Browse past articles</p>
             </div>
           </div>
-          <ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 transition-transform group-hover:translate-x-0.5" />
+          <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </Link>
       </div>
 
       {/* Metrics — secondary, compact */}
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {[
           { label: 'Generations', value: totalGenerations },
           { label: 'Pins Created', value: totalPins },
@@ -257,7 +255,7 @@ export default async function DashboardPage() {
               <Link
                 key={stat.label}
                 href={stat.href}
-                className="rounded-xl border border-border/60 bg-card px-4 py-3 transition-colors hover:border-border hover:bg-muted/30"
+                className="rounded-xl border border-border/60 bg-surface px-4 py-4 transition-colors hover:border-primary/30 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {content}
               </Link>
@@ -265,7 +263,7 @@ export default async function DashboardPage() {
           }
 
           return (
-            <div key={stat.label} className="rounded-xl border border-border/60 bg-card px-4 py-3">
+            <div key={stat.label} className="rounded-xl border border-border/60 bg-surface px-4 py-4">
               {content}
             </div>
           );
@@ -275,7 +273,7 @@ export default async function DashboardPage() {
       {/* Recent Activity */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">Recent Activity</h2>
+          <div><p className="text-label">Activity</p><h2 className="text-section-title mt-1">Recent activity</h2></div>
           {recentActivity.length > 0 && (
             <Link
               href="/history"
@@ -287,30 +285,16 @@ export default async function DashboardPage() {
         </div>
 
         {recentActivity.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/60 py-14 text-center">
-            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-muted">
-              <Sparkles className="h-4.5 w-4.5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium">No activity yet</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Start by creating your first generation.
-            </p>
-            <Link
-              href="/pinterest"
-              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-            >
-              Generate content <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+          <PageState variant="empty" title="No activity yet" description="Start a Pinterest generation or WordPress article to build your workspace history." icon={Sparkles} action={<Link href="/pinterest" className={buttonVariants({ variant: 'outline', size: 'sm' })}>Generate content <ArrowRight className="h-3.5 w-3.5" /></Link>} />
         ) : (
-          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60">
+          <div className="overflow-hidden rounded-xl border border-border/60 bg-surface divide-y divide-border/60">
             {recentActivity.map((item) => {
               const PlatformIcon = item.platform === 'pinterest' ? Sparkles : FileText;
               return (
                 <Link
                   key={`${item.platform}-${item.id}`}
                   href={item.href}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 first:rounded-t-xl last:rounded-b-xl"
+                  className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 first:rounded-t-xl last:rounded-b-xl focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
                 >
                   <StatusDot variant={statusToVariant(item.status)} />
                   <PlatformIcon

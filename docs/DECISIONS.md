@@ -1253,6 +1253,35 @@ Dans [`lib/pinterest/compositing.ts`](../lib/pinterest/compositing.ts) :
 
 ---
 
+## 2026-09-12
+
+### Decision
+
+TASK-FIX-024 : système multi-template de bandeau (SVG statiques, choisis par l'IA, exécutés pixel-parfait en code)
+
+### Context
+
+Depuis TASK-FIX-018/019/020, les deux bandeaux on-image (hook de titre en haut, CTA "save this pin" en bas) sont composités en code (sharp) avec une seule forme possible : un rectangle plein, couleur unie extraite de l'image (TASK-FIX-021/022), hauteur ajustée au texte réel (TASK-FIX-023). Besoin exprimé : varier la forme visuelle du bandeau (bande unie, ruban, pilule, papier déchiré, étiquette de coin) selon le contexte du pin, sans revenir en arrière sur la garantie "jamais demandé au modèle d'image" qui a motivé TASK-FIX-019 (1/10 de réussite mesurée).
+
+### Decision Taken
+
+* **Zod** (`lib/validations/pinterest.ts`) : nouvel enum `BANNER_TEMPLATES` (`clean-band`/`ribbon`/`pill`/`torn-paper`/`corner-tag`), et deux champs optionnels sur `pinResponseSchema` — `titleBannerTemplate`/`ctaBannerTemplate` — plutôt qu'un seul champ. Décision explicite de l'utilisateur pendant le cadrage : le bandeau titre et le bandeau CTA sont composités indépendamment (le titre n'existe que si `visualFormat = text-overlay`, le CTA existe toujours) et doivent donc pouvoir choisir des formes différentes sur un même pin — un seul champ partagé aurait forcé la même forme aux deux.
+* **Migration 025** : `pins.title_banner_template` / `pins.cta_banner_template` (text nullable, pas de CHECK SQL — même convention que `visual_format`/`overlay_text`, migration 018).
+* **Templates SVG statiques** (`lib/pinterest/banner-templates/*.svg`, un fichier par forme) : aucune génération procédurale de forme en JS. Chaque fichier définit sa propre géométrie intrinsèque — largeur de référence fixe (1024, la seule largeur produite par `IMAGE_CONFIG.size`), hauteur via son `viewBox`, position de la forme et du `<text>` — avec des tokens `{{TEXT}}`/`{{ACCENT_COLOR}}`/`{{TEXT_COLOR}}`/`{{FONT_SIZE}}` à substituer. Chargement en mémoire via des `readFileSync` littéraux (un par fichier, pas de nom de fichier dynamique) dans `lib/pinterest/banner-templates/index.ts`, pour rester compatible avec le file-tracing serverless de Next.js (`@vercel/nft`), qui ne peut pas garantir l'inclusion d'un fichier référencé par un chemin construit dynamiquement.
+* **`compositing.ts`** : `compositeBanner()` ne construit plus elle-même le SVG — elle charge le template, substitue les tokens, puis compose le résultat en haut ou en bas de l'image (position toujours générique, pas de logique par template). Le calcul dynamique du `fontSize` (anti-débordement selon la longueur du texte, TASK-FIX-023) est conservé tel quel ; en revanche **la hauteur du bandeau n'est plus dérivée du texte réel** — elle vient maintenant du ratio d'aspect intrinsèque du template (`getTemplateAspectRatio()`, lu depuis son `viewBox`). C'est une régression assumée par rapport à TASK-FIX-023 : la géométrie devient la propriété du fichier statique, pas d'un calcul de code par pin — compromis explicitement demandé (voir point 3 du cadrage : "pas de logique de positionnement séparée à maintenir par template").
+* **Éligibilité par niche** (`lib/ai/niche-visual-conventions.ts`) : `allowedBannerTemplates?: BannerTemplate[]` sur `NicheVisualConvention`. `DEFAULT_NICHE_CONVENTION` exclut `torn-paper` (trop "craft/rustique" hors contexte). `Personal Finance / Budgeting` restreint à `['clean-band', 'corner-tag']` (formes sobres uniquement). `Crochet` autorise les 5 (seul niche où `torn-paper` a du sens). Même mécanisme "defense in depth" que `allowTextOverlay` (décision TASK-034) : le prompt FAST ne liste que les templates éligibles au niche, **et** `app/api/pinterest/generate/route.ts` réécrit après coup (`clampBannerTemplate()`) tout choix de l'IA hors de cette liste — contrairement à `visualFormat`/`overlayText` où seul le prompt contraint (pas de réécriture post-hoc constatée dans le code existant), ici l'utilisateur a explicitement demandé la garantie forte ("le serveur écrase").
+* **Prompt FAST** (`lib/prompts/pinterest-pins.ts`, `pinterest-pins-v7` → `v8`) : nouvelle instruction `ctaBannerTemplate` (toujours demandée) et `titleBannerTemplate` (seulement si `visualFormat` peut être `text-overlay`), avec une description courte par forme et une consigne explicite d'éviter `pill` pour un texte de plus de 2-4 mots — le code ne connaît pas la largeur utile de chaque forme (pas de logique par template), donc cette contrainte est déléguée au choix de l'IA plutôt qu'à un calcul.
+
+### Consequences
+
+* Pas de rendu réel testé par l'agent (demande explicite de l'utilisateur : "ne teste pas toi-même"). Vérification faite en local, hors pipeline IA/DB : script `tsx` appelant directement `compositeBanner()` sur une image de fond synthétique, avec un texte de démonstration pour chacune des 5 formes — rendu visuel montré à l'utilisateur avant tout test réel sur un lot.
+* Limite connue observée sur cet aperçu : `corner-tag` (largeur utile ~420/1024) peut déborder visuellement avec un texte long (ex. CTA de démonstration à 25 caractères) — cohérent avec sa description dans le prompt ("bon pour un label court, pas une phrase complète"), mais confirme que le garde-fou repose sur le choix de l'IA, pas sur un plafond de largeur côté code.
+* Pins existants (avant migration 025) : `title_banner_template`/`cta_banner_template` sont `null` — `app/api/pinterest/generate-images/route.ts` retombe sur `'clean-band'` par défaut à la génération d'image, comportement visuel identique à avant TASK-FIX-024.
+* `types/database.ts` : `Pin.title_banner_template`/`Pin.cta_banner_template` ajoutés (`PinBannerTemplate`).
+* `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

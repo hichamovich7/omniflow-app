@@ -172,7 +172,7 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 
   if (item.disabled) {
     return (
-      <span className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] text-muted-foreground/30 cursor-not-allowed">
+      <span className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-[13px] text-muted-foreground/30 cursor-not-allowed">
         <item.icon className="h-[15px] w-[15px]" />
         {item.label}
       </span>
@@ -183,10 +183,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-2.5 rounded-lg border-l-2 pl-2 pr-2.5 py-1.5 text-[13px] transition-colors duration-100',
+        'relative flex min-h-10 items-center gap-3 rounded-xl border-l-2 px-3 text-[13px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         isActive
-          ? 'border-primary text-foreground font-medium'
-          : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+          ? 'border-primary bg-primary/5 font-medium text-foreground shadow-xs'
+          : 'border-transparent text-muted-foreground hover:bg-muted/70 hover:text-foreground'
       )}
     >
       <item.icon className="h-[15px] w-[15px]" />
@@ -220,20 +220,20 @@ export function SidebarContent() {
 
   return (
     <>
-      <div className="flex h-14 shrink-0 items-center px-5">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-linear-to-br from-primary to-brand-accent shadow-sm">
-            <span className="text-[10px] font-bold text-primary-foreground">O</span>
+      <div className="flex h-18 shrink-0 items-center border-b border-sidebar-border/70 px-5">
+        <Link href="/dashboard" className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br from-primary to-brand-accent shadow-sm">
+            <span className="text-xs font-bold text-primary-foreground">O</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[13px] font-semibold leading-none tracking-tight">OmniFlow</span>
-            <span className="text-[9px] leading-none text-muted-foreground/50 tracking-wide">AI CONTENT OS</span>
+            <span className="text-sm font-semibold leading-none tracking-tight">OmniFlow</span>
+            <span className="mt-1 text-[9px] leading-none tracking-[0.16em] text-muted-foreground/55">AI CONTENT OS</span>
           </div>
         </Link>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
         <div>
-          <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-widest text-muted-foreground/50">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
             {workspaceGroup.label}
           </p>
           <div className="space-y-px">
@@ -243,7 +243,7 @@ export function SidebarContent() {
           </div>
         </div>
 
-        <div className="mt-5 space-y-px">
+        <div className="mt-6 space-y-px">
           <NavLink item={researchItem} pathname={pathname} />
         </div>
 
@@ -255,16 +255,16 @@ export function SidebarContent() {
               key={group.id}
               open={isOpen}
               onOpenChange={(open) => toggleGroup(group.id, open)}
-              className="mt-5"
+              className="mt-6"
             >
-              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium uppercase tracking-widest text-muted-foreground/50 hover:text-muted-foreground">
+              <CollapsibleTrigger className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
                 {group.label}
                 <ChevronRight
                   className={cn('h-3 w-3 shrink-0 transition-transform duration-150', isOpen && 'rotate-90')}
                 />
               </CollapsibleTrigger>
               <CollapsiblePanel>
-                <div className="space-y-px pt-1.5">
+                <div className="space-y-0.5 pt-1.5">
                   {group.items.map((item) => (
                     <NavLink key={item.href} item={item} pathname={pathname} />
                   ))}
@@ -274,8 +274,8 @@ export function SidebarContent() {
           );
         })}
 
-        <div className="mt-5">
-          <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-widest text-muted-foreground/50">
+        <div className="mt-6">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
             {platformsGroup.label}
           </p>
           <div className="space-y-px">
@@ -285,8 +285,8 @@ export function SidebarContent() {
           </div>
         </div>
 
-        <div className="mt-5">
-          <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-widest text-muted-foreground/50">
+        <div className="mt-6">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
             {accountGroup.label}
           </p>
           <div className="space-y-px">
@@ -302,7 +302,7 @@ export function SidebarContent() {
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border/60 bg-sidebar">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar">
       <SidebarContent />
     </aside>
   );

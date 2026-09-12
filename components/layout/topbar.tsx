@@ -8,13 +8,13 @@ interface TopbarProps {
 
 export function Topbar({ email, creditsBalance }: TopbarProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border/60 px-4 md:px-6">
+    <header className="flex h-18 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-sm md:px-8">
       <div className="flex items-center">
         <MobileNav />
       </div>
       <div className="flex items-center gap-3">
         {creditsBalance !== undefined && (
-          <span className="hidden sm:inline-flex text-xs text-muted-foreground">
+          <span className="hidden rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
             {creditsBalance} credits
           </span>
         )}

@@ -17,7 +17,7 @@ export function ProjectCard({ project, generationCount }: ProjectCardProps) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="group relative block rounded-2xl border border-border/60 bg-card p-6 transition-colors hover:border-border"
+      className="group relative block overflow-hidden rounded-2xl border border-border/60 bg-surface p-6 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div
         className="absolute right-4 top-4"
@@ -33,8 +33,8 @@ export function ProjectCard({ project, generationCount }: ProjectCardProps) {
         />
       </div>
       <div className="flex items-start gap-3.5">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-          <FolderOpen className="h-5 w-5 text-muted-foreground" />
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <FolderOpen className="h-5 w-5 text-primary" />
         </div>
         <div className="min-w-0 flex-1 pr-8">
           <p className="truncate text-base font-semibold tracking-tight">{project.name}</p>
@@ -46,11 +46,11 @@ export function ProjectCard({ project, generationCount }: ProjectCardProps) {
         </div>
       </div>
       {project.description && (
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground line-clamp-2">
+        <p className="mt-3 text-secondary line-clamp-2">
           {project.description}
         </p>
       )}
-      <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+      <div className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-border/60 pt-4 text-metadata">
         <span>{generationCount} generation{generationCount !== 1 ? 's' : ''}</span>
         <span className="text-border">·</span>
         <span>{timeAgo(project.created_at)}</span>

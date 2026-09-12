@@ -1,9 +1,11 @@
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
-import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
+import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
+import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
+import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
 
-export const PROMPT_ID = 'pinterest-pins-v7';
+export const PROMPT_ID = 'pinterest-pins-v8';
 
 interface PromptContext {
   keyword: string;
@@ -108,6 +110,23 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
 - overlayText (only when visualFormat is "text-overlay"): a short, punchy hook (5-8 words) distinct from the full title — this is the exact text that will be rendered on top of the image. Omit this field when visualFormat is "photo".
 - image_prompt (only when visualFormat is "text-overlay"): describe only the background scene or context the text will appear over, not the text itself. When visualFormat is "photo", image_prompt describes the full visual scene as usual.`;
 
+  // TASK-FIX-024: the shape of both on-image banners (top title hook, bottom
+  // CTA) is chosen by the AI from a fixed set of static SVG templates, then
+  // clamped server-side against the niche's eligible list (defense in depth,
+  // same mechanism as allowTextOverlay above) — see
+  // app/api/pinterest/generate/route.ts and lib/ai/niche-visual-conventions.ts.
+  const allowedBannerTemplates =
+    nicheConvention?.allowedBannerTemplates ?? DEFAULT_NICHE_CONVENTION.allowedBannerTemplates ?? [...BANNER_TEMPLATES];
+  const bannerTemplateOptions = allowedBannerTemplates
+    .map((t) => `"${t}" (${BANNER_TEMPLATE_DESCRIPTIONS[t]})`)
+    .join(', ');
+
+  const bannerTemplateInstruction =
+    `- ctaBannerTemplate: choose the visual shape for the bottom "save this pin" CTA banner, one of: ${bannerTemplateOptions}. Base the choice on the scene's mood and how long the CTA text is likely to be — never pick "pill" for anything longer than a very short 2-4 word phrase.` +
+    (effectiveTextOverlayMode !== 'never'
+      ? `\n- titleBannerTemplate (only when visualFormat is "text-overlay"): choose the visual shape for the top title-hook banner, from the same options as ctaBannerTemplate. Again, avoid "pill" whenever overlayText is longer than a short 2-4 word phrase — its shape is too narrow for more.`
+      : '');
+
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
 
   const user = `Generate ${ctx.pinsRequested} unique Pinterest pins for the keyword: "${ctx.keyword}"
@@ -119,6 +138,7 @@ For each pin, provide:
 - board: suggested Pinterest board name that accurately reflects the content niche
 - image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre (e.g. "architectural photography", "editorial interior photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include camera settings or lighting instructions.${compositionInstruction}${styleGuidanceInstruction}${referenceStyleInstruction}
 ${overlayFieldInstruction}
+${bannerTemplateInstruction}
 
 Rules:
 - Each pin must be unique. Do not repeat titles, descriptions, or image scenes.
@@ -147,7 +167,9 @@ Respond with this exact JSON structure:
       "board": "...",
       "image_prompt": "...",
       "visualFormat": "photo",
-      "overlayText": "..."
+      "overlayText": "...",
+      "titleBannerTemplate": "clean-band",
+      "ctaBannerTemplate": "clean-band"
     }
   ]
 }`;

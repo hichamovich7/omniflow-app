@@ -145,14 +145,29 @@ export async function POST(request: Request) {
       // Deterministic code-side "save this pin" banner (TASK-FIX-018) — always
       // applied, both visualFormat 'photo' and 'text-overlay', replacing the
       // old in-prompt instruction (1/10 measured success rate on the model).
+      // Fallback to 'clean-band' covers pins created before migration 025.
       const ctaText = pickCtaMessage(pin.language, index);
-      let imageBuffer = await compositeBanner(rawImageBuffer, ctaText, 'bottom', accentColor, textColor);
+      let imageBuffer = await compositeBanner(
+        rawImageBuffer,
+        ctaText,
+        'bottom',
+        accentColor,
+        textColor,
+        pin.cta_banner_template ?? 'clean-band'
+      );
 
       // Deterministic code-side title hook, top of the image (TASK-FIX-020) —
       // only for visualFormat 'text-overlay' pins, same condition the AI
       // in-prompt rendering used to gate on before it was removed.
       if (pin.visual_format === 'text-overlay' && pin.overlay_text) {
-        imageBuffer = await compositeBanner(imageBuffer, pin.overlay_text, 'top', accentColor, textColor);
+        imageBuffer = await compositeBanner(
+          imageBuffer,
+          pin.overlay_text,
+          'top',
+          accentColor,
+          textColor,
+          pin.title_banner_template ?? 'clean-band'
+        );
       }
 
       const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;

@@ -61,6 +61,7 @@ export type BoardInsert = Omit<Board, 'id' | 'created_at' | 'updated_at'> & {
 };
 
 export type PinVisualFormat = 'photo' | 'text-overlay';
+export type PinBannerTemplate = 'clean-band' | 'ribbon' | 'pill' | 'torn-paper' | 'corner-tag';
 
 export interface Pin {
   id: string;
@@ -78,6 +79,8 @@ export interface Pin {
   publish_date: string | null;
   visual_format: PinVisualFormat;
   overlay_text: string | null;
+  title_banner_template: PinBannerTemplate | null;
+  cta_banner_template: PinBannerTemplate | null;
   created_at: string;
   updated_at: string;
 }

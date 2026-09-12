@@ -22,6 +22,28 @@ No planned changes.
 
 ---
 
+# [1.32.0] - 2026-09-12
+
+## TASK-FIX-024: Multi-template banner compositing (static SVG shapes, AI-chosen, code-executed)
+
+### Added
+
+* `lib/pinterest/banner-templates/*.svg`: 5 static SVG banner shapes — `clean-band`, `ribbon`, `pill`, `torn-paper`, `corner-tag`. Each file owns its own intrinsic geometry (reference width 1024, height via its own `viewBox`, shape/text position) — no procedural shape generation in code, no per-template positioning logic to maintain.
+* `pins.title_banner_template` / `pins.cta_banner_template` (migration 025, nullable text, no DB enum/CHECK) — the top title-hook banner and the bottom CTA banner now each independently pick their own shape.
+* `lib/ai/niche-visual-conventions.ts`: `allowedBannerTemplates?: BannerTemplate[]` on `NicheVisualConvention` — `torn-paper` excluded by default, `Personal Finance / Budgeting` restricted to `['clean-band', 'corner-tag']`, `Crochet` allows all 5.
+
+### Changed
+
+* `lib/pinterest/compositing.ts`: `compositeBanner()` now loads the matching template file and substitutes `{{TEXT}}`/`{{ACCENT_COLOR}}`/`{{TEXT_COLOR}}`/`{{FONT_SIZE}}` tokens instead of building its own SVG string. Font-size shrink-to-fit (TASK-FIX-023) is unchanged; banner height is now the template's own aspect ratio rather than derived from the rendered text — a deliberate tradeoff to keep geometry entirely inside the static file.
+* `lib/prompts/pinterest-pins.ts` (`pinterest-pins-v7` → `v8`): FAST role now also returns `ctaBannerTemplate` (every pin) and `titleBannerTemplate` (text-overlay pins only), with a short description of each shape and guidance to avoid `pill` for longer text.
+* `app/api/pinterest/generate/route.ts`: clamps the AI's chosen template(s) against the project niche's `allowedBannerTemplates` before persisting — defense in depth, same principle as the existing `allowTextOverlay` clamp.
+
+### Docs
+
+* `docs/DECISIONS.md` (2026-09-12), `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `docs/TASKS.md` updated.
+
+---
+
 # [1.31.0] - 2026-09-02
 
 ## TASK-FIX-023: Banner height tightened to actual text + top banner near-zero margin

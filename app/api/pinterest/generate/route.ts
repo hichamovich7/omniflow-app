@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateText, analyzeImage } from '@/lib/ai/engine';
 import { getRoleConfig } from '@/lib/ai/config';
-import { generatePinsSchema, openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
+import { generatePinsSchema, openRouterPinsResponseSchema, BANNER_TEMPLATES } from '@/lib/validations/pinterest';
+import type { BannerTemplate } from '@/lib/validations/pinterest';
+import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
 import { imageStyleAnalysisSchema } from '@/lib/validations/vision';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import { buildVisionStyleAnalysisPrompt } from '@/lib/ai/prompts/vision-style-analysis';
@@ -12,6 +14,18 @@ import { buildImageAnalysisContext } from '@/lib/vision/context';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
+
+// Defense in depth (TASK-FIX-024), same mechanism as the allowTextOverlay
+// clamp in lib/prompts/pinterest-pins.ts: the prompt only asks the AI to pick
+// among the niche's eligible templates, but nothing guarantees it complied —
+// so the persisted value is clamped here regardless of what the model returned.
+function clampBannerTemplate(
+  chosen: BannerTemplate | undefined,
+  allowed: BannerTemplate[]
+): BannerTemplate {
+  if (chosen && allowed.includes(chosen)) return chosen;
+  return allowed[0];
+}
 
 function classifyGenerationError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
@@ -246,6 +260,11 @@ export async function POST(request: Request) {
 
     const boardIdByName = await findOrCreateBoardIds(supabase, projectId, user.id, boardNames);
 
+    const allowedBannerTemplates =
+      getNicheVisualConvention(project.niche)?.allowedBannerTemplates ??
+      DEFAULT_NICHE_CONVENTION.allowedBannerTemplates ??
+      [...BANNER_TEMPLATES];
+
     const pinsToInsert = validated.data.pins.map((pin, i) => ({
       generation_id: generation.id,
       language,
@@ -257,6 +276,13 @@ export async function POST(request: Request) {
       image_prompt: pin.image_prompt,
       visual_format: pin.visualFormat,
       overlay_text: pin.overlayText ?? null,
+      // Only meaningful for text-overlay pins — left null on photo pins since
+      // no title banner is ever composited for them.
+      title_banner_template:
+        pin.visualFormat === 'text-overlay'
+          ? clampBannerTemplate(pin.titleBannerTemplate, allowedBannerTemplates)
+          : null,
+      cta_banner_template: clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates),
       image_analysis: imageAnalysisJson,
     }));
 

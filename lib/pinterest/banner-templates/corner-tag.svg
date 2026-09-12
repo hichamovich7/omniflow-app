@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 150">
+  <path d="M 0 15 L 360 15 L 420 75 L 360 135 L 0 135 Z" fill="{{ACCENT_COLOR}}" />
+  <text
+    x="40"
+    y="75"
+    text-anchor="start"
+    dominant-baseline="central"
+    font-family="Arial, Helvetica, sans-serif"
+    font-weight="700"
+    font-size="{{FONT_SIZE}}"
+    fill="{{TEXT_COLOR}}"
+  >{{TEXT}}</text>
+</svg>

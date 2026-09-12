@@ -7,6 +7,9 @@
 // lib/prompts/pinterest-pins.ts, kept there only as a fallback for niches
 // with no entry here).
 
+import type { BannerTemplate } from '@/lib/validations/pinterest';
+import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
+
 export type FramingMode = 'space' | 'object';
 
 export interface NicheVisualConvention {
@@ -16,12 +19,17 @@ export interface NicheVisualConvention {
   allowTextOverlay: boolean;
   /** Free-text art-direction guidance injected into the image_prompt instructions. */
   styleGuidance: string;
+  /** Which banner shapes (lib/pinterest/banner-templates/) are eligible for this niche's pins (TASK-FIX-024). Falls back to DEFAULT_NICHE_CONVENTION.allowedBannerTemplates when omitted. */
+  allowedBannerTemplates?: BannerTemplate[];
 }
 
 export const DEFAULT_NICHE_CONVENTION: NicheVisualConvention = {
   framingMode: 'object',
   allowTextOverlay: false,
   styleGuidance: '',
+  // 'torn-paper' excluded by default — a craft/rustic shape that reads wrong
+  // outside niches that are actually about crafting (see Crochet below).
+  allowedBannerTemplates: BANNER_TEMPLATES.filter((template) => template !== 'torn-paper'),
 };
 
 export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
@@ -36,6 +44,9 @@ export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
     allowTextOverlay: true,
     styleGuidance:
       'Styled flat-lay or desk scene: a calculator, a closed notebook or journal (cover only, no visible pages or writing), an abstract bar-chart illustration shown as plain colored bars with no numbers or labels, stylized coins, a small potted plant growing out of a jar of coins, a set of keys. Never depict people. Never depict banknotes, printed charts with numbers, or any object showing legible text or writing. Overhead or 45-degree framing only.',
+    // Restricted to the two most sober shapes — 'ribbon'/'pill'/'torn-paper'
+    // all read as too playful/informal for a budgeting/finance audience.
+    allowedBannerTemplates: ['clean-band', 'corner-tag'],
   },
   'Food & Recipes': {
     framingMode: 'object',
@@ -54,6 +65,8 @@ export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
     allowTextOverlay: true,
     styleGuidance:
       'Close-up craft photography of a finished crochet or knit piece — amigurumi, blanket, garment, or accessory — showing stitch texture and detail, optionally with yarn skeins or a hook nearby. Soft, warm, cozy lighting. Overhead or 45-degree framing only.',
+    // Only niche where 'torn-paper' fits the craft/DIY mood — all 5 shapes eligible.
+    allowedBannerTemplates: [...BANNER_TEMPLATES],
   },
 };
 

@@ -174,7 +174,13 @@ Providers no usados hoy (FAL, Highfield, Anthropic, Gemini, Ollama) pueden añad
 
 ### Pinterest Package
 
-El Pinterest Package es la salida estructurada del rol FAST para cada pin: `title`, `description`, `keywords`, `board`, `image_prompt`, `visual_format` (`photo` / `text-overlay`, TASK-034), `overlay_text` (nullable, solo cuando `visual_format = text-overlay`). Es el mismo shape que ya devuelve `lib/prompts/pinterest-pins.ts`. El Prompt Engine transforma el Pinterest Package en un prompt optimizado para el rol IMAGE; nunca conoce al proveedor final. Cuando `visual_format = text-overlay`, el Prompt Engine añade una instrucción explícita para renderizar `overlay_text` sobre la imagen y sustituye `NEGATIVE_CONSTRAINTS` (que prohíbe todo texto) por `NEGATIVE_CONSTRAINTS_TEXT_OVERLAY` (permite únicamente ese texto solicitado).
+El Pinterest Package es la salida estructurada del rol FAST para cada pin: `title`, `description`, `keywords`, `board`, `image_prompt`, `visual_format` (`photo` / `text-overlay`, TASK-034), `overlay_text` (nullable, solo cuando `visual_format = text-overlay`), `title_banner_template`/`cta_banner_template` (TASK-FIX-024, ver más abajo). Es el mismo shape que ya devuelve `lib/prompts/pinterest-pins.ts`. El Prompt Engine transforma el Pinterest Package en un prompt optimizado para el rol IMAGE; nunca conoce al proveedor final.
+
+**Nota (TASK-FIX-024)**: ningún texto en imagen se pide ya al modelo IMAGE — ni el hook de título ni el bandeau CTA. Ambos se componen de forma determinista en código después de la generación (`lib/pinterest/compositing.ts`), así que `buildImagePrompt`/`presets.ts` no tienen ninguna rama según `visual_format` (ver TASK-FIX-018/019/020 más abajo).
+
+### Banner Templates (TASK-FIX-024)
+
+Cada bandeau on-image (hook de título arriba, CTA "save this pin" abajo) se compone en `compositeBanner()` (`lib/pinterest/compositing.ts`) a partir de un archivo SVG estático en `lib/pinterest/banner-templates/*.svg` — un archivo por forma (`clean-band`, `ribbon`, `pill`, `torn-paper`, `corner-tag`), cargado una sola vez al iniciar el módulo (lectura literal por archivo, no un lookup dinámico — necesario para que el file-tracing de Next.js/@vercel/nft incluya los archivos en el build serverless). Cada template define su propia geometría (ancho de referencia 1024, alto intrínseco vía su `viewBox`, posición de la forma/del texto) — el código solo sustituye los tokens `{{TEXT}}`/`{{ACCENT_COLOR}}`/`{{TEXT_COLOR}}`/`{{FONT_SIZE}}` y coloca el bandeau renderizado arriba o abajo de la imagen. La elección del template (por bandeau, de forma independiente) la hace el rol FAST en la misma llamada JSON que `title`/`overlayText`/etc., y luego el servidor la restringe (`app/api/pinterest/generate/route.ts`) a la lista `allowedBannerTemplates` del niche (`lib/ai/niche-visual-conventions.ts`) — el mismo mecanismo "defense in depth" que `allowTextOverlay`.
 
 ### Niche Visual Conventions (TASK-034)
 

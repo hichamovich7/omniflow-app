@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 120">
+  <rect x="212" y="10" width="600" height="100" rx="50" ry="50" fill="{{ACCENT_COLOR}}" />
+  <text
+    x="512"
+    y="60"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-family="Arial, Helvetica, sans-serif"
+    font-weight="700"
+    font-size="{{FONT_SIZE}}"
+    fill="{{TEXT_COLOR}}"
+  >{{TEXT}}</text>
+</svg>

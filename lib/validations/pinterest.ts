@@ -4,6 +4,12 @@ import { SUPPORTED_LANGUAGES, PINS_OPTIONS } from '@/types/pinterest';
 export const TEXT_OVERLAY_MODES = ['auto', 'always', 'never'] as const;
 export type TextOverlayMode = (typeof TEXT_OVERLAY_MODES)[number];
 
+// Static SVG banner shapes (TASK-FIX-024) — see lib/pinterest/banner-templates/.
+// One enum shared by both banners (title hook, CTA); each pin picks a template
+// per banner independently (titleBannerTemplate / ctaBannerTemplate below).
+export const BANNER_TEMPLATES = ['clean-band', 'ribbon', 'pill', 'torn-paper', 'corner-tag'] as const;
+export type BannerTemplate = (typeof BANNER_TEMPLATES)[number];
+
 export const generatePinsSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
@@ -35,6 +41,13 @@ const pinResponseSchema = z
     image_prompt: z.string(),
     visualFormat: z.enum(['photo', 'text-overlay']),
     overlayText: z.string().max(80).optional(),
+    // Independently chosen per banner (TASK-FIX-024) — the top title hook only
+    // exists when visualFormat is 'text-overlay', the bottom CTA banner is
+    // composited on every pin regardless of visualFormat. Both optional here:
+    // the server clamps/defaults them against the niche's allowed list
+    // (lib/ai/niche-visual-conventions.ts) rather than rejecting the response.
+    titleBannerTemplate: z.enum(BANNER_TEMPLATES).optional(),
+    ctaBannerTemplate: z.enum(BANNER_TEMPLATES).optional(),
   })
   .refine((pin) => pin.visualFormat !== 'text-overlay' || !!pin.overlayText?.trim(), {
     message: 'overlayText is required when visualFormat is text-overlay',
