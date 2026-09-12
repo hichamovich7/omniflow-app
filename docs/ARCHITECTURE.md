@@ -204,6 +204,16 @@ Les SVG v2 restent statiques, traçables par Next.js et rendus par Sharp. `{{ACC
 
 Cette phase étend seulement le langage visuel. Elle n'ajoute ni Strategy Engine, ni mapping déterministe angle→template, ni Template Auto scoré. Curiosity et Lite sont fusionnés dans `minimal`; l'expression éditoriale/list-style est couverte par `magazine` sans prétendre isoler ou agrandir automatiquement un chiffre. Une hiérarchie numérique dédiée attend une information d'angle fiable dans une phase ultérieure.
 
+### Pinterest Strategy Engine (TASK-FIX-028 / Phase 4)
+
+La réponse FAST expose maintenant un `angle` canonique parmi `curiosity`, `problem-solution`, `listicle`, `discovery` et `article-promise`. Ce champ est transitoire : `openRouterPinsResponseSchema` le valide, `validatePinterestStrategyBatch()` contrôle le lot, puis `selectHeadlineTemplateForAngle()` produit la valeur `title_banner_template` déjà persistée. `angle` n'entre pas dans l'objet Supabase et ne nécessite donc aucune migration.
+
+Pour un lot complet de 5, chaque angle doit apparaître exactement une fois ; pour 10, exactement deux fois. Les deux variantes d'un même angle doivent conserver des titres structurellement distincts ainsi que des promesses et scènes non dupliquées. La similarité est calculée localement sur des tokens Unicode normalisés, sans appel réseau supplémentaire.
+
+Les claims sensibles sont contrôlés avant insertion. Un nombre présent dans le titre ou la description doit exister dans le mot-clé ou le contexte d'analyse source. Les familles multilingues `free` et `beginner/easy` doivent également être confirmées par cette source. En cas d'échec de couverture, diversité ou grounding, la génération passe à `failed` avec un message récupérable ; aucun Pin partiel invalide n'est inséré.
+
+Le mapping Headline est déterministe : Curiosity → `minimal`/`editorial`, Problem→Solution → `editorial`/`split`, Listicle → `magazine`, Discovery → `minimal`/`editorial`, Article Promise → `editorial`/`split`. Le CTA conserve le choix IA et le clamp de niche existants. Le renderer n'est pas modifié.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

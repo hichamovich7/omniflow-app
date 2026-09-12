@@ -411,6 +411,8 @@ Phase 2 sélectionne désormais automatiquement le headline entre une zone haute
 
 Phase 3 ajoute quatre familles visuelles premium sans exposer de nouveaux réglages : `editorial` privilégie une hiérarchie forte et cadrée, `minimal` la respiration et la discrétion, `split` une composition asymétrique qui préserve davantage la photo, et `magazine` une carte éditoriale avec keyline. Chaque famille possède un Headline expressif et un CTA compact cohérents, utilise la couleur de texte adaptative de Phase 2 et conserve Inter pour une sortie déterministe et multilingue. Le choix reste automatique via le mécanisme existant ; aucun sélecteur Template ni panneau avancé n'est ajouté à l'interface dans cette phase.
 
+Phase 4 améliore la diversité visible sans ajouter de contrôle au formulaire : un lot de 5 vise les cinq angles une fois, et un lot de 10 deux variantes distinctes par angle. Le Headline reçoit automatiquement une famille cohérente avec son angle, tandis que le CTA reste inchangé. Les titres quasi identiques et les promesses non sourcées sont bloqués avant création, avec le message d'échec de génération existant et la possibilité de réessayer.
+
 ---
 
 ### Website URL

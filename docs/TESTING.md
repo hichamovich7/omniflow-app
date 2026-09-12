@@ -381,6 +381,31 @@ Final Phase 3 validation (2026-09-12): TypeScript OK, ESLint OK, renderer 27/27,
 
 ---
 
+# Pinterest Strategy Engine (TASK-FIX-028 / Phase 4)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-strategy.spec.ts --project=renderer --reporter=list
+```
+
+Coverage:
+
+* `angle` is required and restricted to the five canonical values.
+* Complete 5-pin batches require one occurrence of every angle; complete 10-pin batches require two.
+* Valid 10-pin batches accept two distinct variants per angle.
+* Missing angle coverage and titles that differ only by a minor modifier are rejected.
+* Repeated promises/scenes within the same angle are rejected without penalizing normal shared niche vocabulary.
+* Numbers plus multilingual free and beginner/easy claims are rejected unless source evidence confirms them.
+* Each angle maps to the expected Templates v2 family, including niche-compatible fallback behavior.
+* Prompt snapshots assert exact 5/10 distribution, grounded-claim rules, keyword distribution, and the structured JSON field.
+
+The ten Strategy Engine cases are pure and offline: no Supabase, provider, image generation, renderer, storage, or authenticated browser session.
+
+Current local validation (2026-09-12): TypeScript OK, ESLint OK, focused Strategy Engine 10/10, full renderer 44/44, production build OK, and `git diff --check` OK.
+
+---
+
 # Image Analysis
 
 ---

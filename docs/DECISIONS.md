@@ -1359,6 +1359,30 @@ TASK-FIX-027 / Phase 3 : Templates v2 sous forme de familles Headline/CTA, sans 
 
 ---
 
+## 2026-09-12 (5)
+
+### Decision
+
+TASK-FIX-028 / Phase 4 : structurer les angles Pinterest dans une couche stratégique transitoire, sans migration.
+
+### Decision Taken
+
+* `angle` devient obligatoire dans la réponse FAST avec cinq valeurs canoniques : `curiosity`, `problem-solution`, `listicle`, `discovery`, `article-promise`.
+* Un lot complet de 5 exige une occurrence par angle ; un lot complet de 10 en exige deux. Les réponses partielles conservent la tolérance historique sur le nombre de Pins mais restent soumises aux contrôles de titres et de claims.
+* La diversité est vérifiée localement avec une similarité de tokens Unicode. Les titres quasi identiques sont rejetés globalement ; les paires d'un même angle dans un lot de 10 ne peuvent pas dupliquer presque exactement promesse ou scène.
+* Les nombres du titre/de la description doivent être présents dans le mot-clé ou le contexte d'analyse. Les claims multilingues `free` et `beginner/easy` sont refusés sans confirmation équivalente dans cette source.
+* Le template Headline est dérivé de l'angle et de son occurrence, puis intersecté avec les templates autorisés par niche. Le CTA conserve le choix et le clamp existants.
+* L'angle est consommé avant `pinsToInsert` et n'est pas persisté. La valeur utile durable reste `title_banner_template`, déjà supportée par le schéma.
+
+### Consequences
+
+* Aucun changement du renderer, de Supabase, des routes publiques, providers, crédits, storage ou anciens Pins.
+* Une réponse structurellement valide mais insuffisamment diverse ou non sourcée échoue avant insertion avec un état de génération récupérable.
+* Le prompt passe à `pinterest-pins-v9` et n'utilise plus d'exemples qui inventent automatiquement `7`, `free` ou `easy`.
+* Dix tests offline couvrent validation, distribution, diversité, grounding, mapping et contrat du prompt.
+
+---
+
 ## 2026-09-12 (2)
 
 ### Decision

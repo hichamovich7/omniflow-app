@@ -1,6 +1,15 @@
 export const SUPPORTED_LANGUAGES = ['en', 'de', 'es', 'fr'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
+export const PINTEREST_ANGLES = [
+  'curiosity',
+  'problem-solution',
+  'listicle',
+  'discovery',
+  'article-promise',
+] as const;
+export type PinterestAngle = (typeof PINTEREST_ANGLES)[number];
+
 export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   en: 'English',
   de: 'Deutsch',
@@ -19,6 +28,7 @@ export interface GenerateRequest {
 }
 
 export interface GeneratedPin {
+  angle: PinterestAngle;
   title: string;
   description: string;
   keywords: string;

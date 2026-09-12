@@ -6,6 +6,10 @@
 
 # ACTIVE TASK
 
+TASK-FIX-028 / Phase 4 (Pinterest Strategy Engine) is implemented locally and awaiting validation. Do not commit Phase 4 automatically.
+
+Implemented scope: structured five-angle enum; exact 1× coverage for complete 5-pin batches and 2× coverage for complete 10-pin batches; language-agnostic near-duplicate title checks; distinct-promise/scene checks for paired variants; source-grounded number, free, and beginner/easy guards; deterministic angle→Headline-template mapping; prompt v9; and ten focused tests. Angle remains transient, so no DB migration or renderer change is required.
+
 TASK-FIX-030 (Remove silent Gemini fallback on `AI_IMAGE_MODEL_TEXT`) completed 2026-09-12 — see DECISIONS.md and CHANGELOG.md. `resolveImageModel('text-overlay')` now requires `AI_IMAGE_MODEL_TEXT` explicitly and throws if unset/empty; no more hardcoded `google/gemini-3.1-flash-image` fallback. `photo` routing unchanged.
 
 TASK-FIX-027 / Phase 3 (Pinterest Templates v2) completed and manually validated 2026-09-12. Phase 4 must not begin automatically.

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SUPPORTED_LANGUAGES, PINS_OPTIONS } from '@/types/pinterest';
+import { PINTEREST_ANGLES, SUPPORTED_LANGUAGES, PINS_OPTIONS } from '@/types/pinterest';
 
 export const TEXT_OVERLAY_MODES = ['auto', 'always', 'never'] as const;
 export type TextOverlayMode = (typeof TEXT_OVERLAY_MODES)[number];
@@ -52,6 +52,7 @@ export const generatePinsSchema = z.object({
 
 const pinResponseSchema = z
   .object({
+    angle: z.enum(PINTEREST_ANGLES),
     title: z.string().max(100),
     description: z.string().max(500),
     keywords: z.string(),
@@ -59,11 +60,9 @@ const pinResponseSchema = z
     image_prompt: z.string(),
     visualFormat: z.enum(['photo', 'text-overlay']),
     overlayText: z.string().max(80).optional(),
-    // Independently chosen per banner (TASK-FIX-024) — the top title hook only
-    // exists when visualFormat is 'text-overlay', the bottom CTA banner is
-    // composited on every pin regardless of visualFormat. Both optional here:
-    // the server clamps/defaults them against the niche's allowed list
-    // (lib/ai/niche-visual-conventions.ts) rather than rejecting the response.
+    // Kept optional for compatibility with earlier model responses. Phase 4
+    // derives the Headline template from angle; the CTA remains model-chosen
+    // and is clamped against the niche's allowed list server-side.
     titleBannerTemplate: z.enum(BANNER_TEMPLATES).optional(),
     ctaBannerTemplate: z.enum(BANNER_TEMPLATES).optional(),
   })

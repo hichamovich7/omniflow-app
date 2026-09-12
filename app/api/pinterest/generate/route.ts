@@ -11,6 +11,10 @@ import { buildVisionStyleAnalysisPrompt } from '@/lib/ai/prompts/vision-style-an
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { buildImageAnalysisContext } from '@/lib/vision/context';
+import {
+  selectHeadlineTemplateForAngle,
+  validatePinterestStrategyBatch,
+} from '@/lib/pinterest/strategy';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
@@ -246,6 +250,24 @@ export async function POST(request: Request) {
       );
     }
 
+    const strategyIssues = validatePinterestStrategyBatch(
+      validated.data.pins,
+      pinsRequested,
+      [keyword, analysisContext].filter(Boolean).join('\n')
+    );
+    if (strategyIssues.length > 0) {
+      console.error(`[${PROMPT_ID}] Strategy validation failed:`, strategyIssues);
+      const errorMessage = 'AI returned Pinterest content that failed strategy safeguards. Try again.';
+      await supabase
+        .from('generations')
+        .update({ status: 'failed', error_message: errorMessage })
+        .eq('id', generation.id);
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: errorMessage, code: 'generation_failed' } },
+        { status: 500 }
+      );
+    }
+
     const pinsGenerated = validated.data.pins.length;
 
     if (pinsGenerated < pinsRequested) {
@@ -265,26 +287,37 @@ export async function POST(request: Request) {
       DEFAULT_NICHE_CONVENTION.allowedBannerTemplates ??
       [...BANNER_TEMPLATES];
 
-    const pinsToInsert = validated.data.pins.map((pin, i) => ({
-      generation_id: generation.id,
-      language,
-      title: pin.title,
-      description: pin.description,
-      keywords: pin.keywords,
-      board: boardNames[i],
-      board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
-      image_prompt: pin.image_prompt,
-      visual_format: pin.visualFormat,
-      overlay_text: pin.overlayText ?? null,
-      // Only meaningful for text-overlay pins — left null on photo pins since
-      // no title banner is ever composited for them.
-      title_banner_template:
-        pin.visualFormat === 'text-overlay'
-          ? clampBannerTemplate(pin.titleBannerTemplate, allowedBannerTemplates)
-          : null,
-      cta_banner_template: clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates),
-      image_analysis: imageAnalysisJson,
-    }));
+    const angleOccurrences = new Map<string, number>();
+
+    const pinsToInsert = validated.data.pins.map((pin, i) => {
+      const angleOccurrence = angleOccurrences.get(pin.angle) ?? 0;
+      angleOccurrences.set(pin.angle, angleOccurrence + 1);
+
+      return {
+        generation_id: generation.id,
+        language,
+        title: pin.title,
+        description: pin.description,
+        keywords: pin.keywords,
+        board: boardNames[i],
+        board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
+        image_prompt: pin.image_prompt,
+        visual_format: pin.visualFormat,
+        overlay_text: pin.overlayText ?? null,
+        // Angle stays transient in Phase 4: it selects an existing persisted
+        // template value without requiring a new pins column or migration.
+        title_banner_template:
+          pin.visualFormat === 'text-overlay'
+            ? selectHeadlineTemplateForAngle(
+                pin.angle,
+                angleOccurrence,
+                allowedBannerTemplates
+              )
+            : null,
+        cta_banner_template: clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates),
+        image_analysis: imageAnalysisJson,
+      };
+    });
 
     const { error: pinsError } = await supabase.from('pins').insert(pinsToInsert);
 

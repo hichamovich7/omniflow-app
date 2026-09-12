@@ -18,6 +18,31 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-028: Pinterest Strategy Engine
+
+### Added
+
+* Structured `angle` output with five canonical values: `curiosity`, `problem-solution`, `listicle`, `discovery`, and `article-promise`.
+* `lib/pinterest/strategy.ts`: batch coverage, title-similarity, paired-variant diversity, source-grounding, and deterministic angle→Headline-template selection.
+* Runtime guards require one pin per angle for complete 5-pin batches and two genuinely different variants per angle for complete 10-pin batches.
+* Source-grounding rejects invented numbers and unconfirmed free or beginner/easy claims across English, French, Spanish, and German terms.
+* Ten focused Strategy Engine tests.
+
+### Changed
+
+* Pinterest prompt `v8` → `v9`: explicit angle field, exact 5/10 distribution, safer non-fabricated examples, structural title diversity, and natural main-keyword distribution across title, description, and keywords.
+* Headline template selection is now deterministic from the structured angle. CTA template selection and niche clamping keep their existing behavior.
+
+### Validation
+
+* TypeScript OK, ESLint OK, 10/10 focused Strategy Engine tests, full renderer 44/44, production build OK, and `git diff --check` OK.
+
+### Compatibility
+
+* Angle is consumed during generation and is not persisted. Existing `title_banner_template` stores the mapped template, so no DB migration, renderer, route contract, provider, credits, storage, history, or old-Pin change is required.
+
+---
+
 ## TASK-FIX-030: Remove silent Gemini fallback on `AI_IMAGE_MODEL_TEXT`
 
 ### Changed

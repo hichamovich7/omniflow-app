@@ -5,7 +5,7 @@ import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
 
-export const PROMPT_ID = 'pinterest-pins-v8';
+export const PROMPT_ID = 'pinterest-pins-v9';
 
 interface PromptContext {
   keyword: string;
@@ -124,14 +124,22 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
   const bannerTemplateInstruction =
     `- ctaBannerTemplate: choose the visual shape for the bottom "save this pin" CTA banner, one of: ${bannerTemplateOptions}. Base the choice on the scene's mood and how long the CTA text is likely to be — never pick "pill" for anything longer than a very short 2-4 word phrase.` +
     (effectiveTextOverlayMode !== 'never'
-      ? `\n- titleBannerTemplate (only when visualFormat is "text-overlay"): choose the visual shape for the top title-hook banner, from the same options as ctaBannerTemplate. Again, avoid "pill" whenever overlayText is longer than a short 2-4 word phrase — its shape is too narrow for more.`
+      ? `\n- Do not include titleBannerTemplate. The server selects the Headline template deterministically from angle and the niche's allowed templates.`
       : '');
+
+  const angleDistributionInstruction =
+    ctx.pinsRequested === 5
+      ? 'Use each of the five angles exactly once in this batch.'
+      : ctx.pinsRequested === 10
+        ? 'Use each of the five angles exactly twice. The two pins sharing an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
+        : 'Balance the five angles across the batch and use every angle once before repeating one whenever the batch size allows it.';
 
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
 
   const user = `Generate ${ctx.pinsRequested} unique Pinterest pins for the keyword: "${ctx.keyword}"
 
 For each pin, provide:
+- angle: exactly one of "curiosity", "problem-solution", "listicle", "discovery", "article-promise"
 - title: SEO-optimized Pinterest title (max 100 characters)
 - description: SEO-optimized Pinterest description with call to action (max 500 characters)
 - keywords: 10 to 15 relevant Pinterest keywords, comma separated, no hashtags
@@ -142,13 +150,16 @@ ${bannerTemplateInstruction}
 
 Rules:
 - Each pin must be unique. Do not repeat titles, descriptions, or image scenes.
-- Titles must use one of these 5 angles, keeping the main keyword naturally included and staying within 100 characters:
-  - Curiosity: create an information gap (e.g. "7 Modern Living Room Ideas You'll Want to Copy")
-  - Problem → Solution: name a precise problem (e.g. "Small Living Room? Try These 7 Space-Saving Ideas")
-  - Listicle: promise multiple ideas without naming them (e.g. "7 Modern Living Room Ideas for a Stylish Home")
-  - Discovery: spark the urge to find out more (e.g. "These Modern Living Rooms Look More Expensive Than They Are")
-  - Article Promise: promise exactly what the article delivers without revealing it (e.g. "7 Modern Living Room Ideas + Easy Styling Tips")
-- Across the pins in this generation, vary the title angle — choose from Curiosity, Problem→Solution, Listicle, Discovery, Article Promise, using each angle no more than twice before repeating.
+- Every title must follow its structured angle and stay within 100 characters:
+  - curiosity: create a specific information gap without revealing the answer (e.g. "The Small-Bathroom Detail Most Makeovers Miss").
+  - problem-solution: name a real problem and promise a relevant path forward without fabricating a result (e.g. "Short on Bathroom Storage? Start With These Spaces").
+  - listicle: promise multiple useful ideas; use an unnumbered list framing unless the source explicitly confirms an exact count (e.g. "Small Bathroom Storage Ideas Worth Saving").
+  - discovery: surface a fresh observation or unexpected direction (e.g. "Small Bathroom Storage Can Look This Calm").
+  - article-promise: state the article's grounded value without revealing the full answer (e.g. "A Practical Guide to Small Bathroom Storage").
+- ${angleDistributionInstruction}
+- Titles must differ in sentence structure and promise, not only by one adjective, number, or synonym. Do not start every title with the main keyword.
+- Distribute the main keyword naturally across title, description, and keywords. Preserve its meaning in every pin, but vary its exact placement; the keywords field must include the main keyword or a faithful localized equivalent.
+- Never invent a number, quantity, result, discount, availability claim, or content attribute. In particular, do not use "free" or a translated equivalent, and do not claim "beginner", "easy", or translated equivalents, unless the keyword or supplied source/context explicitly confirms that exact fact. An angle is not evidence. If an exact list count is not confirmed, write an unnumbered list-style title.
 - The description must give enough information to attract interest, but not enough to satisfy the curiosity created by the title — never state the specific technique, number, or answer that the article reveals. End on an open loop that only clicking through resolves. Keep the natural keyword integration and call to action, but the CTA must point toward discovering something ("see how", "find out which"), never restate the content itself. Stay within 500 characters.
 - Keywords must be relevant to the pin topic, no duplicates across pins.
 - Board name must be a real, specific Pinterest board category.
@@ -161,6 +172,7 @@ Respond with this exact JSON structure:
 {
   "pins": [
     {
+      "angle": "curiosity",
       "title": "...",
       "description": "...",
       "keywords": "keyword1, keyword2, keyword3, ...",
@@ -168,7 +180,6 @@ Respond with this exact JSON structure:
       "image_prompt": "...",
       "visualFormat": "photo",
       "overlayText": "...",
-      "titleBannerTemplate": "clean-band",
       "ctaBannerTemplate": "clean-band"
     }
   ]

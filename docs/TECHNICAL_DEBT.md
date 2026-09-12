@@ -10,19 +10,29 @@ Se implementarán cuando el proyecto lo justifique.
 
 ---
 
-# Pinterest Renderer — limites après Templates v2
+# Pinterest Strategy + Renderer — limites après Phase 4
 
 ## État actuel
 
 La dette locale identifiée après Phase 1 est résolue : le renderer mesure la luminosité, le contraste, la variance et l'edge density dans deux zones candidates, applique des safe areas proportionnelles et renforce localement le contraste uniquement si nécessaire. Templates v2 ajoute quatre familles rôle-aware sans casser les cinq formes historiques.
 
-## Amélioration suivante
+## Limite historique résolue en Phase 4
+
+Le paragraphe suivant décrit l'état constaté avant le Strategy Engine et est conservé comme contexte historique.
 
 Le choix du template reste produit par le mécanisme IA existant puis validé côté serveur ; il n'existe pas encore de Strategy Engine ni de scoring déterministe angle→template. La hiérarchie numérique d'un vrai Listicle n'est pas isolée tant que l'angle n'est pas une donnée fiable. Le moteur ne comprend toujours pas le contenu sémantique : aucune détection de visage, personne, meuble, vêtement ou objet. `visualComplexity` désigne seulement une heuristique locale de variance et d'arêtes. Toute protection sémantique du sujet reste une phase ultérieure distincte, à justifier par une validation produit et une analyse coût/latence.
 
-## Priorité
+## Priorité historique
 
 Moyenne pour une future stratégie angle→template mesurable ; basse pour la vision sémantique tant que les tests réels ne montrent pas d'occlusion récurrente. Ne pas ajouter de Vision API préventivement.
+
+---
+
+## Limites actuelles
+
+L'angle n'est pas persisté : il ne peut donc pas encore être affiché dans l'historique, analysé par CTR ni réutilisé lors d'une régénération séparée. Le contrôle de grounding connaît uniquement le mot-clé et le contexte d'analyse, pas le contenu complet d'une URL non analysée. Le moteur ne comprend toujours pas le contenu sémantique de l'image : `visualComplexity` reste une heuristique locale, sans détection de visage ou d'objet.
+
+Une migration d'angle ne sera justifiée que par un besoin produit d'analytics ou de filtres. La vision sémantique reste basse priorité tant que les tests réels ne montrent pas d'occlusion récurrente.
 
 ---
 
