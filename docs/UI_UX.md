@@ -407,6 +407,8 @@ Pinterest image previews in the generation grid, Pin detail dialog, Boards cards
 
 Phase 1 garantit la géométrie et la lisibilité interne des bandeaux, mais ne choisit pas encore leur emplacement selon le contenu réel de la photo. Phase 2 ajoute uniquement un contraste local et des safe areas géométriques simples ; elle ne prétend pas détecter les visages, objets ou sujets.
 
+Phase 2 sélectionne désormais automatiquement le headline entre une zone haute et une zone basse sûre, cette dernière restant au-dessus du CTA fixe. Le texte passe automatiquement en clair ou sombre selon le fond effectif local. Un support semi-transparent limité à la zone du texte n'apparaît que si les deux positions échouent sans lui. Les marges sûres sont proportionnelles, donc identiques visuellement pour les sorties 1024×1536 et 1000×1500. Aucun contrôle utilisateur ni nouveau CTA n'est ajouté.
+
 ---
 
 ### Website URL

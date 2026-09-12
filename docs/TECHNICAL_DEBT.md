@@ -10,19 +10,19 @@ Se implementarán cuando el proyecto lo justifique.
 
 ---
 
-# Pinterest Renderer — limites après Phase 1
+# Pinterest Renderer — limites après Phase 2
 
 ## État actuel
 
-Phase 1 mesure précisément le texte, respecte les zones internes des templates et conserve le Pin complet dans les previews. Le placement top/bottom ne tient cependant pas encore compte de la luminosité, du contraste ou de la complexité visuelle locale de la photo finale.
+La dette locale identifiée après Phase 1 est résolue : le renderer mesure maintenant la luminosité, le contraste, la variance et l'edge density dans deux zones candidates, applique des safe areas proportionnelles et renforce localement le contraste uniquement si nécessaire.
 
 ## Amélioration suivante
 
-Phase 2 doit ajouter une analyse locale Sharp, des safe areas proportionnelles, un choix limité de zones candidates, une couleur claire/sombre automatique et un overlay subtil seulement si nécessaire. Cette heuristique ne doit pas être décrite comme une détection de sujet ; la vision sémantique reste une évolution séparée et non planifiée dans cette phase.
+Le moteur ne comprend toujours pas le contenu sémantique : aucune détection de visage, personne, meuble, vêtement ou objet. `visualComplexity` désigne seulement une heuristique locale de variance et d'arêtes. Une éventuelle protection sémantique du sujet nécessiterait une Phase 3 distincte, une validation produit et une analyse de coût/latence avant implémentation.
 
 ## Priorité
 
-Haute pour la fiabilité visuelle des Pins avec headline ; aucun changement de schéma, provider ou route n'est requis.
+Basse tant que les tests manuels sur des photos réelles ne montrent pas d'occlusion récurrente du sujet. Ne pas ajouter de Vision API préventivement.
 
 ---
 

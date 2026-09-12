@@ -127,9 +127,9 @@ export const BANNER_TEMPLATE_SPECS: Record<BannerTemplate, BannerTemplateSpec> =
     width: 1024,
     height: 150,
     textArea: {
-      x: 16,
+      x: 32,
       y: 15,
-      width: 344,
+      width: 328,
       height: 120,
       paddingX: 20,
       paddingY: 12,

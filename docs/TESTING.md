@@ -333,6 +333,32 @@ Latest Phase 1 validation (2026-09-12): TypeScript OK, ESLint OK, renderer 10/10
 
 ---
 
+# Pinterest Local Contrast + Safe Areas (TASK-FIX-026 / Phase 2)
+
+The same offline command now runs 22 renderer tests:
+
+```bash
+npx playwright test --project=renderer --reporter=list
+```
+
+Phase 2 coverage:
+
+* Very light and very dark images select `#141414` and `#FFFFFF` respectively.
+* Top-light/bottom-dark and top-dark/bottom-light regions are measured independently.
+* Busy-top/calm-bottom and calm-top/busy-bottom fixtures select the calmer readable zone.
+* A high-variance full-frame fixture requires a bounded local overlay; uniform fixtures require none.
+* Headline text remains inside 5% horizontal / 4% vertical safe areas at 1024×1536 and 1000×1500.
+* The lower headline candidate remains above the fixed CTA in the real two-composition sequence.
+* Final PNG dimensions remain unchanged.
+* Phase 1 versus Phase 2 artifacts are written to the ignored `test-results/pinterest-phase2/` directory.
+* The performance case writes `performance.json`; isolated reference result: 39.9 ms Phase 1 versus 98.4 ms Phase 2 (+58.5 ms, 2.47×). Guards: under 250 ms added and under 4×.
+
+All fixtures are local SVGs and all analysis is Sharp-only. No AI, network, database, Supabase, upload, or authenticated browser session is involved.
+
+Final automated validation (2026-09-12): TypeScript OK, ESLint OK, renderer 22/22, global Playwright 22 passed / 18 intentionally skipped, production build OK, and `git diff --check` OK. Manual validation on newly generated real Pins was completed 2026-09-12 before the Phase 2 commit.
+
+---
+
 # Image Analysis
 
 ---

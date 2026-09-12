@@ -18,7 +18,38 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
-No planned changes.
+## TASK-FIX-026: Pinterest Local Contrast + Simple Safe Areas
+
+### Added
+
+* `lib/pinterest/local-contrast.ts`: local top/bottom region analysis from the generated image pixels with mean luminance, 10th/90th-percentile local contrast, luminance variance, edge density, and a bounded visual-complexity score.
+* Proportional safe areas: 5% horizontal and 4% vertical at both 1024×1536 and 1000×1500.
+* Candidate diagnostics for position, bounding box, brightness, local contrast, variance, edge density, visual complexity, light/dark text contrast, optional overlay, safe-area score, text-fit score, and final score.
+* Eight deterministic SVG fixtures: `light-top`, `dark-top`, `light-bottom`, `dark-bottom`, `busy-top`, `busy-bottom`, `split-light-dark`, and `split-busy-calm`.
+* Twelve Phase 2 renderer tests, bringing the offline renderer suite to 22 tests, plus Phase 1/Phase 2 visual comparisons and an isolated performance benchmark.
+
+### Changed
+
+* Headline placement now evaluates top and bottom, with the bottom candidate reserved above the fixed CTA. The CTA stays in its existing bottom role.
+* Text color is selected from the actual effective local background using `#FFFFFF` and `#141414`, targeting at least 4.5:1 for 90% of sampled pixels.
+* Both candidate zones are tried without reinforcement first. Only if neither is readable, a local darkening/lightening support layer is tested at bounded opacities from 0.12 to 0.36.
+* Top and bottom banner placement now uses proportional safe margins. The `corner-tag` text box was inset to keep its left-aligned text inside the 5% horizontal safe area.
+
+### Fallbacks
+
+* Preferred safe zone without overlay → alternate safe zone without overlay → both zones with the lightest sufficient local overlay → neutral `clean-band` at controlled opacity → `BannerCompositionError`.
+
+### Performance
+
+* Isolated 1000×1500 benchmark on `split-busy-calm`: Phase 1 average 39.9 ms, Phase 2 average 98.4 ms, approximately +58.5 ms / 2.47× for the local renderer. Automated guards require less than 250 ms added overhead and less than 4× on the test host.
+
+### Validation
+
+* TypeScript OK, ESLint OK, renderer 22/22, global Playwright 22 passed / 18 intentionally skipped, production build OK, and `git diff --check` OK.
+
+### Compatibility
+
+* No semantic vision, network call, route-contract change, database/schema migration, provider, credits, storage, CSV, history, or existing-image rerender change. Phase 2 was manually validated 2026-09-12 and approved for release.
 
 ---
 

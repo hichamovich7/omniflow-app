@@ -60,7 +60,7 @@ function srgbChannelToLinear(c: number): number {
 
 // WCAG 2.0 relative luminance — the standard, deterministic basis for contrast
 // ratio, not a hand-tuned brightness heuristic.
-function relativeLuminance(r: number, g: number, b: number): number {
+export function relativeLuminance(r: number, g: number, b: number): number {
   return (
     0.2126 * srgbChannelToLinear(r) +
     0.7152 * srgbChannelToLinear(g) +
@@ -68,7 +68,7 @@ function relativeLuminance(r: number, g: number, b: number): number {
   );
 }
 
-function contrastRatio(luminanceA: number, luminanceB: number): number {
+export function contrastRatio(luminanceA: number, luminanceB: number): number {
   const lighter = Math.max(luminanceA, luminanceB);
   const darker = Math.min(luminanceA, luminanceB);
   return (lighter + 0.05) / (darker + 0.05);

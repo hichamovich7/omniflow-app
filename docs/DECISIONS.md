@@ -1308,6 +1308,33 @@ TASK-FIX-025 : fiabilité du rendu Pinterest avant toute nouvelle famille de tem
 
 ---
 
+## 2026-09-12 (3)
+
+### Decision
+
+TASK-FIX-026 / Phase 2 : contraste local et safe areas simples sans vision sémantique.
+
+### Decision Taken
+
+* L'analyse se fait localement avec Sharp sur les pixels réels de l'image générée. Aucun provider, appel réseau, navigateur headless ou nouvelle donnée persistée.
+* Deux candidats seulement pour le headline : haut et bas au-dessus de l'espace CTA. Le CTA reste fixé en bas afin de préserver le comportement produit et de limiter le risque architectural.
+* Safe areas normalisées : 5% horizontal et 4% vertical, validées à 1024×1536 et 1000×1500. La zone interne de `corner-tag` est légèrement resserrée pour que son texte aligné à gauche respecte ces marges.
+* Les métriques portent leurs vrais noms : `brightness`, `localContrast`, `localVariance`, `edgeDensity`, `visualComplexity`. Aucune prétention de `subjectDetection`.
+* Le contraste simule le mélange photo + remplissage SVG, compare `#FFFFFF` et `#141414`, et retient le 10e percentile des ratios. La cible interne est 4.5:1 sur au moins 90% des pixels échantillonnés.
+* Ordre de décision : tous les candidats sans overlay, puis tous avec le plus léger support local suffisant (opacités bornées 0.12–0.36), puis `clean-band` neutre, puis `BannerCompositionError`. La police ne descend jamais sous les minimums Phase 1.
+* Le score respecte l'ordre text fit → safe area → contraste → calme visuel. Une préférence pour le haut départage seulement deux candidats autrement équivalents.
+* `compositeBanner()` reste compatible avec la route existante ; une variante diagnostique séparée fournit les mesures aux tests sans ajouter de logs de production.
+
+### Consequences
+
+* Les anciens templates, `media_url`, `pin_images`, versions, historique, CSV, PNG, routes, Supabase, providers et crédits sont conservés. Aucun ancien Pin n'est rerendu.
+* Douze nouveaux tests portent le total renderer à 22/22, avec huit fixtures locales, comparaisons visuelles et vérification du non-chevauchement avec le CTA.
+* Benchmark isolé 1000×1500 : 39.9 ms avant, 98.4 ms après, soit environ +58.5 ms / 2.47× sur le compositeur local. Cette hausse reste faible face à la génération IA ; un garde-fou échoue au-delà de +250 ms ou 4× sur le poste de test.
+* Limite assumée : une zone visuellement calme peut contenir un visage ou un objet important. La détection sémantique reste une option de Phase 3, à justifier par les tests manuels réels.
+* Phase 2 a été validée manuellement le 2026-09-12 avant commit.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

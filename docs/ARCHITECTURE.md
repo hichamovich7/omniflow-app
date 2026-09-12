@@ -186,6 +186,16 @@ TASK-FIX-025 remplace la partie typographique de ce mécanisme sans changer le c
 
 Le chemin principal reste explicitement : **AI image generation → SVG/Sharp deterministic text rendering**. Cette séparation garantit le texte exact, la reproductibilité, le contrôle typographique et du layout, la prise en charge multilingue et un coût inférieur à une régénération IA pour corriger uniquement du texte. Le texte intégré directement par un modèle IMAGE n'est pas supprimé comme possibilité future : il reste une option expérimentale éventuelle, mais n'est pas le chemin de production principal.
 
+### Local Contrast + Simple Safe Areas (TASK-FIX-026 / Phase 2)
+
+`lib/pinterest/local-contrast.ts` analyse directement le buffer généré, sans réseau. Pour chaque zone candidate, une grille locale calcule la luminance moyenne, le contraste entre percentiles 10/90, la variance de luminance et l'edge density. `visualComplexity` combine uniquement variance et densité d'arêtes ; ce terme ne signifie pas et ne doit jamais être présenté comme une détection de sujet.
+
+Le headline possède deux candidats : haut, puis bas dans une bande réservée au-dessus du CTA. Le CTA conserve un unique candidat bas. Les safe areas sont proportionnelles (5% horizontal, 4% vertical) et les bounding boxes globales du texte doivent y rester entièrement contenues. Le scoring est volontairement hiérarchique : text fit, safe area, contraste effectif plafonné à la cible 4.5:1, puis calme visuel ; la préférence historique pour le haut ne sert que de dernier départage.
+
+Le contraste est calculé sur le fond effectif simulé pixel par pixel après mélange de la photo avec le remplissage SVG à 0.62, et utilise le 10e percentile des ratios obtenus : au moins 90% de la région échantillonnée doit atteindre la valeur retenue. Le moteur teste `#FFFFFF` et `#141414`. Il évalue d'abord tous les candidats sans renforcement ; si aucun n'atteint 4.5:1, il teste un support local sombre/clair semi-transparent limité à 0.12–0.36. Si cela reste insuffisant, un `clean-band` neutre contrôlé est tenté avant `BannerCompositionError`.
+
+`compositeBannerWithDiagnostics()` expose les métriques aux tests, tandis que `compositeBanner()` conserve sa signature et son retour `Buffer` pour la route existante. Aucun log de production, prompt, donnée utilisateur ou URL privée n'est ajouté.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.
