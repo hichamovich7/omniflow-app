@@ -18,6 +18,28 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-030: Remove silent Gemini fallback on `AI_IMAGE_MODEL_TEXT`
+
+### Changed
+
+* `lib/ai/services/image.ts`: `resolveImageModel('text-overlay')` no longer falls back to a hardcoded `google/gemini-3.1-flash-image` when `AI_IMAGE_MODEL_TEXT` is unset. It now requires the env var explicitly (trimmed, non-empty) and throws a clear error naming `AI_IMAGE_MODEL_TEXT` otherwise.
+* `.env.example`: `AI_IMAGE_MODEL_TEXT` no longer ships an active default value; a commented example is kept for guidance.
+* `photo` routing (`AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL`), OpenRouter/OpenAI providers, Supabase persistence, and the credits flow are unchanged.
+
+### Added
+
+* `tests/renderer/ai-image-model.spec.ts`: `AI_IMAGE_MODEL_TEXT` set → configured model used; unset/empty/whitespace → throws naming the variable; `photo` → behavior unchanged (existing `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL` resolution, unaffected by `AI_IMAGE_MODEL_TEXT`).
+
+### Breaking
+
+* Deployments generating `text-overlay` pins must now set `AI_IMAGE_MODEL_TEXT` explicitly — leaving it unset previously produced Gemini silently, now it fails fast at generation time instead.
+
+### Validation
+
+* TypeScript OK, ESLint OK, targeted Playwright renderer tests passed, production build OK, `git diff --check` OK.
+
+---
+
 ## TASK-FIX-027: Pinterest Templates v2
 
 ### Added

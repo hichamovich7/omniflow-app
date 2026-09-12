@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-030 (Remove silent Gemini fallback on `AI_IMAGE_MODEL_TEXT`) completed 2026-09-12 — see DECISIONS.md and CHANGELOG.md. `resolveImageModel('text-overlay')` now requires `AI_IMAGE_MODEL_TEXT` explicitly and throws if unset/empty; no more hardcoded `google/gemini-3.1-flash-image` fallback. `photo` routing unchanged.
+
 TASK-FIX-027 / Phase 3 (Pinterest Templates v2) completed and manually validated 2026-09-12. Phase 4 must not begin automatically.
 
 Implemented scope: role-aware Headline/CTA variants; `editorial`, `minimal`, `split`, and `magazine` families; eight static SVG assets; controlled Inter typography; Phase 2 contrast/safe-area reuse; deterministic visual contact sheet; and five new renderer tests (27/27 total). No Strategy Engine, angle scoring, template auto-selector, provider, route contract, schema, credits, storage, history, CSV, or old-image mutation.

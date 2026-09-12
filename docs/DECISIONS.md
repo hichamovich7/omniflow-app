@@ -1359,6 +1359,32 @@ TASK-FIX-027 / Phase 3 : Templates v2 sous forme de familles Headline/CTA, sans 
 
 ---
 
+## 2026-09-12 (2)
+
+### Decision
+
+TASK-FIX-030 — Suppression du fallback silencieux `google/gemini-3.1-flash-image` sur `AI_IMAGE_MODEL_TEXT`
+
+### Context
+
+`lib/ai/services/image.ts` définissait `IMAGE_TEXT_MODEL_DEFAULT = 'google/gemini-3.1-flash-image'`, utilisé via `process.env.AI_IMAGE_MODEL_TEXT ?? IMAGE_TEXT_MODEL_DEFAULT` pour tout pin `visualFormat = 'text-overlay'` (routage introduit TASK-034, 2026-07-27). Problème constaté : commenter/retirer `AI_IMAGE_MODEL_TEXT` de l'environnement ne désactive pas Gemini — le fallback codé en dur vaut exactement la même valeur, donc le modèle reste sélectionné silencieusement sans qu'aucune variable d'environnement active ne le déclare. Un opérateur pensant avoir retiré Gemini du chemin de génération (`.env` modifié, déploiement redémarré) continuerait donc à le voir utilisé, sans erreur ni avertissement.
+
+### Decision Taken
+
+Le fallback en dur est supprimé. `resolveImageModel('text-overlay')` lit désormais `process.env.AI_IMAGE_MODEL_TEXT`, `trim()`, et si la valeur est absente, vide ou composée uniquement d'espaces, lève une erreur explicite nommant `AI_IMAGE_MODEL_TEXT` plutôt que de retomber sur un modèle choisi par le code. Comportement `photo` (`AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL`, `getRoleConfig('IMAGE')`) inchangé — seule la branche `text-overlay` est concernée. Aucun changement de provider OpenRouter, de schéma Supabase, du système de crédits, ni de la signature publique de `resolveImageModel`/`generateImage`.
+
+`.env.example` : `AI_IMAGE_MODEL_TEXT` n'a plus de valeur par défaut active ; un exemple (`google/gemini-3.1-flash-image`) reste en commentaire à titre indicatif pour l'opérateur qui veut délibérément ce modèle.
+
+### Consequences
+
+* Toute génération `text-overlay` sans `AI_IMAGE_MODEL_TEXT` explicitement défini échoue immédiatement avec un message nommant la variable, au lieu de générer silencieusement avec Gemini
+* Les déploiements existants qui dépendaient du fallback implicite doivent désormais définir `AI_IMAGE_MODEL_TEXT` explicitement — changement cassant intentionnel pour ce cas précis, conforme à la demande (aucun fallback silencieux acceptable ici)
+* `pin_images.image_model` déjà enregistré sur des générations passées (TASK-FIX-018) n'est pas affecté rétroactivement — ces valeurs restent un historique figé
+* Tests ajoutés dans `tests/renderer/ai-image-model.spec.ts` (variable définie → modèle utilisé ; absente/vide/espaces → erreur ; `photo` → comportement inchangé)
+* `docs/CHANGELOG.md`, `docs/TASKS.md` mis à jour
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.
