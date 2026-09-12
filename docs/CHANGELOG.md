@@ -22,6 +22,39 @@ No planned changes.
 
 ---
 
+# [1.33.0] - 2026-09-12
+
+## TASK-FIX-025: Pinterest Rendering Reliability
+
+### Added
+
+* Declarative text bounding boxes and HEADLINE/CTA constraints for all five existing banner shapes.
+* Sharp/Pango text measurement and line rasterization using controlled Inter SemiBold/Bold TTF files from `@expo-google-fonts/inter`.
+* Word-boundary wrapping, balanced one-to-three-line headlines, measured overflow checks, and explicit clean-band fallback for compact templates.
+* Offline renderer coverage with four static fixtures, before/after artifacts, a five-template matrix, supported languages, special characters, and both 1024×1536 and 1000×1500.
+* Authenticated Playwright coverage for complete grid, detail, and versions previews on desktop and mobile.
+
+### Changed
+
+* Banner SVG files now own shape geometry only; `text-layout.ts` owns measured typography in the same proportional pixel coordinate system used for compositing.
+* CTA typography is secondary and single-line; headline typography remains dominant and may wrap to two or three lines.
+* Pinterest and Board previews use `object-contain` and preserve their 2:3 frame without a conflicting max-height crop.
+* Text in Images descriptions now explain that Never disables the headline while the existing always-on Save CTA remains.
+
+### Compatibility
+
+* No API, route, database schema, provider, credits, storage, CSV, history, or existing-image rerender change.
+
+### Validation
+
+* Phase 1 validated with TypeScript, ESLint, 10/10 offline renderer tests, the global Playwright suite (10 passed, 18 skipped), a production build, `git diff --check`, and a real manual rendering check.
+
+### Remaining limitation / next phase
+
+* Phase 1 does not inspect local image brightness or visual complexity. Phase 2 adds local contrast analysis and simple proportional safe areas with Sharp, without semantic vision or a schema change.
+
+---
+
 # [1.32.0] - 2026-09-12
 
 ## TASK-FIX-024: Multi-template banner compositing (static SVG shapes, AI-chosen, code-executed)

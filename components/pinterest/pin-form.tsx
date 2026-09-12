@@ -47,9 +47,9 @@ const TEXT_OVERLAY_LABELS: Record<TextOverlayMode, string> = {
 };
 
 const TEXT_OVERLAY_DESCRIPTIONS: Record<TextOverlayMode, string> = {
-  auto: "AI decides per pin whether to add text overlay, based on the pin's content type.",
-  always: 'Every pin will have text overlay (title/hook) rendered directly on the image.',
-  never: 'All pins will be pure photography, no text rendered on the images.',
+  auto: "AI decides per pin whether to add a headline overlay. The Save CTA is always added.",
+  always: 'Every pin gets a headline overlay. The Save CTA is also always added.',
+  never: 'Headline overlays are disabled. The Save CTA is still added to every image.',
 };
 
 interface BoardOption {

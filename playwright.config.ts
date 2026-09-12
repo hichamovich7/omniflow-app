@@ -1,7 +1,7 @@
 import { defineConfig, devices } from 'playwright/test';
 
 export default defineConfig({
-  testDir: './tests/playwright',
+  testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -11,7 +11,16 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
+    { name: 'renderer', testMatch: '**/renderer/*.spec.ts' },
+    {
+      name: 'chromium',
+      testMatch: '**/playwright/*.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'mobile-chrome',
+      testMatch: '**/playwright/*.spec.ts',
+      use: { ...devices['Pixel 5'] },
+    },
   ],
 });

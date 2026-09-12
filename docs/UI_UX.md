@@ -401,7 +401,11 @@ Required:
 No — default Auto
 ```
 
-Visible only when the selected Project's Niche has a text-overlay-capable visual convention (`lib/ai/niche-visual-conventions.ts`, TASK-034 — currently Personal Finance / Budgeting). Hidden entirely for any other Niche, including no Niche set. Auto lets the AI decide per pin (list/tip/checklist content gets a text overlay, concept/scene content stays a plain photo); Always forces every pin in the generation to a text overlay; Never forces every pin to a plain photo regardless of the Niche's default.
+Visible only when the selected Project's Niche has a text-overlay-capable visual convention (`lib/ai/niche-visual-conventions.ts`, TASK-034 — currently Personal Finance / Budgeting). Hidden entirely for any other Niche, including no Niche set. Auto lets the AI decide per pin whether to add a headline; Always forces a headline on every pin; Never disables the headline. The deterministic bottom "Save" CTA remains present in all three modes, so the selector descriptions state this explicitly instead of promising a completely text-free image.
+
+Pinterest image previews in the generation grid, Pin detail dialog, Boards cards, and image versions dialog preserve the complete 2:3 image with `object-contain`. No max-height constraint is allowed to collapse the preview frame and crop the top headline or bottom CTA.
+
+Phase 1 garantit la géométrie et la lisibilité interne des bandeaux, mais ne choisit pas encore leur emplacement selon le contenu réel de la photo. Phase 2 ajoute uniquement un contraste local et des safe areas géométriques simples ; elle ne prétend pas détecter les visages, objets ou sujets.
 
 ---
 

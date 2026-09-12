@@ -1282,6 +1282,32 @@ Depuis TASK-FIX-018/019/020, les deux bandeaux on-image (hook de titre en haut, 
 
 ---
 
+## 2026-09-12 (2)
+
+### Decision
+
+TASK-FIX-025 : fiabilité du rendu Pinterest avant toute nouvelle famille de templates.
+
+### Decision Taken
+
+* Les cinq SVG existants restent les sources de géométrie des formes, mais plus de typographie : chaque forme déclare maintenant une zone de texte dans `banner-templates/index.ts`, dans le même repère de référence 1024.
+* HEADLINE et CTA sont deux rôles séparés. Le headline utilise Inter Bold et jusqu'à 2–3 lignes selon la forme ; le CTA utilise Inter SemiBold, une taille inférieure et une seule ligne.
+* Mesure et rendu utilisent Sharp/Pango avec les mêmes TTF versionnés de `@expo-google-fonts/inter`. Le premier essai avec un WOFF2 plus léger a été rejeté après inspection visuelle : Pango retombait sur une police serif malgré des mesures géométriques valides. Les TTF ont supprimé ce fallback.
+* Le wrapping se fait uniquement aux limites de mots, avec recherche de lignes équilibrées et vérification des pixels rasterisés. Aucune troncature, césure silencieuse ou réduction sous la taille minimale n'est autorisée.
+* `pill` et `corner-tag` sont validés contre leur largeur intérieure réelle. Si la copie ne rentre pas, le renderer utilise explicitement `clean-band`; si ce fallback échoue, il lève `BannerCompositionError`.
+* Toutes les coordonnées sont converties une seule fois du repère 1024 vers les pixels de sortie. Les dimensions finales restent celles de l'image d'entrée et sont couvertes à 1024×1536 et 1000×1500.
+* Les previews affichent le Pin entier en 2:3 avec `object-contain`. Le mode Never conserve sa sémantique métier : il retire le headline, mais pas le CTA systématique ; seul le libellé est clarifié.
+* Le pipeline Pinterest conserve comme chemin principal : **AI image generation → SVG/Sharp deterministic text rendering**. Ce choix garantit le texte exact, la reproductibilité, le contrôle typographique et du layout, la prise en charge multilingue, et évite le coût d'une nouvelle génération IA lorsqu'une simple correction de texte suffit. Le texte intégré par le modèle IMAGE peut être réévalué plus tard comme option expérimentale, sans remplacer implicitement ce chemin principal.
+
+### Consequences
+
+* Aucune ancienne image n'est rerendue et aucun schéma, route, fournisseur, stockage ou export ne change.
+* Les tests renderer sont entièrement locaux. Les tests navigateur sur une génération réelle sont read-only et nécessitent un storage state authentifié plus une URL de génération.
+* La détection sémantique du sujet, le contraste local et les nouveaux templates v2 restent hors de cette phase.
+* La prochaine étape est Phase 2 — Local Contrast + Simple Safe Areas — avec analyse Sharp locale uniquement et validation manuelle avant tout commit.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

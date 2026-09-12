@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1500" viewBox="0 0 1000 1500">
+  <defs>
+    <pattern id="tiles" width="120" height="120" patternUnits="userSpaceOnUse">
+      <rect width="120" height="120" fill="#d8c1a3" />
+      <circle cx="30" cy="30" r="24" fill="#7f9f8d" />
+      <circle cx="90" cy="90" r="28" fill="#b66f62" />
+      <path d="M0 120 L120 0" stroke="#f6ead9" stroke-width="14" />
+    </pattern>
+  </defs>
+  <rect width="1000" height="1500" fill="url(#tiles)" />
+</svg>

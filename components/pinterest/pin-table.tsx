@@ -74,6 +74,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
           return (
             <div
               key={pin.id}
+              data-testid="pin-card"
               role="button"
               tabIndex={0}
               onClick={() => setDetailPin(pin)}
@@ -123,13 +124,14 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                       className="block"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="relative aspect-2/3 max-h-56 w-full overflow-hidden bg-muted">
+                      <div className="relative aspect-2/3 w-full overflow-hidden bg-muted" data-testid="pin-grid-preview">
                         <Image
                           src={pin.media_url}
                           alt={pin.title}
                           fill
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                          className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                          className="object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                          data-testid="pin-grid-preview-image"
                         />
                       </div>
                     </a>
@@ -167,7 +169,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                     </div>
                   </div>
                 ) : (
-                  <div className="flex aspect-2/3 max-h-56 w-full items-center justify-center bg-muted/50">
+                  <div className="flex aspect-2/3 w-full items-center justify-center bg-muted/50">
                     <div className="text-center">
                       <Sparkles className="mx-auto h-5 w-5 text-muted-foreground/30" />
                       <p className="mt-1.5 text-[10px] text-muted-foreground/40">AI Generated</p>

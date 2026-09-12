@@ -124,13 +124,14 @@ export function ImageVersionsDialog({
                     className="group/thumb relative block w-full"
                     aria-label={`Preview version ${v.version}`}
                   >
-                    <div className="relative aspect-2/3 w-full bg-muted">
+                    <div className="relative aspect-2/3 w-full bg-muted" data-testid="pin-version-preview">
                       <Image
                         src={v.url}
                         alt={`Version ${v.version}`}
                         fill
                         sizes="150px"
-                        className="object-cover"
+                        className="object-contain"
+                        data-testid="pin-version-preview-image"
                       />
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/thumb:bg-black/20">

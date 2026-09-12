@@ -28,17 +28,17 @@ export function BoardPinCard({ pin }: BoardPinCardProps) {
         className="rounded-xl border border-border/60 bg-card overflow-hidden cursor-pointer transition-all hover:shadow-sm hover:border-border"
       >
         {pin.media_url ? (
-          <div className="relative aspect-2/3 max-h-56 w-full overflow-hidden bg-muted">
+          <div className="relative aspect-2/3 w-full overflow-hidden bg-muted">
             <Image
               src={pin.media_url}
               alt={pin.title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover"
+              className="object-contain"
             />
           </div>
         ) : (
-          <div className="flex aspect-2/3 max-h-56 w-full items-center justify-center bg-muted/50">
+          <div className="flex aspect-2/3 w-full items-center justify-center bg-muted/50">
             <Sparkles className="h-5 w-5 text-muted-foreground/30" />
           </div>
         )}

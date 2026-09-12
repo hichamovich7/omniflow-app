@@ -3,14 +3,4 @@
     d="M 0 0 L 1024 0 L 1024 130 L 960 145 L 900 128 L 840 148 L 780 132 L 720 150 L 660 130 L 600 146 L 540 128 L 480 148 L 420 132 L 360 150 L 300 130 L 240 146 L 180 128 L 120 148 L 60 132 L 0 145 Z"
     fill="{{ACCENT_COLOR}}"
   />
-  <text
-    x="512"
-    y="65"
-    text-anchor="middle"
-    dominant-baseline="central"
-    font-family="Arial, Helvetica, sans-serif"
-    font-weight="700"
-    font-size="{{FONT_SIZE}}"
-    fill="{{TEXT_COLOR}}"
-  >{{TEXT}}</text>
 </svg>

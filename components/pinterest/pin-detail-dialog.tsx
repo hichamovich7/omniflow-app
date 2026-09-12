@@ -46,17 +46,18 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
 
         <div className="space-y-4">
           {pin.media_url ? (
-            <div className="relative aspect-2/3 max-h-80 w-full overflow-hidden rounded-lg bg-muted">
+            <div className="relative aspect-2/3 w-full overflow-hidden rounded-lg bg-muted" data-testid="pin-detail-preview">
               <Image
                 src={pin.media_url}
                 alt={pin.title}
                 fill
                 sizes="(max-width: 640px) 100vw, 512px"
-                className="object-cover"
+                className="object-contain"
+                data-testid="pin-detail-preview-image"
               />
             </div>
           ) : (
-            <div className="flex aspect-2/3 max-h-80 w-full items-center justify-center rounded-lg bg-muted/50">
+            <div className="flex aspect-2/3 w-full items-center justify-center rounded-lg bg-muted/50">
               <Sparkles className="h-6 w-6 text-muted-foreground/30" />
             </div>
           )}

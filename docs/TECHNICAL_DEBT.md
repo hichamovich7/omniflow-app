@@ -10,6 +10,22 @@ Se implementarán cuando el proyecto lo justifique.
 
 ---
 
+# Pinterest Renderer — limites après Phase 1
+
+## État actuel
+
+Phase 1 mesure précisément le texte, respecte les zones internes des templates et conserve le Pin complet dans les previews. Le placement top/bottom ne tient cependant pas encore compte de la luminosité, du contraste ou de la complexité visuelle locale de la photo finale.
+
+## Amélioration suivante
+
+Phase 2 doit ajouter une analyse locale Sharp, des safe areas proportionnelles, un choix limité de zones candidates, une couleur claire/sombre automatique et un overlay subtil seulement si nécessaire. Cette heuristique ne doit pas être décrite comme une détection de sujet ; la vision sémantique reste une évolution séparée et non planifiée dans cette phase.
+
+## Priorité
+
+Haute pour la fiabilité visuelle des Pins avec headline ; aucun changement de schéma, provider ou route n'est requis.
+
+---
+
 # Logging
 
 ## Estado actual

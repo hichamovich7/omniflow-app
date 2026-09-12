@@ -309,6 +309,30 @@ Board generado correctamente
 
 ---
 
+# Pinterest Renderer Reliability (TASK-FIX-025)
+
+Automated, offline renderer suite:
+
+```bash
+npx playwright test --project=renderer
+```
+
+Coverage:
+
+* Headline: short, medium, long, two lines, three lines, and explicit overlong failure.
+* CTA: short and long; compact-template fallback.
+* Templates: clean-band, ribbon, pill, torn-paper, corner-tag.
+* Text: EN, DE, ES, FR and XML-special characters.
+* Output: 1024x1536 and 1000x1500 PNG dimensions.
+* Geometry: text bounds, inner template bounds, canvas bounds, line count, minimum font size.
+* Static fixtures: light, dark, busy, minimal; no AI, network, database, or Supabase call.
+
+Authenticated preview suite requires `PLAYWRIGHT_STORAGE_STATE` and `PLAYWRIGHT_PIN_GENERATION_URL`, and runs in both desktop and mobile Playwright projects. It verifies complete 2:3 images with `object-contain` in the Pin grid, detail dialog, and versions dialog. When credentials or a suitable generation are absent, these read-only browser tests are intentionally skipped.
+
+Latest Phase 1 validation (2026-09-12): TypeScript OK, ESLint OK, renderer 10/10, global Playwright 10 passed / 18 skipped, production build OK, `git diff --check` OK, and a real manual rendering check OK.
+
+---
+
 # Image Analysis
 
 ---
