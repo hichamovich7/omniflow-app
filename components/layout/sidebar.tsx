@@ -172,9 +172,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 
   if (item.disabled) {
     return (
-      <span className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-[13px] text-muted-foreground/30 cursor-not-allowed">
+      <span aria-disabled="true" className="flex min-h-9 items-center gap-3 rounded-xl px-3 text-[13px] text-muted-foreground/45 cursor-not-allowed">
         <item.icon className="h-[15px] w-[15px]" />
-        {item.label}
+        <span className="flex-1">{item.label}</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/35">Soon</span>
       </span>
     );
   }
@@ -183,10 +184,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       className={cn(
-        'relative flex min-h-10 items-center gap-3 rounded-xl border-l-2 px-3 text-[13px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'relative flex min-h-9 items-center gap-3 rounded-xl px-3 text-[13px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
         isActive
-          ? 'border-primary bg-primary/5 font-medium text-foreground shadow-xs'
-          : 'border-transparent text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+          ? 'bg-primary/6 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary'
+          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
       )}
     >
       <item.icon className="h-[15px] w-[15px]" />
@@ -231,7 +232,7 @@ export function SidebarContent() {
           </div>
         </Link>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-5">
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div>
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
             {workspaceGroup.label}
@@ -243,7 +244,7 @@ export function SidebarContent() {
           </div>
         </div>
 
-        <div className="mt-6 space-y-px">
+        <div className="mt-5 space-y-px">
           <NavLink item={researchItem} pathname={pathname} />
         </div>
 
@@ -255,7 +256,7 @@ export function SidebarContent() {
               key={group.id}
               open={isOpen}
               onOpenChange={(open) => toggleGroup(group.id, open)}
-              className="mt-6"
+              className="mt-5"
             >
               <CollapsibleTrigger className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
                 {group.label}
@@ -274,7 +275,7 @@ export function SidebarContent() {
           );
         })}
 
-        <div className="mt-6">
+        <div className="mt-5">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
             {platformsGroup.label}
           </p>
@@ -285,7 +286,7 @@ export function SidebarContent() {
           </div>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
             {accountGroup.label}
           </p>
