@@ -10,19 +10,19 @@ Se implementarán cuando el proyecto lo justifique.
 
 ---
 
-# Pinterest Renderer — limites après Phase 2
+# Pinterest Renderer — limites après Templates v2
 
 ## État actuel
 
-La dette locale identifiée après Phase 1 est résolue : le renderer mesure maintenant la luminosité, le contraste, la variance et l'edge density dans deux zones candidates, applique des safe areas proportionnelles et renforce localement le contraste uniquement si nécessaire.
+La dette locale identifiée après Phase 1 est résolue : le renderer mesure la luminosité, le contraste, la variance et l'edge density dans deux zones candidates, applique des safe areas proportionnelles et renforce localement le contraste uniquement si nécessaire. Templates v2 ajoute quatre familles rôle-aware sans casser les cinq formes historiques.
 
 ## Amélioration suivante
 
-Le moteur ne comprend toujours pas le contenu sémantique : aucune détection de visage, personne, meuble, vêtement ou objet. `visualComplexity` désigne seulement une heuristique locale de variance et d'arêtes. Une éventuelle protection sémantique du sujet nécessiterait une Phase 3 distincte, une validation produit et une analyse de coût/latence avant implémentation.
+Le choix du template reste produit par le mécanisme IA existant puis validé côté serveur ; il n'existe pas encore de Strategy Engine ni de scoring déterministe angle→template. La hiérarchie numérique d'un vrai Listicle n'est pas isolée tant que l'angle n'est pas une donnée fiable. Le moteur ne comprend toujours pas le contenu sémantique : aucune détection de visage, personne, meuble, vêtement ou objet. `visualComplexity` désigne seulement une heuristique locale de variance et d'arêtes. Toute protection sémantique du sujet reste une phase ultérieure distincte, à justifier par une validation produit et une analyse coût/latence.
 
 ## Priorité
 
-Basse tant que les tests manuels sur des photos réelles ne montrent pas d'occlusion récurrente du sujet. Ne pas ajouter de Vision API préventivement.
+Moyenne pour une future stratégie angle→template mesurable ; basse pour la vision sémantique tant que les tests réels ne montrent pas d'occlusion récurrente. Ne pas ajouter de Vision API préventivement.
 
 ---
 

@@ -44,9 +44,9 @@ export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
     allowTextOverlay: true,
     styleGuidance:
       'Styled flat-lay or desk scene: a calculator, a closed notebook or journal (cover only, no visible pages or writing), an abstract bar-chart illustration shown as plain colored bars with no numbers or labels, stylized coins, a small potted plant growing out of a jar of coins, a set of keys. Never depict people. Never depict banknotes, printed charts with numbers, or any object showing legible text or writing. Overhead or 45-degree framing only.',
-    // Restricted to the two most sober shapes — 'ribbon'/'pill'/'torn-paper'
-    // all read as too playful/informal for a budgeting/finance audience.
-    allowedBannerTemplates: ['clean-band', 'corner-tag'],
+    // Restricted to sober legacy/v2 families; playful and craft shapes stay
+    // excluded for this audience.
+    allowedBannerTemplates: ['clean-band', 'corner-tag', 'editorial', 'minimal', 'magazine'],
   },
   'Food & Recipes': {
     framingMode: 'object',

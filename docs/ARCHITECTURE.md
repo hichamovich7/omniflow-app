@@ -196,6 +196,14 @@ Le contraste est calculé sur le fond effectif simulé pixel par pixel après m�
 
 `compositeBannerWithDiagnostics()` expose les métriques aux tests, tandis que `compositeBanner()` conserve sa signature et son retour `Buffer` pour la route existante. Aucun log de production, prompt, donnée utilisateur ou URL privée n'est ajouté.
 
+### Templates v2 (TASK-FIX-027 / Phase 3)
+
+Le registre de templates représente désormais une famille par valeur persistée, avec deux variantes internes : `headline` et `cta`. Les cinq valeurs historiques réutilisent leur SVG et leur géométrie d'origine pour les deux rôles. Les familles v2 — `editorial`, `minimal`, `split` et `magazine` — chargent chacune un SVG et une `BannerTemplateSpec` propres à chaque rôle. Une grande composition Headline peut ainsi coexister avec un CTA compact sans ajouter de colonne ni modifier la route.
+
+Les SVG v2 restent statiques, traçables par Next.js et rendus par Sharp. `{{ACCENT_COLOR}}` conserve le fond adaptatif de Phase 2 ; le nouveau token `{{TEXT_COLOR}}` applique la même couleur accessible aux filets, points et keylines décoratifs. Inter 600/700, la mesure Pango, les bounding boxes, les safe areas, le contraste local et les fallbacks restent les sources de vérité.
+
+Cette phase étend seulement le langage visuel. Elle n'ajoute ni Strategy Engine, ni mapping déterministe angle→template, ni Template Auto scoré. Curiosity et Lite sont fusionnés dans `minimal`; l'expression éditoriale/list-style est couverte par `magazine` sans prétendre isoler ou agrandir automatiquement un chiffre. Une hiérarchie numérique dédiée attend une information d'angle fiable dans une phase ultérieure.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

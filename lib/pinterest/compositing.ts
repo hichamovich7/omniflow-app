@@ -125,8 +125,9 @@ export async function compositeBannerWithDiagnostics(
   );
   const backgroundFill = `rgba(${plan.background.r},${plan.background.g},${plan.background.b},${plan.background.opacity})`;
 
-  const filledSvg = getTemplateSource(layout.template)
+  const filledSvg = getTemplateSource(layout.template, role)
     .replace(/\{\{ACCENT_COLOR\}\}/g, backgroundFill)
+    .replace(/\{\{TEXT_COLOR\}\}/g, plan.chosen.textColor)
     .replace(
       '<svg ',
       `<svg width="${layout.bannerWidth}" height="${layout.bannerHeight}" `

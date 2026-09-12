@@ -225,7 +225,7 @@ async function prepareForTemplate(
   const normalizedText = text.trim().replace(/\s+/g, ' ');
   if (!normalizedText) throw new BannerCompositionError(`Cannot compose an empty ${role}`);
 
-  const spec = getTemplateSpec(template);
+  const spec = getTemplateSpec(template, role);
   const roleSpec = spec.textArea.typography[role];
   const scale = bannerWidth / TEMPLATE_REFERENCE_WIDTH;
   const bannerHeight = Math.round(spec.height * scale);

@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { BANNER_TEMPLATE_SPECS } from './banner-templates';
+import { getMaximumTemplateHeight } from './banner-templates';
 import { contrastRatio, relativeLuminance, type AccentColorResult } from './color-extraction';
 import type { BannerTextLayout, PixelRect } from './text-layout';
 
@@ -157,10 +157,7 @@ function getCandidateBannerBounds(
     ];
   }
 
-  const maximumCtaHeight = Math.round(
-    width *
-      (Math.max(...Object.values(BANNER_TEMPLATE_SPECS).map((spec) => spec.height)) / 1024)
-  );
+  const maximumCtaHeight = Math.round(width * (getMaximumTemplateHeight('cta') / 1024));
   const ctaGap = Math.ceil(height * HEADLINE_CTA_GAP_RATIO);
 
   return [

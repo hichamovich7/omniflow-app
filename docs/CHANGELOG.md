@@ -18,6 +18,31 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-027: Pinterest Templates v2
+
+### Added
+
+* Four premium visual families: `editorial`, `minimal`, `split`, and `magazine`.
+* Separate static SVG assets and measured geometry for each family's Headline and CTA variants (eight assets total).
+* Five renderer tests covering the v2 registry, role variants, multilingual text fit, 1024×1536 and 1000×1500 outputs, safe areas, Headline/CTA separation, preserved PNG dimensions, and a deterministic 2×2 visual contact sheet.
+
+### Changed
+
+* The banner registry is role-aware: a template family can now use a large, expressive Headline composition and a smaller CTA treatment without changing the existing `title_banner_template` / `cta_banner_template` storage contract.
+* Static templates can use the adaptive `{{TEXT_COLOR}}` token for accessible decorative rules and keylines alongside the existing accent-color fill.
+* The existing prompt can choose the four new values through the same validated template enum. Finance remains restricted to sober legacy/v2 families; other niche fallback behavior is unchanged.
+
+### Scope
+
+* Curiosity and Lite are intentionally represented by `minimal`; editorial list-style content is represented by `magazine`. Deterministic angle mapping, a dedicated numeric-token treatment, and Template Auto belong to later strategy work, not this phase.
+* No Strategy Engine, semantic vision, network call, route-contract change, database/schema migration, provider, credits, storage, CSV, history, or existing-image rerender change.
+
+### Validation
+
+* TypeScript OK, ESLint OK, renderer 27/27, global Playwright 27 passed / 18 intentionally skipped, production build OK, `git diff --check` OK, and the visual contact sheet reviewed locally.
+
+---
+
 ## TASK-FIX-026: Pinterest Local Contrast + Simple Safe Areas
 
 ### Added

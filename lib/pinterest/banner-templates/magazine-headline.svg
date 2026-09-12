@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 260">
+  <rect x="52" y="8" width="920" height="244" rx="6" fill="{{ACCENT_COLOR}}" />
+  <rect x="66" y="22" width="892" height="216" rx="3" fill="none" stroke="{{TEXT_COLOR}}" stroke-width="2" opacity="0.52" />
+  <path d="M 78 40 H 174 M 850 220 H 946" stroke="{{TEXT_COLOR}}" stroke-width="5" opacity="0.82" />
+</svg>

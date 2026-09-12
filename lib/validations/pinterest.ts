@@ -7,7 +7,25 @@ export type TextOverlayMode = (typeof TEXT_OVERLAY_MODES)[number];
 // Static SVG banner shapes (TASK-FIX-024) — see lib/pinterest/banner-templates/.
 // One enum shared by both banners (title hook, CTA); each pin picks a template
 // per banner independently (titleBannerTemplate / ctaBannerTemplate below).
-export const BANNER_TEMPLATES = ['clean-band', 'ribbon', 'pill', 'torn-paper', 'corner-tag'] as const;
+export const LEGACY_BANNER_TEMPLATES = [
+  'clean-band',
+  'ribbon',
+  'pill',
+  'torn-paper',
+  'corner-tag',
+] as const;
+
+export const V2_BANNER_TEMPLATES = [
+  'editorial',
+  'minimal',
+  'split',
+  'magazine',
+] as const;
+
+export const BANNER_TEMPLATES = [
+  ...LEGACY_BANNER_TEMPLATES,
+  ...V2_BANNER_TEMPLATES,
+] as const;
 export type BannerTemplate = (typeof BANNER_TEMPLATES)[number];
 
 export const generatePinsSchema = z.object({

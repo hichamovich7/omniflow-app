@@ -1330,8 +1330,32 @@ TASK-FIX-026 / Phase 2 : contraste local et safe areas simples sans vision séma
 * Les anciens templates, `media_url`, `pin_images`, versions, historique, CSV, PNG, routes, Supabase, providers et crédits sont conservés. Aucun ancien Pin n'est rerendu.
 * Douze nouveaux tests portent le total renderer à 22/22, avec huit fixtures locales, comparaisons visuelles et vérification du non-chevauchement avec le CTA.
 * Benchmark isolé 1000×1500 : 39.9 ms avant, 98.4 ms après, soit environ +58.5 ms / 2.47× sur le compositeur local. Cette hausse reste faible face à la génération IA ; un garde-fou échoue au-delà de +250 ms ou 4× sur le poste de test.
-* Limite assumée : une zone visuellement calme peut contenir un visage ou un objet important. La détection sémantique reste une option de Phase 3, à justifier par les tests manuels réels.
+* Limite assumée : une zone visuellement calme peut contenir un visage ou un objet important. La détection sémantique reste une option d'une phase ultérieure, à justifier par les tests manuels réels.
 * Phase 2 a été validée manuellement le 2026-09-12 avant commit.
+
+---
+
+## 2026-09-12 (4)
+
+### Decision
+
+TASK-FIX-027 / Phase 3 : Templates v2 sous forme de familles Headline/CTA, sans Strategy Engine.
+
+### Decision Taken
+
+* Le registre conserve une seule valeur `BannerTemplate` persistée mais résout désormais une source SVG et une géométrie distinctes selon le rôle `headline` ou `cta`.
+* Les cinq valeurs historiques gardent exactement leur asset et leur spec pour les deux rôles. Quatre valeurs s'ajoutent : `editorial`, `minimal`, `split`, `magazine`.
+* Chaque famille v2 associe un Headline plus expressif à un CTA plus compact. Les assets restent statiques, rendus par Sharp et traçables au build ; Inter 600/700 et le moteur de mesure existant restent inchangés.
+* Les décorations SVG utilisent `{{TEXT_COLOR}}`, résolu avec la couleur adaptative déjà choisie par Phase 2, et `{{ACCENT_COLOR}}` pour le fond effectif analysé.
+* `minimal` fusionne Minimal Text, Curiosity et Lite, qui seraient visuellement trop proches. `magazine` couvre l'expression éditoriale/list-style sans inventer une hiérarchie de chiffre tant que l'angle n'est pas explicitement disponible.
+* Le prompt existant reçoit simplement les nouvelles descriptions validées. Aucun mapping angle→template, score de stratégie, nouveau réglage utilisateur ou sélecteur Template Auto n'est introduit.
+
+### Consequences
+
+* Aucun changement de route, provider, crédits, table ou migration : les colonnes texte de la migration 025 acceptent les nouvelles valeurs, et les anciens Pins restent lisibles sans rerender.
+* La hauteur CTA maximale utilisée pour réserver la zone du Headline est désormais calculée sur les variantes CTA uniquement ; une grande variante Headline ne gaspille donc pas d'espace vertical.
+* Cinq tests portent la suite renderer à 27/27 et génèrent une planche 2×2 ignorée par Git pour validation manuelle.
+* Phase 3 a été validée manuellement le 2026-09-12 avant commit. La Phase 4 reste hors périmètre.
 
 ---
 

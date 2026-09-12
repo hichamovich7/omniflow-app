@@ -6,7 +6,11 @@
 
 # ACTIVE TASK
 
-No active task. TASK-FIX-026 / Phase 2 (Pinterest Local Contrast + Simple Safe Areas) completed and manually validated 2026-09-12. Phase 3 must not begin automatically.
+TASK-FIX-027 / Phase 3 (Pinterest Templates v2) completed and manually validated 2026-09-12. Phase 4 must not begin automatically.
+
+Implemented scope: role-aware Headline/CTA variants; `editorial`, `minimal`, `split`, and `magazine` families; eight static SVG assets; controlled Inter typography; Phase 2 contrast/safe-area reuse; deterministic visual contact sheet; and five new renderer tests (27/27 total). No Strategy Engine, angle scoring, template auto-selector, provider, route contract, schema, credits, storage, history, CSV, or old-image mutation.
+
+TASK-FIX-026 / Phase 2 (Pinterest Local Contrast + Simple Safe Areas) completed, manually validated, committed, and pushed 2026-09-12 as `9b5f98e`. Its history remains unchanged.
 
 Implemented scope: Sharp-only local luminance/contrast/variance/edge-density analysis; 5% horizontal and 4% vertical safe areas; top/bottom headline candidates with the lower candidate reserved above the fixed CTA; automatic `#FFFFFF`/`#141414`; bounded local overlay only when both raw candidates miss 4.5:1; explicit neutral `clean-band` and `BannerCompositionError` fallbacks; eight controlled fixtures; 22/22 offline renderer tests; visual comparisons; and an isolated +58.5 ms benchmark. No semantic vision, schema, provider, credits, route-contract, storage, history, CSV, or old-image mutation.
 

@@ -359,6 +359,28 @@ Final automated validation (2026-09-12): TypeScript OK, ESLint OK, renderer 22/2
 
 ---
 
+# Pinterest Templates v2 (TASK-FIX-027 / Phase 3)
+
+The offline renderer command now runs 27 tests:
+
+```bash
+npx playwright test --project=renderer --reporter=list
+```
+
+Phase 3 coverage:
+
+* `editorial`, `minimal`, `split`, and `magazine` each register distinct Headline and CTA SVG/spec variants.
+* Headline variants are intentionally taller than their matching CTA variants.
+* Long English Headline text and a Spanish CTA fit without fallback at 1024×1536 and 1000×1500.
+* Both text roles stay inside their measured text areas and the proportional safe area.
+* The auto-positioned Headline remains above the fixed CTA for every v2 family.
+* Final PNG dimensions remain unchanged.
+* A deterministic 2×2 review sheet is written to the ignored `test-results/pinterest-templates-v2/templates-v2-contact-sheet.png` path.
+
+Final Phase 3 validation (2026-09-12): TypeScript OK, ESLint OK, renderer 27/27, global Playwright 27 passed / 18 intentionally skipped, production build OK, `git diff --check` OK, generated contact sheet reviewed, and real generated-photo output manually approved before commit.
+
+---
+
 # Image Analysis
 
 ---
