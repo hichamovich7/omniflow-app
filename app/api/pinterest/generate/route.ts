@@ -12,6 +12,7 @@ import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { buildImageAnalysisContext } from '@/lib/vision/context';
 import {
+  attachPinterestStrategyMetadata,
   selectHeadlineTemplateForAngle,
   validatePinterestStrategyBatch,
 } from '@/lib/pinterest/strategy';
@@ -315,7 +316,10 @@ export async function POST(request: Request) {
               )
             : null,
         cta_banner_template: clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates),
-        image_analysis: imageAnalysisJson,
+        // Reuse the existing JSON text column so image rendering can recover
+        // the structured angle without a schema migration. Reference-style
+        // fields remain unchanged at the top level for compatibility.
+        image_analysis: attachPinterestStrategyMetadata(imageAnalysisJson, pin.angle),
       };
     });
 

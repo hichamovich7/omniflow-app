@@ -6,6 +6,16 @@ import { buildImagePrompt, IMAGE_PROMPT_ID } from '@/lib/ai/prompt-engine/engine
 import { compositeBanner } from '@/lib/pinterest/compositing';
 import { extractAccentColor } from '@/lib/pinterest/color-extraction';
 import { pickCtaMessage } from '@/lib/pinterest/cta-messages';
+import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
+import {
+  selectHeadlineTemplate,
+  type TemplateSelectionHistoryItem,
+} from '@/lib/pinterest/template-selection';
+import {
+  DEFAULT_NICHE_CONVENTION,
+  getNicheVisualConvention,
+} from '@/lib/ai/niche-visual-conventions';
+import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
 import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
@@ -60,7 +70,7 @@ export async function POST(request: Request) {
 
   const { data: generation } = await supabase
     .from('generations')
-    .select('id, image_status, status, user_id')
+    .select('id, image_status, status, user_id, project_id')
     .eq('id', generationId)
     .single();
 
@@ -77,6 +87,16 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('niche')
+    .eq('id', generation.project_id)
+    .single();
+  const allowedBannerTemplates =
+    getNicheVisualConvention(project?.niche)?.allowedBannerTemplates ??
+    DEFAULT_NICHE_CONVENTION.allowedBannerTemplates ??
+    [...BANNER_TEMPLATES];
 
   if (generation.image_status === 'processing') {
     return NextResponse.json<ApiResponse<null>>(
@@ -116,95 +136,140 @@ export async function POST(request: Request) {
     .update({ image_status: 'processing' })
     .eq('id', generationId);
 
+  // Image generation stays concurrent, but template decisions are released
+  // in pin order so repetition penalties cannot depend on provider latency.
+  const selectionTurns = pinsToProcess.map(() => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => {
+      resolve = done;
+    });
+    return { promise, resolve };
+  });
+  const selectionHistory: TemplateSelectionHistoryItem[] = [];
+
   const { successes, failures } = await promisePool(
     pinsToProcess,
     async (pin, index) => {
-      const { data: existingVersions } = await supabase
-        .from('pin_images')
-        .select('version')
-        .eq('pin_id', pin.id)
-        .order('version', { ascending: false })
-        .limit(1);
+      const previousSelection =
+        index === 0 ? Promise.resolve() : selectionTurns[index - 1].promise;
+      let selectionReleased = false;
+      const releaseSelection = () => {
+        if (selectionReleased) return;
+        selectionReleased = true;
+        selectionTurns[index].resolve();
+      };
 
-      const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
+      try {
+        const { data: existingVersions } = await supabase
+          .from('pin_images')
+          .select('version')
+          .eq('pin_id', pin.id)
+          .order('version', { ascending: false })
+          .limit(1);
 
-      const { model: imageModel } = resolveImageModel(pin.visual_format);
+        const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
+        const { model: imageModel } = resolveImageModel(pin.visual_format);
+        const rawImageBuffer = await generateImage({
+          prompt: buildImagePrompt(pin, nextVersion),
+          size: IMAGE_CONFIG.size,
+          visualFormat: pin.visual_format,
+        });
 
-      const rawImageBuffer = await generateImage({
-        prompt: buildImagePrompt(pin, nextVersion),
-        size: IMAGE_CONFIG.size,
-        visualFormat: pin.visual_format,
-      });
-
-      // One accent-color extraction per image, reused for both banners
-      // (TASK-FIX-020) — accentColor is null when extraction fails or yields
-      // no usable color, in which case compositeBanner falls back to the
-      // original neutral dark style.
-      const { accentColor, textColor } = await extractAccentColor(rawImageBuffer);
-
-      // Deterministic code-side "save this pin" banner (TASK-FIX-018) — always
-      // applied, both visualFormat 'photo' and 'text-overlay', replacing the
-      // old in-prompt instruction (1/10 measured success rate on the model).
-      // Fallback to 'clean-band' covers pins created before migration 025.
-      const ctaText = pickCtaMessage(pin.language, index);
-      let imageBuffer = await compositeBanner(
-        rawImageBuffer,
-        ctaText,
-        'bottom',
-        accentColor,
-        textColor,
-        pin.cta_banner_template ?? 'clean-band'
-      );
-
-      // Deterministic code-side title hook, top of the image (TASK-FIX-020) —
-      // only for visualFormat 'text-overlay' pins, same condition the AI
-      // in-prompt rendering used to gate on before it was removed.
-      if (pin.visual_format === 'text-overlay' && pin.overlay_text) {
-        imageBuffer = await compositeBanner(
-          imageBuffer,
-          pin.overlay_text,
-          'top',
+        const { accentColor, textColor } = await extractAccentColor(rawImageBuffer);
+        const ctaText = pickCtaMessage(pin.language, index);
+        let imageBuffer = await compositeBanner(
+          rawImageBuffer,
+          ctaText,
+          'bottom',
           accentColor,
           textColor,
-          pin.title_banner_template ?? 'clean-band'
+          pin.cta_banner_template ?? 'clean-band'
         );
+
+        let selectedHeadlineTemplate = pin.title_banner_template ?? 'clean-band';
+        let selectedHeadlinePosition: 'top' | 'bottom' | undefined;
+        const angle = readPinterestStrategyAngle(pin.image_analysis);
+
+        // Provider calls remain concurrent. Only this small local decision is
+        // ordered, making repetition penalties stable for the whole batch.
+        await previousSelection;
+        if (pin.visual_format === 'text-overlay' && pin.overlay_text && angle) {
+          const selection = await selectHeadlineTemplate(
+            {
+              imageBuffer,
+              text: pin.overlay_text,
+              angle,
+              accentColor,
+              allowedTemplates: allowedBannerTemplates,
+            },
+            selectionHistory
+          );
+          selectedHeadlineTemplate = selection.template;
+          selectedHeadlinePosition = selection.position;
+          selectionHistory.push({
+            angle,
+            template: selection.template,
+            position: selection.position,
+          });
+        }
+        releaseSelection();
+
+        if (pin.visual_format === 'text-overlay' && pin.overlay_text) {
+          imageBuffer = await compositeBanner(
+            imageBuffer,
+            pin.overlay_text,
+            'top',
+            accentColor,
+            textColor,
+            selectedHeadlineTemplate,
+            selectedHeadlinePosition
+          );
+        }
+
+        const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
+        const { error: uploadError } = await supabase.storage
+          .from('generated-images')
+          .upload(filePath, imageBuffer, { contentType: 'image/png' });
+
+        if (uploadError) {
+          throw new Error(`Storage upload failed: ${uploadError.message}`);
+        }
+
+        const { data: publicUrl } = supabase.storage
+          .from('generated-images')
+          .getPublicUrl(filePath);
+
+        await supabase
+          .from('pin_images')
+          .update({ is_active: false })
+          .eq('pin_id', pin.id)
+          .eq('is_active', true);
+
+        await supabase.from('pin_images').insert({
+          pin_id: pin.id,
+          storage_path: filePath,
+          url: publicUrl.publicUrl,
+          is_active: true,
+          version: nextVersion,
+          image_model: imageModel,
+        });
+
+        await supabase
+          .from('pins')
+          .update({
+            media_url: publicUrl.publicUrl,
+            ...(angle && pin.visual_format === 'text-overlay'
+              ? { title_banner_template: selectedHeadlineTemplate }
+              : {}),
+          })
+          .eq('id', pin.id);
+
+        return pin.id;
+      } catch (error) {
+        await previousSelection;
+        releaseSelection();
+        throw error;
       }
-
-      const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('generated-images')
-        .upload(filePath, imageBuffer, { contentType: 'image/png' });
-
-      if (uploadError) {
-        throw new Error(`Storage upload failed: ${uploadError.message}`);
-      }
-
-      const { data: publicUrl } = supabase.storage
-        .from('generated-images')
-        .getPublicUrl(filePath);
-
-      await supabase
-        .from('pin_images')
-        .update({ is_active: false })
-        .eq('pin_id', pin.id)
-        .eq('is_active', true);
-
-      await supabase.from('pin_images').insert({
-        pin_id: pin.id,
-        storage_path: filePath,
-        url: publicUrl.publicUrl,
-        is_active: true,
-        version: nextVersion,
-        image_model: imageModel,
-      });
-
-      await supabase
-        .from('pins')
-        .update({ media_url: publicUrl.publicUrl })
-        .eq('id', pin.id);
-
-      return pin.id;
     },
     IMAGE_CONFIG.concurrency
   );

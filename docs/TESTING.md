@@ -406,6 +406,30 @@ Current local validation (2026-09-12): TypeScript OK, ESLint OK, focused Strateg
 
 ---
 
+# Pinterest Auto Template Selection + Variation Engine (Phase 5)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-auto-template-selection.spec.ts --project=renderer --reporter=list
+```
+
+Coverage:
+
+* Every structured angle selects only from its mapped v2 family when that family is niche-compatible.
+* Measured text-fit failure falls back to a readable neutral template; missing niche compatibility also has an explicit fallback reason.
+* Five-pin batches use at least three template families and four template/position combinations on controlled fixtures.
+* Ten-pin batches avoid duplicate angle/template/position combinations for both variants of every angle.
+* Ordered input produces deterministic selections across repeated runs.
+* Angle metadata preserves existing reference-style fields and safely ignores malformed or legacy values.
+* The renderer honors the selected readable position and still reaches the Phase 2 contrast target.
+
+The nine focused cases are local and offline. They use controlled Sharp fixtures and do not call Supabase, an AI provider, Storage, or a Vision API.
+
+Current local validation (2026-09-12): TypeScript OK, ESLint OK, focused Auto Template Selection 9/9, full renderer 53/53, production build OK, and `git diff --check` OK.
+
+---
+
 # Image Analysis
 
 ---

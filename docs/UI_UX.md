@@ -413,6 +413,8 @@ Phase 3 ajoute quatre familles visuelles premium sans exposer de nouveaux régla
 
 Phase 4 améliore la diversité visible sans ajouter de contrôle au formulaire : un lot de 5 vise les cinq angles une fois, et un lot de 10 deux variantes distinctes par angle. Le Headline reçoit automatiquement une famille cohérente avec son angle, tandis que le CTA reste inchangé. Les titres quasi identiques et les promesses non sourcées sont bloqués avant création, avec le message d'échec de génération existant et la possibilité de réessayer.
 
+Phase 5 rend ce choix réellement contextuel sans exposer un réglage supplémentaire : sur chaque image `text-overlay`, le Headline utilise le template et la zone qui offrent le meilleur compromis mesuré entre compatibilité d'angle, taille de texte, densité, contraste et calme local. Le lot pénalise les répétitions visuelles, mais uniquement parmi les alternatives proches du meilleur niveau de lisibilité. Les safe areas, le contraste minimum et le fallback neutre restent prioritaires ; le CTA conserve son comportement existant.
+
 ---
 
 ### Website URL

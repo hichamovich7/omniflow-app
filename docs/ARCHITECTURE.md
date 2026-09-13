@@ -214,6 +214,16 @@ Les claims sensibles sont contrôlés avant insertion. Un nombre présent dans l
 
 Le mapping Headline est déterministe : Curiosity → `minimal`/`editorial`, Problem→Solution → `editorial`/`split`, Listicle → `magazine`, Discovery → `minimal`/`editorial`, Article Promise → `editorial`/`split`. Le CTA conserve le choix IA et le clamp de niche existants. Le renderer n'est pas modifié.
 
+### Pinterest Auto Template Selection + Variation Engine (Phase 5)
+
+Phase 5 déplace le choix final du Headline au seul moment où tous les signaux fiables sont disponibles : après génération de l'image et composition du CTA. `lib/pinterest/template-selection.ts` intersecte d'abord le mapping d'angle avec les templates autorisés par la niche, mesure chaque texte avec le moteur Pango de Phase 1, puis évalue les zones `top`/`bottom` avec le contraste local, la complexité et les safe areas de Phase 2. Aucun appel Vision ou réseau supplémentaire n'est ajouté.
+
+Chaque candidat lisible reçoit un score de qualité : compatibilité d'angle, marge de taille de police, densité de lignes/surface, marge de contraste, calme local et absence d'overlay. Les candidats à plus de 12 points du meilleur score brut sont exclus avant la pénalité de répétition. Cette barrière permet de varier template et position uniquement entre solutions visuellement raisonnables.
+
+La génération d'images reste concurrente. Une courte barrière ordonne seulement les décisions de template selon `created_at`, afin que l'historique du lot et ses pénalités ne dépendent jamais de la latence du provider. Le choix final est transmis au renderer comme template et position préférée, puis sauvegardé dans `title_banner_template`.
+
+Le pipeline texte conserve l'angle dans une clé privée `_pinterestStrategy` du JSON texte `pins.image_analysis`, aux côtés des éventuels champs de style de référence. Cela évite une migration et permet aux régénérations Phase 5 de retrouver l'angle. Les anciens Pins sans cette métadonnée conservent leur template déjà persisté.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

@@ -82,7 +82,8 @@ export async function compositeBannerWithDiagnostics(
   position: BannerPosition,
   accentColor: AccentColorResult['accentColor'],
   textColor: AccentColorResult['textColor'],
-  template: BannerTemplate
+  template: BannerTemplate,
+  preferredPosition?: CandidateTextZone['position']
 ): Promise<CompositedBanner> {
   const image = sharp(imageBuffer);
   const metadata = await image.metadata();
@@ -97,7 +98,11 @@ export async function compositeBannerWithDiagnostics(
   let fallbackUsed: BannerCompositionDiagnostics['fallbackUsed'] = prepared.layout.fallbackReason
     ? 'clean-band:text-fit'
     : null;
-  let plan = await planBannerPlacement(imageBuffer, prepared.layout, { role, accentColor });
+  let plan = await planBannerPlacement(imageBuffer, prepared.layout, {
+    role,
+    accentColor,
+    preferredPosition,
+  });
 
   if (plan.fallbackRequired) {
     prepared = await prepareBannerText(text, 'clean-band', role, width, '#FFFFFF');
@@ -105,6 +110,7 @@ export async function compositeBannerWithDiagnostics(
       role,
       accentColor: null,
       forceNeutralFallback: true,
+      preferredPosition,
     });
     fallbackUsed = 'clean-band:contrast';
   }
@@ -188,7 +194,8 @@ export async function compositeBanner(
   position: BannerPosition,
   accentColor: AccentColorResult['accentColor'],
   textColor: AccentColorResult['textColor'],
-  template: BannerTemplate
+  template: BannerTemplate,
+  preferredPosition?: CandidateTextZone['position']
 ): Promise<Buffer> {
   return (
     await compositeBannerWithDiagnostics(
@@ -197,7 +204,8 @@ export async function compositeBanner(
       position,
       accentColor,
       textColor,
-      template
+      template,
+      preferredPosition
     )
   ).buffer;
 }

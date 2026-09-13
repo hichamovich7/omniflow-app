@@ -1383,6 +1383,30 @@ TASK-FIX-028 / Phase 4 : structurer les angles Pinterest dans une couche straté
 
 ---
 
+## 2026-09-12 (6)
+
+### Decision
+
+Phase 5 : sélectionner automatiquement le template Headline et sa position à partir de signaux locaux mesurés, avec diversité déterministe du lot.
+
+### Decision Taken
+
+* Le mapping d'angle Phase 4 reste une contrainte de compatibilité forte. Le sélecteur évalue uniquement `minimal`/`editorial`, `editorial`/`split` ou `magazine` selon l'angle, après intersection avec les templates autorisés par la niche.
+* Le score brut combine compatibilité, marge de text-fit mesurée, densité textuelle, contraste après renforcement local, complexité de la zone et coût d'un overlay.
+* Un garde-fou de qualité élimine tout candidat éloigné de plus de 12 points du meilleur score avant d'appliquer les pénalités de répétition. La diversité ne peut donc pas forcer un template nettement inférieur.
+* Les répétitions de template, de paire angle/template et surtout de triplet angle/template/position reçoivent des pénalités cumulatives. Les égalités sont résolues dans un ordre stable.
+* La position retenue est réinjectée dans le moteur Phase 2, qui ne l'accepte que si elle reste lisible et dans les safe areas ; sinon son fallback de contraste reste prioritaire.
+* L'angle est transporté dans `_pinterestStrategy.angle` au sein de la colonne texte JSON `image_analysis`. Les champs existants d'analyse de style restent au même niveau et aucune migration n'est ajoutée.
+
+### Consequences
+
+* La génération IA d'images reste concurrente ; seule la sélection locale est ordonnée par Pin pour rendre les pénalités indépendantes de la latence provider.
+* Le template final est sauvegardé dans la colonne `title_banner_template` existante. Le CTA, les prompts, providers, crédits, chemins Storage et contrats API publics ne changent pas.
+* Les anciens Pins sans métadonnée d'angle conservent leur template existant lors d'une régénération.
+* La complexité reste une mesure locale de variance et d'arêtes, sans interprétation sémantique ni Vision API.
+
+---
+
 ## 2026-09-12 (2)
 
 ### Decision

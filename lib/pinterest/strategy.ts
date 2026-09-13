@@ -1,6 +1,8 @@
 import type { BannerTemplate } from '@/lib/validations/pinterest';
 import { PINTEREST_ANGLES, type PinterestAngle } from '@/types/pinterest';
 
+const STRATEGY_METADATA_KEY = '_pinterestStrategy';
+
 export const ANGLE_TEMPLATE_MAP: Record<PinterestAngle, readonly BannerTemplate[]> = {
   curiosity: ['minimal', 'editorial'],
   'problem-solution': ['editorial', 'split'],
@@ -215,4 +217,41 @@ export function selectHeadlineTemplateForAngle(
   );
   if (compatible.length > 0) return compatible[occurrence % compatible.length];
   return allowedTemplates[0] ?? 'clean-band';
+}
+
+export function attachPinterestStrategyMetadata(
+  imageAnalysisJson: string | null,
+  angle: PinterestAngle
+): string {
+  let metadata: Record<string, unknown> = {};
+  if (imageAnalysisJson) {
+    try {
+      const parsed = JSON.parse(imageAnalysisJson);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed;
+    } catch {
+      // Malformed legacy data must not prevent a new pin from being generated.
+    }
+  }
+
+  return JSON.stringify({
+    ...metadata,
+    [STRATEGY_METADATA_KEY]: { angle },
+  });
+}
+
+export function readPinterestStrategyAngle(
+  imageAnalysisJson: string | null
+): PinterestAngle | null {
+  if (!imageAnalysisJson) return null;
+  try {
+    const parsed = JSON.parse(imageAnalysisJson) as Record<string, unknown>;
+    const strategy = parsed?.[STRATEGY_METADATA_KEY];
+    if (!strategy || typeof strategy !== 'object') return null;
+    const angle = (strategy as { angle?: unknown }).angle;
+    return PINTEREST_ANGLES.includes(angle as PinterestAngle)
+      ? (angle as PinterestAngle)
+      : null;
+  } catch {
+    return null;
+  }
 }

@@ -18,6 +18,33 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Phase 5: Pinterest Auto Template Selection + Variation Engine
+
+### Added
+
+* `lib/pinterest/template-selection.ts`: deterministic Headline candidate scoring across angle compatibility, measured font headroom, text density, local contrast, local complexity, overlay need, and batch repetition.
+* A quality guardrail limits variation to candidates close to the best raw visual score, so diversity cannot promote an unsuitable or unreadable layout.
+* Ordered batch history penalizes repeated templates, repeated angle/template pairs, and exact angle/template/position combinations.
+* Nine focused renderer tests cover all five angle mappings, measured text-fit and compatibility fallbacks, 5/10-pin diversity, non-cloned combinations, determinism, metadata compatibility, and renderer position handoff.
+
+### Changed
+
+* Image generation now performs the final Headline selection after the image and CTA exist, reusing Phase 1 text measurement and Phase 2 local contrast/safe-area metrics.
+* Provider calls remain concurrent, while only the local selection turn is ordered by Pin creation order so results do not depend on provider latency.
+* The selected template is written back to the existing `title_banner_template` column. The structured angle is carried in the existing `image_analysis` JSON text value alongside unchanged reference-style fields.
+* `PinBannerTemplate` now reflects all legacy and v2 values already accepted by the database column.
+
+### Validation
+
+* TypeScript OK, ESLint OK, focused Auto Template Selection 9/9, full renderer 53/53, production build OK, and `git diff --check` OK.
+
+### Compatibility
+
+* No migration, Vision API, prompt, provider, credit, storage-path, CTA-selection, or public request/response contract change.
+* Older Pins without angle metadata retain their persisted template and the existing renderer behavior.
+
+---
+
 ## TASK-FIX-028: Pinterest Strategy Engine
 
 ### Added

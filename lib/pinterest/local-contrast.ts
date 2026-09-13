@@ -86,6 +86,7 @@ export interface BannerPlacementOptions {
   role: 'headline' | 'cta';
   accentColor: AccentColorResult['accentColor'];
   forceNeutralFallback?: boolean;
+  preferredPosition?: CandidateZoneName;
 }
 
 export function getSimpleSafeArea(width: number, height: number): SimpleSafeArea {
@@ -470,15 +471,21 @@ export async function planBannerPlacement(
       source.textBounds,
       source.safeAreaScore,
       false,
-      source.position === (options.role === 'headline' ? 'top' : 'bottom')
+      source.position ===
+        (options.preferredPosition ?? (options.role === 'headline' ? 'top' : 'bottom'))
     )
   );
   const readableWithoutOverlay = withoutOverlay.filter(
     (candidate) => candidate.postOverlayContrastRatio >= LOCAL_CONTRAST_TARGET
   );
   if (readableWithoutOverlay.length > 0) {
+    const preferred = options.preferredPosition
+      ? readableWithoutOverlay.find(
+          (candidate) => candidate.position === options.preferredPosition
+        )
+      : null;
     return {
-      chosen: chooseHighestScore(readableWithoutOverlay),
+      chosen: preferred ?? chooseHighestScore(readableWithoutOverlay),
       candidates: withoutOverlay,
       safeArea,
       background,
@@ -497,16 +504,20 @@ export async function planBannerPlacement(
       source.textBounds,
       source.safeAreaScore,
       true,
-      source.position === (options.role === 'headline' ? 'top' : 'bottom')
+      source.position ===
+        (options.preferredPosition ?? (options.role === 'headline' ? 'top' : 'bottom'))
     )
   );
   const readableWithOverlay = withOverlay.filter(
     (candidate) => candidate.postOverlayContrastRatio >= LOCAL_CONTRAST_TARGET
   );
   const candidates = readableWithOverlay.length > 0 ? readableWithOverlay : withOverlay;
+  const preferred = options.preferredPosition
+    ? candidates.find((candidate) => candidate.position === options.preferredPosition)
+    : null;
 
   return {
-    chosen: chooseHighestScore(candidates),
+    chosen: preferred ?? chooseHighestScore(candidates),
     candidates: withOverlay,
     safeArea,
     background,
