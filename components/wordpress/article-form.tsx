@@ -13,6 +13,7 @@ import {
   TONES_OF_VOICE,
   POINTS_OF_VIEW,
   TARGET_COUNTRIES,
+  HOOK_BRIEF_MAX_LENGTH,
 } from '@/lib/validations/wordpress';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -86,6 +87,75 @@ const POINT_OF_VIEW_LABELS: Record<(typeof POINTS_OF_VIEW)[number], string> = {
 
 const NONE_VALUE = 'none';
 
+// Structure (TASK-FIX-035, "1-Click Blog Post" / Option 1 only). Hook Brief
+// presets pre-fill the textarea and stay editable afterward — picking one
+// never locks the field.
+const HOOK_BRIEF_PRESETS: { label: string; text: string }[] = [
+  {
+    label: 'Question',
+    text: "Open with a thought-provoking question that speaks directly to the reader's situation or curiosity about this topic.",
+  },
+  {
+    label: 'Statistical or Fact',
+    text: 'Open with a striking statistic or verified fact that immediately establishes relevance and credibility.',
+  },
+  {
+    label: 'Quotation',
+    text: "Open with a relevant, attributed quotation that sets the tone and connects to the article's theme.",
+  },
+  {
+    label: 'Anecdotal or Story',
+    text: 'Open with a short, relatable story or scenario that draws the reader in before getting to the point.',
+  },
+  {
+    label: 'Personal or Emotional',
+    text: "Write an emotionally resonant opening that connects personally with the reader — a reflection, a personal experience, or an emotional appeal aligned with the article's theme.",
+  },
+];
+
+// Each Structure toggle is 3-state: '' ("Non défini" — default, unchanged
+// behavior), 'yes' ("Oui" — force presence), 'no' ("Non" — force absence).
+type ToggleValue = '' | 'yes' | 'no';
+
+const TOGGLE_NONE_VALUE = 'unset';
+
+function StructureToggle({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  value: ToggleValue;
+  onChange: (value: ToggleValue) => void;
+  disabled: boolean;
+}) {
+  const displayValue = value === 'yes' ? 'Oui' : value === 'no' ? 'Non' : 'Non défini';
+
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
+      <Select
+        value={value || TOGGLE_NONE_VALUE}
+        onValueChange={(v) => v && onChange(v === TOGGLE_NONE_VALUE ? '' : (v as ToggleValue))}
+      >
+        <SelectTrigger id={id} className="w-full min-w-0" disabled={disabled}>
+          <span className="min-w-0 truncate text-sm">{displayValue}</span>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={TOGGLE_NONE_VALUE}>Non défini</SelectItem>
+          <SelectItem value="yes">Oui</SelectItem>
+          <SelectItem value="no">Non</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export function ArticleForm({ projects, categories: initialCategories }: ArticleFormProps) {
   const router = useRouter();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
@@ -108,6 +178,16 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
   const [toneOfVoice, setToneOfVoice] = useState('');
   const [pointOfView, setPointOfView] = useState('');
   const [targetCountry, setTargetCountry] = useState('');
+  const [hookBrief, setHookBrief] = useState('');
+  const [includeConclusion, setIncludeConclusion] = useState<ToggleValue>('');
+  const [includeTables, setIncludeTables] = useState<ToggleValue>('');
+  const [includeH3, setIncludeH3] = useState<ToggleValue>('');
+  const [includeLists, setIncludeLists] = useState<ToggleValue>('');
+  const [includeItalics, setIncludeItalics] = useState<ToggleValue>('');
+  const [includeQuotes, setIncludeQuotes] = useState<ToggleValue>('');
+  const [includeKeyTakeaways, setIncludeKeyTakeaways] = useState<ToggleValue>('');
+  const [includeFaq, setIncludeFaq] = useState<ToggleValue>('');
+  const [includeBold, setIncludeBold] = useState<ToggleValue>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -143,6 +223,16 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
         toneOfVoice: toneOfVoice || undefined,
         pointOfView: pointOfView || undefined,
         targetCountry: targetCountry || undefined,
+        hookBrief: hookBrief.trim() || undefined,
+        includeConclusion: includeConclusion ? includeConclusion === 'yes' : undefined,
+        includeTables: includeTables ? includeTables === 'yes' : undefined,
+        includeH3: includeH3 ? includeH3 === 'yes' : undefined,
+        includeLists: includeLists ? includeLists === 'yes' : undefined,
+        includeItalics: includeItalics ? includeItalics === 'yes' : undefined,
+        includeQuotes: includeQuotes ? includeQuotes === 'yes' : undefined,
+        includeKeyTakeaways: includeKeyTakeaways ? includeKeyTakeaways === 'yes' : undefined,
+        includeFaq: includeFaq ? includeFaq === 'yes' : undefined,
+        includeBold: includeBold ? includeBold === 'yes' : undefined,
       });
       if (!parsed.success) {
         setError(parsed.error.issues[0].message);
@@ -535,6 +625,63 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </div>
+        )}
+
+        {sourceMode === 'keyword' && (
+          <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div>
+              <p className="text-xs font-medium">Structure</p>
+              <p className="text-[11px] text-muted-foreground">
+                Optional — shape the introduction and force specific elements on or off. Leave everything on
+                &quot;Non défini&quot; to keep the default behavior.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="hook-brief" className="text-xs font-medium text-muted-foreground">
+                Introductory Hook Brief
+              </Label>
+              <div className="flex flex-wrap gap-1.5">
+                {HOOK_BRIEF_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                    onClick={() => setHookBrief(preset.text)}
+                    className="h-7 px-2.5 text-[11px] font-normal"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+              <Textarea
+                id="hook-brief"
+                placeholder="Describe how the article should open — pick a preset above to start, then edit freely"
+                value={hookBrief}
+                onChange={(e) => setHookBrief(e.target.value.slice(0, HOOK_BRIEF_MAX_LENGTH))}
+                maxLength={HOOK_BRIEF_MAX_LENGTH}
+                disabled={loading}
+                className="min-h-20 text-sm placeholder:text-muted-foreground/40"
+              />
+              <p className="text-right text-[11px] text-muted-foreground">
+                {hookBrief.length} / {HOOK_BRIEF_MAX_LENGTH} characters
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <StructureToggle id="include-conclusion" label="Conclusion" value={includeConclusion} onChange={setIncludeConclusion} disabled={loading} />
+              <StructureToggle id="include-tables" label="Tables" value={includeTables} onChange={setIncludeTables} disabled={loading} />
+              <StructureToggle id="include-h3" label="H3" value={includeH3} onChange={setIncludeH3} disabled={loading} />
+              <StructureToggle id="include-lists" label="Lists" value={includeLists} onChange={setIncludeLists} disabled={loading} />
+              <StructureToggle id="include-italics" label="Italics" value={includeItalics} onChange={setIncludeItalics} disabled={loading} />
+              <StructureToggle id="include-quotes" label="Quotes" value={includeQuotes} onChange={setIncludeQuotes} disabled={loading} />
+              <StructureToggle id="include-key-takeaways" label="Key Takeaways" value={includeKeyTakeaways} onChange={setIncludeKeyTakeaways} disabled={loading} />
+              <StructureToggle id="include-faq" label="FAQ" value={includeFaq} onChange={setIncludeFaq} disabled={loading} />
+              <StructureToggle id="include-bold" label="Bold" value={includeBold} onChange={setIncludeBold} disabled={loading} />
             </div>
           </div>
         )}

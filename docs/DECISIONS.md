@@ -1490,6 +1490,55 @@ Le formulaire combiné (Option 1 + Option 3, strictement inchangé pour Option 3
 
 ---
 
+## 2026-09-13 (3)
+
+### Decision
+
+TASK-FIX-035 — Structure block (Phase 2) : colonnes plates ou `settings jsonb` consolidé sur `wordpress_generations`, sachant que Phase 3 (SEO Keywords) et Phase 4 (Media Hub) ajouteront encore des réglages optionnels.
+
+### Context
+
+Le fondateur a explicitement demandé d'évaluer les deux options avant d'implémenter, en anticipant que le nombre de colonnes va continuer à grossir. Après Phase 1 (5 colonnes : `article_type`, `article_size`, `tone_of_voice`, `point_of_view`, `target_country`), Phase 2 ajoute 10 colonnes de plus (`hook_brief` + 9 booléens `include_*`) — 15 colonnes de réglages optionnels au total sur `wordpress_generations` avant même Phase 3/4.
+
+### Decision Taken
+
+Colonnes plates nullable, même convention que Phase 1 — pas de `settings jsonb`. Raisons :
+1. **Zéro précédent JSONB dans les 26 migrations existantes** (`grep jsonb` sur `supabase/migrations/*.sql` ne retourne rien) — que ce soit pour Pinterest (`visual_format`, `overlay_text`, `title_banner_template`, `cta_banner_template`, `image_model`...) ou WordPress (Phase 1). Introduire un JSONB maintenant serait le premier changement de ce type dans tout le schéma, ce qu'AGENT.md/RULES.md (Rule #3, "Never Modify Architecture Without Approval") traitent comme un changement d'architecture, pas une simple extension de colonnes.
+2. **Philosophie déjà actée dans ce projet** : TASK-027 (Multi-Generator Architecture) a été explicitement DEFERRED le 2026-07-15 avec le raisonnement "se reconsidérera une fois que les patterns réels seront visibles dans le code, pas avant" — le même principe s'applique ici. Consolider en JSONB maintenant, avant que la forme réelle des réglages Phase 3/4 soit connue, reviendrait à deviner une structure qui pourrait ne pas convenir, sans bénéfice mesurable aujourd'hui.
+3. Les colonnes plates gardent la validation Zod, le typage TypeScript et un futur filtrage WordPress History (si demandé) triviaux — exactement les mêmes outils que Phase 1, sans nouvelle couche de sérialisation/désérialisation JSON à maintenir.
+4. 15 colonnes optionnelles nullables sur une table qui n'en a que ~10 "métier" (`keyword`, `language`, `source_type`, etc.) commence à être notable, mais reste gérable et lisible dans `docs/DATABASE.md` — pas encore un signal fort de dette.
+
+### Consequences
+
+* Migration 027 ajoute 10 colonnes nullables (`hook_brief` text + 9 booléens `include_*`), même style que la migration 026.
+* Si Phase 3/4 ajoutent encore 10-15 colonnes supplémentaires, ce jugement sera revisité à ce moment-là — avec la forme réelle des réglages de 4 phases connue, une migration de consolidation dédiée (colonnes existantes → un seul `settings jsonb`, avec migration de données) sera plus facile à bien concevoir qu'une décision anticipée aujourd'hui. Ce n'est pas planifié tant que ce seuil n'est pas atteint.
+* Les 9 toggles `include_*` sont des `boolean nullable` (tri-état natif Postgres : `true`/`false`/`null`), pas un `text` `'yes'|'no'|null` — plus idiomatique et sans besoin de contrainte CHECK ou d'enum Zod supplémentaire pour ce tri-état.
+
+---
+
+## 2026-09-13 (4)
+
+### Decision
+
+TASK-FIX-035 — comment garantir l'absence réelle d'un élément de formatage (gras, italique, listes, citations, H3) quand un toggle "Structure" est réglé sur "Non", sans avoir pu générer d'article réel de test dans cet environnement.
+
+### Context
+
+Le brief demandait de générer 1-2 articles réels pour observer le comportement par défaut du modèle avant d'écrire les instructions "Non", afin de forcer une vraie absence plutôt que de simplement ne pas la demander. Cet agent n'a pas d'accès à des identifiants Supabase/OpenRouter réels dans cet environnement (même limitation que TASK-FIX-034) — impossible de lancer une génération réelle pour observer le comportement naturel du modèle.
+
+### Decision Taken
+
+Deux garanties de nature différente, selon ce qui est techniquement possible sans modèle réel :
+1. **Key Takeaways et FAQ** ("Non") : garantie dure au niveau du schema Zod — `buildWordpressOutlineSchema()` contraint `keyTakeawaysThemes`/`faqQuestions` à exactement 0 élément (`min(0).max(0)`) au lieu de 4-6. Si le modèle tente d'en produire quand même, la validation Zod échoue et l'étape est traitée comme une erreur de génération (retry côté utilisateur) — l'absence est structurellement forcée, pas seulement demandée.
+2. **Bold, Italics, Quotes, H3, Lists** ("Non") : garantie par instruction de prompt uniquement — une interdiction explicite nommant la syntaxe Markdown littérale à éviter (ex. "no **double asterisks**"), pas une simple omission de la demande. Pas de sanitizer déterministe côté code (regex de nettoyage post-génération) ajouté dans cette phase : (a) le brief de l'Étape 2.3 scope explicitement ce point à des "directives de formatage Markdown", pas à un post-traitement ; (b) un sanitizer pour "Lists" risquerait de corrompre les listes structurelles légitimes (Key Takeaways, Common Mistakes) qui restent des listes à puces par construction, indépendamment de ce toggle ; (c) sans test réel, ajouter une couche de correction pour un problème non mesuré serait de la sur-ingénierie prématurée.
+
+### Consequences
+
+* La garantie Key Takeaways/FAQ="Non" est fiable à 100% par construction (Zod), comme documenté dans DATABASE.md.
+* La garantie Bold/Italics/Quotes/H3/Lists="Non" dépend de l'obéissance du modèle à l'instruction — non vérifiée empiriquement dans cette tâche. Le fondateur doit valider avec une vraie génération (voir TASKS.md, Étape 3 du brief). Si un test réel montre une fuite fréquente (ex. le modèle insère du gras malgré l'interdiction), le prochain correctif suivrait le précédent déjà établi dans ce projet (TASK-FIX-019 : remplacer une instruction IA non fiable par un traitement déterministe côté code) plutôt que de re-formuler indéfiniment le prompt.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

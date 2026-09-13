@@ -87,8 +87,28 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, researchNotes, categoryId, articleType, articleSize, toneOfVoice, pointOfView, targetCountry } =
-    parsed.data;
+  const {
+    projectId,
+    keyword,
+    language,
+    researchNotes,
+    categoryId,
+    articleType,
+    articleSize,
+    toneOfVoice,
+    pointOfView,
+    targetCountry,
+    hookBrief,
+    includeConclusion,
+    includeTables,
+    includeH3,
+    includeLists,
+    includeItalics,
+    includeQuotes,
+    includeKeyTakeaways,
+    includeFaq,
+    includeBold,
+  } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -140,6 +160,16 @@ export async function POST(request: Request) {
       tone_of_voice: toneOfVoice ?? null,
       point_of_view: pointOfView ?? null,
       target_country: targetCountry ?? null,
+      hook_brief: hookBrief ?? null,
+      include_conclusion: includeConclusion ?? null,
+      include_tables: includeTables ?? null,
+      include_h3: includeH3 ?? null,
+      include_lists: includeLists ?? null,
+      include_italics: includeItalics ?? null,
+      include_quotes: includeQuotes ?? null,
+      include_key_takeaways: includeKeyTakeaways ?? null,
+      include_faq: includeFaq ?? null,
+      include_bold: includeBold ?? null,
     })
     .select()
     .single();
@@ -166,6 +196,16 @@ export async function POST(request: Request) {
       toneOfVoice,
       pointOfView,
       targetCountry,
+      hookBrief,
+      includeConclusion,
+      includeTables,
+      includeH3,
+      includeLists,
+      includeItalics,
+      includeQuotes,
+      includeKeyTakeaways,
+      includeFaq,
+      includeBold,
     });
 
     const { data: article, error: articleError } = await supabase

@@ -647,6 +647,15 @@ A collapsed-looking, always-visible block below Project/Language/Category, label
 
 None of these fields are exposed as an AI-model choice (see `docs/DECISIONS.md` — model/provider selection stays role-based, Rule #11, not user-facing in this phase).
 
+## Structure (TASK-FIX-035, Keyword mode only)
+
+A second optional block below Core Settings, same visual treatment (bordered panel, "Optional" one-liner). Two kinds of controls:
+
+* **Introductory Hook Brief** — a textarea (max 500 characters) with 5 preset buttons above it that pre-fill the field with a ready-made instruction, still fully editable afterward: **Question**, **Statistical or Fact**, **Quotation**, **Anecdotal or Story**, **Personal or Emotional**. Empty by default — no instruction is injected and the article's opening behaves exactly as before this task.
+* **9 three-state toggles**, each a select with **Non défini** (default) / **Oui** / **Non**: **Conclusion**, **Tables**, **H3**, **Lists**, **Italics**, **Quotes**, **Key Takeaways**, **FAQ**, **Bold**. "Oui" forces the element's presence, "Non" forces its explicit absence (not merely "not requested" — the instruction bans the literal Markdown syntax, and for Key Takeaways/FAQ the underlying schema itself only accepts an empty array), "Non défini" reproduces the article's current default behavior for that element exactly.
+
+Every field defaults to "None"/"Non défini" — leaving all of Structure untouched reproduces generation identically to before this task, same guarantee as Core Settings.
+
 ---
 
 # WordPress Article (Results)

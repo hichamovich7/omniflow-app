@@ -61,6 +61,22 @@ export const ARTICLE_SIZE_CONFIG: Record<
 export const DEFAULT_SECTIONS_RANGE = { minSections: 8, maxSections: 10 } as const;
 export const DEFAULT_WORDS_RANGE = { minWords: 1800, maxWords: 2500 } as const;
 
+// Structure (TASK-FIX-035, "1-Click Blog Post" / Option 1 only). Hook Brief is
+// free text (capped, with 5 client-side presets — see components/wordpress/
+// article-form.tsx); the other 9 are 3-state toggles represented as
+// z.boolean().optional() — true ("Oui"), false ("Non"), omitted/undefined
+// ("Non défini", the default that reproduces pre-existing behavior exactly).
+export const HOOK_BRIEF_MAX_LENGTH = 500;
+
+// Key Takeaways and FAQ are always-present sections before TASK-FIX-035 (the
+// outline schema requires 4-6 items for each). DEFAULT_* reproduces that
+// exactly — used whenever the corresponding toggle is true/undefined. Only an
+// explicit "Non" swaps in DISABLED_RANGE (a hard 0-length array), which is a
+// genuine Zod-enforced guarantee of absence, not just a soft prompt request.
+export const DEFAULT_KEY_TAKEAWAYS_RANGE = { min: 4, max: 6 } as const;
+export const DEFAULT_FAQ_RANGE = { min: 4, max: 6 } as const;
+export const DISABLED_ARRAY_RANGE = { min: 0, max: 0 } as const;
+
 export const generateArticleSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
@@ -72,6 +88,16 @@ export const generateArticleSchema = z.object({
   toneOfVoice: z.enum(TONES_OF_VOICE, { message: 'Invalid tone of voice' }).optional(),
   pointOfView: z.enum(POINTS_OF_VIEW, { message: 'Invalid point of view' }).optional(),
   targetCountry: z.enum(TARGET_COUNTRIES, { message: 'Invalid target country' }).optional(),
+  hookBrief: z.string().trim().max(HOOK_BRIEF_MAX_LENGTH, 'Hook brief is too long').optional(),
+  includeConclusion: z.boolean().optional(),
+  includeTables: z.boolean().optional(),
+  includeH3: z.boolean().optional(),
+  includeLists: z.boolean().optional(),
+  includeItalics: z.boolean().optional(),
+  includeQuotes: z.boolean().optional(),
+  includeKeyTakeaways: z.boolean().optional(),
+  includeFaq: z.boolean().optional(),
+  includeBold: z.boolean().optional(),
 });
 
 export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;
@@ -128,15 +154,26 @@ const outlineImageSchema = z.object({
   altText: z.string().min(1),
 });
 
+interface OutlineSchemaOptions {
+  sectionsRange?: { minSections: number; maxSections: number };
+  keyTakeawaysRange?: { min: number; max: number };
+  faqRange?: { min: number; max: number };
+}
+
 /**
- * Parameterized by Main Content section count so Article Size (TASK-FIX-034,
- * Option 1 only) can widen or narrow the outline without duplicating the
- * whole schema. Called with no args, this produces byte-for-byte the same
- * schema as before TASK-FIX-034 (8-10 sections) — see DEFAULT_SECTIONS_RANGE.
+ * Parameterized by Main Content section count (Article Size, TASK-FIX-034)
+ * and by Key Takeaways/FAQ array length (Structure, TASK-FIX-035) so those
+ * optional settings can widen, narrow, or zero out parts of the outline
+ * without duplicating the whole schema. Called with no args, this produces
+ * byte-for-byte the same schema as before TASK-FIX-034/035 (8-10 sections,
+ * 4-6 Key Takeaways, 4-6 FAQ) — see DEFAULT_SECTIONS_RANGE/
+ * DEFAULT_KEY_TAKEAWAYS_RANGE/DEFAULT_FAQ_RANGE.
  */
-export function buildWordpressOutlineSchema(
-  sectionsRange: { minSections: number; maxSections: number } = DEFAULT_SECTIONS_RANGE
-) {
+export function buildWordpressOutlineSchema(opts: OutlineSchemaOptions = {}) {
+  const sectionsRange = opts.sectionsRange ?? DEFAULT_SECTIONS_RANGE;
+  const keyTakeawaysRange = opts.keyTakeawaysRange ?? DEFAULT_KEY_TAKEAWAYS_RANGE;
+  const faqRange = opts.faqRange ?? DEFAULT_FAQ_RANGE;
+
   return z.object({
     // H1 shown on the page — generous ceiling, deterministically truncated
     // (truncateAtWordBoundary) before this schema ever sees it, so this max is
@@ -156,7 +193,7 @@ export function buildWordpressOutlineSchema(
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase, hyphen-separated, ASCII only'),
     metaDescription: z.string().min(1).max(160),
     quickAnswerAngle: z.string().min(1),
-    keyTakeawaysThemes: z.array(z.string().min(1)).min(4).max(6),
+    keyTakeawaysThemes: z.array(z.string().min(1)).min(keyTakeawaysRange.min).max(keyTakeawaysRange.max),
     sections: z
       .array(z.object({ heading: z.string().min(1), summary: z.string().min(1) }))
       .min(sectionsRange.minSections)
@@ -164,7 +201,7 @@ export function buildWordpressOutlineSchema(
     includeComparisonTable: z.boolean(),
     comparisonTableReason: z.string().min(1),
     commonMistakesThemes: z.array(z.string().min(1)).min(3).max(5),
-    faqQuestions: z.array(z.string().min(1)).min(4).max(6),
+    faqQuestions: z.array(z.string().min(1)).min(faqRange.min).max(faqRange.max),
     featuredImage: z.object({ prompt: z.string().min(1), altText: z.string().min(1) }),
     images: z.array(outlineImageSchema).min(2).max(3),
   });
@@ -197,14 +234,32 @@ const comparisonTableSchema = z.object({
   rows: z.array(z.array(z.string().min(1)).min(2)).min(2),
 });
 
-export const wordpressArticleResponseSchema = z.object({
-  content: z.string().min(1),
-  quickAnswer: z.string().min(1),
-  keyTakeaways: z.array(z.string().min(1)).min(4).max(6),
-  comparisonTable: comparisonTableSchema.nullable(),
-  commonMistakes: z.array(z.string().min(1)).min(3).max(5),
-  faq: z.array(faqItemSchema).min(4).max(6),
-});
+interface ArticleResponseSchemaOptions {
+  keyTakeawaysRange?: { min: number; max: number };
+  faqRange?: { min: number; max: number };
+}
+
+/**
+ * Parameterized the same way as buildWordpressOutlineSchema (TASK-FIX-035) so
+ * the article response's keyTakeaways/faq array lengths stay consistent with
+ * whatever range the outline was built with. Called with no args, this is
+ * byte-for-byte the same schema as before TASK-FIX-035 (4-6 each).
+ */
+export function buildWordpressArticleResponseSchema(opts: ArticleResponseSchemaOptions = {}) {
+  const keyTakeawaysRange = opts.keyTakeawaysRange ?? DEFAULT_KEY_TAKEAWAYS_RANGE;
+  const faqRange = opts.faqRange ?? DEFAULT_FAQ_RANGE;
+
+  return z.object({
+    content: z.string().min(1),
+    quickAnswer: z.string().min(1),
+    keyTakeaways: z.array(z.string().min(1)).min(keyTakeawaysRange.min).max(keyTakeawaysRange.max),
+    comparisonTable: comparisonTableSchema.nullable(),
+    commonMistakes: z.array(z.string().min(1)).min(3).max(5),
+    faq: z.array(faqItemSchema).min(faqRange.min).max(faqRange.max),
+  });
+}
+
+export const wordpressArticleResponseSchema = buildWordpressArticleResponseSchema();
 
 export type WordPressArticleResponse = z.infer<typeof wordpressArticleResponseSchema>;
 

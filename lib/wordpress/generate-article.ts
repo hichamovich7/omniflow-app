@@ -7,11 +7,14 @@ import { buildWordPressFromPinsPrompt } from '@/lib/ai/prompts/wordpress-from-pi
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import { addExternalLink } from '@/lib/ai/services/external-link';
 import {
-  wordpressOutlineSchema,
   wordpressArticleResponseSchema,
   buildWordpressPinsOutlineSchema,
   buildWordpressOutlineSchema,
+  buildWordpressArticleResponseSchema,
   ARTICLE_SIZE_CONFIG,
+  DEFAULT_KEY_TAKEAWAYS_RANGE,
+  DEFAULT_FAQ_RANGE,
+  DISABLED_ARRAY_RANGE,
   type ARTICLE_TYPES,
   type ARTICLE_SIZES,
   type TONES_OF_VOICE,
@@ -126,6 +129,19 @@ interface GenerateArticleParams {
   toneOfVoice?: (typeof TONES_OF_VOICE)[number] | null;
   pointOfView?: (typeof POINTS_OF_VIEW)[number] | null;
   targetCountry?: string | null;
+  // Structure (TASK-FIX-035, "1-Click Blog Post" / Option 1 only) — all
+  // optional/null. Leaving every one of them unset reproduces the exact
+  // pre-existing outline/article generation with zero regression.
+  hookBrief?: string | null;
+  includeConclusion?: boolean | null;
+  includeTables?: boolean | null;
+  includeH3?: boolean | null;
+  includeLists?: boolean | null;
+  includeItalics?: boolean | null;
+  includeQuotes?: boolean | null;
+  includeKeyTakeaways?: boolean | null;
+  includeFaq?: boolean | null;
+  includeBold?: boolean | null;
 }
 
 interface GeneratedImageResult {
@@ -176,9 +192,24 @@ export async function generateWordPressArticle(
     toneOfVoice,
     pointOfView,
     targetCountry,
+    hookBrief,
+    includeConclusion,
+    includeTables,
+    includeH3,
+    includeLists,
+    includeItalics,
+    includeQuotes,
+    includeKeyTakeaways,
+    includeFaq,
+    includeBold,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
+  // Only an explicit "Non" (false) shrinks these to a hard 0-length — "Oui"
+  // (true) and "Non défini" (undefined/null) both keep the pre-existing 4-6
+  // range, since Key Takeaways/FAQ were always present before TASK-FIX-035.
+  const keyTakeawaysRange = includeKeyTakeaways === false ? DISABLED_ARRAY_RANGE : DEFAULT_KEY_TAKEAWAYS_RANGE;
+  const faqRange = includeFaq === false ? DISABLED_ARRAY_RANGE : DEFAULT_FAQ_RANGE;
 
   // Step 1: outline
   const { system: outlineSystem, user: outlineUser } = buildWordPressOutlinePrompt({
@@ -191,6 +222,10 @@ export async function generateWordPressArticle(
     toneOfVoice: toneOfVoice || undefined,
     pointOfView: pointOfView || undefined,
     targetCountry: targetCountry || undefined,
+    hookBrief: hookBrief || undefined,
+    includeConclusion: includeConclusion ?? undefined,
+    includeKeyTakeaways: includeKeyTakeaways ?? undefined,
+    includeFaq: includeFaq ?? undefined,
   });
 
   const outlineRaw = await generateText({
@@ -209,7 +244,10 @@ export async function generateWordPressArticle(
     console.error('[wordpress] outline JSON.parse failed. Raw response below:\n' + outlineRaw);
     throw err;
   }
-  const outlineSchema = sizeConfig ? buildWordpressOutlineSchema(sizeConfig) : wordpressOutlineSchema;
+  // Always rebuilt (never the bare wordpressOutlineSchema singleton) — when
+  // sizeConfig/keyTakeawaysRange/faqRange are all left at their defaults this
+  // produces byte-for-byte the same validation as before TASK-FIX-034/035.
+  const outlineSchema = buildWordpressOutlineSchema({ sectionsRange: sizeConfig, keyTakeawaysRange, faqRange });
   const outlineValidated = outlineSchema.safeParse(applyOutlineTextLimits(outlineJson));
   if (!outlineValidated.success) {
     console.error('[wordpress] outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
@@ -227,6 +265,14 @@ export async function generateWordPressArticle(
     toneOfVoice: toneOfVoice || undefined,
     pointOfView: pointOfView || undefined,
     targetCountry: targetCountry || undefined,
+    hookBrief: hookBrief || undefined,
+    includeConclusion: includeConclusion ?? undefined,
+    includeTables: includeTables ?? undefined,
+    includeH3: includeH3 ?? undefined,
+    includeLists: includeLists ?? undefined,
+    includeItalics: includeItalics ?? undefined,
+    includeQuotes: includeQuotes ?? undefined,
+    includeBold: includeBold ?? undefined,
   });
 
   const articleRaw = await generateText({
@@ -239,7 +285,11 @@ export async function generateWordPressArticle(
     timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
   });
 
-  const articleValidated = wordpressArticleResponseSchema.safeParse(JSON.parse(articleRaw));
+  // Same keyTakeawaysRange/faqRange as the outline, so the article response's
+  // arrays are validated against the exact lengths the outline actually
+  // committed to (0 when disabled, 4-6 otherwise).
+  const articleSchema = buildWordpressArticleResponseSchema({ keyTakeawaysRange, faqRange });
+  const articleValidated = articleSchema.safeParse(JSON.parse(articleRaw));
   if (!articleValidated.success) {
     throw new Error('AI returned an invalid article format. Try again.');
   }

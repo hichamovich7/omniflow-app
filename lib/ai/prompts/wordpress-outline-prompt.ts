@@ -31,6 +31,15 @@ interface OutlinePromptContext {
   toneOfVoice?: ToneOfVoice;
   pointOfView?: PointOfView;
   targetCountry?: string;
+  // Structure (TASK-FIX-035, "1-Click Blog Post" / Option 1 only) — all
+  // optional. Leaving every one of them undefined reproduces the exact prompt
+  // text this function produced before TASK-FIX-035 (Key Takeaways and FAQ
+  // both always 4-6 items, Conclusion listed in the block structure, no hook
+  // brief instruction).
+  hookBrief?: string;
+  includeConclusion?: boolean;
+  includeKeyTakeaways?: boolean;
+  includeFaq?: boolean;
 }
 
 const ARTICLE_TYPE_GUIDANCE: Record<ArticleType, string> = {
@@ -78,29 +87,58 @@ export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
   if (ctx.targetCountry) coreSettingsNotes.push(`Target audience: readers in ${ctx.targetCountry} — favor examples, references, units, and context relevant to that country where natural, without forcing it into every section.`);
   const coreSettingsBlock = coreSettingsNotes.length > 0 ? `\n\nCore Settings for this article:\n${coreSettingsNotes.map((n) => `- ${n}`).join('\n')}` : '';
 
+  // Structure (TASK-FIX-035). Only Hook Brief adds a note here — Conclusion
+  // only affects the block-list sentence below (no outline schema field of
+  // its own), Key Takeaways/FAQ presence is enforced via the two instruction
+  // lines further down, not via a free-text note.
+  const structureNotes: string[] = [];
+  if (ctx.hookBrief) structureNotes.push(`Introduction angle/hook: ${ctx.hookBrief} Let this shape the overall angle of your planning (title, quickAnswerAngle) where natural.`);
+  const structureBlock = structureNotes.length > 0 ? `\n\nStructure preferences for this article:\n${structureNotes.map((n) => `- ${n}`).join('\n')}` : '';
+
   const system = `You are an expert SEO content strategist. You plan long-form WordPress articles optimized for search engines, featured snippets, and AI answer engines — before a single word of the article is written. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
   const researchNotesBlock = ctx.researchNotes
     ? `\n\nThe user has provided this prior SEO research — take it into account for the structure and secondary keywords (e.g. secondary keywords to weave into sections/FAQ, a search intent to match, or specific angles to cover). Treat it as informed guidance, not a rigid script — still use your own judgment on structure:\n${ctx.researchNotes}`
     : '';
 
-  const user = `Plan the outline for a WordPress article targeting the keyword: "${ctx.keyword}"${researchNotesBlock}${coreSettingsBlock}
+  // Block-list description (TASK-FIX-035): Key Takeaways/FAQ/Conclusion are
+  // dropped from the sentence when explicitly disabled, purely descriptive —
+  // when every Structure toggle is left unset this collapses to the exact
+  // original 10-block sentence.
+  const blockNames = ['H1', 'Introduction', 'Quick Answer'];
+  if (ctx.includeKeyTakeaways !== false) blockNames.push('Key Takeaways');
+  blockNames.push('Main Content', 'optional Comparison Table', 'Common Mistakes');
+  if (ctx.includeFaq !== false) blockNames.push('FAQ');
+  if (ctx.includeConclusion !== false) blockNames.push('Conclusion');
+  blockNames.push('Soft CTA');
+
+  const keyTakeawaysInstruction =
+    ctx.includeKeyTakeaways === false
+      ? '- keyTakeawaysThemes: return an empty array []. Do not plan a Key Takeaways section for this article — it must not appear.'
+      : '- keyTakeawaysThemes: 4 to 6 short theme phrases (not full sentences) — one per planned Key Takeaway bullet';
+
+  const faqInstruction =
+    ctx.includeFaq === false
+      ? '- faqQuestions: return an empty array []. Do not plan any FAQ questions for this article.'
+      : '- faqQuestions: 4 to 6 real, distinct questions a reader would actually search for about this topic — not generic "what is X" filler, and not overlapping with each other or with the Main Content sections';
+
+  const user = `Plan the outline for a WordPress article targeting the keyword: "${ctx.keyword}"${researchNotesBlock}${coreSettingsBlock}${structureBlock}
 
 ${guidelines}
 
-The article follows a fixed 10-block structure (H1, Introduction, Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, FAQ, Conclusion, Soft CTA). At this planning stage, provide:
+The article follows a fixed ${blockNames.length}-block structure (${blockNames.join(', ')}). At this planning stage, provide:
 
 - title: SEO-optimized H1 title, includes the primary keyword. Aim for around 70 characters — the system will trim anything longer at a word boundary, so write it naturally rather than counting characters defensively.
 - metaTitle: a <title>/search-result-facing version of the title, includes the primary keyword. Aim for around 60 characters (70 is trimmed automatically if you go over) — it can be a tighter rephrasing of the title, not just a copy.
 - slug: URL-friendly slug (lowercase, hyphens, ASCII only, derived from the title)
 - metaDescription: 150-160 characters, includes the primary keyword
 - quickAnswerAngle: one sentence describing the direct answer the Quick Answer block will give (the article step will expand this into the final 40-60 word answer)
-- keyTakeawaysThemes: 4 to 6 short theme phrases (not full sentences) — one per planned Key Takeaway bullet
+${keyTakeawaysInstruction}
 - sections: an ordered list of ${sections.minSections} to ${sections.maxSections} Main Content H2 sections, each with a one-sentence summary of what it will cover. Do not write the section content yet, only plan it. Each section must be scoped broadly enough to support at least 150-200 words of full body text once written — plan enough sub-points (2-3) per section that it can be developed at that length. This is what makes the final article reach the ${words.minWords}-${words.maxWords} word target, not just the section count.
 - includeComparisonTable: true only if the topic naturally involves comparing materials, methods, products, or options — false otherwise. Do not force a table onto a topic that doesn't call for one.
 - comparisonTableReason: one short sentence justifying the includeComparisonTable decision either way (why a comparison fits, or why the topic has nothing to meaningfully compare)
 - commonMistakesThemes: 3 to 5 short theme phrases, one per real, specific mistake people make on this topic — not generic filler
-- faqQuestions: 4 to 6 real, distinct questions a reader would actually search for about this topic — not generic "what is X" filler, and not overlapping with each other or with the Main Content sections
+${faqInstruction}
 - featuredImage: a single hero image for the top of the article — { prompt, altText }
 - images: exactly 2 or 3 internal images to place within the body — each with { placementMarker, prompt, altText }, where placementMarker is "IMAGE_1", "IMAGE_2", "IMAGE_3" (in that order, only as many as you include)
 
@@ -117,12 +155,12 @@ Respond with this exact JSON structure:
   "slug": "...",
   "metaDescription": "...",
   "quickAnswerAngle": "...",
-  "keyTakeawaysThemes": ["...", "..."],
+  "keyTakeawaysThemes": ${ctx.includeKeyTakeaways === false ? '[]' : '["...", "..."]'},
   "sections": [{ "heading": "...", "summary": "..." }],
   "includeComparisonTable": true,
   "comparisonTableReason": "...",
   "commonMistakesThemes": ["...", "..."],
-  "faqQuestions": ["...", "..."],
+  "faqQuestions": ${ctx.includeFaq === false ? '[]' : '["...", "..."]'},
   "featuredImage": { "prompt": "...", "altText": "..." },
   "images": [{ "placementMarker": "IMAGE_1", "prompt": "...", "altText": "..." }]
 }`;

@@ -18,6 +18,32 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-035: WordPress Structure Block (Refonte Phase 2)
+
+### Added
+
+* A "Structure" block on the "1-Click Blog Post" generator (Keyword mode only, below Core Settings): an Introductory Hook Brief textarea (500-char cap) with 5 one-click presets (Question, Statistical or Fact, Quotation, Anecdotal or Story, Personal or Emotional), still freely editable after picking one.
+* 9 three-state toggles (Non défini / Oui / Non): Conclusion, Tables, H3, Lists, Italics, Quotes, Key Takeaways, FAQ, Bold.
+* `wordpress_generations` gains 10 nullable columns (migration 027): `hook_brief` (text) and 9 `boolean` `include_*` columns.
+
+### Changed
+
+* Hook Brief overrides the article's generic opening-angle instruction with the user's specific text (still never restating the H1).
+* Tables ("Oui"/"Non") overrides the outline's own topic-driven judgment on whether to include a Comparison Table, in either direction, including banning ad-hoc tables elsewhere in the body when set to "Non".
+* H3, Lists, Italics, Quotes, Bold add explicit formatting directives to the article prompt — "Non" is always phrased as a ban naming the literal Markdown syntax, not a soft "not required".
+* Key Takeaways and FAQ ("Non") shrink the outline's `keyTakeawaysThemes`/`faqQuestions` arrays to a hard, Zod-enforced 0 length instead of the pre-existing 4-6 — a genuine schema guarantee of absence, not just a prompt request. Both also drop from the article's fixed-structure block list and its "N-block AEO structure" description.
+* Every field defaults to "Non défini"/empty and is a no-op in that state.
+
+### Preserved
+
+* Core Settings (TASK-FIX-034), Option 3 (External Source), Option 4 (Selected Pins), TASK-035 (WordPress publishing), and the IMAGE role are all unchanged — the 10 new columns are only ever populated by Option 1.
+* Generating via "1-Click Blog Post" with every Structure field left on "Non défini" reproduces the exact pre-existing outline/article prompts (verified by inspection, not a live regeneration — see Validation).
+* Schema convention unchanged from Phase 1: flat nullable columns, not a consolidated `settings jsonb` — see DECISIONS.md 2026-09-13 (3).
+
+### Validation
+
+* TypeScript OK, ESLint OK on every changed file, production build OK. Not tested against a real generation (no live Supabase/OpenRouter credentials in this environment) — the brief's request to generate real test articles before wording the "Non" instructions could not be carried out; see DECISIONS.md 2026-09-13 (4). Manual validation left to the user.
+
 ## TASK-FIX-034: WordPress Homepage + Core Settings (Refonte Phase 1)
 
 ### Added
