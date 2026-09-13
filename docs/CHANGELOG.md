@@ -18,6 +18,26 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-033: Strip C2PA Metadata
+
+### Fixed
+
+* Images generated via `gpt-image-1` carried an embedded C2PA content-credentials manifest through to the final uploaded file, along with any EXIF/XMP metadata.
+
+### Changed
+
+* `lib/ai/providers/openai.ts` `generateImage()`: the buffer received from OpenAI (`b64_json` or downloaded from `url`) is now re-encoded through `sharp(...).png().toBuffer()` before being returned. Sharp drops all metadata by default (only kept with an explicit `.withMetadata()` call), so this strips the C2PA manifest and any other embedded metadata.
+
+### Compatibility
+
+* Same PNG output format already used across the pipeline (`lib/pinterest/compositing.ts`, Supabase upload `contentType: 'image/png'`) — no format change. `sharp` was already a project dependency. Scoped to `lib/ai/providers/openai.ts` only — no schema, API, or route-contract change, and no change to `lib/ai/providers/openrouter.ts`, `lib/ai/services/image.ts`, or the generate-images route.
+
+### Validation
+
+* TypeScript OK, ESLint OK, production build OK.
+
+---
+
 ## TASK-FIX-032: Board Badge Reflects Live State
 
 ### Fixed

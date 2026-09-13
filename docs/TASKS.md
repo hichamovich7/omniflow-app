@@ -297,6 +297,19 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-FIX-033] Strip C2PA Metadata — 2026-09-13
+
+* `lib/ai/providers/openai.ts` `generateImage()`: the raw buffer received from OpenAI (`b64_json` or downloaded from `url`) is now re-encoded through `sharp(...).png().toBuffer()` before being returned, instead of being returned as-is
+* Sharp only preserves metadata when `.withMetadata()` is explicitly called, so this re-encode strips all embedded metadata by default — including gpt-image-1's embedded C2PA content-credentials manifest, plus any EXIF/XMP
+* Same output format already used by the rest of the pipeline (`lib/pinterest/compositing.ts` also outputs `.png()`, Supabase upload already sets `contentType: 'image/png'`) — no format change
+* `sharp` was already a project dependency (used throughout `lib/pinterest/*`), so no new dependency was added
+* Scoped to the OpenAI provider only (`lib/ai/providers/openai.ts`) — `lib/ai/providers/openrouter.ts` (text-overlay image routing, TASK-034) is untouched, `lib/ai/services/image.ts`, `app/api/pinterest/generate-images/route.ts`, Supabase Storage upload logic, and the `pins`/`pin_images` schema are all unchanged
+* No API, schema, or route-contract change — purely an internal buffer transformation inside the existing AI Engine provider boundary (Rule #10)
+* `docs/ARCHITECTURE.md` "Image Generation Flow" diagram gained a "Metadata Stripped" step between "Generated Image" and "Supabase Storage"
+* Validation: TypeScript OK, ESLint OK, production build OK
+
+---
+
 ## [TASK-FIX-032] Board Badge Reflects Live State — 2026-09-13
 
 * Bug: the pin Board badge on the Results page (`components/pinterest/pin-table.tsx`) rendered `pins.board`, the AI-generated text frozen at generation time — deleting or renaming a board left the old name on screen (confirmed with a deleted board, "Beginner Crochet Tips", still showing on its pins)

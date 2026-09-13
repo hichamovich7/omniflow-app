@@ -1,3 +1,5 @@
+import sharp from 'sharp';
+
 interface ImageGenerationOptions {
   model: string;
   prompt: string;
@@ -52,20 +54,27 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Bu
       throw new Error('No image data in response');
     }
 
-    if (imageData.b64_json) {
-      return Buffer.from(imageData.b64_json, 'base64');
-    }
+    let rawBuffer: Buffer;
 
-    if (imageData.url) {
+    if (imageData.b64_json) {
+      rawBuffer = Buffer.from(imageData.b64_json, 'base64');
+    } else if (imageData.url) {
       const imageRes = await fetch(imageData.url);
       if (!imageRes.ok) {
         throw new Error(`Failed to download image: ${imageRes.status}`);
       }
       const arrayBuffer = await imageRes.arrayBuffer();
-      return Buffer.from(arrayBuffer);
+      rawBuffer = Buffer.from(arrayBuffer);
+    } else {
+      throw new Error('Response contains neither url nor b64_json');
     }
 
-    throw new Error('Response contains neither url nor b64_json');
+    // Re-encode through sharp before returning — strips all embedded metadata
+    // (EXIF/XMP and gpt-image-1's C2PA content-credentials manifest) since
+    // sharp only preserves metadata when .withMetadata() is explicitly
+    // called. Same PNG format already used by the rest of the pipeline
+    // (lib/pinterest/compositing.ts, Supabase upload contentType).
+    return await sharp(rawBuffer).png().toBuffer();
   } finally {
     clearTimeout(timeout);
   }

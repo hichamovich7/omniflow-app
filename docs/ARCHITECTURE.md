@@ -270,6 +270,8 @@ AI Engine → IMAGE role → OpenAI gpt-image-1
 ↓
 Generated Image
 ↓
+Metadata Stripped (TASK-FIX-033 — `lib/ai/providers/openai.ts` re-encodes the buffer through sharp before returning it, removing gpt-image-1's embedded C2PA content-credentials manifest and any EXIF/XMP; same PNG format, no other pipeline change)
+↓
 Supabase Storage (generated-images bucket)
 ↓
 Public URL attached to Pin
