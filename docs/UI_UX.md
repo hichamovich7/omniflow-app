@@ -650,6 +650,19 @@ Manage Pinterest boards as real entities. Boards are created automatically when 
 
 ---
 
+## Filters
+
+* Project (select, "All Projects" default)
+* Search by name (text input)
+
+---
+
+## Pagination
+
+Same pattern as History (TASK-FIX-031): 20 boards per page, Previous/Next preserving current query params, changing a filter resets to page 1, an out-of-range page redirects to the last valid page, controls hidden when there is only one page.
+
+---
+
 ## Boards List
 
 Card grid, one card per board:

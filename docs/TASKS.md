@@ -308,6 +308,21 @@ Stripe Working                  ⬚ TASK-012
 
 ---
 
+## [TASK-FIX-031] Boards Filters & Pagination — 2026-09-13
+
+* Bug: `/boards` listed every board across all projects on a single unpaginated page, with no way to filter — each card already showed its project name but nothing let the user filter on it, unlike History (TASK-FIX-002) which already solved the identical problem
+* `app/(dashboard)/boards/page.tsx`: reads `project`/`search`/`page` search params, applies `project_id` and `name ILIKE '%search%'` filters before `.range()` pagination (20 per page, `{ count: 'exact' }`) — same pattern as `app/(dashboard)/history/page.tsx`
+* New `components/boards/board-filters.tsx` (Client Component): Project select ("All Projects" default) + debounced name search input, mirrors `history-filters.tsx`; updates query params and resets to page 1 on any filter change
+* New `components/boards/board-pagination.tsx` (Server Component): Previous/Next preserving all current query params, hidden when only one page — near-identical copy of `history-pagination.tsx` adapted to `/boards`
+* Out-of-range page redirects server-side to the last valid page, same logic as History
+* Empty states split: "No matching results" (with Clear filters) when filters exclude everything vs. the original "No boards yet" when there are truly zero boards
+* Zero regression on TASK-025: "New Board" button and per-card Edit/Delete (`board-actions.tsx`) unchanged
+* No DB migration, no new API route — `GET /api/boards` remains NOT IMPLEMENTED, board listing stays a direct server-side Supabase query (same convention as Projects/History)
+* `docs/UI_UX.md` "Boards" section gained "Filters" and "Pagination" subsections, matching the detail level already documented under "History"
+* Validation: TypeScript OK, ESLint OK, production build OK. Manual verification (Project filter isolates that project's boards, case-insensitive name search, pagination no longer dumping all boards at once) confirmed by the user
+
+---
+
 ## [TASK-FIX-025] Pinterest Rendering Reliability — 2026-09-12
 
 * Kept the existing SVG + Sharp pipeline, PNG export, five template names, routes, storage, `pin_images`, `media_url`, versions, CSV export, and legacy `'clean-band'` fallback for pre-migration Pins.

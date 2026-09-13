@@ -43,6 +43,31 @@ No registrar cambios menores de formato o comentarios.
 
 ---
 
+## TASK-FIX-031: Boards Filters & Pagination
+
+### Fixed
+
+* `/boards` listed every board across all projects on a single unpaginated page with no way to filter — each card already showed its project name but there was no way to filter on it, unlike History (TASK-FIX-002) which already solved the identical problem.
+
+### Added
+
+* `components/boards/board-filters.tsx`: Project select ("All Projects" default) + debounced name search input, mirroring `history-filters.tsx`; updates query params and resets to page 1 on any change.
+* `components/boards/board-pagination.tsx`: Previous/Next controls preserving all current query params, hidden when there is only one page — adapted from `history-pagination.tsx`.
+
+### Changed
+
+* `app/(dashboard)/boards/page.tsx`: reads `project`/`search`/`page` search params, applies `project_id` and `name ILIKE '%search%'` filters before `.range()` pagination (20 per page, `{ count: 'exact' }`), same server-side pattern as `app/(dashboard)/history/page.tsx`. An out-of-range page redirects to the last valid page. Empty states split into "No matching results" (filtered, with Clear filters) vs. the original "No boards yet" (truly empty).
+
+### Compatibility
+
+* No DB migration, no new API route — `GET /api/boards` remains NOT IMPLEMENTED. Zero regression on TASK-025: "New Board" and per-card Edit/Delete (`board-actions.tsx`) unchanged.
+
+### Validation
+
+* TypeScript OK, ESLint OK, production build OK. Manually verified by the user: Project filter isolates that project's boards, name search is case-insensitive, pagination no longer dumps all boards on one page.
+
+---
+
 ## Phase 5: Pinterest Auto Template Selection + Variation Engine
 
 ### Added
