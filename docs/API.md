@@ -344,6 +344,168 @@ server_error
 
 ---
 
+# POST /api/wordpress/generate-from-pins
+
+Generate a unified WordPress SEO article from selected Pinterest pins (TASK-028, Option 4).
+
+## Description
+
+Reached from the Pinterest Results page's selection toolbar ("Generate WordPress Article"), not from the `/wordpress` form's Source toggle. `projectId` and `language` are never sent in the request — both are derived server-side from the selected pins (their shared generation's `project_id`, and the pins' own `language`). All selected pins must belong to the same generation, or the request is rejected.
+
+Same outline → full-article pipeline as Option 1 (`lib/ai/prompts/wordpress-article-prompt.ts`, unchanged), but the outline is synthesized from the pins' combined theme (`lib/ai/prompts/wordpress-from-pins-prompt.ts`) into one cohesive article, not a concatenation of the pins.
+
+Images follow a strict split (see `docs/DECISIONS.md` 2026-07-17): the featured image is **always** freshly generated via `generateImage()` (role IMAGE) from a prompt describing the article's unified theme, never a specific pin. Internal images (up to 3) are **always** the already-generated active `pin_images` image of the selected pins, copied by their existing public Supabase Storage URL — no new `generateImage()` call, no re-upload. `addExternalLink()` runs the same as Option 1, after the article is written and before `{{IMAGE_N}}` marker resolution.
+
+Fewer than 3 pins is allowed (the UI warns "may lack enough source material" before navigating, and the API logs a warning) but is not a hard block.
+
+## Request
+
+```json
+{
+  "pinIds": ["uuid", "uuid", "uuid"],
+  "researchNotes": "Optional free-text guidance",
+  "categoryId": "uuid"
+}
+```
+
+`pinIds` is required, 1-20 uuids. `researchNotes` is optional (max 2000 chars). `categoryId` is optional and must belong to the same project as the selected pins' generation.
+
+## Response
+
+Same shape as `POST /api/wordpress/generate`:
+
+```json
+{
+  "data": {
+    "generationId": "uuid",
+    "status": "completed"
+  },
+  "error": null
+}
+```
+
+## Credits
+
+Not yet enforced — same as `/api/wordpress/generate`. Subject to the same lifetime Trial Usage Cap (see above).
+
+## Possible Errors
+
+```txt
+unauthorized
+rate_limited
+invalid_json
+invalid_request
+not_found
+forbidden
+invalid_category
+generation_failed
+server_error
+```
+
+`not_found` — one or more selected pins don't exist. `forbidden` — the caller doesn't own the generation the pins belong to. `invalid_request` also covers selecting pins that span more than one generation. `invalid_category` — the category doesn't belong to the pins' project.
+
+---
+
+# POST /api/wordpress/categories
+
+Create a WordPress category (project-scoped, TASK-032) — an OmniFlow-native record, independent of any real WordPress site.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "name": "Home Decor"
+}
+```
+
+`name` max 60 characters. A URL-safe `slug` is derived from `name` server-side (`slugify()`) and stored alongside it.
+
+## Response
+
+```json
+{
+  "data": {
+    "category": { "...": "full wordpress_categories row" }
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_json
+invalid_request (duplicate name within the same project)
+invalid_project
+forbidden
+server_error
+```
+
+---
+
+# PATCH /api/wordpress/categories/[id]
+
+Rename a category and/or map it to a real WordPress category term.
+
+## Request
+
+```json
+{
+  "name": "Updated Name",
+  "wpCategoryId": 4
+}
+```
+
+Both fields optional (partial update) — `name` (max 60 chars, re-derives `slug`) and/or `wpCategoryId` (a real WordPress term id from `GET /api/wordpress/sites/[id]/categories`, or `null` to unmap; omitting the field leaves the existing mapping unchanged).
+
+## Response
+
+```json
+{
+  "data": {
+    "category": { "...": "full wordpress_categories row" }
+  },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request (duplicate name within the same project)
+not_found
+forbidden
+```
+
+---
+
+# DELETE /api/wordpress/categories/[id]
+
+Delete a category. Articles previously assigned to it are not deleted — `wordpress_articles.category_id` is set to `null` (ON DELETE SET NULL, falls back to "Uncategorized").
+
+## Response
+
+```json
+{ "data": { "success": true }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+server_error
+```
+
+---
+
 # POST /api/wordpress/sites/test
 
 Validate a WordPress Application Password before it is stored (TASK-035). No resource is created — this is a pure credential check via `GET /wp-json/wp/v2/users/me`.
@@ -605,6 +767,32 @@ invalid_json
 invalid_request
 not_found
 forbidden
+```
+
+---
+
+# DELETE /api/wordpress/[id]
+
+Delete a WordPress article generation and its associated article/images (CASCADE). `[id]` is the `wordpress_generations.id`, matching `PATCH /api/wordpress/[id]` and `POST /api/wordpress/[id]/publish`.
+
+## Description
+
+Storage cleanup is best-effort and runs before the DB delete: every file under `wordpress-images/{user_id}/{id}/` (featured + internal images, see `docs/DATABASE.md`) is listed and removed. A failure here (or an already-absent file) is logged and swallowed, never surfaced to the user or allowed to block the deletion. `wordpress_articles` and `wordpress_article_images` both have `ON DELETE CASCADE` to `wordpress_generations` (migration 012), so deleting the generation row is enough — no separate deletes needed. Deleting a generation does **not** delete or unpublish the corresponding post on the live WordPress site if one was already sent via `POST /api/wordpress/[id]/publish` — only the OmniFlow-side record is removed.
+
+## Response
+
+```json
+{ "data": { "success": true }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+not_found
+forbidden
+server_error
 ```
 
 ---

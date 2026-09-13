@@ -218,6 +218,25 @@ Read-only overview of a single Project: name, niche, default language, Brand Pro
 
 ---
 
+## WordPress Connection (New / Edit Project form)
+
+An optional "WordPress Connection" section inside the same form used by `/projects/new` and `/projects/[id]/edit` (`components/projects/project-form.tsx`), TASK-035 — not a separate route.
+
+**Not connected** (or replacing an existing connection):
+
+* Site URL (text input)
+* WP Username (text input)
+* Application Password (password input) — a note explains it's generated in WordPress under Users → Profile → Application Passwords, is encrypted before storage, and is never shown again after saving
+* "Test Connection" button — disabled until all three fields are filled; must succeed (`POST /api/wordpress/sites/test`) before the connection can be saved with the project
+* "Cancel" — only shown when a connection already exists, discards the in-progress edit and reverts to the connected view
+
+**Connected**: a "Connected to {site_url}" badge, plus:
+
+* "Change connection" — reopens the fields above, pre-cleared, to replace the credentials (always re-tested, full replace only — no partial update)
+* "Disconnect" — opens a confirmation dialog warning that this Project's scheduled or published articles will revert to Draft **in OmniFlow only**; nothing changes on the WordPress site itself
+
+---
+
 # Research
 
 Route:
@@ -612,9 +631,60 @@ Displayed after generation. Header mirrors the Pinterest Results page (back link
 * Copy Markdown / Copy HTML / Download .md buttons (`components/wordpress/copy-export-buttons.tsx`)
 * Featured image (if generated)
 * Meta description
+* Category editor (`components/wordpress/article-category-editor.tsx`) — a select reusing the same `CategorySelect` component as the generation forms (own lightweight "+ New Category" quick-create included), saves immediately on change via `PATCH /api/wordpress/[id]`. If the article was already sent to WordPress (`wp_post_id` set), a note explains the change only takes effect on the next publish/update — it never re-publishes automatically
+* Publish control (`components/wordpress/publish-control.tsx`, shown only when the Project has a connected WordPress site) — a mode select (Save as Draft / Publish Now / Schedule, the last showing Date/Time fields) plus a submit button labeled after the selected mode. Below it: a send-status badge (`components/wordpress/wp-send-status-badge.tsx` — Not sent to WordPress / Sent as Draft / Published / Scheduled for [date] / Failed to send / Update failed), the last-published timestamp, a "View on WordPress" link when a `wp_post_id` exists, and the stored `publish_error` inline when the status is `failed`
 * Rendered article (Markdown → HTML via `marked`, styled with Tailwind child-selector utilities — no typography plugin, see RULES.md Rule #30)
 
+Clicking Save as Draft/Publish Now/Schedule when the article already has a `wp_post_id` (i.e. it was sent before) opens a confirmation dialog first — informational, not blocking: it names when the article was last sent/scheduled and clarifies this action will *update* the existing WordPress post, not create a duplicate. `POST /api/wordpress/[id]/publish` already handles the update-vs-create case correctly regardless; this dialog exists purely so the user isn't surprised.
+
 No Editorial Workflow selection UI here — a single generated article has nothing to multi-select, unlike Pinterest's batch of pins.
+
+---
+
+# WordPress History
+
+Route:
+
+```txt
+/wordpress/history
+```
+
+Purpose:
+
+Review previous WordPress article generations — the WordPress equivalent of Pinterest's `History` page, independent history (`wordpress_generations`, not `generations`).
+
+## Filters
+
+* Search by keyword (text input)
+* Project (select)
+* Language (select)
+* Status (select — the AI generation status: `completed`/`processing`/`failed`/`pending`, not the WordPress send status)
+* Category (select, scoped to the selected Project — disabled with a "Select a Project first" hint until a Project is chosen; changing or clearing the Project filter always drops the Category filter, since a category id is only meaningful within its own project)
+
+## WordPress History List
+
+One row per generation (card list, not a table):
+
+* Selection checkbox
+* AI generation status badge (`completed`/`processing`/`failed`/`pending`)
+* Category badge ("Uncategorized" if none assigned)
+* Send-status badge (`WpSendStatusBadge`, compact — see "WordPress Article (Results)" above for its states)
+* Title (the generated article's title, falling back to the raw keyword if generation failed before producing one), linking to `/wordpress/[id]`
+* Project name · Language · word count (article only) · relative date
+
+Actions:
+
+* Delete (hover-reveal, per row) — opens the same confirmation dialog as the bulk action below
+* Bulk delete — select rows, then a selection action bar exposes "Delete (N)"
+
+## Pagination
+
+Same pattern as Pinterest History (TASK-FIX-002): 20 articles per page, Previous/Next preserving current query params, changing a filter resets to page 1, an out-of-range page redirects to the last valid page, controls hidden when there is only one page.
+
+Empty states:
+
+* No filters, zero generations ever → "No articles yet", links to the WordPress Generator
+* Filters applied, zero matches → "No matching results", link to clear filters
 
 ---
 
