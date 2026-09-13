@@ -6,9 +6,11 @@
 
 # ACTIVE TASK
 
-Phase 6 (Pinterest Quality Gate Before Export) is implemented locally and awaiting validation. Do not commit Phase 6 automatically.
+Phase 7 (Pinterest Manual Recomposition) is implemented locally and awaiting validation. Do not commit Phase 7 automatically.
 
-Implemented scope: `PASS`/`WARN`/`RECOMPOSE`/`FAIL`; blocking geometry, contrast and safe-area checks; warning signals for compatibility, local complexity, image/text balance and excessive repetition; deterministic local recomposition using the same generated bitmap; and focused offline tests. No DB migration, Vision API, provider, credit or public route change is required.
+Implemented scope: Change layout UI; Auto/Minimal/Editorial/Split/Magazine and Auto/Top/Bottom preferences; local recomposition from a versioned raw-photo companion; Phase 1–6 renderer reuse; `PASS`/`WARN`-only persistence; and additive `pin_images` version history. No DB migration, Vision API, provider call or credit change is required. Versions created before Phase 7 need one fresh generation before manual recomposition because their raw photo was not retained.
+
+Phase 6 was manually validated and committed as `f3ad8f8`. Its Quality Gate remains unchanged and is reused by Phase 7.
 
 Phase 5 was manually validated and committed as `e49576f`. Its deterministic scoring, batch variation and existing-column persistence remain unchanged.
 

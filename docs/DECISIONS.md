@@ -1452,6 +1452,22 @@ Phase 6 : ajouter un Quality Gate déterministe entre le rendu final d'un Headli
 
 ---
 
+Phase 7 : conserver une photo brute versionnée comme fichier Storage compagnon pour permettre la recomposition manuelle sans migration.
+
+### Decision Taken
+
+* Chaque rendu text-overlay structuré `{version}.png` généré après Phase 7 possède un compagnon `{version}.source.png` dans le même bucket et le même répertoire utilisateur/Pin.
+* Le chemin source est dérivé de `pin_images.storage_path`; aucune colonne Supabase n'est ajoutée.
+* La recomposition repart exclusivement du compagnon brut, reconstruit CTA et Headline localement, exécute le Quality Gate et crée une nouvelle version seulement pour `PASS`/`WARN`.
+
+### Consequences
+
+* Il n'existe aucun appel IA ni débit de crédit dans le chemin manuel; l'historique précédent reste intact.
+* Une ancienne version sans compagnon renvoie un conflit explicite. Recomposer l'image finale existante a été rejeté car cela doublerait les overlays et dégraderait la photo.
+* Le bucket consomme un fichier source supplémentaire par version; la suppression de version retire les deux fichiers.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

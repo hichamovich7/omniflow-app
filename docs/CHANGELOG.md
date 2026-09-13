@@ -18,6 +18,20 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Phase 7: Pinterest Manual Recomposition
+
+### Added
+
+* A `Change layout` action and recomposition dialog with Auto/Minimal/Editorial/Split/Magazine and Auto/Top/Bottom preferences.
+* A local-only recomposition endpoint that reuses typography, contrast, safe areas, template selection and the Quality Gate, accepting only `PASS` or `WARN`.
+* Versioned raw-photo companion files in the existing `generated-images` bucket, with no schema migration.
+
+### Preserved
+
+* Manual recomposition never calls an image provider or consumes generation credits.
+* Every accepted result becomes a new active `pin_images` version; prior rows and files remain available.
+* Legacy versions without a raw companion fail explicitly instead of layering new text over an already composed image.
+
 ## TASK-FIX-033: Strip C2PA Metadata
 
 ### Fixed

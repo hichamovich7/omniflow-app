@@ -15,6 +15,7 @@ import {
   composeHeadlineWithQualityGate,
   type PinQualityHistoryItem,
 } from '@/lib/pinterest/quality-gate';
+import { getPinSourceStoragePath } from '@/lib/pinterest/pin-image-storage';
 import {
   DEFAULT_NICHE_CONVENTION,
   getNicheVisualConvention,
@@ -247,11 +248,27 @@ export async function POST(request: Request) {
         }
 
         const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
+        const sourcePath = getPinSourceStoragePath(filePath);
+        const storesRecompositionSource =
+          pin.visual_format === 'text-overlay' && Boolean(pin.overlay_text && angle);
+        if (storesRecompositionSource) {
+          const { error: sourceUploadError } = await supabase.storage
+            .from('generated-images')
+            .upload(sourcePath, rawImageBuffer, { contentType: 'image/png' });
+
+          if (sourceUploadError) {
+            throw new Error(`Source storage upload failed: ${sourceUploadError.message}`);
+          }
+        }
+
         const { error: uploadError } = await supabase.storage
           .from('generated-images')
           .upload(filePath, imageBuffer, { contentType: 'image/png' });
 
         if (uploadError) {
+          if (storesRecompositionSource) {
+            await supabase.storage.from('generated-images').remove([sourcePath]);
+          }
           throw new Error(`Storage upload failed: ${uploadError.message}`);
         }
 

@@ -228,6 +228,14 @@ Le pipeline texte conserve l'angle dans une clé privée `_pinterestStrategy` du
 
 `lib/pinterest/quality-gate.ts` évalue les diagnostics exacts du rendu final et produit `PASS`, `WARN`, `RECOMPOSE` ou `FAIL`. Seuls `PASS` et `WARN` poursuivent vers Storage. Une recomposition réutilise le bitmap IA : position opposée, autre template compatible, puis overlay local Phase 2. Aucun endpoint, provider, crédit, version ou schéma ne change.
 
+### Pinterest Manual Recomposition (Phase 7)
+
+`POST /api/pinterest/pin-images/recompose` reconstruit le CTA et le Headline à partir de la photo provider déjà produite. Le moteur local appelle successivement extraction de couleur, compositeur CTA, sélecteur Phase 5 et Quality Gate Phase 6. Un choix manuel sert de préférence initiale; le Quality Gate garde le droit de choisir une position ou un template sûr. Seuls `PASS` et `WARN` sont persistés.
+
+Pour chaque Pin text-overlay structuré, la photo brute est stockée dans le bucket public existant à côté du rendu, avec un chemin dérivé (`{version}.source.png` pour `{version}.png`). Chaque nouvelle version manuelle reçoit une copie de cette source et un nouveau row `pin_images`; les versions précédentes et leurs fichiers ne sont ni remplacés ni supprimés. Cette convention évite une colonne et une migration. Les versions créées avant Phase 7, dépourvues de fichier compagnon, répondent `source_unavailable` et nécessitent une nouvelle génération une seule fois.
+
+Le chemin de recomposition n'importe aucun provider IA et ne touche ni aux crédits ni au statut de génération. La suppression d'une version retire désormais son rendu et son éventuel fichier source compagnon.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

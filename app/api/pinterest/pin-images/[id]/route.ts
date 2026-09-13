@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPinOwnerUserId } from '@/lib/queries/pin-images';
+import { getPinSourceStoragePath } from '@/lib/pinterest/pin-image-storage';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 import type { PinImage } from '@/types/database';
@@ -170,7 +171,7 @@ export async function DELETE(
 
   await supabase.storage
     .from('generated-images')
-    .remove([image.storage_path]);
+    .remove([image.storage_path, getPinSourceStoragePath(image.storage_path)]);
 
   return NextResponse.json<ApiResponse<{ deleted: true }>>({
     data: { deleted: true },

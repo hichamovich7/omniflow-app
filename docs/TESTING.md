@@ -451,6 +451,28 @@ Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Quality
 
 ---
 
+# Pinterest Manual Recomposition (Phase 7)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-manual-recomposition.spec.ts --project=renderer --reporter=list
+```
+
+Coverage:
+
+* The local recomposition module and route have no image-provider dependency.
+* Explicit and automatic template/position choices pass through the existing selector and Quality Gate.
+* The final safe fallback is returned when a requested layout is rejected.
+* A new active image version is added while every prior version remains in history.
+* Raw companion paths are derived deterministically without a database column.
+
+The focused logic is offline. Supabase Storage/row activation remains covered by manual integration validation because it requires an authenticated project and a Phase 7 source companion.
+
+Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Manual Recomposition 6/6, full renderer 70/70, production build OK, and `git diff --check` OK.
+
+---
+
 # Image Analysis
 
 ---

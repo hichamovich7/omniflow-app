@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Sparkles, RefreshCw, Layers, Loader2, FileText } from 'lucide-react';
+import { Sparkles, RefreshCw, Layers, Loader2, FileText, LayoutTemplate } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { ImageVersionsDialog } from './image-versions-dialog';
+import { RecomposePinDialog } from './recompose-pin-dialog';
 import { PinDetailDialog } from './pin-detail-dialog';
 import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
@@ -39,6 +40,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
   const router = useRouter();
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [versionsPin, setVersionsPin] = useState<{ id: string; title: string } | null>(null);
+  const [recomposePin, setRecomposePin] = useState<Pin | null>(null);
   const [detailPin, setDetailPin] = useState<Pin | null>(null);
 
   async function handleRegenerate(pinId: string) {
@@ -138,7 +140,20 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                     </a>
 
                     {/* Image action overlay */}
-                    <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                      {pin.visual_format === 'text-overlay' && pin.overlay_text && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRecomposePin(pin);
+                          }}
+                          className="flex h-8 items-center gap-1.5 rounded-md border border-border/80 bg-card/95 px-2 text-[11px] font-medium text-foreground shadow-sm transition-colors hover:bg-card"
+                          aria-label={`Change layout for: ${pin.title}`}
+                        >
+                          <LayoutTemplate className="h-3.5 w-3.5" />
+                          <span>Change layout</span>
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -235,6 +250,13 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
           pinId={versionsPin.id}
           pinTitle={versionsPin.title}
           onClose={() => setVersionsPin(null)}
+        />
+      )}
+
+      {recomposePin && (
+        <RecomposePinDialog
+          pin={recomposePin}
+          onClose={() => setRecomposePin(null)}
         />
       )}
 
