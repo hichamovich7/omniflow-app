@@ -10,9 +10,11 @@ TASK-FIX-035 (WordPress "Refonte Phase 2" — Structure block: Introductory Hook
 
 TASK-FIX-034 (WordPress "Refonte Phase 1" — homepage grid of generator cards + Core Settings block on "1-Click Blog Post") completed, committed (`dddb124`), and pushed to `main` 2026-09-13. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (2) for the route-restructuring rationale.
 
-Phase 7 (Pinterest Manual Recomposition) is implemented locally and awaiting validation. Do not commit Phase 7 automatically.
+Phase 8 (Pinterest Live Recomposition Preview) is implemented locally and awaiting validation. Do not commit Phase 8 automatically.
 
-Implemented scope: Change layout UI; Auto/Minimal/Editorial/Split/Magazine and Auto/Top/Bottom preferences; local recomposition from a versioned raw-photo companion; Phase 1–6 renderer reuse; `PASS`/`WARN`-only persistence; and additive `pin_images` version history. No DB migration, Vision API, provider call or credit change is required. Versions created before Phase 7 need one fresh generation before manual recomposition because their raw photo was not retained.
+Implemented scope: read-only in-memory preview route; 300 ms debounce; stale request cancellation; live rendered preview; visible `PASS`/`WARN`/`RECOMPOSE`/`FAIL` feedback and issue reasons; and `Apply` gating to the current valid preview. No DB schema, provider, credit, Strategy Engine or WordPress change is part of Phase 8.
+
+Phase 7 (Pinterest Manual Recomposition) was committed as `eea6bd5`. Its source-companion and additive versioning behavior remain unchanged.
 
 Phase 6 was manually validated and committed as `f3ad8f8`. Its Quality Gate remains unchanged and is reused by Phase 7.
 

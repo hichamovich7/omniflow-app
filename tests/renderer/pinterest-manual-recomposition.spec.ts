@@ -9,6 +9,11 @@ import {
   getPinImageStoragePath,
   getPinSourceStoragePath,
 } from '@/lib/pinterest/pin-image-storage';
+import {
+  buildRecompositionPreviewKey,
+  canApplyRecomposition,
+  getRecompositionQualityLabel,
+} from '@/lib/pinterest/recomposition-preview';
 import type { QualityGateCompositionInput } from '@/lib/pinterest/quality-gate';
 import type { PinImage } from '@/types/database';
 
@@ -185,5 +190,42 @@ test.describe('Pinterest manual recomposition', () => {
     expect(finalPath).toBe('user-1/pin-1/4.png');
     expect(getPinSourceStoragePath(finalPath)).toBe('user-1/pin-1/4.source.png');
     expect(getPinSourceStoragePath('legacy-path')).toBe('legacy-path.source');
+  });
+
+  test('changes the preview identity when template or position changes', () => {
+    const initial = buildRecompositionPreviewKey('pin-1', 'auto', 'auto');
+    const templateChanged = buildRecompositionPreviewKey('pin-1', 'minimal', 'auto');
+    const positionChanged = buildRecompositionPreviewKey('pin-1', 'minimal', 'bottom');
+
+    expect(templateChanged).not.toBe(initial);
+    expect(positionChanged).not.toBe(templateChanged);
+  });
+
+  test('blocks Apply for unresolved or failed preview quality', () => {
+    expect(canApplyRecomposition('PASS')).toBe(true);
+    expect(canApplyRecomposition('WARN')).toBe(true);
+    expect(canApplyRecomposition('RECOMPOSE')).toBe(false);
+    expect(canApplyRecomposition('FAIL')).toBe(false);
+    expect(canApplyRecomposition(null)).toBe(false);
+  });
+
+  test('provides explicit accessible labels for every Quality Gate status', () => {
+    expect(getRecompositionQualityLabel('PASS')).toContain('PASS');
+    expect(getRecompositionQualityLabel('WARN')).toContain('WARN');
+    expect(getRecompositionQualityLabel('RECOMPOSE')).toContain('RECOMPOSE');
+    expect(getRecompositionQualityLabel('FAIL')).toContain('FAIL');
+  });
+
+  test('preview route is read-only and has no image-provider dependency', () => {
+    const routeSource = readFileSync(
+      'app/api/pinterest/pin-images/recompose/preview/route.ts',
+      'utf8'
+    );
+
+    expect(routeSource).not.toContain("from '@/lib/ai/engine'");
+    expect(routeSource).not.toContain('.insert(');
+    expect(routeSource).not.toContain('.update(');
+    expect(routeSource).not.toContain('.delete(');
+    expect(routeSource).not.toContain('.upload(');
   });
 });

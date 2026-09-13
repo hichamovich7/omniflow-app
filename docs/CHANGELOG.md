@@ -68,6 +68,19 @@ No registrar cambios menores de formato o comentarios.
 
 * TypeScript OK, ESLint OK, production build OK. Not tested against a real generation (no live Supabase/OpenRouter credentials in this environment) — manual validation left to the user.
 
+## Phase 8: Pinterest Live Recomposition Preview
+
+### Added
+
+* A debounced, cancellable live preview whenever template or position changes.
+* Visible Quality Gate status and issue explanations for `PASS`, `WARN`, `RECOMPOSE`, and `FAIL`.
+* A read-only preview endpoint returning the rendered PNG in memory without Storage or database writes.
+
+### Changed
+
+* `Apply` is enabled only for the current completed `PASS`/`WARN` preview; stale, loading, `RECOMPOSE`, and `FAIL` states are blocked.
+* Phase 7 remains the only persistence path and still creates a new version while preserving history and the raw companion.
+
 ## Phase 7: Pinterest Manual Recomposition
 
 ### Added

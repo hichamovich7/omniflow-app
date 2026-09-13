@@ -236,6 +236,12 @@ Pour chaque Pin text-overlay structuré, la photo brute est stockée dans le buc
 
 Le chemin de recomposition n'importe aucun provider IA et ne touche ni aux crédits ni au statut de génération. La suppression d'une version retire désormais son rendu et son éventuel fichier source compagnon.
 
+### Pinterest Live Recomposition Preview (Phase 8)
+
+`POST /api/pinterest/pin-images/recompose/preview` charge en lecture seule la même source compagnon et appelle exactement `recomposeExistingPin()`. Un résultat `PASS`/`WARN` est renvoyé directement comme PNG en mémoire; statut, issues, template et position réels sont transportés dans les headers. Un `RECOMPOSE`/`FAIL` est une réponse JSON structurée sans création de fichier.
+
+La modale attend 300 ms après un changement de template ou position, annule la requête précédente via `AbortController`, remplace son URL Blob et libère l'ancienne. `Apply` reste désactivé tant que le preview courant n'est pas terminé ou que son statut n'est pas `PASS`/`WARN`. La route de preview n'insère ni ne met à jour aucune ligne, n'upload aucun fichier, n'appelle aucun provider et ne consomme aucun crédit; la route Phase 7 reste seule responsable du versioning permanent.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

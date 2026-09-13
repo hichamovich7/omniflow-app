@@ -1468,6 +1468,22 @@ Phase 7 : conserver une photo brute versionnée comme fichier Storage compagnon 
 
 ---
 
+Phase 8 : transporter le preview en mémoire et séparer strictement lecture et persistance.
+
+### Decision Taken
+
+* La route `/recompose/preview` appelle le moteur Phase 7 mais renvoie le PNG directement dans la réponse HTTP avec les diagnostics Quality Gate dans les headers.
+* `RECOMPOSE` et `FAIL` reviennent comme JSON structuré; aucun rendu invalide n'est applicable.
+* Le client attend 300 ms, annule la requête obsolète et identifie chaque résultat par `pinId:template:position` avant d'activer `Apply`.
+
+### Consequences
+
+* Aucun fichier temporaire ou permanent, row `pin_images`, `media_url`, crédit ou provider n'est touché pendant un preview.
+* La route Phase 7 refait volontairement le calcul déterministe au clic `Apply` et reste l'unique chemin de création d'une version.
+* Le PNG transite en mémoire; la charge maximale d'un preview reste donc bornée par la taille d'une image Pinterest.
+
+---
+
 ## 2026-09-13 (2)
 
 ### Decision

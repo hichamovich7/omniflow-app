@@ -473,6 +473,20 @@ Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Manual 
 
 ---
 
+# Pinterest Live Recomposition Preview (Phase 8)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-manual-recomposition.spec.ts --project=renderer --reporter=list
+```
+
+Coverage adds template/position preview-key invalidation, all four visible Quality Gate labels, `Apply` gating, and a guard proving the preview route contains no DB/Storage mutation or AI engine import. Existing Phase 7 cases continue to verify valid version creation and prior-version preservation.
+
+Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Manual Recomposition + Live Preview 10/10, full renderer 74/74, production build OK, and `git diff --check` OK.
+
+---
+
 # Image Analysis
 
 ---
