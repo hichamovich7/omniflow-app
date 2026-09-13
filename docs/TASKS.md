@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-034 (WordPress "Refonte Phase 1" — homepage grid of generator cards + Core Settings block on "1-Click Blog Post") is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment). Do not commit automatically. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (2) for the route-restructuring rationale.
+
 Phase 7 (Pinterest Manual Recomposition) is implemented locally and awaiting validation. Do not commit Phase 7 automatically.
 
 Implemented scope: Change layout UI; Auto/Minimal/Editorial/Split/Magazine and Auto/Top/Bottom preferences; local recomposition from a versioned raw-photo companion; Phase 1–6 renderer reuse; `PASS`/`WARN`-only persistence; and additive `pin_images` version history. No DB migration, Vision API, provider call or credit change is required. Versions created before Phase 7 need one fresh generation before manual recomposition because their raw photo was not retained.
@@ -190,6 +192,16 @@ Not yet wired into Option 1: Content Analyzer (TASK-024) — the keyword-only fl
 
 Usuario puede generar un artículo SEO completo desde un keyword, con imagen destacada e imágenes internas, y exportarlo en Markdown o HTML. (Cumplido por Option 1.) Usuario puede seleccionar pins de Pinterest y generar un artículo SEO unificado, con imagen destacada nueva e imágenes internas reutilizadas de los pins. (Cumplido por Option 4.) Options 2 y 3 quedan PLANNED.
 
+#### [TASK-FIX-034] WordPress Homepage + Core Settings (Refonte Phase 1)
+
+##### Status: Implemented 2026-09-13, awaiting manual validation
+
+Nueva página de inicio en `/wordpress` (grid de 4 cards de generadores — solo "1-Click Blog Post" activo, "Bulk Article Generation"/"Super Page"/"Rewriter Tool" deshabilitados, mismo tratamiento visual que las entradas Facebook/LinkedIn/Medium del sidebar). El formulario Option 1/Option 3 existente se movió sin cambios a `/wordpress/blog-post` (ver DECISIONS.md 2026-09-13 (2)). Option 1 gana un bloque "Core Settings" opcional: Article Type, Article Size, Tone of Voice, Point of View, Target Country — los cinco por defecto en "None", reproduciendo exactamente el comportamiento previo cuando no se tocan. Migration 026 añade las 5 columnas nullable a `wordpress_generations`. Sin cambios en Option 3, Option 4, TASK-035 (publishing), ni en el rol IMAGE.
+
+##### Backlog (no activo)
+
+Future: evaluate exposing AI model choice (Claude/DeepSeek/GPT/...) to users once the SaaS is more mature — currently role-based only (Rule #11, Roles Not Providers). Not an active task; revisit once the product has more traction.
+
 ---
 
 ## [TASK-011] Credits System
@@ -298,6 +310,22 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-034] WordPress Homepage + Core Settings (Refonte Phase 1) — 2026-09-13
+
+* Scope agreed with the founder: (A) a new WordPress home page as a grid of generator cards, (B) an enriched "Core Settings" block on the "1-Click Blog Post" generator (Option 1, keyword → article). Nothing else — no Structure/SEO Keywords/Media Hub/Internal-External Linking/Syndication blocks, no AI model choice exposed to users (Rule #11 stays intact; see the Backlog note under FASE 4 above)
+* **Route restructuring** (see DECISIONS.md 2026-09-13 (2)): the existing combined Option 1 + Option 3 form (`components/wordpress/article-form.tsx`) moved unchanged to a new route `app/(dashboard)/wordpress/blog-post/page.tsx`. `app/(dashboard)/wordpress/page.tsx` now renders a 4-card grid ("1-Click Blog Post" active → `/wordpress/blog-post`; "Bulk Article Generation", "Super Page", "Rewriter Tool" disabled placeholders, same visual treatment as the sidebar's disabled Facebook/LinkedIn/Medium entries — grayed, "Soon" tag, no route). The `?pinIds=` branch (Option 4) is untouched and still lives at `/wordpress`, checked before the grid renders, so a Pinterest-selection link never sees it. Direct "create an article now" CTAs (dashboard's "Generate WordPress Article" button, WordPress History's empty-state "Go to Generator", the article page's back arrow and its generation-not-found fallback) were repointed to `/wordpress/blog-post` so they keep their one-click behavior instead of adding an extra hop through the hub; the sidebar's "WordPress → Generate" link intentionally still points at `/wordpress` (the hub)
+* Migration 026: `wordpress_generations` gains 5 nullable columns — `article_type`, `article_size`, `tone_of_voice`, `point_of_view`, `target_country`. No DB CHECK, validated at the Zod layer, same convention as `visual_format`/`title_banner_template`
+* `lib/validations/wordpress.ts`: `ARTICLE_TYPES`, `ARTICLE_SIZES`, `TONES_OF_VOICE`, `POINTS_OF_VIEW`, `TARGET_COUNTRIES` (fixed lists) plus `ARTICLE_SIZE_CONFIG` (section-count/word-count range per size tier). `generateArticleSchema` gains the 5 optional fields. `wordpressOutlineSchema` is now `buildWordpressOutlineSchema(sectionsRange?)` called with no args — byte-for-byte the same schema as before (8-10 sections) — so Option 3/4 (which still call the zero-arg form via `wordpressOutlineSchema`/`buildWordpressPinsOutlineSchema`) are unaffected
+* `lib/ai/prompts/wordpress-outline-prompt.ts` / `wordpress-article-prompt.ts`: 5 new optional context fields. Article Type nudges how Main Content H2 sections are framed (step-by-step for How-to, numbered items for Listicle, pros/cons + verdict for Product review, inverted-pyramid for News, criteria-based for Comparison) without altering the fixed 10-block AEO skeleton. Article Size drives the section-count range and word-count target passed into both prompts. Tone of Voice and Point of View are sentence-level voice instructions on the article body, explicitly distinct from and layered on top of the Brand Profile. Target Country steers examples/references/units. Every one of the 5 fields is optional and unused branches reproduce the exact prior prompt text (verified by inspection: identical string output when all are `undefined`)
+* `lib/wordpress/generate-article.ts`: `generateWordPressArticle()` accepts the 5 optional fields, builds a size-specific outline schema only when `articleSize` is set (falls back to the untouched default otherwise), and bumps the article generation's `maxTokens` from `ARTICLE_MAX_TOKENS` (8000) to a new `ARTICLE_MAX_TOKENS_LARGE` (11000) only for the `large` tier (~3600-5000 words) to avoid truncating the JSON response — every other tier, including no size chosen, keeps the original constant unchanged
+* `app/api/wordpress/generate/route.ts`: parses, persists, and forwards the 5 fields; `generateArticleFromUrlSchema`/`generateArticleFromPinsSchema` and their routes are untouched, so Option 3/4 never populate these columns
+* `components/wordpress/article-form.tsx`: new "Core Settings" block (5 selects, all defaulting to "None") rendered only in Keyword mode, below the existing Project/Language/Category row — invisible and inert in External Source mode
+* `types/wordpress.ts`: `WordPressGeneration` gains the 5 nullable fields; `WordPressGenerationInsert` keeps them optional
+* `docs/UI_UX.md` (new "WordPress Home" section + rewritten "WordPress Generator — 1-Click Blog Post" section with a "Core Settings" subsection), `docs/DATABASE.md`, `docs/DECISIONS.md` (2026-09-13 (2)), `lib/guide/content.ts` updated
+* **Not tested by the agent against a real generation** — no live Supabase/OpenRouter credentials in this environment. Verified instead: TypeScript OK, ESLint OK, production build OK (`/wordpress` and `/wordpress/blog-post` both compile as separate routes). Manual validation left to the user: (1) generate via "1-Click Blog Post" with Core Settings untouched and confirm the result is unchanged from before this task, (2) generate with Article Type=Listicle + Article Size=Small + Tone=Witty and confirm the structure/length/tone reflect those choices, (3) confirm the 3 placeholder cards on the WordPress home are non-clickable
+
+---
 
 ## [TASK-FIX-033] Strip C2PA Metadata — 2026-09-13
 

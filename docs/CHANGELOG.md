@@ -18,6 +18,30 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-034: WordPress Homepage + Core Settings (Refonte Phase 1)
+
+### Added
+
+* A new WordPress home page (`/wordpress`) — a grid of 4 generator cards. Only "1-Click Blog Post" is active (→ `/wordpress/blog-post`); "Bulk Article Generation", "Super Page", and "Rewriter Tool" are disabled placeholders for future phases, styled like the sidebar's disabled Facebook/LinkedIn/Medium entries.
+* A "Core Settings" block on the "1-Click Blog Post" generator (Keyword mode only): Article Type, Article Size, Tone of Voice, Point of View, Target Country — all optional, all defaulting to "None".
+* `wordpress_generations` gains 5 nullable columns (migration 026): `article_type`, `article_size`, `tone_of_voice`, `point_of_view`, `target_country`.
+
+### Changed
+
+* The pre-existing combined Option 1 (Keyword) + Option 3 (External Source) form moved from `/wordpress` to `/wordpress/blog-post`, unchanged in behavior — see DECISIONS.md 2026-09-13 (2). The `?pinIds=` Option 4 entry point stays at `/wordpress`, checked before the new grid renders.
+* Article Type and Article Size now shape the outline's Main Content section count/structure and the article's target word count when chosen; Tone of Voice, Point of View, and Target Country add sentence-level voice/localization instructions to the article prompt, layered on top of the Brand Profile. All five are no-ops when left on "None".
+* A few "create an article now" shortcuts (dashboard button, WordPress History empty state, article page back-link and not-found fallback) now point directly at `/wordpress/blog-post` instead of the new hub, preserving their one-click behavior.
+
+### Preserved
+
+* Option 3 (External Source) and Option 4 (Selected Pins) generation, TASK-035 (WordPress publishing), and the IMAGE role are all unchanged — the 5 new columns are only ever populated by Option 1.
+* Generating via "1-Click Blog Post" with every Core Settings field left on "None" reproduces the exact pre-existing outline/article prompts (verified by inspection, not a live regeneration — see Validation).
+* AI model/provider choice remains role-based only (Rule #11) — not exposed to users in this phase. See TASKS.md "Backlog" note under FASE 4 — WordPress.
+
+### Validation
+
+* TypeScript OK, ESLint OK, production build OK. Not tested against a real generation (no live Supabase/OpenRouter credentials in this environment) — manual validation left to the user.
+
 ## Phase 7: Pinterest Manual Recomposition
 
 ### Added

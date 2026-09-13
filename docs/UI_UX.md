@@ -151,7 +151,7 @@ Resumen rápido del uso, reflejando ambas plataformas (Pinterest + WordPress), n
 
 Primary Action:
 
-* "Generate Content ▾" — único botón sólido de la pantalla, con menú desplegable: "Pinterest Pins" (→ `/pinterest`) y "WordPress Article" (→ `/wordpress`)
+* "Generate Content ▾" — único botón sólido de la pantalla, con menú desplegable: "Pinterest Pins" (→ `/pinterest`) y "WordPress Article" (→ `/wordpress/blog-post`)
 
 Quick Actions (3 cards):
 
@@ -599,7 +599,7 @@ Downloads Pinterest-compatible CSV.
 
 ---
 
-# WordPress Generator (TASK-028, Options 1 and 3)
+# WordPress Home (TASK-FIX-034)
 
 Route:
 
@@ -607,14 +607,45 @@ Route:
 /wordpress
 ```
 
+Landing hub for the WordPress module — a 2×2 grid of generator cards, same visual language as the sidebar's disabled "Platforms" entries (Facebook/LinkedIn/Medium): grayed icon and text, a small "Soon" tag, `cursor-not-allowed`, no route. Only one card is active today:
+
+* **1-Click Blog Post** (active) — links to `/wordpress/blog-post` (Options 1 and 3 below).
+* **Bulk Article Generation** (disabled — future phase)
+* **Super Page** (disabled — future phase)
+* **Rewriter Tool** (disabled — future phase)
+
+The sidebar's "WordPress → Generate" link still points at `/wordpress` — it now lands on this hub instead of the form directly, then the user picks a card. `?pinIds=` (Option 4, see below) is handled at this same `/wordpress` route, ahead of the hub, exactly as before — a Pinterest selection never sees the grid.
+
+---
+
+# WordPress Generator — 1-Click Blog Post (TASK-028, Options 1 and 3)
+
+Route:
+
+```txt
+/wordpress/blog-post
+```
+
 Same page structure as the Pinterest Generator form. A "Source" select at the top switches between two modes — no Pins/Board fields, no Research/Analyze passthrough in either mode (both start fresh, not from a Research result):
 
-* **Keyword** (Option 1, default): Keyword (text, required), Research Notes (textarea, optional, free-text SEO guidance), Project (select), Language (select).
-* **External Source** (Option 3): a second "Input Type" select — **Link** (URL field) or **Paste text** (textarea, 12,000-character cap shown live under the field) — followed by a short explanatory line ("Used only as research context...") and a required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") that gates the submit button. Research Notes is not shown in this mode — its role is filled by an AI-generated summary of the source instead. Project and Language selects are shared with Keyword mode.
+* **Keyword** (Option 1, default): Keyword (text, required), Research Notes (textarea, optional, free-text SEO guidance), Project (select), Language (select), Category (select), then a **Core Settings** block (see below).
+* **External Source** (Option 3): a second "Input Type" select — **Link** (URL field) or **Paste text** (textarea, 12,000-character cap shown live under the field) — followed by a short explanatory line ("Used only as research context...") and a required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") that gates the submit button. Research Notes is not shown in this mode — its role is filled by an AI-generated summary of the source instead. Project and Language selects are shared with Keyword mode. No Core Settings block in this mode (Option 1 only).
 
 Submit button reads "Generate Article" and its loading label warns generation can take up to a minute (2-3 AI text calls + up to 4 image calls, synchronous) — an extra summary call for External Source mode.
 
-Selected-pins mode (Option 4) is a separate entry point (reached via "Generate WordPress Article" from a Pinterest generation's selection toolbar, `?pinIds=` query param), not part of this Source toggle.
+Selected-pins mode (Option 4) is a separate entry point (reached via "Generate WordPress Article" from a Pinterest generation's selection toolbar, `?pinIds=` query param on `/wordpress`, not `/wordpress/blog-post`), not part of this Source toggle.
+
+## Core Settings (TASK-FIX-034, Keyword mode only)
+
+A collapsed-looking, always-visible block below Project/Language/Category, labeled "Core Settings" with a one-line "Optional" note. Five independent selects, every one defaulting to "None" — leaving all five untouched reproduces generation exactly as before this task, with zero change to output:
+
+* **Article Type** — None, How-to guide, Listicle, Product review, News, Comparison. Nudges how the outline's Main Content H2 sections are shaped (e.g. sequential steps for How-to, a numbered list for Listicle, pros/cons + verdict for Product review, inverted-pyramid lead for News, criteria-based sections for Comparison) — the fixed 10-block AEO article skeleton itself (Intro, Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, FAQ, Conclusion, CTA) never changes.
+* **Article Size** — None (default), Small (~1200-2400 words, 5-8 sections), Medium (~2400-3600 words, 9-12 sections), Large (~3600-5000 words, 13-16 sections). Controls both the outline's Main Content section count and the article's word-count target.
+* **Tone of Voice** — None, Friendly, Professional, Informational, Transactional, Inspirational, Neutral, Witty, Casual. A sentence-level voice instruction for the article body, layered on top of (not a replacement for) the Project's Brand Profile.
+* **Point of View** — None, First person singular, First person plural, Second person, Third person.
+* **Target Country** — None, or a fixed list of common countries (United States, United Kingdom, Canada, Australia, Germany, Austria, Switzerland, France, Belgium, Spain, Mexico, Argentina, Ireland, New Zealand, Netherlands, Italy, Portugal, India). Steers examples, references, and units toward that market without forcing it into every section.
+
+None of these fields are exposed as an AI-model choice (see `docs/DECISIONS.md` — model/provider selection stays role-based, Rule #11, not user-facing in this phase).
 
 ---
 

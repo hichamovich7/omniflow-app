@@ -1468,6 +1468,28 @@ Phase 7 : conserver une photo brute versionnée comme fichier Storage compagnon 
 
 ---
 
+## 2026-09-13 (2)
+
+### Decision
+
+TASK-FIX-034 — WordPress homepage (grille de cards) + Core Settings sur "1-Click Blog Post" : où placer Option 3 (External Source) une fois `/wordpress` transformé en grille.
+
+### Context
+
+Le formulaire actuel (`components/wordpress/article-form.tsx`) combine déjà Option 1 (Keyword) et Option 3 (External Source) sur une seule page (`/wordpress`) via un sélecteur "Source". Le brief Phase 1 demande une nouvelle page d'accueil en grille à `/wordpress`, avec une card "1-Click Blog Post" mais sans mentionner où Option 3 doit vivre — seulement qu'"aucun changement" ne doit lui être apporté et qu'aucun lien ne doit casser.
+
+### Decision Taken
+
+Le formulaire combiné (Option 1 + Option 3, strictement inchangé pour Option 3) est déplacé tel quel vers une nouvelle route `/wordpress/blog-post`. `/wordpress` devient la grille d'accueil (4 cards, une seule active). Le cas `?pinIds=` (Option 4) reste géré à `/wordpress` exactement comme avant, avant même le rendu de la grille — un lien Pinterest→WordPress ne voit jamais la grille. La sidebar ("WordPress → Generate" → `/wordpress`) n'a pas changé : elle mène désormais au hub, ce qui reste cohérent avec son intitulé.
+
+### Consequences
+
+* Aucun lien existant ne casse : `/wordpress?pinIds=...` (bouton Pinterest), le lien "WordPress Article" du dashboard, et le lien sidebar continuent de fonctionner.
+* Option 3 reste accessible au même formulaire, avec le même code, seulement à une nouvelle URL.
+* Les futures cards (Bulk Article Generation, Super Page, Rewriter Tool) sont des placeholders désactivés, même traitement visuel que les entrées Facebook/LinkedIn/Medium du sidebar — aucune route créée pour elles dans cette phase.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

@@ -3,6 +3,21 @@ export type WordPressGenerationStatus = 'pending' | 'processing' | 'completed' |
 export type WordPressArticleStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type WordPressPublishStatus = 'draft' | 'scheduled' | 'published' | 'failed';
 
+// Core Settings (TASK-FIX-034, "1-Click Blog Post" / Option 1 only). Each is
+// optional and null means "None" — Option 3/4 generations never set these.
+export type WordPressArticleType = 'how-to' | 'listicle' | 'product-review' | 'news' | 'comparison';
+export type WordPressArticleSize = 'small' | 'medium' | 'large';
+export type WordPressToneOfVoice =
+  | 'friendly'
+  | 'professional'
+  | 'informational'
+  | 'transactional'
+  | 'inspirational'
+  | 'neutral'
+  | 'witty'
+  | 'casual';
+export type WordPressPointOfView = 'first-singular' | 'first-plural' | 'second' | 'third';
+
 export interface WordPressGeneration {
   id: string;
   project_id: string;
@@ -16,15 +31,25 @@ export interface WordPressGeneration {
   source_url: string | null;
   status: WordPressGenerationStatus;
   created_at: string;
+  article_type: WordPressArticleType | null;
+  article_size: WordPressArticleSize | null;
+  tone_of_voice: WordPressToneOfVoice | null;
+  point_of_view: WordPressPointOfView | null;
+  target_country: string | null;
 }
 
-export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url'> & {
+export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url' | 'article_type' | 'article_size' | 'tone_of_voice' | 'point_of_view' | 'target_country'> & {
   id?: string;
   status?: WordPressGenerationStatus;
   source_type?: WordPressSourceType;
   research_notes?: string | null;
   source_pin_ids?: string[] | null;
   source_url?: string | null;
+  article_type?: WordPressArticleType | null;
+  article_size?: WordPressArticleSize | null;
+  tone_of_voice?: WordPressToneOfVoice | null;
+  point_of_view?: WordPressPointOfView | null;
+  target_country?: string | null;
 };
 
 export interface WordPressArticle {

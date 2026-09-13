@@ -10,6 +10,12 @@ import {
   wordpressOutlineSchema,
   wordpressArticleResponseSchema,
   buildWordpressPinsOutlineSchema,
+  buildWordpressOutlineSchema,
+  ARTICLE_SIZE_CONFIG,
+  type ARTICLE_TYPES,
+  type ARTICLE_SIZES,
+  type TONES_OF_VOICE,
+  type POINTS_OF_VIEW,
 } from '@/lib/validations/wordpress';
 import { promisePool } from '@/lib/utils/promise-pool';
 import { truncateAtWordBoundary } from '@/lib/utils/text-truncate';
@@ -38,6 +44,13 @@ export const WORDPRESS_IMAGE_CONFIG = {
 // generateText() calls and must stay sized identically.
 export const OUTLINE_MAX_TOKENS = 3000;
 export const ARTICLE_MAX_TOKENS = 8000;
+
+// Article Size (TASK-FIX-034, Option 1 only) can widen the target well past
+// the 1800-2500 words ARTICLE_MAX_TOKENS was originally sized for. Only the
+// 'large' tier (3600-5000 words) risks truncating the JSON response before it
+// finishes — bumped for that tier alone, everything else (including no size
+// chosen) keeps the exact original ARTICLE_MAX_TOKENS.
+export const ARTICLE_MAX_TOKENS_LARGE = 11000;
 
 // The full-article write (10-block AEO structure, 1800-2500 words, 8000 max
 // tokens) routinely runs past the provider's default 60s fetch timeout —
@@ -105,6 +118,14 @@ interface GenerateArticleParams {
   language: SupportedLanguage;
   brandProfileDescription: string | null;
   researchNotes?: string | null;
+  // Core Settings (TASK-FIX-034, "1-Click Blog Post" / Option 1 only) — all
+  // optional. Leaving every one of them undefined/null reproduces the exact
+  // pre-existing outline/article generation with zero regression.
+  articleType?: (typeof ARTICLE_TYPES)[number] | null;
+  articleSize?: (typeof ARTICLE_SIZES)[number] | null;
+  toneOfVoice?: (typeof TONES_OF_VOICE)[number] | null;
+  pointOfView?: (typeof POINTS_OF_VIEW)[number] | null;
+  targetCountry?: string | null;
 }
 
 interface GeneratedImageResult {
@@ -142,8 +163,22 @@ export interface GenerateArticleResult {
 export async function generateWordPressArticle(
   params: GenerateArticleParams
 ): Promise<GenerateArticleResult> {
-  const { supabase, userId, generationId, keyword, language, brandProfileDescription, researchNotes } = params;
+  const {
+    supabase,
+    userId,
+    generationId,
+    keyword,
+    language,
+    brandProfileDescription,
+    researchNotes,
+    articleType,
+    articleSize,
+    toneOfVoice,
+    pointOfView,
+    targetCountry,
+  } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
+  const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
 
   // Step 1: outline
   const { system: outlineSystem, user: outlineUser } = buildWordPressOutlinePrompt({
@@ -151,6 +186,11 @@ export async function generateWordPressArticle(
     brandProfileContext: brandProfileContext || undefined,
     researchNotes: researchNotes || undefined,
     language,
+    articleType: articleType || undefined,
+    articleSize: articleSize || undefined,
+    toneOfVoice: toneOfVoice || undefined,
+    pointOfView: pointOfView || undefined,
+    targetCountry: targetCountry || undefined,
   });
 
   const outlineRaw = await generateText({
@@ -169,7 +209,8 @@ export async function generateWordPressArticle(
     console.error('[wordpress] outline JSON.parse failed. Raw response below:\n' + outlineRaw);
     throw err;
   }
-  const outlineValidated = wordpressOutlineSchema.safeParse(applyOutlineTextLimits(outlineJson));
+  const outlineSchema = sizeConfig ? buildWordpressOutlineSchema(sizeConfig) : wordpressOutlineSchema;
+  const outlineValidated = outlineSchema.safeParse(applyOutlineTextLimits(outlineJson));
   if (!outlineValidated.success) {
     console.error('[wordpress] outline Zod validation failed:', JSON.stringify(outlineValidated.error.format(), null, 2));
     console.error('[wordpress] Raw response below:\n' + outlineRaw);
@@ -181,6 +222,11 @@ export async function generateWordPressArticle(
   const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({
     outline,
     language,
+    minWords: sizeConfig?.minWords,
+    maxWords: sizeConfig?.maxWords,
+    toneOfVoice: toneOfVoice || undefined,
+    pointOfView: pointOfView || undefined,
+    targetCountry: targetCountry || undefined,
   });
 
   const articleRaw = await generateText({
@@ -189,7 +235,7 @@ export async function generateWordPressArticle(
       { role: 'system', content: articleSystem },
       { role: 'user', content: articleUser },
     ],
-    maxTokens: ARTICLE_MAX_TOKENS,
+    maxTokens: articleSize === 'large' ? ARTICLE_MAX_TOKENS_LARGE : ARTICLE_MAX_TOKENS,
     timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
   });
 

@@ -32,7 +32,7 @@ export default async function WordPressArticlePage({
   const { generation, article, images } = await getWordPressArticleByGenerationId(supabase, id);
 
   if (!generation) {
-    redirect('/wordpress');
+    redirect('/wordpress/blog-post');
   }
 
   const wordpressSite = await getWordPressSiteByProjectId(supabase, generation.project_id);
@@ -51,7 +51,7 @@ export default async function WordPressArticlePage({
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Link
-            href="/wordpress"
+            href="/wordpress/blog-post"
             className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted transition-colors"
             aria-label="Back to generator"
           >

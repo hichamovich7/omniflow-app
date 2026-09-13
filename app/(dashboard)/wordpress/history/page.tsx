@@ -112,7 +112,7 @@ export default async function WordPressHistoryPage({ searchParams }: WordPressHi
               Clear filters
             </Link>
           ) : (
-            <Link href="/wordpress" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+            <Link href="/wordpress/blog-post" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Go to Generator
             </Link>
           )}

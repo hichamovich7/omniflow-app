@@ -87,7 +87,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, keyword, language, researchNotes, categoryId } = parsed.data;
+  const { projectId, keyword, language, researchNotes, categoryId, articleType, articleSize, toneOfVoice, pointOfView, targetCountry } =
+    parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -134,6 +135,11 @@ export async function POST(request: Request) {
       source_type: 'keyword',
       research_notes: researchNotes ?? null,
       status: 'processing',
+      article_type: articleType ?? null,
+      article_size: articleSize ?? null,
+      tone_of_voice: toneOfVoice ?? null,
+      point_of_view: pointOfView ?? null,
+      target_country: targetCountry ?? null,
     })
     .select()
     .single();
@@ -155,6 +161,11 @@ export async function POST(request: Request) {
       language,
       brandProfileDescription: project.description,
       researchNotes,
+      articleType,
+      articleSize,
+      toneOfVoice,
+      pointOfView,
+      targetCountry,
     });
 
     const { data: article, error: articleError } = await supabase

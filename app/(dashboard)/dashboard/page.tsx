@@ -128,7 +128,7 @@ export default async function DashboardPage() {
           metadata={<span>Your AI content workspace is ready to create, review, and publish.</span>}
           actions={<div className="flex flex-wrap gap-2">
           <Link
-            href="/wordpress"
+            href="/wordpress/blog-post"
             className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'min-h-11 px-4')}
           >
             <FileText className="h-4 w-4" />

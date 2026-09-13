@@ -4,7 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, FileText } from 'lucide-react';
-import { generateArticleSchema, generateArticleFromUrlSchema, MAX_PASTED_CONTENT_LENGTH } from '@/lib/validations/wordpress';
+import {
+  generateArticleSchema,
+  generateArticleFromUrlSchema,
+  MAX_PASTED_CONTENT_LENGTH,
+  ARTICLE_TYPES,
+  ARTICLE_SIZES,
+  TONES_OF_VOICE,
+  POINTS_OF_VIEW,
+  TARGET_COUNTRIES,
+} from '@/lib/validations/wordpress';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { Button } from '@/components/ui/button';
@@ -39,6 +48,44 @@ type UrlSourceType = 'link' | 'pasted';
 const CONFIRMATION_LABEL =
   "I confirm I'm using this content as research inspiration for an original article, not to reproduce it";
 
+// Core Settings (TASK-FIX-034, "1-Click Blog Post" / Option 1 only). "None" is
+// represented as an empty string in local state and stripped before the
+// request is sent, so leaving every field untouched reproduces the exact
+// pre-existing generation behavior.
+const ARTICLE_TYPE_LABELS: Record<(typeof ARTICLE_TYPES)[number], string> = {
+  'how-to': 'How-to guide',
+  listicle: 'Listicle',
+  'product-review': 'Product review',
+  news: 'News',
+  comparison: 'Comparison',
+};
+
+const ARTICLE_SIZE_LABELS: Record<(typeof ARTICLE_SIZES)[number], string> = {
+  small: 'Small (~1200-2400 words, 5-8 sections)',
+  medium: 'Medium (~2400-3600 words, 9-12 sections)',
+  large: 'Large (~3600-5000 words, 13-16 sections)',
+};
+
+const TONE_OF_VOICE_LABELS: Record<(typeof TONES_OF_VOICE)[number], string> = {
+  friendly: 'Friendly',
+  professional: 'Professional',
+  informational: 'Informational',
+  transactional: 'Transactional',
+  inspirational: 'Inspirational',
+  neutral: 'Neutral',
+  witty: 'Witty',
+  casual: 'Casual',
+};
+
+const POINT_OF_VIEW_LABELS: Record<(typeof POINTS_OF_VIEW)[number], string> = {
+  'first-singular': 'First person singular',
+  'first-plural': 'First person plural',
+  second: 'Second person',
+  third: 'Third person',
+};
+
+const NONE_VALUE = 'none';
+
 export function ArticleForm({ projects, categories: initialCategories }: ArticleFormProps) {
   const router = useRouter();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
@@ -56,6 +103,11 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
   const [confirmedOriginal, setConfirmedOriginal] = useState(false);
   const [categories, setCategories] = useState(initialCategories);
   const [categoryId, setCategoryId] = useState('');
+  const [articleType, setArticleType] = useState('');
+  const [articleSize, setArticleSize] = useState('');
+  const [toneOfVoice, setToneOfVoice] = useState('');
+  const [pointOfView, setPointOfView] = useState('');
+  const [targetCountry, setTargetCountry] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -86,6 +138,11 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
         language,
         researchNotes: researchNotes.trim() || undefined,
         categoryId: categoryId || undefined,
+        articleType: articleType || undefined,
+        articleSize: articleSize || undefined,
+        toneOfVoice: toneOfVoice || undefined,
+        pointOfView: pointOfView || undefined,
+        targetCountry: targetCountry || undefined,
       });
       if (!parsed.success) {
         setError(parsed.error.issues[0].message);
@@ -349,6 +406,138 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
             />
           </div>
         </div>
+
+        {sourceMode === 'keyword' && (
+          <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div>
+              <p className="text-xs font-medium">Core Settings</p>
+              <p className="text-[11px] text-muted-foreground">
+                Optional — fine-tune the article&apos;s structure and voice. Leave any of these on &quot;None&quot; to keep
+                the default behavior.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="article-type" className="text-xs font-medium text-muted-foreground">
+                  Article Type
+                </Label>
+                <Select
+                  value={articleType || NONE_VALUE}
+                  onValueChange={(v) => v && setArticleType(v === NONE_VALUE ? '' : v)}
+                >
+                  <SelectTrigger id="article-type" className="w-full min-w-0" disabled={loading}>
+                    <span className="min-w-0 truncate text-sm">
+                      {articleType ? ARTICLE_TYPE_LABELS[articleType as (typeof ARTICLE_TYPES)[number]] : 'None'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None</SelectItem>
+                    {ARTICLE_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {ARTICLE_TYPE_LABELS[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="article-size" className="text-xs font-medium text-muted-foreground">
+                  Article Size
+                </Label>
+                <Select
+                  value={articleSize || NONE_VALUE}
+                  onValueChange={(v) => v && setArticleSize(v === NONE_VALUE ? '' : v)}
+                >
+                  <SelectTrigger id="article-size" className="w-full min-w-0" disabled={loading}>
+                    <span className="min-w-0 truncate text-sm">
+                      {articleSize ? ARTICLE_SIZE_LABELS[articleSize as (typeof ARTICLE_SIZES)[number]] : 'None (default)'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None (default)</SelectItem>
+                    {ARTICLE_SIZES.map((size) => (
+                      <SelectItem key={size} value={size}>
+                        {ARTICLE_SIZE_LABELS[size]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="tone-of-voice" className="text-xs font-medium text-muted-foreground">
+                  Tone of Voice
+                </Label>
+                <Select
+                  value={toneOfVoice || NONE_VALUE}
+                  onValueChange={(v) => v && setToneOfVoice(v === NONE_VALUE ? '' : v)}
+                >
+                  <SelectTrigger id="tone-of-voice" className="w-full min-w-0" disabled={loading}>
+                    <span className="min-w-0 truncate text-sm">
+                      {toneOfVoice ? TONE_OF_VOICE_LABELS[toneOfVoice as (typeof TONES_OF_VOICE)[number]] : 'None'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None</SelectItem>
+                    {TONES_OF_VOICE.map((tone) => (
+                      <SelectItem key={tone} value={tone}>
+                        {TONE_OF_VOICE_LABELS[tone]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="point-of-view" className="text-xs font-medium text-muted-foreground">
+                  Point of View
+                </Label>
+                <Select
+                  value={pointOfView || NONE_VALUE}
+                  onValueChange={(v) => v && setPointOfView(v === NONE_VALUE ? '' : v)}
+                >
+                  <SelectTrigger id="point-of-view" className="w-full min-w-0" disabled={loading}>
+                    <span className="min-w-0 truncate text-sm">
+                      {pointOfView ? POINT_OF_VIEW_LABELS[pointOfView as (typeof POINTS_OF_VIEW)[number]] : 'None'}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None</SelectItem>
+                    {POINTS_OF_VIEW.map((pov) => (
+                      <SelectItem key={pov} value={pov}>
+                        {POINT_OF_VIEW_LABELS[pov]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-0 space-y-1.5 sm:col-span-2">
+                <Label htmlFor="target-country" className="text-xs font-medium text-muted-foreground">
+                  Target Country
+                </Label>
+                <Select
+                  value={targetCountry || NONE_VALUE}
+                  onValueChange={(v) => v && setTargetCountry(v === NONE_VALUE ? '' : v)}
+                >
+                  <SelectTrigger id="target-country" className="w-full min-w-0" disabled={loading}>
+                    <span className="min-w-0 truncate text-sm">{targetCountry || 'None'}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None</SelectItem>
+                    {TARGET_COUNTRIES.map((country) => (
+                      <SelectItem key={country} value={country}>
+                        {country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="rounded-lg bg-destructive/5 px-3 py-2">
