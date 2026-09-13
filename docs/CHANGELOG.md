@@ -18,6 +18,20 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Phase 9: Pinterest Creative Diagnostics & Batch Review
+
+### Added
+
+* Compact angle, template, position, Quality Gate and warning indicators on Pinterest Results cards.
+* Local filters for `PASS`, `WARN`, `RECOMPOSE`/`FAIL`, angle and template.
+* A responsive Batch Review dialog with thumbnails, diversity summaries and direct access to `Change layout`.
+* Durable Quality Gate metadata in the existing `image_analysis` JSON text value.
+
+### Preserved
+
+* No database migration, Vision API, marketing score, provider, credit, image-generation, versioning or preview-route behavior change.
+* Historical Pins without diagnostics remain visible with explicit unavailable/not-evaluated labels.
+
 ## TASK-FIX-035: WordPress Structure Block (Refonte Phase 2)
 
 ### Added

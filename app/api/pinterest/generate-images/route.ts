@@ -8,6 +8,10 @@ import { extractAccentColor } from '@/lib/pinterest/color-extraction';
 import { pickCtaMessage } from '@/lib/pinterest/cta-messages';
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import {
+  attachPinterestCreativeDiagnostics,
+  type PersistedCreativeDiagnostics,
+} from '@/lib/pinterest/creative-diagnostics';
+import {
   selectHeadlineTemplate,
   type TemplateSelectionHistoryItem,
 } from '@/lib/pinterest/template-selection';
@@ -194,6 +198,7 @@ export async function POST(request: Request) {
 
         let selectedHeadlineTemplate = pin.title_banner_template ?? 'clean-band';
         let selectedHeadlinePosition: 'top' | 'bottom' | undefined;
+        let creativeDiagnostics: PersistedCreativeDiagnostics | null = null;
         let headlineComposed = false;
         const angle = readPinterestStrategyAngle(pin.image_analysis);
 
@@ -225,6 +230,12 @@ export async function POST(request: Request) {
           imageBuffer = composition.buffer;
           selectedHeadlineTemplate = composition.template;
           selectedHeadlinePosition = composition.position;
+          creativeDiagnostics = {
+            status: composition.quality.status,
+            warnings: composition.quality.issues.map((issue) => issue.code),
+            template: composition.template,
+            position: composition.position,
+          };
           headlineComposed = true;
           selectionHistory.push({
             angle,
@@ -297,6 +308,14 @@ export async function POST(request: Request) {
             media_url: publicUrl.publicUrl,
             ...(angle && pin.visual_format === 'text-overlay'
               ? { title_banner_template: selectedHeadlineTemplate }
+              : {}),
+            ...(creativeDiagnostics
+              ? {
+                  image_analysis: attachPinterestCreativeDiagnostics(
+                    pin.image_analysis,
+                    creativeDiagnostics
+                  ),
+                }
               : {}),
           })
           .eq('id', pin.id);

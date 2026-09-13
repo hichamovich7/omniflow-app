@@ -1484,6 +1484,22 @@ Phase 8 : transporter le preview en mémoire et séparer strictement lecture et 
 
 ---
 
+Phase 9 : rendre les diagnostics créatifs durables et filtrables sans migration.
+
+### Decision Taken
+
+* Le dernier résultat accepté du Quality Gate est sérialisé dans `_pinterestCreativeDiagnostics` au sein de la colonne texte JSON `pins.image_analysis`, selon le même mécanisme privé déjà utilisé pour `_pinterestStrategy.angle`.
+* La source de vérité du template reste `title_banner_template`; la copie dans les diagnostics décrit la combinaison exacte évaluée avec sa position et ses codes d'issue.
+* Les mesures Batch Review sont descriptives et locales : cardinalité des templates et combinaisons, couverture des angles, et comptage des issues `excessive-repetition` existantes.
+
+### Consequences
+
+* Aucune migration, colonne, Vision API ou nouvelle route n'est nécessaire. Les providers, crédits, images brutes, fichiers, versions et contrats publics restent inchangés.
+* Un Pin antérieur à Phase 9 peut exposer son angle/template connus, mais sa position et son statut restent `Not evaluated`; aucune qualité historique n'est inventée.
+* Les filtres opèrent sur le lot déjà chargé côté client. Ils sont adaptés aux lots de 5/10 Pins mais ne constituent pas une couche d'analytics globale indexée.
+
+---
+
 ## 2026-09-13 (2)
 
 ### Decision

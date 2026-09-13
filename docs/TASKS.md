@@ -6,11 +6,13 @@
 
 # ACTIVE TASK
 
+Phase 9 (Pinterest Creative Diagnostics & Batch Review) is implemented locally and awaiting validation. Do not commit automatically. It adds compact creative indicators, local filters, a 5/10-Pin review dialog, descriptive batch diversity diagnostics and a direct hand-off to the existing Change layout flow. Quality metadata is carried in the existing `image_analysis` JSON text value; no schema, provider, credit, Vision API or marketing-scoring change is included.
+
 TASK-FIX-035 (WordPress "Refonte Phase 2" — Structure block: Introductory Hook Brief + 9 three-state toggles on "1-Click Blog Post") is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment — no live credentials in this agent's environment). Do not commit automatically. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (3)/(4) for the schema-convention and absence-guarantee rationale.
 
 TASK-FIX-034 (WordPress "Refonte Phase 1" — homepage grid of generator cards + Core Settings block on "1-Click Blog Post") completed, committed (`dddb124`), and pushed to `main` 2026-09-13. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (2) for the route-restructuring rationale.
 
-Phase 8 (Pinterest Live Recomposition Preview) is implemented locally and awaiting validation. Do not commit Phase 8 automatically.
+Phase 8 (Pinterest Live Recomposition Preview) was committed and pushed as `aec597f`.
 
 Implemented scope: read-only in-memory preview route; 300 ms debounce; stale request cancellation; live rendered preview; visible `PASS`/`WARN`/`RECOMPOSE`/`FAIL` feedback and issue reasons; and `Apply` gating to the current valid preview. No DB schema, provider, credit, Strategy Engine or WordPress change is part of Phase 8.
 

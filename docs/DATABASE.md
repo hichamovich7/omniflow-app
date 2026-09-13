@@ -199,7 +199,7 @@ Stores generated Pinterest pins.
 | board          | text                     | Suggested board (AI free text, denormalized) |
 | board_id       | uuid nullable FK → boards.id | Real board entity, auto-linked at generation time (TASK-025). ON DELETE SET NULL |
 | image_prompt   | text                     | Prompt for image generation |
-| image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` (colorPalette/materials/mood/lightingStyle) from the VISION role, when `generations.reference_image_url` was set (TASK-013). Same value replicated on every pin of the generation |
+| image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` plus private Pinterest metadata keys for the structured angle (`_pinterestStrategy`) and latest accepted Quality Gate result (`_pinterestCreativeDiagnostics`: status/warnings/template/position). Same text column; no schema migration |
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
 | link_url       | text nullable            | Website destination        |
 | publish_date   | timestamptz nullable     | Schedule date              |

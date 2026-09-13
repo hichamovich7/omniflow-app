@@ -242,6 +242,12 @@ Le chemin de recomposition n'importe aucun provider IA et ne touche ni aux créd
 
 La modale attend 300 ms après un changement de template ou position, annule la requête précédente via `AbortController`, remplace son URL Blob et libère l'ancienne. `Apply` reste désactivé tant que le preview courant n'est pas terminé ou que son statut n'est pas `PASS`/`WARN`. La route de preview n'insère ni ne met à jour aucune ligne, n'upload aucun fichier, n'appelle aucun provider et ne consomme aucun crédit; la route Phase 7 reste seule responsable du versioning permanent.
 
+### Pinterest Creative Diagnostics & Batch Review (Phase 9)
+
+`lib/pinterest/creative-diagnostics.ts` normalise les données de contrôle déjà produites par les Phases 4–8. L'angle reste lu depuis `_pinterestStrategy`, le template depuis `title_banner_template`, et le dernier résultat Quality Gate est conservé dans la clé privée `_pinterestCreativeDiagnostics` du JSON texte `image_analysis` avec sa position et ses codes d'issue. Les générations et recompositions acceptées mettent à jour cette métadonnée au même moment que `media_url`; aucun champ ou contrat public n'est ajouté.
+
+`PinTable` expose des indicateurs et filtres locaux par qualité, angle et template. `PinBatchReviewDialog` synthétise le lot avec quatre mesures descriptives seulement : templates distincts, combinaisons template/position, couverture des cinq angles et Pins déjà signalés `excessive-repetition`. Il n'ajoute aucun score marketing. Les Pins historiques sans métadonnée affichent explicitement `Not evaluated` et restent consultables.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

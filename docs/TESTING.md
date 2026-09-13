@@ -487,6 +487,22 @@ Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Manual 
 
 ---
 
+# Pinterest Creative Diagnostics & Batch Review (Phase 9)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-creative-diagnostics.spec.ts --project=renderer --reporter=list
+```
+
+Coverage includes metadata parsing and legacy fallback, compact diagnostic fields, status/angle/template filters, five-angle coverage, ten-Pin layout diversity, repetition warnings, the Batch Review → Change layout hand-off, and persistence through the existing generation/recomposition routes.
+
+The aggregation and filtering cases are pure and offline. Visual responsive behavior and authenticated Supabase persistence remain manual integration checks.
+
+Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Creative Diagnostics 7/7, full renderer 81/81, production build OK, and `git diff --check` OK.
+
+---
+
 # Image Analysis
 
 ---

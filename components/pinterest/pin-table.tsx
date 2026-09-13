@@ -1,14 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Sparkles, RefreshCw, Layers, Loader2, FileText, LayoutTemplate } from 'lucide-react';
+import { Sparkles, RefreshCw, Layers, Loader2, FileText, LayoutTemplate, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { ImageVersionsDialog } from './image-versions-dialog';
 import { RecomposePinDialog } from './recompose-pin-dialog';
 import { PinDetailDialog } from './pin-detail-dialog';
+import { PinBatchReviewDialog } from './pin-batch-review-dialog';
+import { PinDiagnosticBadges, formatCreativeLabel } from './pin-diagnostic-badges';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  filterPinsByCreativeDiagnostics,
+  type CreativeDiagnosticFilters,
+} from '@/lib/pinterest/creative-diagnostics';
+import { BANNER_TEMPLATES, type BannerTemplate } from '@/lib/validations/pinterest';
+import { PINTEREST_ANGLES, type PinterestAngle } from '@/types/pinterest';
 import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
@@ -42,6 +58,16 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
   const [versionsPin, setVersionsPin] = useState<{ id: string; title: string } | null>(null);
   const [recomposePin, setRecomposePin] = useState<Pin | null>(null);
   const [detailPin, setDetailPin] = useState<Pin | null>(null);
+  const [batchReviewOpen, setBatchReviewOpen] = useState(false);
+  const [filters, setFilters] = useState<CreativeDiagnosticFilters>({
+    quality: 'ALL',
+    angle: 'ALL',
+    template: 'ALL',
+  });
+  const filteredPins = useMemo(
+    () => filterPinsByCreativeDiagnostics(pins, filters),
+    [pins, filters]
+  );
 
   async function handleRegenerate(pinId: string) {
     setRegeneratingId(pinId);
@@ -67,8 +93,74 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
 
   return (
     <>
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-wrap items-end gap-2" aria-label="Creative diagnostic filters">
+          <div className="space-y-1">
+            <label htmlFor="quality-filter" className="block text-[11px] font-medium text-muted-foreground">Quality</label>
+            <Select
+              value={filters.quality}
+              onValueChange={(value) => value && setFilters((current) => ({
+                ...current,
+                quality: value as CreativeDiagnosticFilters['quality'],
+              }))}
+            >
+              <SelectTrigger id="quality-filter" className="h-9 min-w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All statuses</SelectItem>
+                <SelectItem value="PASS">PASS</SelectItem>
+                <SelectItem value="WARN">WARN</SelectItem>
+                <SelectItem value="NEEDS_REVIEW">RECOMPOSE / FAIL</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="angle-filter" className="block text-[11px] font-medium text-muted-foreground">Angle</label>
+            <Select
+              value={filters.angle}
+              onValueChange={(value) => value && setFilters((current) => ({
+                ...current,
+                angle: value as PinterestAngle | 'ALL',
+              }))}
+            >
+              <SelectTrigger id="angle-filter" className="h-9 min-w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All angles</SelectItem>
+                {PINTEREST_ANGLES.map((angle) => (
+                  <SelectItem key={angle} value={angle}>{formatCreativeLabel(angle)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="template-filter" className="block text-[11px] font-medium text-muted-foreground">Template</label>
+            <Select
+              value={filters.template}
+              onValueChange={(value) => value && setFilters((current) => ({
+                ...current,
+                template: value as BannerTemplate | 'ALL',
+              }))}
+            >
+              <SelectTrigger id="template-filter" className="h-9 min-w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All templates</SelectItem>
+                {BANNER_TEMPLATES.map((template) => (
+                  <SelectItem key={template} value={template}>{formatCreativeLabel(template)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <span className="pb-2 text-xs text-muted-foreground" aria-live="polite">
+            {filteredPins.length} of {pins.length}
+          </span>
+        </div>
+        <Button type="button" variant="outline" className="min-h-11" onClick={() => setBatchReviewOpen(true)}>
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          Batch Review
+        </Button>
+      </div>
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {pins.map((pin, i) => {
+        {filteredPins.map((pin, i) => {
           const selected = isSelected(pin.id);
           const versionCount = imageVersionCounts[pin.id] ?? 0;
           const isRegenerating = regeneratingId === pin.id;
@@ -220,6 +312,8 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                   {pin.description}
                 </p>
 
+                <PinDiagnosticBadges pin={pin} />
+
                 <div className="flex items-center justify-between pt-0.5">
                   <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                     {boardNames[pin.id] ?? 'No board assigned'}
@@ -245,6 +339,19 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
         })}
       </div>
 
+      {filteredPins.length === 0 && (
+        <div className="rounded-xl border border-dashed py-12 text-center">
+          <p className="text-sm font-medium">No Pins match these filters</p>
+          <button
+            type="button"
+            className="mt-2 min-h-11 px-3 text-sm text-primary hover:underline"
+            onClick={() => setFilters({ quality: 'ALL', angle: 'ALL', template: 'ALL' })}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
       {versionsPin && (
         <ImageVersionsDialog
           pinId={versionsPin.id}
@@ -257,6 +364,17 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
         <RecomposePinDialog
           pin={recomposePin}
           onClose={() => setRecomposePin(null)}
+        />
+      )}
+
+      {batchReviewOpen && (
+        <PinBatchReviewDialog
+          pins={pins}
+          onClose={() => setBatchReviewOpen(false)}
+          onChangeLayout={(pin) => {
+            setBatchReviewOpen(false);
+            setRecomposePin(pin);
+          }}
         />
       )}
 

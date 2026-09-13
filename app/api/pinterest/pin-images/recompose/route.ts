@@ -17,6 +17,7 @@ import {
   getPinSourceStoragePath,
 } from '@/lib/pinterest/pin-image-storage';
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
+import { attachPinterestCreativeDiagnostics } from '@/lib/pinterest/creative-diagnostics';
 import { BANNER_TEMPLATES, type BannerTemplate } from '@/lib/validations/pinterest';
 import type { ApiResponse } from '@/types/api';
 import type { Pin, PinImage } from '@/types/database';
@@ -244,7 +245,16 @@ export async function POST(request: Request) {
     ? { error: activateError }
     : await supabase
         .from('pins')
-        .update({ media_url: publicUrl.publicUrl, title_banner_template: composition.template })
+        .update({
+          media_url: publicUrl.publicUrl,
+          title_banner_template: composition.template,
+          image_analysis: attachPinterestCreativeDiagnostics(pin.image_analysis, {
+            status: composition.quality.status,
+            warnings: composition.quality.issues.map((issue) => issue.code),
+            template: composition.template,
+            position: composition.position,
+          }),
+        })
         .eq('id', pin.id);
 
   if (deactivateError || activateError || pinUpdateError) {
