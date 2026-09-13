@@ -656,6 +656,15 @@ A second optional block below Core Settings, same visual treatment (bordered pan
 
 Every field defaults to "None"/"Non défini" — leaving all of Structure untouched reproduces generation identically to before this task, same guarantee as Core Settings.
 
+## SEO Keywords (TASK-FIX-036, Keyword mode only)
+
+A third optional block below Structure, same visual treatment (bordered panel, "Optional" one-liner).
+
+* **Keywords to include in the text** — a tag input: type a keyword or phrase and press Enter or click "+" to add it as a chip, click the "x" on a chip to remove it. No dedicated tag/chip input existed in the codebase before this task (`pins.keywords`/Research Notes are plain comma-separated text), so a minimal one was built for this block alone. Capped at 15 keywords (same order of magnitude as the existing Pinterest pin-keywords precedent — "10 to 15" — `lib/prompts/pinterest-pins.ts`), 60 characters each.
+* **"Générer avec l'IA"** button next to the input — calls a FAST-role AI suggestion (`POST /api/wordpress/suggest-keywords`) using the Main Keyword (and Language/Target Country when Core Settings' Target Country is set), and adds the returned suggestions as new chips (existing chips and the 15-item cap are respected, duplicates skipped). Presented honestly as an AI brainstorm of semantically related terms — not a real NLP/SERP tool, no search volume, difficulty, or ranking data involved.
+* Empty by default — no instruction is added to the article prompt and generation behaves exactly as before this task.
+* When the list isn't empty, each keyword/phrase is instructed to appear naturally at least once somewhere in the article body — no keyword stuffing, no dedicated list of them anywhere in the text.
+
 ---
 
 # WordPress Article (Results)

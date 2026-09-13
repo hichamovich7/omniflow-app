@@ -142,6 +142,10 @@ interface GenerateArticleParams {
   includeKeyTakeaways?: boolean | null;
   includeFaq?: boolean | null;
   includeBold?: boolean | null;
+  // SEO Keywords (TASK-FIX-036, "1-Click Blog Post" / Option 1 only) —
+  // optional/null. Empty/unset reproduces the exact pre-existing article
+  // generation with zero regression.
+  seoKeywords?: string[] | null;
 }
 
 interface GeneratedImageResult {
@@ -202,6 +206,7 @@ export async function generateWordPressArticle(
     includeKeyTakeaways,
     includeFaq,
     includeBold,
+    seoKeywords,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
@@ -273,6 +278,7 @@ export async function generateWordPressArticle(
     includeItalics: includeItalics ?? undefined,
     includeQuotes: includeQuotes ?? undefined,
     includeBold: includeBold ?? undefined,
+    seoKeywords: seoKeywords && seoKeywords.length > 0 ? seoKeywords : undefined,
   });
 
   const articleRaw = await generateText({

@@ -77,6 +77,14 @@ export const DEFAULT_KEY_TAKEAWAYS_RANGE = { min: 4, max: 6 } as const;
 export const DEFAULT_FAQ_RANGE = { min: 4, max: 6 } as const;
 export const DISABLED_ARRAY_RANGE = { min: 0, max: 0 } as const;
 
+// SEO Keywords (TASK-FIX-036, "1-Click Blog Post" / Option 1 only). 15 matches
+// the only existing precedent for a keyword-list size in this codebase —
+// lib/prompts/pinterest-pins.ts asks for "10 to 15" keywords per pin. Stored
+// comma-separated on wordpress_generations.seo_keywords (text, not an array —
+// see DECISIONS.md 2026-09-13 (5)), same convention as pins.keywords.
+export const SEO_KEYWORDS_MAX_COUNT = 15;
+export const SEO_KEYWORD_MAX_LENGTH = 60;
+
 export const generateArticleSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
@@ -98,9 +106,31 @@ export const generateArticleSchema = z.object({
   includeKeyTakeaways: z.boolean().optional(),
   includeFaq: z.boolean().optional(),
   includeBold: z.boolean().optional(),
+  seoKeywords: z
+    .array(z.string().trim().min(1).max(SEO_KEYWORD_MAX_LENGTH))
+    .max(SEO_KEYWORDS_MAX_COUNT, `Too many keywords (max ${SEO_KEYWORDS_MAX_COUNT})`)
+    .optional(),
 });
 
 export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;
+
+// SEO Keywords AI suggestion (TASK-FIX-036) — POST /api/wordpress/suggest-keywords.
+export const suggestKeywordsSchema = z.object({
+  projectId: z.string().uuid('Invalid project ID'),
+  keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
+  language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
+  targetCountry: z.enum(TARGET_COUNTRIES, { message: 'Invalid target country' }).optional(),
+});
+
+export type SuggestKeywordsInput = z.infer<typeof suggestKeywordsSchema>;
+
+// Validates the AI response itself — same "respond only with this JSON shape"
+// pattern as sourceContextSummarySchema below.
+export const keywordSuggestionsSchema = z.object({
+  keywords: z.array(z.string().trim().min(1).max(SEO_KEYWORD_MAX_LENGTH)).min(1).max(SEO_KEYWORDS_MAX_COUNT),
+});
+
+export type KeywordSuggestions = z.infer<typeof keywordSuggestionsSchema>;
 
 export const generateArticleFromPinsSchema = z.object({
   pinIds: z.array(z.string().uuid()).min(1, 'Select at least one pin').max(20, 'Too many pins selected'),

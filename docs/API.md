@@ -68,6 +68,7 @@ Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit(
 | POST /api/wordpress/generate-from-url | 20 / hour  |
 | POST /api/wordpress/sites/test        | 30 / hour  |
 | POST /api/wordpress/[id]/publish      | 15 / hour  |
+| POST /api/wordpress/suggest-keywords  | 30 / hour  |
 
 Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider. `wordpress/sites/test` and `wordpress/publish` are the exception among non-AI endpoints: both make real external HTTP requests to a third-party WordPress host OmniFlow doesn't control, with real side effects (a live post appearing/updating on the user's site), so they're rate-limited like the AI endpoints — `publish` deliberately below `wordpress/generate`'s 20/hour since a single publish can fan out into up to ~5 sequential WordPress requests (image uploads + post create/update).
 
@@ -268,6 +269,57 @@ server_error
 ```
 
 If image generation partially fails, the article still completes — failed markers are stripped from the content rather than left as raw `{{IMAGE_N}}` text, and `wordpress_article_images.url` / `wordpress_articles.featured_image_url` are `null` for the images that failed.
+
+---
+
+# POST /api/wordpress/suggest-keywords
+
+Suggest SEO keywords related to a Main Keyword, for the "SEO Keywords" block on "1-Click Blog Post" (TASK-FIX-036, Option 1 / Keyword mode only).
+
+## Description
+
+A single FAST-role AI call (`lib/ai/prompts/wordpress-keyword-suggestions-prompt.ts`) that returns a short list of semantically related keywords/phrases for the given Main Keyword. This is a language-model brainstorm, not a real NLP/SERP tool — no search volume, keyword difficulty, or scraped ranking data is involved or implied to the model or the user. Does not create or modify any row — purely a suggestion call, the result only ever reaches `wordpress_generations.seo_keywords` if and once the user submits the generation form with it.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "keyword": "small bathroom storage ideas",
+  "language": "en",
+  "targetCountry": "United States"
+}
+```
+
+`targetCountry` is optional — mirrors Core Settings' Target Country when set, omitted otherwise.
+
+## Response
+
+```json
+{
+  "data": {
+    "keywords": ["bathroom organization", "small space storage", "..."]
+  },
+  "error": null
+}
+```
+
+## Credits
+
+Not yet enforced — same as `/api/wordpress/generate`. Not subject to the Trial Usage Cap (see above) — a lightweight, cheap auxiliary FAST call, not a full article generation, same treatment as `wordpress/sites/test`.
+
+## Possible Errors
+
+```txt
+unauthorized
+forbidden
+rate_limited
+invalid_json
+invalid_request
+invalid_project
+suggestion_failed
+server_error
+```
 
 ---
 

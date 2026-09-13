@@ -55,6 +55,10 @@ interface ArticlePromptContext {
   includeItalics?: boolean;
   includeQuotes?: boolean;
   includeBold?: boolean;
+  // SEO Keywords (TASK-FIX-036, "1-Click Blog Post" / Option 1 only) —
+  // optional. Empty/undefined reproduces the exact prompt text this function
+  // produced before TASK-FIX-036.
+  seoKeywords?: string[];
 }
 
 export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
@@ -85,6 +89,14 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   if (ctx.includeBold === true) formattingNotes.push('Use Markdown bold ("**text**") occasionally to highlight key terms or phrases for scannability.');
   if (ctx.includeBold === false) formattingNotes.push('Do not use any bold text (no "**double asterisks**" or "__double underscores__") anywhere in the article.');
   const formattingBlock = formattingNotes.length > 0 ? `\n\nFormatting directives for this article:\n${formattingNotes.map((n) => `- ${n}`).join('\n')}\n` : '';
+
+  // SEO Keywords (TASK-FIX-036): each entry must appear naturally at least
+  // once — no stuffing, no dedicated list of them anywhere in the visible
+  // text. Empty/undefined produces no block at all, unchanged from before.
+  const seoKeywordsBlock =
+    ctx.seoKeywords && ctx.seoKeywords.length > 0
+      ? `\n\nSEO keywords to include: naturally work each of the following keywords/phrases into the article body at least once each (verbatim or with minor natural inflection) — spread across the most relevant sections, never forced, never as a standalone list or heading, never keyword-stuffed:\n${ctx.seoKeywords.map((k) => `- ${k}`).join('\n')}\n`
+      : '';
 
   const sectionsList = outline.sections
     .map((s, i) => `${i + 1}. H2 "${s.heading}" — ${s.summary}`)
@@ -174,7 +186,7 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const system = `You are an expert SEO copywriter. You write the full body of a WordPress article from an approved outline, following a fixed ${structureSteps.length}-block AEO structure. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown fences around the JSON itself, no explanations, no extra text — but the "content" field value must itself be Markdown.`;
 
   const user = `Write the full article for the outline below. Follow the section order and summaries exactly — do not add, remove, or reorder the Main Content H2 sections.
-${voiceBlock}${formattingBlock}
+${voiceBlock}${formattingBlock}${seoKeywordsBlock}
 Title: ${outline.title}
 Meta description: ${outline.metaDescription}
 Quick Answer angle: ${outline.quickAnswerAngle}${keyTakeawaysContextBlock}

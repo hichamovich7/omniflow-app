@@ -18,6 +18,28 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-036: WordPress SEO Keywords Block (Refonte Phase 3)
+
+### Added
+
+* A "SEO Keywords" block on the "1-Click Blog Post" generator (Keyword mode only, below Structure): a tag input ("Keywords to include in the text", up to 15 entries, 60 chars each) plus a "Générer avec l'IA" button.
+* `POST /api/wordpress/suggest-keywords` — a FAST-role AI call that suggests keywords/phrases related to the Main Keyword (and Target Country when set from Core Settings), presented honestly as an AI brainstorm, not a real NLP/SERP tool.
+* `wordpress_generations` gains one nullable column (migration 028): `seo_keywords` (text, comma-separated, same convention as `pins.keywords` — not a Postgres array).
+
+### Changed
+
+* When the keyword list isn't empty, the article prompt (`wordpress-article-prompt.ts`) instructs the model to naturally weave each keyword/phrase in at least once, without stuffing or a dedicated list of them in the visible text.
+
+### Preserved
+
+* Core Settings (TASK-FIX-034), Structure (TASK-FIX-035), Option 3 (External Source), Option 4 (Selected Pins), TASK-035 (WordPress publishing), and the IMAGE role are all unchanged.
+* Generating via "1-Click Blog Post" with an empty SEO Keywords list reproduces the exact pre-existing article prompt (verified by inspection — see Validation).
+* Schema convention unchanged from Phase 1/2: a flat nullable column, not a consolidated `settings jsonb` — see DECISIONS.md 2026-09-13 (5).
+
+### Validation
+
+* TypeScript OK, ESLint OK on every changed file, production build OK. Not tested against a real generation or a real AI suggestion call (no live Supabase/OpenRouter credentials in this environment) — manual validation left to the user (submit with an empty list first to confirm zero regression, then with manually-added keywords, then via the suggestion button).
+
 ## Phase 9: Pinterest Creative Diagnostics & Batch Review
 
 ### Added

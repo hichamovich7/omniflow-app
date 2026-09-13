@@ -49,9 +49,13 @@ export interface WordPressGeneration {
   include_key_takeaways: boolean | null;
   include_faq: boolean | null;
   include_bold: boolean | null;
+  // SEO Keywords (TASK-FIX-036, "1-Click Blog Post" / Option 1 only).
+  // Comma-separated, same convention as pins.keywords — not an array. Null =
+  // empty (the default, reproducing pre-existing behavior exactly).
+  seo_keywords: string | null;
 }
 
-export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url' | 'article_type' | 'article_size' | 'tone_of_voice' | 'point_of_view' | 'target_country' | 'hook_brief' | 'include_conclusion' | 'include_tables' | 'include_h3' | 'include_lists' | 'include_italics' | 'include_quotes' | 'include_key_takeaways' | 'include_faq' | 'include_bold'> & {
+export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url' | 'article_type' | 'article_size' | 'tone_of_voice' | 'point_of_view' | 'target_country' | 'hook_brief' | 'include_conclusion' | 'include_tables' | 'include_h3' | 'include_lists' | 'include_italics' | 'include_quotes' | 'include_key_takeaways' | 'include_faq' | 'include_bold' | 'seo_keywords'> & {
   id?: string;
   status?: WordPressGenerationStatus;
   source_type?: WordPressSourceType;
@@ -73,6 +77,7 @@ export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'create
   include_key_takeaways?: boolean | null;
   include_faq?: boolean | null;
   include_bold?: boolean | null;
+  seo_keywords?: string | null;
 };
 
 export interface WordPressArticle {

@@ -1571,6 +1571,32 @@ Deux garanties de nature différente, selon ce qui est techniquement possible sa
 
 ---
 
+## 2026-09-13 (5)
+
+### Decision
+
+TASK-FIX-036 — SEO Keywords block (Phase 3, annoncée dans DECISIONS.md 2026-09-13 (3)) : type de stockage DB, composant tag input à créer ou réutiliser, limite du nombre de mots-clés, et cadrage honnête du bouton "Générer avec l'IA".
+
+### Context
+
+Le brief demandait explicitement de chercher (Étape 0) un composant tag/chip existant à réutiliser (Rule #27) et le typage réel de `pins.keywords`, avant de coder quoi que ce soit.
+
+### Decision Taken
+
+1. **Stockage** : `seo_keywords text nullable`, comma-separated — `pins.keywords` est lui-même `text not null` (comma-separated), jamais un array Postgres. `source_pin_ids uuid[]` n'est pas un précédent comparable (généré côté système, jamais saisi par l'utilisateur). Cohérent avec la décision (3) ci-dessus : colonnes plates, pas de nouveau type introduit.
+2. **Composant tag input** : la recherche n'a trouvé aucun tag/chip input éditable existant. `PinDetailDialog` affiche des `Badge` en lecture seule depuis un `.split(',')`, mais rien d'ajoutable/supprimable ; Research Notes et `pins.keywords` sont de simples champs texte. Un composant minimal (`TagInput`, colocalisé dans `article-form.tsx`, même convention que `StructureToggle` de Phase 2) a donc été créé — ce n'est pas une duplication, faute d'existant.
+3. **Limite** : 15 mots-clés, alignée sur le seul précédent chiffré du projet pour une liste de mots-clés comparable — `lib/prompts/pinterest-pins.ts` demande déjà "10 to 15 relevant Pinterest keywords" par pin. 60 caractères par entrée (une phrase courte, pas une phrase complète).
+4. **Cadrage du bouton IA** : le prompt (`lib/ai/prompts/wordpress-keyword-suggestions-prompt.ts`) et la documentation utilisateur présentent le résultat comme un brainstorm d'un modèle de langage (rôle FAST) sur des termes sémantiquement liés — jamais comme un outil NLP/SERP réel. Aucune donnée de volume de recherche, de difficulté ou de scraping n'est utilisée ni sous-entendue.
+5. **Rate limit sans Trial Usage Cap** : `POST /api/wordpress/suggest-keywords` est limité à 30/heure (même palier que `wordpress/sites/test`) mais n'entre pas dans le plafond lifetime Trial Usage Cap — c'est un appel FAST auxiliaire bon marché, pas une génération d'article complète.
+
+### Consequences
+
+* Aucun nouveau type de colonne (array, jsonb) introduit dans le schéma — migration 028 ajoute une seule colonne `text nullable`, même style que 026/027.
+* Si un futur Media Hub (Phase 4) a lui aussi besoin d'un tag input, ce sera le deuxième cas d'usage réel qui justifiera d'extraire `TagInput` en composant partagé (Rule #27 : pas d'abstraction avant un second cas concret).
+* Si un vrai besoin de recherche de mots-clés (volume, difficulté, SERP) apparaît plus tard, ce sera une intégration/provider explicite et documentée comme telle — pas une extension silencieuse de ce prompt FAST.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

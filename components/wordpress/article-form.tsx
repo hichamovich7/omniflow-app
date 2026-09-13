@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText, X } from 'lucide-react';
 import {
   generateArticleSchema,
   generateArticleFromUrlSchema,
@@ -14,6 +14,8 @@ import {
   POINTS_OF_VIEW,
   TARGET_COUNTRIES,
   HOOK_BRIEF_MAX_LENGTH,
+  SEO_KEYWORDS_MAX_COUNT,
+  SEO_KEYWORD_MAX_LENGTH,
 } from '@/lib/validations/wordpress';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -156,6 +158,97 @@ function StructureToggle({
   );
 }
 
+// SEO Keywords (TASK-FIX-036, "1-Click Blog Post" / Option 1 only). No
+// reusable tag/chip input existed in the codebase before this task (see
+// DECISIONS.md 2026-09-13 (5)) — this minimal one is scoped to this block.
+function TagInput({
+  id,
+  values,
+  onChange,
+  disabled,
+  maxCount,
+  maxLength,
+  placeholder,
+}: {
+  id: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  disabled: boolean;
+  maxCount: number;
+  maxLength: number;
+  placeholder?: string;
+}) {
+  const [draft, setDraft] = useState('');
+  const atLimit = values.length >= maxCount;
+
+  function addValue() {
+    const value = draft.trim();
+    if (!value || atLimit) return;
+    if (values.some((v) => v.toLowerCase() === value.toLowerCase())) {
+      setDraft('');
+      return;
+    }
+    onChange([...values, value]);
+    setDraft('');
+  }
+
+  return (
+    <div className="space-y-2">
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {values.map((value) => (
+            <span
+              key={value}
+              className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground"
+            >
+              {value}
+              <button
+                type="button"
+                onClick={() => onChange(values.filter((v) => v !== value))}
+                disabled={disabled}
+                aria-label={`Remove ${value}`}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.slice(0, maxLength))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addValue();
+            }
+          }}
+          placeholder={atLimit ? `Limit reached (${maxCount})` : placeholder}
+          disabled={disabled || atLimit}
+          maxLength={maxLength}
+          className="h-9 flex-1 text-sm placeholder:text-muted-foreground/40"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addValue}
+          disabled={disabled || atLimit || !draft.trim()}
+          className="h-9 px-3"
+        >
+          +
+        </Button>
+      </div>
+      <p className="text-right text-[11px] text-muted-foreground">
+        {values.length} / {maxCount}
+      </p>
+    </div>
+  );
+}
+
 export function ArticleForm({ projects, categories: initialCategories }: ArticleFormProps) {
   const router = useRouter();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
@@ -188,6 +281,8 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
   const [includeKeyTakeaways, setIncludeKeyTakeaways] = useState<ToggleValue>('');
   const [includeFaq, setIncludeFaq] = useState<ToggleValue>('');
   const [includeBold, setIncludeBold] = useState<ToggleValue>('');
+  const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
+  const [suggestingKeywords, setSuggestingKeywords] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -205,6 +300,44 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
   function handleSourceModeChange(next: SourceMode) {
     setSourceMode(next);
     setError(null);
+  }
+
+  async function handleSuggestKeywords() {
+    if (!keyword.trim() || seoKeywords.length >= SEO_KEYWORDS_MAX_COUNT) return;
+    setSuggestingKeywords(true);
+    try {
+      const res = await fetch('/api/wordpress/suggest-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          keyword,
+          language,
+          targetCountry: targetCountry || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        toast.error(json.error?.message ?? 'Keyword suggestion failed');
+        return;
+      }
+      const suggestions: string[] = json.data.keywords;
+      setSeoKeywords((current) => {
+        const existingLower = new Set(current.map((k) => k.toLowerCase()));
+        const merged = [...current];
+        for (const s of suggestions) {
+          if (merged.length >= SEO_KEYWORDS_MAX_COUNT) break;
+          if (existingLower.has(s.toLowerCase())) continue;
+          merged.push(s);
+          existingLower.add(s.toLowerCase());
+        }
+        return merged;
+      });
+    } catch {
+      toast.error('Keyword suggestion failed');
+    } finally {
+      setSuggestingKeywords(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -233,6 +366,7 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
         includeKeyTakeaways: includeKeyTakeaways ? includeKeyTakeaways === 'yes' : undefined,
         includeFaq: includeFaq ? includeFaq === 'yes' : undefined,
         includeBold: includeBold ? includeBold === 'yes' : undefined,
+        seoKeywords: seoKeywords.length > 0 ? seoKeywords : undefined,
       });
       if (!parsed.success) {
         setError(parsed.error.issues[0].message);
@@ -682,6 +816,54 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
               <StructureToggle id="include-key-takeaways" label="Key Takeaways" value={includeKeyTakeaways} onChange={setIncludeKeyTakeaways} disabled={loading} />
               <StructureToggle id="include-faq" label="FAQ" value={includeFaq} onChange={setIncludeFaq} disabled={loading} />
               <StructureToggle id="include-bold" label="Bold" value={includeBold} onChange={setIncludeBold} disabled={loading} />
+            </div>
+          </div>
+        )}
+
+        {sourceMode === 'keyword' && (
+          <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div>
+              <p className="text-xs font-medium">SEO Keywords</p>
+              <p className="text-[11px] text-muted-foreground">
+                Optional — keywords the article should naturally include. Leave empty to keep the default behavior.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="seo-keywords" className="text-xs font-medium text-muted-foreground">
+                  Keywords to include in the text
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || suggestingKeywords || !keyword.trim() || seoKeywords.length >= SEO_KEYWORDS_MAX_COUNT}
+                  onClick={handleSuggestKeywords}
+                  className="h-7 px-2.5 text-[11px] font-normal"
+                >
+                  {suggestingKeywords ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    "Générer avec l'IA"
+                  )}
+                </Button>
+              </div>
+              <TagInput
+                id="seo-keywords"
+                values={seoKeywords}
+                onChange={setSeoKeywords}
+                disabled={loading}
+                maxCount={SEO_KEYWORDS_MAX_COUNT}
+                maxLength={SEO_KEYWORD_MAX_LENGTH}
+                placeholder="Type a keyword and press Enter"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                AI suggestions are a language-model brainstorm of related terms — not real search-volume or SERP data.
+              </p>
             </div>
           </div>
         )}

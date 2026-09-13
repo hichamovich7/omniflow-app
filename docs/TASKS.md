@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-036 (WordPress "Refonte Phase 3" — SEO Keywords block: tag input + "Générer avec l'IA" suggestion on "1-Click Blog Post") is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment — no live credentials in this agent's environment). Do not commit automatically. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (5) for the storage/tag-input/framing rationale.
+
 Phase 9 (Pinterest Creative Diagnostics & Batch Review) is implemented locally and awaiting validation. Do not commit automatically. It adds compact creative indicators, local filters, a 5/10-Pin review dialog, descriptive batch diversity diagnostics and a direct hand-off to the existing Change layout flow. Quality metadata is carried in the existing `image_analysis` JSON text value; no schema, provider, credit, Vision API or marketing-scoring change is included.
 
 TASK-FIX-035 (WordPress "Refonte Phase 2" — Structure block: Introductory Hook Brief + 9 three-state toggles on "1-Click Blog Post") is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment — no live credentials in this agent's environment). Do not commit automatically. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (3)/(4) for the schema-convention and absence-guarantee rationale.
@@ -209,6 +211,20 @@ Nueva página de inicio en `/wordpress` (grid de 4 cards de generadores — solo
 ##### Status: Implemented 2026-09-13, awaiting manual validation
 
 Segundo bloque opcional en "1-Click Blog Post" (modo Keyword únicamente), debajo de Core Settings: un Introductory Hook Brief (textarea + 5 presets) y 9 toggles de 3 estados (Conclusion, Tables, H3, Lists, Italics, Quotes, Key Takeaways, FAQ, Bold), todos por defecto en "Non défini" — comportamiento previo inalterado si no se tocan. Migration 027 añade `hook_brief` (text) + 9 columnas booleanas `include_*` a `wordpress_generations`, misma convención de columnas planas que Phase 1 (ver DECISIONS.md 2026-09-13 (3) para la comparación con `settings jsonb` consolidado). Key Takeaways/FAQ="Non" es una garantía dura vía schema Zod (array forzado a longitud 0); Bold/Italics/Quotes/H3/Lists="Non" son prohibiciones explícitas a nivel de prompt, no un sanitizer determinista de código (ver DECISIONS.md 2026-09-13 (4)). Sin cambios en Option 3, Option 4, TASK-035 (publishing), ni en el rol IMAGE.
+
+#### [TASK-FIX-036] WordPress SEO Keywords Block (Refonte Phase 3)
+
+##### Status: Implemented 2026-09-13, awaiting manual validation
+
+Tercer bloque opcional en "1-Click Blog Post" (modo Keyword únicamente), debajo de Structure: un tag input "Keywords to include in the text" (hasta 15 mots-clés, 60 caracteres cada uno — ningún componente tag/chip reutilizable existía en el proyecto, ver DECISIONS.md 2026-09-13 (5)) y un botón "Générer avec l'IA" que sugiere mots-clés vía `POST /api/wordpress/suggest-keywords` (rol FAST, presentado honestamente como brainstorm IA, no como un outil NLP/SERP real). Migration 028 añade `seo_keywords` (text nullable, comma-separated, misma convención que `pins.keywords` — no un array Postgres) a `wordpress_generations`. Lista vacía = comportamiento previo inalterado; lista no vacía = instruction en `wordpress-article-prompt.ts` para tisser chaque mot-clé naturellement au moins une fois. Sin cambios en Core Settings, Structure, Option 3, Option 4, TASK-035 (publishing), ni en el rol IMAGE.
+
+##### Manual Validation Pending
+
+Not tested — no Supabase/OpenRouter access in the development environment. Left to the user:
+
+* Générer sans toucher SEO Keywords → résultat identique à avant Phase 3
+* Ajouter 3-4 mots-clés manuels → vérifier leur présence dans le texte généré
+* Tester le bouton "Générer avec l'IA" → vérifier que les suggestions sont cohérentes avec le Main Keyword
 
 ##### Backlog (no activo)
 

@@ -108,6 +108,7 @@ export async function POST(request: Request) {
     includeKeyTakeaways,
     includeFaq,
     includeBold,
+    seoKeywords,
   } = parsed.data;
 
   const { data: project } = await supabase
@@ -170,6 +171,7 @@ export async function POST(request: Request) {
       include_key_takeaways: includeKeyTakeaways ?? null,
       include_faq: includeFaq ?? null,
       include_bold: includeBold ?? null,
+      seo_keywords: seoKeywords && seoKeywords.length > 0 ? seoKeywords.join(', ') : null,
     })
     .select()
     .single();
@@ -206,6 +208,7 @@ export async function POST(request: Request) {
       includeKeyTakeaways,
       includeFaq,
       includeBold,
+      seoKeywords,
     });
 
     const { data: article, error: articleError } = await supabase
