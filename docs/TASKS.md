@@ -295,6 +295,19 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-FIX-032] Board Badge Reflects Live State — 2026-09-13
+
+* Bug: the pin Board badge on the Results page (`components/pinterest/pin-table.tsx`) rendered `pins.board`, the AI-generated text frozen at generation time — deleting or renaming a board left the old name on screen (confirmed with a deleted board, "Beginner Crochet Tips", still showing on its pins)
+* `lib/queries/generations.ts` `getGenerationWithPins()`: pins query now embeds `boards(name)` and returns a new `boardNames: Record<string, string | null>` map (same sibling-map pattern as the existing `imageVersionCounts`/`activeImageModels`), keyed by pin id, resolved live via `board_id`
+* `components/pinterest/pin-table.tsx` Board badge now renders `boardNames[pin.id] ?? 'No board assigned'` instead of `pin.board`; `boardNames` threaded through `components/editorial/editorial-workspace.tsx` and `app/(dashboard)/pinterest/[id]/page.tsx`
+* `components/boards/board-pin-card.tsx` (Board Detail page) never rendered a Board badge to begin with — every pin there already belongs to the one board named in the page header — so it needed no change
+* `pins.board` (AI-generated text), `lib/csv/pinterest.ts` (CSV export), and `findOrCreateBoardIds()` are untouched by design — CSV keeps exporting the original generation-time text
+* No DB migration, route, or schema change — `pins.board_id` (nullable, `ON DELETE SET NULL`) already existed since the original Boards migration
+* `docs/UI_UX.md` "Pin Grid" section's Board badge bullet updated to describe the live join and the "No board assigned" fallback
+* Validation: TypeScript OK, ESLint OK, production build OK. Manual verification (delete a board → pins show "No board assigned"; rename a board → pins show the new name without regenerating; CSV export still contains the original board text) left to the user, since it requires an authenticated session against real data
+
+---
+
 ## [TASK-FIX-025] Pinterest Rendering Reliability — 2026-09-12
 
 * Kept the existing SVG + Sharp pipeline, PNG export, five template names, routes, storage, `pin_images`, `media_url`, versions, CSV export, and legacy `'clean-band'` fallback for pre-migration Pins.

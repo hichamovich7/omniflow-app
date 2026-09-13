@@ -14,16 +14,25 @@ export async function getGenerationWithPins(supabase: SupabaseClient, generation
       pins: [] as Pin[],
       imageVersionCounts: {} as Record<string, number>,
       activeImageModels: {} as Record<string, string | null>,
+      boardNames: {} as Record<string, string | null>,
     };
   }
 
   const { data: pins } = await supabase
     .from('pins')
-    .select('*')
+    .select('*, boards(name)')
     .eq('generation_id', generationId)
     .order('created_at', { ascending: true });
 
-  const pinList = (pins ?? []) as Pin[];
+  const rawPins = pins ?? [];
+  const pinList = rawPins as Pin[];
+
+  const boardNames: Record<string, string | null> = {};
+  for (const row of rawPins) {
+    const boardRelation = (row as { boards?: { name: string } | { name: string }[] | null }).boards;
+    const boardName = Array.isArray(boardRelation) ? boardRelation[0]?.name : boardRelation?.name;
+    boardNames[row.id] = boardName ?? null;
+  }
 
   const imageVersionCounts: Record<string, number> = {};
   const activeImageModels: Record<string, string | null> = {};
@@ -50,5 +59,5 @@ export async function getGenerationWithPins(supabase: SupabaseClient, generation
     }
   }
 
-  return { generation, pins: pinList, imageVersionCounts, activeImageModels };
+  return { generation, pins: pinList, imageVersionCounts, activeImageModels, boardNames };
 }

@@ -18,6 +18,31 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-032: Board Badge Reflects Live State
+
+### Fixed
+
+* The pin Board badge (Results page grid, `pin-table.tsx`) showed `pins.board` — the AI-generated text frozen at generation time — so deleting or renaming a board left the stale name on screen (confirmed: a deleted board, "Beginner Crochet Tips", still showing on its old pins).
+
+### Added
+
+* `lib/queries/generations.ts` `getGenerationWithPins()`: the pins query now embeds `boards(name)` and returns a new `boardNames: Record<string, string | null>` map, keyed by pin id and resolved live via `board_id` — same sibling-map pattern already used for `imageVersionCounts`/`activeImageModels`.
+
+### Changed
+
+* `components/pinterest/pin-table.tsx`: the Board badge now renders `boardNames[pin.id] ?? 'No board assigned'` instead of `pin.board`. `boardNames` threaded through `EditorialWorkspace` and the Results page (`app/(dashboard)/pinterest/[id]/page.tsx`).
+
+### Compatibility
+
+* `pins.board` (the AI-generated text) and CSV export (`lib/csv/pinterest.ts`) are untouched — CSV keeps exporting the original text unchanged. `findOrCreateBoardIds()` unchanged. No DB migration, route, or schema change — `board_id` (nullable, `ON DELETE SET NULL`) already existed.
+* Board Detail page (`components/boards/board-pin-card.tsx`) never rendered a Board badge — every pin there already belongs to the one board named in the page header — so it is unaffected.
+
+### Validation
+
+* TypeScript OK, ESLint OK, production build OK.
+
+---
+
 ## Phase 5: Pinterest Auto Template Selection + Variation Engine
 
 ### Added

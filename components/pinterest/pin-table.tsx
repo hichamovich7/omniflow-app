@@ -17,6 +17,7 @@ interface PinTableProps {
   imageVersionCounts: Record<string, number>;
   pinsWordPressUsage: Record<string, WordPressUsageArticle[]>;
   activeImageModels: Record<string, string | null>;
+  boardNames: Record<string, string | null>;
 }
 
 function usageTooltip(articles: WordPressUsageArticle[]): string {
@@ -33,7 +34,7 @@ function formatDate(dateString: string): string {
   );
 }
 
-export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPressUsage, activeImageModels }: PinTableProps) {
+export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPressUsage, activeImageModels, boardNames }: PinTableProps) {
   const { isSelected, toggle } = useSelection();
   const router = useRouter();
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
@@ -206,7 +207,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
 
                 <div className="flex items-center justify-between pt-0.5">
                   <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {pin.board}
+                    {boardNames[pin.id] ?? 'No board assigned'}
                   </span>
                   {pin.publish_date && (
                     <span className="text-[11px] text-muted-foreground/70">

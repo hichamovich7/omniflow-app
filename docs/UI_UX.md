@@ -537,7 +537,7 @@ Each card displays, read-only:
 * Image (or "AI Generated" placeholder while no image exists yet)
 * Title, truncated to 2 lines (`line-clamp-2`)
 * Description, truncated to 3 lines (`line-clamp-3`)
-* Board badge
+* Board badge — shows the linked board's **current** name, joined live via `pins.board_id` (TASK-FIX-032), not the frozen `pins.board` text captured at generation time. Renamed boards update the badge without regenerating; a deleted board (`board_id` set to `null`, see `DELETE /api/boards/[id]`) shows "No board assigned" instead of the stale name. CSV export is unaffected — it still reads `pins.board`, the original AI-generated text, unchanged.
 * Publish date (if scheduled)
 
 Results page only, hover-revealed:
