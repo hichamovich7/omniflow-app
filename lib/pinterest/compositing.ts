@@ -25,6 +25,9 @@ import {
 export type BannerPosition = 'top' | 'bottom';
 
 export interface BannerCompositionDiagnostics {
+  requestedTemplate: BannerTemplate;
+  renderedTemplate: BannerTemplate;
+  canvas: { width: number; height: number };
   requestedPosition: BannerPosition;
   chosenZone: CandidateTextZone['position'];
   brightness: number;
@@ -168,6 +171,9 @@ export async function compositeBannerWithDiagnostics(
   return {
     buffer,
     diagnostics: {
+      requestedTemplate: template,
+      renderedTemplate: layout.template,
+      canvas: { width, height: metadata.height },
       requestedPosition: position,
       chosenZone: plan.chosen.position,
       brightness: plan.chosen.brightness,

@@ -6,9 +6,11 @@
 
 # ACTIVE TASK
 
-Phase 5 (Pinterest Auto Template Selection + Variation Engine) is implemented locally and awaiting validation. Do not commit Phase 5 automatically.
+Phase 6 (Pinterest Quality Gate Before Export) is implemented locally and awaiting validation. Do not commit Phase 6 automatically.
 
-Implemented scope: deterministic image-aware Headline scoring by angle compatibility, measured text fit, text density, local contrast and visual complexity; quality-gated repetition penalties across ordered 5–10 pin batches; exact position handoff to the Phase 2 renderer; safe `clean-band` fallback; nine focused tests; and angle recovery through the existing `image_analysis` JSON text column. No DB migration or Vision API is required.
+Implemented scope: `PASS`/`WARN`/`RECOMPOSE`/`FAIL`; blocking geometry, contrast and safe-area checks; warning signals for compatibility, local complexity, image/text balance and excessive repetition; deterministic local recomposition using the same generated bitmap; and focused offline tests. No DB migration, Vision API, provider, credit or public route change is required.
+
+Phase 5 was manually validated and committed as `e49576f`. Its deterministic scoring, batch variation and existing-column persistence remain unchanged.
 
 TASK-FIX-028 / Phase 4 (Pinterest Strategy Engine) completed and committed as `1763a0f`. Its five-angle validation, grounded claims, title diversity, and prompt v9 remain unchanged.
 

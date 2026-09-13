@@ -430,6 +430,27 @@ Current local validation (2026-09-12): TypeScript OK, ESLint OK, focused Auto Te
 
 ---
 
+# Pinterest Quality Gate Before Export (Phase 6)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-quality-gate.spec.ts --project=renderer --reporter=list
+```
+
+Coverage:
+
+* Explicit `PASS`, `WARN`, `RECOMPOSE`, and `FAIL` outcomes.
+* Contrast below 4.5, text overflow, and safe-area violations.
+* Angle/template incompatibility, excessive batch similarity, local complexity, and image/text balance signals.
+* Successful local recomposition using the same input bitmap, without an AI generation dependency or network call.
+
+The focused cases are pure and offline. The Quality Gate module does not import an AI engine, Supabase client, Storage client, or provider SDK.
+
+Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Quality Gate 11/11, full renderer 64/64, production build OK, and `git diff --check` OK.
+
+---
+
 # Image Analysis
 
 ---

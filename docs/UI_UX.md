@@ -415,6 +415,8 @@ Phase 4 améliore la diversité visible sans ajouter de contrôle au formulaire 
 
 Phase 5 rend ce choix réellement contextuel sans exposer un réglage supplémentaire : sur chaque image `text-overlay`, le Headline utilise le template et la zone qui offrent le meilleur compromis mesuré entre compatibilité d'angle, taille de texte, densité, contraste et calme local. Le lot pénalise les répétitions visuelles, mais uniquement parmi les alternatives proches du meilleur niveau de lisibilité. Les safe areas, le contraste minimum et le fallback neutre restent prioritaires ; le CTA conserve son comportement existant.
 
+Phase 6 ajoute un contrôle invisible avant export : un Headline valide passe directement, une faiblesse non bloquante reste exportable avec un statut interne `WARN`, et un problème récupérable déclenche une recomposition locale sur la même photo. Aucun réglage ni appel IA supplémentaire n'apparaît dans l'interface. Un overflow ou l'absence persistante de composition sûre bloque l'image au lieu d'exporter un Pin visuellement défectueux.
+
 ---
 
 ### Website URL

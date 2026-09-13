@@ -68,6 +68,21 @@ No registrar cambios menores de formato o comentarios.
 
 ---
 
+## Phase 6: Pinterest Quality Gate Before Export
+
+### Added
+
+* `PinQualityGate` classifies final Headline renders as `PASS`, `WARN`, `RECOMPOSE`, or `FAIL` from measured fit, contrast, safe areas, local complexity, angle/template compatibility, image/text balance, and batch repetition.
+* Local recomposition tries an alternate position and compatible templates against the same generated bitmap; the existing Phase 2 overlay remains the final local contrast reinforcement.
+* Eleven offline renderer tests cover all statuses, contrast, overflow, safe areas, repetition, complexity, image/text balance, and recomposition without another AI image call.
+
+### Compatibility
+
+* No migration, Supabase field, Vision API, provider, credit, Storage path, image version, public route, or response-contract change.
+* `PASS` and `WARN` remain exportable. `RECOMPOSE` retries locally; `FAIL` or exhausted alternatives stop the Pin before upload through the existing batch failure path.
+
+---
+
 ## Phase 5: Pinterest Auto Template Selection + Variation Engine
 
 ### Added

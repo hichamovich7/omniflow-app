@@ -224,6 +224,10 @@ La génération d'images reste concurrente. Une courte barrière ordonne seuleme
 
 Le pipeline texte conserve l'angle dans une clé privée `_pinterestStrategy` du JSON texte `pins.image_analysis`, aux côtés des éventuels champs de style de référence. Cela évite une migration et permet aux régénérations Phase 5 de retrouver l'angle. Les anciens Pins sans cette métadonnée conservent leur template déjà persisté.
 
+### Pinterest Quality Gate avant export (Phase 6)
+
+`lib/pinterest/quality-gate.ts` évalue les diagnostics exacts du rendu final et produit `PASS`, `WARN`, `RECOMPOSE` ou `FAIL`. Seuls `PASS` et `WARN` poursuivent vers Storage. Une recomposition réutilise le bitmap IA : position opposée, autre template compatible, puis overlay local Phase 2. Aucun endpoint, provider, crédit, version ou schéma ne change.
+
 ### Niche Visual Conventions (TASK-034)
 
 `lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.

@@ -12,6 +12,10 @@ import {
   type TemplateSelectionHistoryItem,
 } from '@/lib/pinterest/template-selection';
 import {
+  composeHeadlineWithQualityGate,
+  type PinQualityHistoryItem,
+} from '@/lib/pinterest/quality-gate';
+import {
   DEFAULT_NICHE_CONVENTION,
   getNicheVisualConvention,
 } from '@/lib/ai/niche-visual-conventions';
@@ -146,6 +150,7 @@ export async function POST(request: Request) {
     return { promise, resolve };
   });
   const selectionHistory: TemplateSelectionHistoryItem[] = [];
+  const qualityHistory: PinQualityHistoryItem[] = [];
 
   const { successes, failures } = await promisePool(
     pinsToProcess,
@@ -188,6 +193,7 @@ export async function POST(request: Request) {
 
         let selectedHeadlineTemplate = pin.title_banner_template ?? 'clean-band';
         let selectedHeadlinePosition: 'top' | 'bottom' | undefined;
+        let headlineComposed = false;
         const angle = readPinterestStrategyAngle(pin.image_analysis);
 
         // Provider calls remain concurrent. Only this small local decision is
@@ -204,17 +210,31 @@ export async function POST(request: Request) {
             },
             selectionHistory
           );
-          selectedHeadlineTemplate = selection.template;
-          selectedHeadlinePosition = selection.position;
+          const composition = await composeHeadlineWithQualityGate({
+            imageBuffer,
+            text: pin.overlay_text,
+            angle,
+            accentColor,
+            textColor,
+            selectedTemplate: selection.template,
+            selectedPosition: selection.position,
+            allowedTemplates: allowedBannerTemplates,
+            history: qualityHistory,
+          });
+          imageBuffer = composition.buffer;
+          selectedHeadlineTemplate = composition.template;
+          selectedHeadlinePosition = composition.position;
+          headlineComposed = true;
           selectionHistory.push({
             angle,
-            template: selection.template,
-            position: selection.position,
+            template: composition.template,
+            position: composition.position,
           });
+          qualityHistory.push(composition.historyItem);
         }
         releaseSelection();
 
-        if (pin.visual_format === 'text-overlay' && pin.overlay_text) {
+        if (pin.visual_format === 'text-overlay' && pin.overlay_text && !headlineComposed) {
           imageBuffer = await compositeBanner(
             imageBuffer,
             pin.overlay_text,

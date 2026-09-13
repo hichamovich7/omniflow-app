@@ -1433,6 +1433,25 @@ Le fallback en dur est supprimé. `resolveImageModel('text-overlay')` lit désor
 
 ---
 
+## 2026-09-13 (1)
+
+### Decision
+
+Phase 6 : ajouter un Quality Gate déterministe entre le rendu final d'un Headline Pinterest et son export.
+
+### Decision Taken
+
+* Les diagnostics Phase 1–5 sont l'unique source : text-fit, contraste final, safe areas, complexité locale, template rendu, équilibre texte/bandeau et historique du lot.
+* `PASS` et `WARN` autorisent l'export. Un texte hors bandeau produit `FAIL`; contraste ou safe area invalides produisent `RECOMPOSE`.
+* La recomposition conserve le bitmap IA et essaie la position opposée puis les templates compatibles. Chaque tentative réutilise l'overlay local Phase 2; aucun appel à `generateImage()` n'existe dans ce module.
+
+### Consequences
+
+* Un Pin toujours `RECOMPOSE` après les alternatives ou passé à `FAIL` n'est pas uploadé.
+* Aucun champ Supabase, migration, Vision API, crédit, provider, endpoint ou contrat JSON public n'est ajouté.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

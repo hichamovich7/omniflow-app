@@ -10,11 +10,11 @@ Se implementarán cuando el proyecto lo justifique.
 
 ---
 
-# Pinterest Strategy + Renderer — limites après Phase 5
+# Pinterest Strategy + Renderer — limites après Phase 6
 
 ## État actuel
 
-La dette locale identifiée après Phase 1 est résolue : le renderer mesure la luminosité, le contraste, la variance et l'edge density dans deux zones candidates, applique des safe areas proportionnelles et renforce localement le contraste uniquement si nécessaire. Templates v2 ajoute quatre familles rôle-aware, et Phase 5 les sélectionne automatiquement à partir de l'angle, du text-fit et des métriques locales avec une variation de lot déterministe.
+La dette locale identifiée après Phase 1 est résolue : le renderer mesure la luminosité, le contraste, la variance et l'edge density dans deux zones candidates, applique des safe areas proportionnelles et renforce localement le contraste uniquement si nécessaire. Templates v2 ajoute quatre familles rôle-aware, Phase 5 les sélectionne automatiquement et Phase 6 bloque l'export d'un Headline dont la géométrie, le contraste ou la safe area restent invalides après recomposition locale.
 
 ## Limite historique résolue en Phase 4
 
@@ -35,6 +35,8 @@ L'angle est conservé comme métadonnée technique dans le JSON texte `pins.imag
 Le contrôle de grounding connaît uniquement le mot-clé et le contexte d'analyse, pas le contenu complet d'une URL non analysée. Le moteur ne comprend toujours pas le contenu sémantique de l'image : `visualComplexity` reste une heuristique locale de variance et d'arêtes, sans détection de visage ou d'objet. La diversité est volontairement subordonnée au garde-fou de qualité ; un lot dont toutes les alternatives sont nettement moins lisibles peut donc répéter un bon layout.
 
 Une migration d'angle ne sera justifiée que par un besoin produit d'analytics ou de filtres. La vision sémantique reste basse priorité tant que les tests réels ne montrent pas d'occlusion récurrente.
+
+Le Quality Gate couvre le Headline des Pins `text-overlay` possédant un angle structuré. Le CTA conserve les garanties strictes du renderer Phase 2, et les anciens Pins sans angle suivent leur chemin historique. Les statuts du gate ne sont pas persistés : une observabilité agrégée nécessiterait un besoin produit explicite avant d'ajouter logs structurés ou schéma.
 
 ---
 
