@@ -18,6 +18,28 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-037: WordPress External Linking Block — Manual URLs (Refonte Phase 4)
+
+### Added
+
+* An "External Linking" block on the "1-Click Blog Post" generator (Keyword mode only, below SEO Keywords): a plain comma-separated "Manual URLs" text field, each entry validated as a well-formed URL (up to 10).
+* `wordpress_generations` gains one nullable column (migration 029): `manual_external_urls` (text, comma-separated, same convention as `seo_keywords`).
+
+### Changed
+
+* When the list isn't empty, the article prompt (`wordpress-article-prompt.ts`) instructs the model to insert each URL as a Markdown link wherever contextually relevant.
+
+### Preserved
+
+* The existing, unconditional `addExternalLink()` (`lib/ai/services/external-link.ts`, OpenRouter web-search-verified link, Options 1/3/4) is completely untouched — no line changed, no new condition added. This new field is purely additive on top of it, never a replacement.
+* Core Settings (TASK-FIX-034), Structure (TASK-FIX-035), SEO Keywords (TASK-FIX-036), Option 3 (External Source), Option 4 (Selected Pins), TASK-035 (WordPress publishing), and the IMAGE role are all unchanged.
+* Generating via "1-Click Blog Post" with an empty Manual URLs field reproduces the exact pre-existing article prompt and `addExternalLink()` behavior (verified by inspection — see Validation).
+* Automatic Firecrawl-based external link discovery is explicitly deferred — see docs/TASKS.md Backlog note. This task is manual URLs only.
+
+### Validation
+
+* TypeScript OK, ESLint OK on every changed file, production build OK. Not tested against a real generation (no live Supabase/OpenRouter credentials in this environment) — manual validation left to the user.
+
 ## TASK-FIX-036: WordPress SEO Keywords Block (Refonte Phase 3)
 
 ### Added

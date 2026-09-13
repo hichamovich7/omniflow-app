@@ -283,6 +283,7 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
   const [includeBold, setIncludeBold] = useState<ToggleValue>('');
   const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
   const [suggestingKeywords, setSuggestingKeywords] = useState(false);
+  const [manualExternalUrls, setManualExternalUrls] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -367,6 +368,7 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
         includeFaq: includeFaq ? includeFaq === 'yes' : undefined,
         includeBold: includeBold ? includeBold === 'yes' : undefined,
         seoKeywords: seoKeywords.length > 0 ? seoKeywords : undefined,
+        manualExternalUrls: manualExternalUrls.trim() || undefined,
       });
       if (!parsed.success) {
         setError(parsed.error.issues[0].message);
@@ -864,6 +866,32 @@ export function ArticleForm({ projects, categories: initialCategories }: Article
               <p className="text-[11px] text-muted-foreground">
                 AI suggestions are a language-model brainstorm of related terms — not real search-volume or SERP data.
               </p>
+            </div>
+          </div>
+        )}
+
+        {sourceMode === 'keyword' && (
+          <div className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div>
+              <p className="text-xs font-medium">External Linking</p>
+              <p className="text-[11px] text-muted-foreground">
+                Optional — specific sources to link to, in addition to the article&apos;s usual automatic external link. Leave empty to keep the default behavior.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="manual-external-urls" className="text-xs font-medium text-muted-foreground">
+                Manual URLs
+              </Label>
+              <Input
+                id="manual-external-urls"
+                placeholder="https://example.com/a, https://example.com/b"
+                value={manualExternalUrls}
+                onChange={(e) => setManualExternalUrls(e.target.value)}
+                disabled={loading}
+                className="h-11 text-sm placeholder:text-muted-foreground/40"
+              />
+              <p className="text-[11px] text-muted-foreground">Comma-separated. Up to 10 URLs.</p>
             </div>
           </div>
         )}

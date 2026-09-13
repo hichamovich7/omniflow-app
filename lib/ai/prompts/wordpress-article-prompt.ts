@@ -59,6 +59,13 @@ interface ArticlePromptContext {
   // optional. Empty/undefined reproduces the exact prompt text this function
   // produced before TASK-FIX-036.
   seoKeywords?: string[];
+  // External Linking (TASK-FIX-037, "1-Click Blog Post" / Option 1 only) —
+  // optional, manual URLs only. Purely additive to the existing, unconditional
+  // addExternalLink() post-processing pass (generate-article.ts) — this
+  // function has no awareness of that mechanism, and empty/undefined
+  // reproduces the exact prompt text this function produced before
+  // TASK-FIX-037.
+  manualExternalUrls?: string[];
 }
 
 export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
@@ -96,6 +103,13 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const seoKeywordsBlock =
     ctx.seoKeywords && ctx.seoKeywords.length > 0
       ? `\n\nSEO keywords to include: naturally work each of the following keywords/phrases into the article body at least once each (verbatim or with minor natural inflection) — spread across the most relevant sections, never forced, never as a standalone list or heading, never keyword-stuffed:\n${ctx.seoKeywords.map((k) => `- ${k}`).join('\n')}\n`
+      : '';
+
+  // External Linking (TASK-FIX-037): manual URLs only, purely additive —
+  // does not reference or depend on the separate addExternalLink() pass.
+  const manualLinksBlock =
+    ctx.manualExternalUrls && ctx.manualExternalUrls.length > 0
+      ? `\n\nExternal links to include: insert each of the following URLs as a Markdown link (\`[relevant anchor text](url)\`) naturally into the article body, wherever contextually relevant to the surrounding content — one per URL where a genuine fit exists, never forced into an unrelated sentence, never as a standalone list of links:\n${ctx.manualExternalUrls.map((u) => `- ${u}`).join('\n')}\n`
       : '';
 
   const sectionsList = outline.sections
@@ -186,7 +200,7 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const system = `You are an expert SEO copywriter. You write the full body of a WordPress article from an approved outline, following a fixed ${structureSteps.length}-block AEO structure. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown fences around the JSON itself, no explanations, no extra text — but the "content" field value must itself be Markdown.`;
 
   const user = `Write the full article for the outline below. Follow the section order and summaries exactly — do not add, remove, or reorder the Main Content H2 sections.
-${voiceBlock}${formattingBlock}${seoKeywordsBlock}
+${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}
 Title: ${outline.title}
 Meta description: ${outline.metaDescription}
 Quick Answer angle: ${outline.quickAnswerAngle}${keyTakeawaysContextBlock}

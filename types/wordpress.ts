@@ -53,9 +53,13 @@ export interface WordPressGeneration {
   // Comma-separated, same convention as pins.keywords — not an array. Null =
   // empty (the default, reproducing pre-existing behavior exactly).
   seo_keywords: string | null;
+  // External Linking (TASK-FIX-037, "1-Click Blog Post" / Option 1 only).
+  // Comma-separated, same convention as seo_keywords. Purely additive to the
+  // existing, unconditional addExternalLink() mechanism — see DATABASE.md.
+  manual_external_urls: string | null;
 }
 
-export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url' | 'article_type' | 'article_size' | 'tone_of_voice' | 'point_of_view' | 'target_country' | 'hook_brief' | 'include_conclusion' | 'include_tables' | 'include_h3' | 'include_lists' | 'include_italics' | 'include_quotes' | 'include_key_takeaways' | 'include_faq' | 'include_bold' | 'seo_keywords'> & {
+export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url' | 'article_type' | 'article_size' | 'tone_of_voice' | 'point_of_view' | 'target_country' | 'hook_brief' | 'include_conclusion' | 'include_tables' | 'include_h3' | 'include_lists' | 'include_italics' | 'include_quotes' | 'include_key_takeaways' | 'include_faq' | 'include_bold' | 'seo_keywords' | 'manual_external_urls'> & {
   id?: string;
   status?: WordPressGenerationStatus;
   source_type?: WordPressSourceType;
@@ -78,6 +82,7 @@ export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'create
   include_faq?: boolean | null;
   include_bold?: boolean | null;
   seo_keywords?: string | null;
+  manual_external_urls?: string | null;
 };
 
 export interface WordPressArticle {

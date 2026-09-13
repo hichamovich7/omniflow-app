@@ -109,6 +109,7 @@ export async function POST(request: Request) {
     includeFaq,
     includeBold,
     seoKeywords,
+    manualExternalUrls,
   } = parsed.data;
 
   const { data: project } = await supabase
@@ -172,6 +173,7 @@ export async function POST(request: Request) {
       include_faq: includeFaq ?? null,
       include_bold: includeBold ?? null,
       seo_keywords: seoKeywords && seoKeywords.length > 0 ? seoKeywords.join(', ') : null,
+      manual_external_urls: manualExternalUrls && manualExternalUrls.length > 0 ? manualExternalUrls.join(', ') : null,
     })
     .select()
     .single();
@@ -209,6 +211,7 @@ export async function POST(request: Request) {
       includeFaq,
       includeBold,
       seoKeywords,
+      manualExternalUrls,
     });
 
     const { data: article, error: articleError } = await supabase

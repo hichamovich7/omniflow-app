@@ -665,6 +665,15 @@ A third optional block below Structure, same visual treatment (bordered panel, "
 * Empty by default — no instruction is added to the article prompt and generation behaves exactly as before this task.
 * When the list isn't empty, each keyword/phrase is instructed to appear naturally at least once somewhere in the article body — no keyword stuffing, no dedicated list of them anywhere in the text.
 
+## External Linking (TASK-FIX-037, Keyword mode only)
+
+A fourth optional block below SEO Keywords, same visual treatment (bordered panel, "Optional" one-liner). Manual URLs only in this first step — no automatic web search yet (see the roadmap note under FASE 4 in TASKS.md).
+
+* **Manual URLs** — a plain text field, comma-separated (e.g. `https://example.com/a, https://example.com/b`), each entry validated as a well-formed URL. Not the SEO Keywords tag input — a simple text field is enough for a short, occasional list of specific sources.
+* These are additive: they never replace or disable the existing automatic external-link behavior (a single web-search-verified source `addExternalLink()` already adds to every generated article, unconditionally, unrelated to this field) — this field only adds more, specific links the user wants included.
+* Empty by default — no instruction is added to the article prompt and generation behaves exactly as before this task, including the existing automatic link.
+* When the list isn't empty, each URL is instructed to be inserted as a Markdown link naturally, wherever contextually relevant — never forced into an unrelated sentence, never as a dedicated list of links.
+
 ---
 
 # WordPress Article (Results)

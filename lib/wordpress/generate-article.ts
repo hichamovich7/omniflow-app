@@ -146,6 +146,10 @@ interface GenerateArticleParams {
   // optional/null. Empty/unset reproduces the exact pre-existing article
   // generation with zero regression.
   seoKeywords?: string[] | null;
+  // External Linking (TASK-FIX-037, "1-Click Blog Post" / Option 1 only) —
+  // optional/null, manual URLs only. Purely additive to addExternalLink()
+  // below, which is called unconditionally regardless of this field.
+  manualExternalUrls?: string[] | null;
 }
 
 interface GeneratedImageResult {
@@ -207,6 +211,7 @@ export async function generateWordPressArticle(
     includeFaq,
     includeBold,
     seoKeywords,
+    manualExternalUrls,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
@@ -279,6 +284,7 @@ export async function generateWordPressArticle(
     includeQuotes: includeQuotes ?? undefined,
     includeBold: includeBold ?? undefined,
     seoKeywords: seoKeywords && seoKeywords.length > 0 ? seoKeywords : undefined,
+    manualExternalUrls: manualExternalUrls && manualExternalUrls.length > 0 ? manualExternalUrls : undefined,
   });
 
   const articleRaw = await generateText({

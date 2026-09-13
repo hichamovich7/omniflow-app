@@ -85,6 +85,35 @@ export const DISABLED_ARRAY_RANGE = { min: 0, max: 0 } as const;
 export const SEO_KEYWORDS_MAX_COUNT = 15;
 export const SEO_KEYWORD_MAX_LENGTH = 60;
 
+// External Linking (TASK-FIX-037, "1-Click Blog Post" / Option 1 only) —
+// manual URLs step, purely additive to the existing, unconditional
+// addExternalLink() (lib/ai/services/external-link.ts, untouched by this
+// task). 10 is a moderate cap — no precedent count for this field, chosen to
+// keep the candidate list injected into the article prompt bounded without
+// being restrictive for a short, occasional list of sources.
+export const MANUAL_EXTERNAL_URLS_MAX_COUNT = 10;
+export const MANUAL_EXTERNAL_URL_MAX_LENGTH = 500;
+
+// Accepts a simple comma-separated string from the client (e.g. "https://a, https://b")
+// and transforms it into a validated string[] — same input shape as
+// seoKeywords conceptually, but a plain text field, not a tag input (see
+// DECISIONS.md). Empty/undefined transforms to [], matching the "no
+// instruction" default everywhere else in this file.
+const manualExternalUrlsSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((val) => (val ? val.split(',').map((u) => u.trim()).filter(Boolean) : []))
+  .refine((urls) => urls.length <= MANUAL_EXTERNAL_URLS_MAX_COUNT, {
+    message: `Too many URLs (max ${MANUAL_EXTERNAL_URLS_MAX_COUNT})`,
+  })
+  .refine((urls) => urls.every((u) => u.length <= MANUAL_EXTERNAL_URL_MAX_LENGTH), {
+    message: 'One of the URLs is too long',
+  })
+  .refine((urls) => urls.every((u) => z.string().url().safeParse(u).success), {
+    message: 'One of the URLs is not a valid URL',
+  });
+
 export const generateArticleSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
@@ -110,6 +139,7 @@ export const generateArticleSchema = z.object({
     .array(z.string().trim().min(1).max(SEO_KEYWORD_MAX_LENGTH))
     .max(SEO_KEYWORDS_MAX_COUNT, `Too many keywords (max ${SEO_KEYWORDS_MAX_COUNT})`)
     .optional(),
+  manualExternalUrls: manualExternalUrlsSchema,
 });
 
 export type GenerateArticleInput = z.infer<typeof generateArticleSchema>;

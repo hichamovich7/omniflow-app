@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-037 (WordPress "Refonte Phase 4" — External Linking block, manual URLs only: no automatic Firecrawl search yet, see Backlog note below) is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment — no live credentials in this agent's environment). Do not commit automatically. See "Completed Tasks" below for full scope.
+
 TASK-FIX-036 (WordPress "Refonte Phase 3" — SEO Keywords block: tag input + "Générer avec l'IA" suggestion on "1-Click Blog Post") is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment — no live credentials in this agent's environment). Do not commit automatically. See "Completed Tasks" below for full scope; see DECISIONS.md 2026-09-13 (5) for the storage/tag-input/framing rationale.
 
 Phase 9 (Pinterest Creative Diagnostics & Batch Review) is implemented locally and awaiting validation. Do not commit automatically. It adds compact creative indicators, local filters, a 5/10-Pin review dialog, descriptive batch diversity diagnostics and a direct hand-off to the existing Change layout flow. Quality metadata is carried in the existing `image_analysis` JSON text value; no schema, provider, credit, Vision API or marketing-scoring change is included.
@@ -226,9 +228,24 @@ Not tested — no Supabase/OpenRouter access in the development environment. Lef
 * Ajouter 3-4 mots-clés manuels → vérifier leur présence dans le texte généré
 * Tester le bouton "Générer avec l'IA" → vérifier que les suggestions sont cohérentes avec le Main Keyword
 
+#### [TASK-FIX-037] WordPress External Linking Block — Manual URLs (Refonte Phase 4)
+
+##### Status: Implemented 2026-09-13, awaiting manual validation
+
+Cuarto bloque opcional en "1-Click Blog Post" (modo Keyword únicamente), debajo de SEO Keywords: un campo de texto simple "Manual URLs" (comma-separated, validación de formato URL por entrada, hasta 10 URLs). Migration 029 añade `manual_external_urls` (text nullable, comma-separated, misma convención que `seo_keywords`) a `wordpress_generations`. Puramente aditivo: el mecanismo automático existente `addExternalLink()` (`lib/ai/services/external-link.ts`, búsqueda web vía OpenRouter, 0-1 enlace, incondicional en las Options 1/3/4) permanece completamente intocado y sigue ejecutándose exactamente igual, sin ninguna condición ligada a este nuevo campo. Lista vacía = comportamiento previo inalterado (incluido el comportamiento habitual de `addExternalLink()`); lista no vacía = instruction adicional en `wordpress-article-prompt.ts` para insertar cada URL como lien Markdown allí donde sea contextualmente relevante. Sin cambios en Core Settings, Structure, SEO Keywords, Option 3, Option 4, TASK-035 (publishing), ni en el rol IMAGE.
+
+##### Manual Validation Pending
+
+Not tested — no Supabase/OpenRouter access in the development environment. Left to the user:
+
+* Générer sans toucher Manual URLs → résultat identique à avant Phase 4, y compris le comportement habituel d'`addExternalLink()`
+* Ajouter 2-3 URLs séparées par virgules → confirmer leur présence en tant que liens dans le texte généré, en plus du lien habituel d'`addExternalLink()`
+
 ##### Backlog (no activo)
 
 Future: evaluate exposing AI model choice (Claude/DeepSeek/GPT/...) to users once the SaaS is more mature — currently role-based only (Rule #11, Roles Not Providers). Not an active task; revisit once the product has more traction.
+
+Future: Automatic external linking via Firecrawl `/search` (candidate URLs found from the Main Keyword, not just user-typed ones) — coexistence with the existing `addExternalLink()` (OpenRouter web_search) to be decided when this is actually built, not guessed now. Not an active task.
 
 ---
 
