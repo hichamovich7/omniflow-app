@@ -4,9 +4,12 @@ import { PageContainer } from '@/components/ui/page-container';
 import { StatusDot } from '@/components/ui/status-dot';
 import { buttonVariants } from '@/components/ui/button';
 import { PageState } from '@/components/shared/page-state';
-import { ResourceHeader } from '@/components/shared/resource-header';
+import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { CommandCenterSection } from '@/components/dashboard/command-center-section';
+import { MOCK_DAY_SUMMARY } from '@/lib/dashboard/command-center-mock';
+import { buildCommandCenterKpis, resolveActiveProjects } from '@/lib/dashboard/build-command-center';
 import { cn } from '@/lib/utils';
-import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Wand2, FilePlus2, Sparkles, TriangleAlert } from 'lucide-react';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
@@ -35,7 +38,7 @@ export default async function DashboardPage() {
     generationsResult,
     pinsResult,
     profileResult,
-    projectsResult,
+    projectsListResult,
     articlesResult,
     recentPinterestResult,
     recentWordPressResult,
@@ -44,7 +47,9 @@ export default async function DashboardPage() {
     supabase.from('generations').select('id', { count: 'exact', head: true }),
     supabase.from('pins').select('id', { count: 'exact', head: true }),
     supabase.from('profiles').select('credits_balance, name, total_generations_used').single(),
-    supabase.from('projects').select('id', { count: 'exact', head: true }),
+    // Fetched as rows (not head-count) so Active Projects can link to a
+    // matching real project by name — see lib/dashboard/build-command-center.ts
+    supabase.from('projects').select('id, name'),
     supabase.from('wordpress_articles').select('id', { count: 'exact', head: true }),
     supabase
       .from('generations')
@@ -64,10 +69,19 @@ export default async function DashboardPage() {
 
   const totalGenerations = generationsResult.count ?? 0;
   const totalPins = pinsResult.count ?? 0;
-  const totalProjects = projectsResult.count ?? 0;
+  const realProjects = projectsListResult.data ?? [];
+  const totalProjects = realProjects.length;
   const totalArticles = articlesResult.count ?? 0;
   const credits = profileResult.data?.credits_balance ?? 0;
   const userName = profileResult.data?.name;
+
+  const commandCenterKpis = buildCommandCenterKpis({
+    pinsCreated: totalPins,
+    articlesGenerated: totalArticles,
+    projects: totalProjects,
+    generations: totalGenerations,
+  });
+  const activeProjects = resolveActiveProjects(realProjects);
 
   const isTrialExempt = user?.email === process.env.ADMIN_EMAIL || bypassResult.data === true;
   const trialLimit = getTrialGenerationLimit();
@@ -119,31 +133,29 @@ export default async function DashboardPage() {
     return 'Good evening';
   })();
 
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const quickActions = [
+    { href: '/projects/new', icon: FolderOpen, label: 'New Project', description: 'Organize your content' },
+    { href: '/pinterest', icon: Wand2, label: 'Generate Pinterest Pins', description: 'Create a new pin batch' },
+    { href: '/wordpress/blog-post', icon: FilePlus2, label: 'Generate WordPress Article', description: 'Write a full SEO article' },
+    { href: '/history', icon: Sparkles, label: 'Pinterest History', description: 'Browse past pin generations' },
+    { href: '/wordpress/history', icon: FileText, label: 'WordPress History', description: 'Browse past articles' },
+  ];
+
   return (
     <PageContainer>
-      <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-surface px-5 py-6 shadow-sm sm:px-7 sm:py-8">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-        <ResourceHeader
-          title={`${greeting}${userName ? `, ${userName}` : ''}`}
-          metadata={<span>Your AI content workspace is ready to create, review, and publish.</span>}
-          actions={<div className="flex flex-wrap gap-2">
-          <Link
-            href="/wordpress/blog-post"
-            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'min-h-11 px-4')}
-          >
-            <FileText className="h-4 w-4" />
-            Generate WordPress Article
-          </Link>
-          <Link
-            href="/pinterest"
-            className={cn(buttonVariants({ size: 'lg' }), 'min-h-11 px-4')}
-          >
-            <Sparkles className="h-4 w-4" />
-            Generate Pinterest Pins
-          </Link>
-          </div>}
-        />
-      </section>
+      <DashboardHeader
+        greeting={greeting}
+        userName={userName}
+        date={today}
+        summary={MOCK_DAY_SUMMARY}
+        credits={credits}
+      />
 
       {/* Trial usage banner — lightweight lifetime cap distinct from the future
           Credits System (TASK-011/012, still PLANNED). Hidden for admin/bypassed
@@ -183,91 +195,38 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Quick Actions — secondary shortcuts (Generate Pinterest/WordPress above are the primary actions) */}
-      <div className="grid gap-6 sm:grid-cols-3">
-        <Link
-          href="/projects/new"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <FolderOpen className="h-4.5 w-4.5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">New Project</p>
-              <p className="text-xs text-muted-foreground">Organize your content</p>
-            </div>
-          </div>
-          <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-        </Link>
-        <Link
-          href="/history"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <Sparkles className="h-4.5 w-4.5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Pinterest History</p>
-              <p className="text-xs text-muted-foreground">Browse past pin generations</p>
-            </div>
-          </div>
-          <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-        </Link>
-        <Link
-          href="/wordpress/history"
-          className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <FileText className="h-4.5 w-4.5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">WordPress History</p>
-              <p className="text-xs text-muted-foreground">Browse past articles</p>
-            </div>
-          </div>
-          <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-        </Link>
+      {/* Command Center — KPIs, Today's Priorities, Active Projects, Weekly
+          Progress (TASK-FIX-038). KPIs and Active Projects mix real Supabase
+          data with mock goals; Today's Priorities and Weekly Progress stay
+          fully mocked. See docs/tasks/TASK-COMMAND-CENTER-MVP.md. */}
+      <div className="space-y-3">
+        <div>
+          <p className="text-label">Overview</p>
+          <h2 className="text-section-title mt-1">Command Center</h2>
+        </div>
+        <CommandCenterSection kpis={commandCenterKpis} activeProjects={activeProjects} />
       </div>
 
-      {/* Metrics — secondary, compact */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {[
-          { label: 'Generations', value: totalGenerations },
-          { label: 'Pins Created', value: totalPins },
-          { label: 'Articles Generated', value: totalArticles },
-          { label: 'Projects', value: totalProjects, href: '/projects' },
-          { label: 'Credits', value: credits },
-        ].map((stat) => {
-          const content = (
-            <>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
-                {stat.label}
-              </p>
-              <p className="mt-0.5 text-lg font-semibold tracking-tight">{stat.value}</p>
-            </>
-          );
-
-          if (stat.href) {
-            return (
-              <Link
-                key={stat.label}
-                href={stat.href}
-                className="rounded-xl border border-border/60 bg-surface px-4 py-4 transition-colors hover:border-primary/30 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {content}
-              </Link>
-            );
-          }
-
-          return (
-            <div key={stat.label} className="rounded-xl border border-border/60 bg-surface px-4 py-4">
-              {content}
+      {/* Quick Actions */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {quickActions.map((action) => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                <action.icon className="h-4.5 w-4.5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">{action.label}</p>
+                <p className="text-xs text-muted-foreground">{action.description}</p>
+              </div>
             </div>
-          );
-        })}
+            <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
+        ))}
       </div>
 
       {/* Recent Activity */}

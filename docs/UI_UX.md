@@ -172,6 +172,18 @@ Recent Activity:
 * Combina generaciones Pinterest y WordPress, ordenadas juntas por fecha descendente (top 5)
 * Cada fila muestra un icono de plataforma (Pinterest vs WordPress) junto al status dot, y enlaza a `/pinterest/[id]` o `/wordpress/[id]` según su tipo
 
+### Command Center (TASK-FIX-038, Phase 1.1 — UI Consolidation)
+
+Jerarquía final de `/dashboard`: `DashboardHeader` → trial usage banner → Command Center (KPIs → Today's Priorities + Active Projects → Weekly Progress) → Quick Actions → Recent Activity. La vieja franja "Metrics" (Generations, Pins Created, Articles Generated, Projects, Credits) ya no existe como bloque separado — sus valores reales se reubicaron dentro del Command Center y del header, sin perder ninguna consulta Supabase.
+
+* `DashboardHeader`: saludo, fecha de hoy, resumen del día (mockeado), y ahora también un badge de **Credits** — el único lugar del dashboard donde se muestra.
+* KPI cards (grid de 7): `Monthly Revenue`, `Tasks Completed`, `Digital Products` son mock (etiqueta discreta "Preview" en la card, `source: 'mock'`) — objetivos sin tabla Supabase todavía. `Pins Created`, `Articles Generated`, `Projects` (clicable → `/projects`), y `Generations` son reales (`source: 'real'`), leídos de las mismas queries que antes alimentaban la franja Metrics. La KPI mock "Content Published" de la Fase 1 se eliminó — duplicaba conceptualmente lo que ahora muestran con precisión Pins Created/Articles Generated.
+* "Today's Priorities": lista de hasta 3 prioridades, ahora interactiva localmente (Client Component) — click en el círculo alterna un estado visual "completed" (tachado + check), y un botón discreto "+ Add priority" (visible solo si hay menos de 3) permite añadir una prioridad local. Ninguna de las dos acciones llega a Supabase; un texto pequeño ("Preview only — changes aren't saved yet.") lo deja explícito.
+* "Active Projects": grid de 3 project cards (CrochetSal, Home Decor DE, POD) con cabecera propia + enlace "View all projects" (→ `/projects`). Cada card muestra badge de estado (On Track/At Risk/Paused), % de progreso con barra, KPI principal, y "Next action" (ahora con contraste corregido: prefijo `text-muted-foreground` + valor en `text-foreground`, con ajuste de línea para no cortar texto largo). Una card solo es clicable cuando su nombre coincide (case-insensitive) con un proyecto real del usuario — si no hay coincidencia, se muestra sin enlace, nunca un enlace falso.
+* "Weekly Progress": 4 métricas con objetivo y barra de progreso compacta cada una — Articles Published 3/4, Pins Created 21/49, Products Launched 0/1, Revenue 240 €/1 000 €. Sigue siendo 100% mock.
+* Quick Actions (5 cards, cada acción una sola vez en la página): New Project, Generate Pinterest Pins, Generate WordPress Article, Pinterest History, WordPress History — los dos "Generate" ya no viven también como botones en el header.
+* Todos los valores mock siguen centralizados en `lib/dashboard/command-center-mock.ts`; la fusión mock/real vive en `lib/dashboard/build-command-center.ts`.
+
 ---
 
 ## Projects

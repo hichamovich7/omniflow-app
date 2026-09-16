@@ -6,6 +6,7 @@ import {
   ListChecks,
   ImageIcon,
   LayoutGrid,
+  LayoutDashboard,
   CalendarClock,
   Download,
   Clock,
@@ -22,6 +23,20 @@ export interface GuideSection {
 }
 
 export const guideSections: GuideSection[] = [
+  {
+    id: 'command-center',
+    title: 'Command Center',
+    icon: LayoutDashboard,
+    summary: 'The Dashboard opens on a Command Center overview: your priorities, active projects, and results at a glance.',
+    points: [
+      'A greeting header shows today\'s date, a short summary of your day, and your Credits balance.',
+      'KPI cards combine real numbers — Pins Created, Articles Generated, Projects, Generations — with a few goals not tracked yet (Monthly Revenue, Tasks Completed, Digital Products, marked "Preview"). Pins Created, Articles Generated, and Projects are clickable and open their respective page; Generations is real but not linked yet.',
+      'Today\'s Priorities lists up to 3 focus items — click a priority to mark it done, or use "+ Add priority" to add one. These changes are local to your current visit and are not saved yet.',
+      'Active Projects shows a card per project with its status, progress bar, main KPI, and next action — a card only links to a real project page when one of your projects actually matches that name.',
+      'Weekly Progress summarizes articles published, pins created, products launched, and revenue progress against their weekly targets.',
+      'The goal KPIs, Today\'s Priorities, and Weekly Progress are still previews — placeholder data not yet connected to a real goals/tasks system. It does not affect Pinterest or WordPress generation.',
+    ],
+  },
   {
     id: 'projects',
     title: 'Projects & Brand Profile',

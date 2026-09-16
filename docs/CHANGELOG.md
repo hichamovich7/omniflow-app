@@ -18,6 +18,70 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-038 (Phase 1.1 Hotfix): Command Center Visual Fixes
+
+### Fixed
+
+* Real KPI cards (Pins Created, Articles Generated, Projects) are now actually clickable — they were missing their `href` entirely. Pins Created → `/history` (existing Pinterest History page), Articles Generated → `/wordpress/history` (existing WordPress History page). Generations intentionally stays non-clickable — no combined history route exists yet, and none was invented.
+* The "+ Add priority" button in Today's Priorities now actually appears and works — it was gated behind a condition that was always false (3 mock priorities already equaled the display cap on first render).
+* "Next action" on project cards is now an always-visible two-line block (label, then value), rendered unconditionally regardless of whether the card links to a real project.
+* Removed the fabricated "POD" card from Active Projects — no real POD project exists. Active Projects now shows CrochetSal and Home Decor DE only, with no auto-added replacement.
+
+### Added
+
+* `tests/renderer/dashboard-command-center.spec.ts`: offline data-contract tests for KPI hrefs and Active Project matching behavior.
+
+### Validation
+
+* TypeScript OK, ESLint OK (scoped), production build OK, offline Pinterest renderer suite 87/87. New Playwright browser assertions correctly skip without `PLAYWRIGHT_STORAGE_STATE` — not verified live. See docs/TASKS.md TASK-FIX-038 (Phase 1.1 Hotfix).
+
+---
+
+## TASK-FIX-038 (Phase 1.1): Command Center UI Consolidation
+
+### Changed
+
+* Consolidated `/dashboard` into one hierarchy: Header → trial banner → Command Center (KPIs → Today's Priorities + Active Projects → Weekly Progress) → Quick Actions → Recent Activity.
+* KPI cards now mix real Supabase data (Pins Created, Articles Generated, Projects, Generations — tagged `source: 'real'`) with the remaining mock goals (Monthly Revenue, Tasks Completed, Digital Products — tagged `source: 'mock'`, shown with a small "Preview" label). Dropped the mocked "Content Published" KPI, which duplicated what the real metrics now show precisely.
+* Retired the old 5-stat Metrics strip (Generations, Pins Created, Articles Generated, Projects, Credits) — every underlying Supabase query was kept, only the duplicated render was removed. Credits now displays only in the header, as a badge.
+* Moved the "Generate Pinterest Pins" / "Generate WordPress Article" buttons out of the header and into two new Quick Action cards, for 5 total — each action now appears exactly once on the page.
+* Today's Priorities is now a Client Component: clicking a priority toggles a local "done" state, and a discreet "+ Add priority" button (under 3 items) adds a local-only item — neither is persisted, and a caption says so explicitly.
+* Active Projects cards link to a real project (`/projects/[id]`) only when its name matches a real project for the logged-in user (case-insensitive); otherwise the card renders without a link. Added an "Active Projects" section header with "View all projects".
+* Fixed the low-contrast "Next action" text on project cards (was muted throughout; now a labeled prefix + full-contrast value) and prevented long actions from clipping.
+* Weekly Progress now shows a target and a compact progress bar per metric (Articles Published 3/4, Pins Created 21/49, Products Launched 0/1, Revenue 240 €/1 000 €).
+
+### Added
+
+* `lib/dashboard/build-command-center.ts` (mock/real KPI and Active Project merge logic) and `lib/dashboard/format-metric.ts` (shared currency/count formatter).
+
+### Preserved
+
+* No Supabase migration or schema change. No Pinterest/WordPress business logic touched. No new dependency added. Every real metric's underlying query is unchanged — only where/how it renders moved.
+
+### Validation
+
+* TypeScript OK, ESLint OK (scoped to every changed file — an unrelated pre-existing untracked file fails whole-repo lint, not touched by this task), production build OK, offline Pinterest renderer suite unaffected (81/81). Not verified against a live authenticated session — left to the user (see docs/TASKS.md TASK-FIX-038 Phase 1.1).
+
+---
+
+## TASK-FIX-038: Command Center MVP (Dashboard Prototype)
+
+### Added
+
+* A first visual prototype of a "Command Center" section on `/dashboard`: 4 KPI cards (Monthly Revenue, Tasks Completed, Content Published, Digital Products), a "Today's Priorities" list, an "Active Projects" grid (status, progress bar, main KPI, next action), and a compact "Weekly Progress" row.
+* The dashboard hero now shows today's date and a short day summary alongside the existing greeting, via a new `DashboardHeader` component.
+* All data is mocked in a single new file, `lib/dashboard/command-center-mock.ts`, typed in `types/dashboard.ts` — no Supabase table exists for this yet.
+
+### Preserved
+
+* Every pre-existing dashboard section (trial usage banner, Quick Actions, Metrics, Recent Activity) and every existing route/component is unchanged. No Pinterest or WordPress business logic, credits logic, or Supabase schema was touched.
+
+### Validation
+
+* TypeScript OK, ESLint OK (project-wide), production build OK, full offline Pinterest renderer suite unaffected (81/81). Not verified against a live authenticated session — no Supabase credentials in this environment; left to the user (see docs/TASKS.md TASK-FIX-038).
+
+---
+
 ## TASK-FIX-037: WordPress External Linking Block — Manual URLs (Refonte Phase 4)
 
 ### Added
