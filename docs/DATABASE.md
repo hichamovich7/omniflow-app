@@ -49,6 +49,12 @@ auth.users
               └── wordpress_article_images
 
   └── wordpress_categories (TASK-032, scoped to project like boards)
+
+  └── content_streams (TASK-FIX-039 Phase 2a, scoped to project)
+        │
+        │  wordpress_category_id references wordpress_categories, nullable
+        │
+        └── content_stream_boards (join table) → boards
 ```
 
 ---
@@ -269,6 +275,131 @@ user_id = auth.uid()
 ```sql
 (project_id, name) UNIQUE
 (project_id)
+```
+
+---
+
+# content_streams
+
+Topic-pillar grouping under a project (TASK-FIX-039 Phase 2a, discovery in `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md`). A content stream links a project to an optional WordPress category and to one or more Pinterest boards (via `content_stream_boards`), and carries its own publication targets. No `pinterest_accounts` table exists or is planned for the current experiment — a board plays that role directly (see the "1 account = 1 subniche = 1 board" decision in the task doc, §1.3a).
+
+## Columns
+
+| Column                     | Type                              | Description |
+| -------------------------- | ---------------------------------- | ------------ |
+| id                         | uuid PK                            | |
+| project_id                 | uuid FK → projects.id              | NOT NULL, ON DELETE CASCADE |
+| user_id                    | uuid FK → profiles.id              | NOT NULL, ON DELETE CASCADE |
+| name                       | text                                | NOT NULL |
+| wordpress_category_id      | uuid FK → wordpress_categories.id  | nullable, ON DELETE SET NULL |
+| target_pins_per_day        | integer                            | nullable, CHECK >= 0 |
+| target_articles_per_week   | integer                            | nullable, CHECK >= 0 |
+| target_buffer_days         | integer                            | nullable, CHECK >= 0 |
+| status                     | text                                | NOT NULL DEFAULT 'active', CHECK IN ('active','warming','paused','archived') |
+| created_at                 | timestamptz                        | |
+| updated_at                 | timestamptz                        | |
+
+## Purpose
+
+Groups a project's Pinterest/WordPress activity into named pillars (e.g. "Crochet Cats", "Crochet Sweaters") without duplicating `projects`, `wordpress_categories`, or `boards` — it only stores foreign keys to them. `target_pins_per_day` and `target_buffer_days` together define the required planning buffer (`required_buffer = target_pins_per_day × target_buffer_days`), used to compute a "missing pins" figure from real `pins.publish_date` data. This is Phase 2a only: no `tasks`, no recommendations, no UI reads or writes this table yet.
+
+## RLS
+
+**Hardened 2026-09-16** (before the first apply of migration 030 — see
+`docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §14a for the full rationale).
+`USING` still protects existing-row visibility exactly like every other
+table in this schema; `WITH CHECK` is now stricter than `user_id = auth.uid()`
+alone, and is the actual security boundary — not the TypeScript layer:
+
+```sql
+USING (user_id = auth.uid())
+WITH CHECK (
+  user_id = auth.uid()
+  AND EXISTS (SELECT 1 FROM projects p WHERE p.id = project_id AND p.user_id = auth.uid())
+  AND (
+    wordpress_category_id IS NULL
+    OR EXISTS (
+      SELECT 1 FROM wordpress_categories wc
+      WHERE wc.id = wordpress_category_id
+        AND wc.user_id = auth.uid()
+        AND wc.project_id = content_streams.project_id
+    )
+  )
+)
+```
+
+This guarantees, **at the database level**, that `project_id` resolves to a
+project owned by the caller, and that `wordpress_category_id` (when set)
+resolves to a category owned by the caller **and** belonging to that same
+project — a category from a different project of the same user is rejected
+too. `isOwnedProject`/`isCategoryInProject` in `lib/queries/content-streams.ts`
+still run before every write, but only as defense-in-depth and for clearer
+error messages — a direct Supabase/PostgREST call bypassing that file
+entirely is still bound by the `WITH CHECK` above.
+
+## Indexes
+
+```sql
+(project_id, name) UNIQUE
+(user_id)
+(project_id)
+(wordpress_category_id)
+(status)
+```
+
+---
+
+# content_stream_boards
+
+Many-to-many join between `content_streams` and `boards` (TASK-FIX-039 Phase 2a). A stream can technically span several boards; a board can technically belong to several streams — the schema stays flexible N:N on purpose. For the current "1 account = 1 subniche = 1 board" experiment, the future UI will enforce "one board per *active* stream" at the application layer only; this is not a database constraint (a cross-table condition on `content_streams.status` cannot be expressed as a clean partial index/CHECK on this table).
+
+## Columns
+
+| Column             | Type                          | Description |
+| ------------------ | ------------------------------ | ------------ |
+| content_stream_id  | uuid FK → content_streams.id  | NOT NULL, ON DELETE CASCADE, part of PK |
+| board_id           | uuid FK → boards.id            | NOT NULL, ON DELETE CASCADE, part of PK |
+| user_id            | uuid FK → profiles.id          | NOT NULL, ON DELETE CASCADE |
+| created_at         | timestamptz                    | |
+
+## RLS
+
+**Hardened 2026-09-16** (same pass as `content_streams` above — see
+`docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §14a):
+
+```sql
+USING (user_id = auth.uid())
+WITH CHECK (
+  user_id = auth.uid()
+  AND EXISTS (SELECT 1 FROM content_streams cs WHERE cs.id = content_stream_id AND cs.user_id = auth.uid())
+  AND EXISTS (
+    SELECT 1 FROM boards b
+    JOIN content_streams cs ON cs.project_id = b.project_id
+    WHERE b.id = board_id AND cs.id = content_stream_id AND b.user_id = auth.uid()
+  )
+)
+```
+
+This guarantees, **at the database level**, that a link can only be created
+between a content stream the caller owns and a board that the caller owns
+**and** that belongs to that stream's own project — never verifiable from
+`user_id` alone, since a board and a stream can each independently belong to
+the same user under different projects. It also transitively forces
+`content_stream_boards.user_id`, the stream's `user_id`, and the board's
+`user_id` to the same value, so a link row with an inconsistent `user_id`
+(only reachable via a direct client call, never via
+`lib/queries/content-streams.ts`) is rejected too.
+`isBoardInProject`/`isOwnedProject` in `lib/queries/content-streams.ts`
+still run first, as defense-in-depth and for clearer error messages — the
+`WITH CHECK` above is what actually enforces this, independent of that
+file.
+
+## Indexes
+
+```sql
+(content_stream_id, board_id) PRIMARY KEY
+(board_id)
+(user_id)
 ```
 
 ---

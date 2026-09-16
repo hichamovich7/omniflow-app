@@ -18,6 +18,37 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-039 (Phase 2a): Content Streams schema
+
+### Added
+
+* Migration `030_add_content_streams.sql`: new tables `content_streams` (project-scoped topic pillar, optional WordPress category link, `target_pins_per_day`/`target_articles_per_week`/`target_buffer_days` with non-negative CHECK constraints, `status` CHECK'd to `active|warming|paused|archived`, unique `(project_id, name)`) and `content_stream_boards` (many-to-many join to `boards`, composite primary key). RLS enabled on both.
+* `types/content-streams.ts`, `lib/validations/content-streams.ts` (Zod), `lib/queries/content-streams.ts` (list/create/update/archive a content stream, link/unlink a board, plus the pure `isOwnedProject`/`isCategoryInProject`/`isBoardInProject` ownership checks reused from the existing boards API-route pattern).
+* `tests/renderer/content-streams.spec.ts`: 25 offline tests for the validation schemas and the ownership-check functions (19 from the initial Phase 2a pass, 6 added in the security-hardening pass below).
+
+### Decided while implementing
+
+* No `pinterest_accounts` table (per the founder's decision, TASK-COMMAND-CENTER-PHASE-2.md §1.3a/§11). No `tasks`/`task_occurrences` table — those remain design-only.
+* "One board per active content stream" stays an application-layer rule for the future UI, not a database constraint — a cross-table condition on `content_streams.status` can't be expressed as a clean index/CHECK on the join table without a trigger, which this phase didn't need.
+
+### Security (2026-09-16, before first apply)
+
+* **RLS hardened on both tables before migration 030 was ever applied anywhere.** The original single `USING (user_id = auth.uid())` policy on each table only checked self-ownership of the row being written, never that a *referenced* row (`project_id`, `wordpress_category_id`, `board_id`, `content_stream_id`) belongs to the same caller/project — a direct Supabase/PostgREST call bypassing `lib/queries/content-streams.ts` could otherwise have attached a stream or a board link to another user's data.
+* Both policies now add an explicit `WITH CHECK` (kept alongside the unchanged `USING`, in the same `FOR ALL` policy — no new policy count, no new pattern): `content_streams` verifies via `EXISTS` that `project_id` belongs to the caller and, when set, that `wordpress_category_id` belongs to the caller **and** to that same project; `content_stream_boards` verifies via `EXISTS` that `content_stream_id` belongs to the caller and that `board_id` belongs to the caller **and** to that stream's own project — which also transitively forces all three `user_id`s involved to match.
+* No `SECURITY DEFINER` function was introduced — direct `EXISTS` against `projects`/`wordpress_categories`/`boards`/`content_streams` was sufficient and carries no recursion risk (none of those tables' own RLS policies reference `content_streams`/`content_stream_boards`).
+* Migration `030` was edited in place, not superseded by `031` — it had not been applied to any shared/deployed environment.
+* `isOwnedProject`/`isCategoryInProject`/`isBoardInProject` are unchanged and still run before every write, now explicitly documented as defense-in-depth/error-message quality rather than the security boundary.
+
+### Preserved
+
+* No API route, no UI component, no Pinterest/WordPress logic change, no OAuth, no credential storage, no seed/mock data inserted, and the Command Center dashboard is not yet reconnected to this table.
+
+### Validation
+
+* TypeScript OK, ESLint OK (scoped), offline renderer suite 112/112 (86 pre-existing + 19 from Phase 2a + 6 from this hardening pass), full Playwright suite 112 passed / 36 skipped (pre-existing, auth-gated), production build OK with no new route. **Not run against a real Supabase instance** — no local Supabase CLI or Docker in this environment; RLS isolation (including the new `WITH CHECK` cross-table guarantees), unique/CHECK constraint enforcement and cascade-delete behavior are statically reviewed against the already-proven `boards`(007)/`wordpress_categories`(016) migrations rather than executed. An exact SQL checklist to run against a real Supabase test project is provided in docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md §14a. See §14/§14a for the full record.
+
+---
+
 ## TASK-FIX-038 (Phase 1.1 Hotfix): Command Center Visual Fixes
 
 ### Fixed

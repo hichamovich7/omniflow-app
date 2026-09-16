@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-039 (Command Center Phase 2) — design doc's 8 open decisions are now resolved (founder, 2026-09-16), and **Phase 2a is implemented**: migration 030 creates `content_streams` + `content_stream_boards` (constraints, indexes, RLS), with matching `types/content-streams.ts`, `lib/validations/content-streams.ts`, and `lib/queries/content-streams.ts`. No `tasks`/`task_occurrences`/`pinterest_accounts` table, no API route, no UI, no recommendation engine — Phases 2b–2e remain design-only. Local Supabase/Docker are unavailable in this environment, so RLS isolation, CHECK/unique-constraint enforcement and cascade-delete behavior are statically reviewed against the proven `boards`/`wordpress_categories` migrations rather than executed; TypeScript, ESLint, the offline test suite (106/106, +20 new), and the production build all pass. Implemented locally, awaiting manual validation against a real Supabase project before this migration is applied anywhere. Do not commit automatically. See docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md (§14) for the full record.
+
 TASK-FIX-038 (Command Center MVP, now including Phase 1.1 — UI Consolidation and a Phase 1.1 Hotfix: real KPI links to /history, /wordpress/history and /projects; a fixed always-false condition that hid the "Add priority" button; "Next action" restructured into an always-visible two-line block; and the fabricated "POD" Active Project card removed) is implemented locally and awaiting manual visual validation (no authenticated browser session in this agent's environment). Do not commit automatically. See docs/tasks/TASK-COMMAND-CENTER-MVP.md and "Completed Tasks" below for full scope.
 
 TASK-FIX-037 (WordPress "Refonte Phase 4" — External Linking block, manual URLs only: no automatic Firecrawl search yet, see Backlog note below) is implemented locally and awaiting manual validation (a real generation against a live Supabase/OpenRouter environment — no live credentials in this agent's environment). Do not commit automatically. See "Completed Tasks" below for full scope.
@@ -357,6 +359,20 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-039] Command Center Phase 2 — Discovery & Design — 2026-09-16
+
+* Discovery/design only, per the founder's explicit scope: no migration, no schema change, no component modified. Full writeup: `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md`
+* **Method note**: Graphify (referenced by `.claude/hooks/graphify-reminder.js` / `.opencode/plugins/graphify.js`) is not actually available in this environment — no `graphify-out/graph.json`, no CLI. Signaled rather than worked around; classical inspection (migrations, types, queries, pages, docs) was used as the fallback, exactly as the brief allowed
+* Confirmed by direct inspection (not assumed): `projects` has no direct WordPress/Pinterest columns — it reaches WordPress via `wordpress_sites.project_id` (UNIQUE, one per project) and `wordpress_categories.project_id` (one-to-many), and reaches Pinterest only via `boards.project_id` (one-to-many) — there is no Pinterest account/profile table anywhere, and `docs/DATABASE.md`'s own "Future Tables (Not MVP)" list explicitly names `pinterest_accounts` as "Do NOT create yet"
+* Confirmed `pins.publish_date` is OmniFlow's own scheduling *intent* for CSV export only — never sent to Pinterest (no OAuth/API integration exists) — so scheduled-count/next/last/days-covered are all honestly computable from Supabase, while real board activity/engagement is not and was not fabricated
+* Proposed minimal model: `content_streams` + `content_stream_boards` (join table, references `wordpress_categories`/`boards` by id only, never duplicates their names), `tasks`, `task_occurrences` — flat columns (no JSONB), following the project's own established precedent (`docs/DECISIONS.md` 2026-09-13)
+* RLS proposal follows the existing denormalized `user_id` convention (`wordpress_sites`/`wordpress_categories`/`boards`), not the subquery convention
+* Task state machine (Accept/Edit/Schedule/Postpone/Skip/Complete/Make recurring/Pin to Today) documented with every brief-mandated rule mapped to a specific mechanism — including a DB-level `CHECK` preventing a `suggested` (unaccepted) task from ever being pinned
+* Recurrence handled with zero cron/Inngest dependency (occurrences created lazily on first interaction), consistent with RULES.md Rule #15 ("Inngest esta previsto pero no implementado")
+* Next Best Action documented as a conceptual, tunable scoring function over existing/proposed fields only — explicitly ranks candidates and never auto-pins or auto-schedules
+* 8 explicit open decisions flagged for founder review before any implementation phase begins (notably: whether to unblock `pinterest_account_id` with a placeholder table despite the standing "do not create yet" guidance — recommended against for now)
+* Also flagged as a discovered risk (not fixed in this task): the Phase 1.1 Command Center's `resolveActiveProjects()` name-matching hack must be retired once real Content Streams/Tasks data exists, replaced by real id-based joins
 
 ## [TASK-FIX-038] Command Center MVP — Phase 1.1 Hotfix — 2026-09-15
 
