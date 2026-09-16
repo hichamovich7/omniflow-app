@@ -1276,3 +1276,51 @@ a signaled limitation, not a silently dropped test.
   (matching the current 1-account-per-board experiment), even though
   `content_stream_boards` stays N:N in the schema — consistent with §5.1's
   own framing, not a new decision.
+
+## 14d. Cross-reference: TASK-FIX-040 (WordPress Generator reorg, 2026-09-16)
+
+**Not a Phase 2 sub-phase.** This document's own §12 numbering already
+reserves "Phase 2b" for a different, unimplemented feature (persistent
+manual `tasks`, see §12 item 2) — so the separate, smaller UX/UI pass on
+`/wordpress/blog-post` done the same day was tracked under its own task
+number, **TASK-FIX-040**, not as "Phase 2b." It is cross-referenced here,
+briefly, only because it reads (never writes) `content_streams` for
+display purposes.
+
+**What it did:** reorganized `/wordpress/blog-post` (the existing WordPress
+article generator form, unrelated to this document's own scope otherwise)
+into 6 stacked blocks — Project Context, Article Source, Article Settings,
+Advanced Options (collapsed by default), Generation Summary, then submit.
+No field removed, no default value, validation rule, Zod schema, API
+payload, AI prompt, rate limit, generation, saving, or publishing changed.
+
+**The only touchpoint with this document's scope:** Project Context shows,
+read-only, any `content_streams` row in the selected project whose
+`wordpress_category_id` matches the selected WordPress category — reusing
+Phase 2a's schema exactly as-is (`lib/queries/content-streams.ts` is not
+even imported; a lighter dedicated lookup lives in
+`lib/wordpress/project-context.ts` instead, since the generator only ever
+needs a read, never the Phase 2a.1 CRUD/ownership machinery). This creates
+**no new relation**: the underlying link is the same
+`content_streams.wordpress_category_id` column Phase 2a already has. No
+article ever gets associated with a Content Stream by this change — the
+display is informational only, and disappears (an empty section, no
+placeholder) when zero streams match.
+
+**Full writeup:** `docs/TASKS.md` ("[TASK-FIX-040] WordPress Generator
+Reorg") and `docs/CHANGELOG.md` ("TASK-FIX-040: WordPress Generator
+(`/wordpress/blog-post`) reorg"). `docs/UI_UX.md`'s "WordPress Generator —
+1-Click Blog Post" section was rewritten to describe the new block order.
+
+**Addendum (same day) — visual finish:** the reorg above initially kept
+the pre-existing single `bg-card` wrapper around the whole form, which the
+founder reported (from screenshots) made every section blend into the
+form and into each other. Fixed, still the same task, by giving each of
+the 5 blocks its own real card (`ArticleFormSectionCard`, new
+`components/wordpress/article-form-section-card.tsx`) with a numbered
+step, a violet `bg-primary/10` icon, a title, and a description — no
+touchpoint with this document's scope beyond the same Content Stream
+badges still being rendered read-only inside Project Context, unchanged
+in substance. See `docs/CHANGELOG.md`'s "Visual finish (same task)"
+subsection under the TASK-FIX-040 entry for the full list of style-only
+changes (no field, state, handler, schema, or API touched).

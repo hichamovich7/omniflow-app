@@ -649,53 +649,68 @@ Route:
 /wordpress/blog-post
 ```
 
-Same page structure as the Pinterest Generator form. A "Source" select at the top switches between two modes — no Pins/Board fields, no Research/Analyze passthrough in either mode (both start fresh, not from a Research result):
+Reorganized (TASK-FIX-040) into 6 stacked blocks, in this order — project context first, then the article's brief, then progressively more advanced/optional settings, ending with a read-only recap right above the submit button. No field from before this reorg was removed, and no default value or validation rule changed — this section only reorders what was already there and adds two purely-informational, read-only elements (WordPress connection status, matching Content Stream). Selected-pins mode (Option 4) is a separate entry point (reached via "Generate WordPress Article" from a Pinterest generation's selection toolbar, `?pinIds=` query param on `/wordpress`, not `/wordpress/blog-post`), not part of any block below.
 
-* **Keyword** (Option 1, default): Keyword (text, required), Research Notes (textarea, optional, free-text SEO guidance), Project (select), Language (select), Category (select), then a **Core Settings** block (see below).
-* **External Source** (Option 3): a second "Input Type" select — **Link** (URL field) or **Paste text** (textarea, 12,000-character cap shown live under the field) — followed by a short explanatory line ("Used only as research context...") and a required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") that gates the submit button. Research Notes is not shown in this mode — its role is filled by an AI-generated summary of the source instead. Project and Language selects are shared with Keyword mode. No Core Settings block in this mode (Option 1 only).
+## Visual system (TASK-FIX-040 visual finish + surface hierarchy pass)
 
-Submit button reads "Generate Article" and its loading label warns generation can take up to a minute (2-3 AI text calls + up to 4 image calls, synchronous) — an extra summary call for External Source mode.
+Four visually distinct surface levels, all built from this app's existing semantic tokens (no hex, no new color):
 
-Selected-pins mode (Option 4) is a separate entry point (reached via "Generate WordPress Article" from a Pinterest generation's selection toolbar, `?pinIds=` query param on `/wordpress`, not `/wordpress/blog-post`), not part of this Source toggle.
+1. **Page** — the layout's own `bg-background`.
+2. **Workspace** — the 5 numbered blocks sit inside one `bg-muted/60 rounded-2xl` panel (`article-form.tsx`). `bg-muted` is already a very slightly violet-hued neutral in this app's tokens, reused as-is rather than inventing a new tint — it reads as a recessed panel, not another white card.
+3. **Cards** — each block is its own real card (`rounded-2xl border border-border bg-card shadow-sm` — the same card convention already used elsewhere in the app, e.g. the project detail page). Every card's header uses the same shared layout (`components/wordpress/article-form-section-card.tsx`'s `SectionHeading`) on its own `bg-primary/5` fill: a discreet step number ("01"–"05"), a small Lucide icon inside a `bg-primary/15` violet-tinted square (the same treatment as the page's own hero icon — one accent color reused everywhere, never a different tint per section), a visible title, and a one-line description, separated from the card's content by a `border-t` divider. Project Context and Generation Summary additionally get a slightly stronger, violet-tinted border (`border-primary/30` + a light `ring-primary/15`) to read as "active context" / "recap" — still the one accent color, not a new palette. Advanced Options reuses the identical header/fill inside its `Collapsible` trigger (a real `<button>`, hover/focus-visible states, `aria-expanded`), with a chevron that rotates on open; its own sub-sections (Structure/SEO Keywords/External Linking) use `bg-muted/40` boxes so they read as distinct from the `bg-card` panel that appears once it's open.
+4. **Fields & tiles** — every `Input`/`Textarea`/`SelectTrigger` in Project Context, Article Source, and Article Settings, plus each Generation Summary tile, gets a secondary fill via `FIELD_SURFACE_CLASS`/`SELECT_SURFACE_CLASS` (exported from `article-form-section-card.tsx`) passed through each field's own `className` prop — a per-usage override, not an edit to the shared `Input`/`Textarea`/`Select` components, so no other page in the app is affected.
 
-## Core Settings (TASK-FIX-034, Keyword mode only)
+## 1. Project Context
 
-A collapsed-looking, always-visible block below Project/Language/Category, labeled "Core Settings" with a one-line "Optional" note. Five independent selects, every one defaulting to "None" — leaving all five untouched reproduces generation exactly as before this task, with zero change to output:
+Always visible, first block. Groups everything about *where* the article will live:
 
-* **Article Type** — None, How-to guide, Listicle, Product review, News, Comparison. Nudges how the outline's Main Content H2 sections are shaped (e.g. sequential steps for How-to, a numbered list for Listicle, pros/cons + verdict for Product review, inverted-pyramid lead for News, criteria-based sections for Comparison) — the fixed 10-block AEO article skeleton itself (Intro, Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, FAQ, Conclusion, CTA) never changes.
-* **Article Size** — None (default), Small (~1200-2400 words, 5-8 sections), Medium (~2400-3600 words, 9-12 sections), Large (~3600-5000 words, 13-16 sections). Controls both the outline's Main Content section count and the article's word-count target.
-* **Tone of Voice** — None, Friendly, Professional, Informational, Transactional, Inspirational, Neutral, Witty, Casual. A sentence-level voice instruction for the article body, layered on top of (not a replacement for) the Project's Brand Profile.
-* **Point of View** — None, First person singular, First person plural, Second person, Third person.
-* **Target Country** — None, or a fixed list of common countries (United States, United Kingdom, Canada, Australia, Germany, Austria, Switzerland, France, Belgium, Spain, Mexico, Argentina, Ireland, New Zealand, Netherlands, Italy, Portugal, India). Steers examples, references, and units toward that market without forcing it into every section.
+* **Project** (select) — unchanged. Defaults to the user's default project, or the first one.
+* **WordPress connection status** (read-only) — a small labeled row (`border-border/70 bg-muted/70`, tinted a bit stronger than a regular field so it reads as a distinct status strip against the card body): "WordPress" + a `Badge` reading "Connected" (success) or "Not connected" (secondary). When connected, the site URL is shown separately, in a smaller muted line, so it never dominates the card; when not connected, a "Connect WordPress" link to `/projects/[id]/edit` appears instead. A discrete warning, never a blocker — generation stays available either way, exactly as before this reorg (the generator never checked this before, and still doesn't gate on it).
+* **Language** (select) — unchanged, resyncs to the project's `default_language` on project change.
+* **Category** (`CategorySelect`, create/manage inline) — unchanged.
+* **Content Stream(s) for this category** (read-only, shown only when at least one exists) — every `content_streams` row in the selected project whose `wordpress_category_id` matches the selected category, each as a small status-colored `Badge` (reusing `contentStreamStatusToBadgeVariant`). If several streams reference the same category, all of them are shown — never just one picked arbitrarily. Purely informational: this lookup never creates a new relation (the only underlying link is the pre-existing `content_streams.wordpress_category_id` column, Phase 2a) and has no effect on generation, saving, or publishing.
 
-None of these fields are exposed as an AI-model choice (see `docs/DECISIONS.md` — model/provider selection stays role-based, Rule #11, not user-facing in this phase).
+Both the WordPress site list and the Content Stream list are fetched once, server-side, for every project the user owns (`app/(dashboard)/wordpress/blog-post/page.tsx`) — switching Project client-side never triggers a new network request; the status/badges simply re-derive from the already-loaded props via two pure lookups (`lib/wordpress/project-context.ts`).
 
-## Structure (TASK-FIX-035, Keyword mode only)
+## 2. Article Source
 
-A second optional block below Core Settings, same visual treatment (bordered panel, "Optional" one-liner). Two kinds of controls:
+The existing "Source" select (Keyword / External Source) and each mode's fields, unchanged:
 
-* **Introductory Hook Brief** — a textarea (max 500 characters) with 5 preset buttons above it that pre-fill the field with a ready-made instruction, still fully editable afterward: **Question**, **Statistical or Fact**, **Quotation**, **Anecdotal or Story**, **Personal or Emotional**. Empty by default — no instruction is injected and the article's opening behaves exactly as before this task.
-* **9 three-state toggles**, each a select with **Non défini** (default) / **Oui** / **Non**: **Conclusion**, **Tables**, **H3**, **Lists**, **Italics**, **Quotes**, **Key Takeaways**, **FAQ**, **Bold**. "Oui" forces the element's presence, "Non" forces its explicit absence (not merely "not requested" — the instruction bans the literal Markdown syntax, and for Key Takeaways/FAQ the underlying schema itself only accepts an empty array), "Non défini" reproduces the article's current default behavior for that element exactly.
+* **Keyword** (Option 1, default): Keyword (text, required), Research Notes (textarea, optional, free-text SEO guidance).
+* **External Source** (Option 3): "Input Type" select — **Link** (URL field) or **Paste text** (textarea, 12,000-character cap shown live under the field) — followed by a short explanatory line ("Used only as research context...") and a required confirmation checkbox ("I confirm I'm using this content as research inspiration for an original article, not to reproduce it") that gates the submit button. Research Notes is not shown in this mode.
 
-Every field defaults to "None"/"Non défini" — leaving all of Structure untouched reproduces generation identically to before this task, same guarantee as Core Settings.
+## 3. Article Settings (Keyword mode only)
 
-## SEO Keywords (TASK-FIX-036, Keyword mode only)
+The 3 most-used Core Settings fields (TASK-FIX-034), always visible without expanding anything:
 
-A third optional block below Structure, same visual treatment (bordered panel, "Optional" one-liner).
+* **Article Type** — None, How-to guide, Listicle, Product review, News, Comparison.
+* **Article Size** — None (default), Small (~1200-2400 words, 5-8 sections), Medium (~2400-3600 words, 9-12 sections), Large (~3600-5000 words, 13-16 sections).
+* **Tone of Voice** — None, Friendly, Professional, Informational, Transactional, Inspirational, Neutral, Witty, Casual.
 
-* **Keywords to include in the text** — a tag input: type a keyword or phrase and press Enter or click "+" to add it as a chip, click the "x" on a chip to remove it. No dedicated tag/chip input existed in the codebase before this task (`pins.keywords`/Research Notes are plain comma-separated text), so a minimal one was built for this block alone. Capped at 15 keywords (same order of magnitude as the existing Pinterest pin-keywords precedent — "10 to 15" — `lib/prompts/pinterest-pins.ts`), 60 characters each.
-* **"Générer avec l'IA"** button next to the input — calls a FAST-role AI suggestion (`POST /api/wordpress/suggest-keywords`) using the Main Keyword (and Language/Target Country when Core Settings' Target Country is set), and adds the returned suggestions as new chips (existing chips and the 15-item cap are respected, duplicates skipped). Presented honestly as an AI brainstorm of semantically related terms — not a real NLP/SERP tool, no search volume, difficulty, or ranking data involved.
-* Empty by default — no instruction is added to the article prompt and generation behaves exactly as before this task.
-* When the list isn't empty, each keyword/phrase is instructed to appear naturally at least once somewhere in the article body — no keyword stuffing, no dedicated list of them anywhere in the text.
+All default to "None" — leaving them untouched reproduces generation exactly as before TASK-FIX-034.
 
-## External Linking (TASK-FIX-037, Keyword mode only)
+## 4. Advanced Options (Keyword mode only, collapsed by default)
 
-A fourth optional block below SEO Keywords, same visual treatment (bordered panel, "Optional" one-liner). Manual URLs only in this first step — no automatic web search yet (see the roadmap note under FASE 4 in TASKS.md).
+A single disclosure panel (`Collapsible`, closed on every page load — no state persisted across visits) holding everything else that used to be always-visible:
 
-* **Manual URLs** — a plain text field, comma-separated (e.g. `https://example.com/a, https://example.com/b`), each entry validated as a well-formed URL. Not the SEO Keywords tag input — a simple text field is enough for a short, occasional list of specific sources.
-* These are additive: they never replace or disable the existing automatic external-link behavior (a single web-search-verified source `addExternalLink()` already adds to every generated article, unconditionally, unrelated to this field) — this field only adds more, specific links the user wants included.
-* Empty by default — no instruction is added to the article prompt and generation behaves exactly as before this task, including the existing automatic link.
-* When the list isn't empty, each URL is instructed to be inserted as a Markdown link naturally, wherever contextually relevant — never forced into an unrelated sentence, never as a dedicated list of links.
+* **Point of View** and **Target Country** — the other 2 Core Settings fields (TASK-FIX-034).
+* **Structure** (TASK-FIX-035) — the Introductory Hook Brief (textarea + 5 presets: Question, Statistical or Fact, Quotation, Anecdotal or Story, Personal or Emotional) and the 9 three-state toggles (Non défini / Oui / Non): Conclusion, Tables, H3, Lists, Italics, Quotes, Key Takeaways, FAQ, Bold.
+* **SEO Keywords** (TASK-FIX-036) — the tag input (up to 15 keywords, 60 characters each) and the "Générer avec l'IA" AI-suggestion button.
+* **External Linking** (TASK-FIX-037) — the comma-separated Manual URLs field (up to 10 URLs).
+
+None of these fields' defaults, validation, or effect on the AI prompt changed — only their default visibility did. Opening the panel never resends a request; the same client-side Zod validation and the same API payload apply whether it was opened or not.
+
+None of the Core Settings/Structure fields are exposed as an AI-model choice (see `docs/DECISIONS.md` — model/provider selection stays role-based, Rule #11, not user-facing in this phase).
+
+## 5. Generation Summary
+
+A small read-only recap directly above the submit button, in the same accented card style as Project Context: the current Source (keyword text, or the URL/pasted-text length for External Source), Project name, Language, Category name (or "Uncategorized"), the chosen Article Settings (or "Default"), and — only when at least one is set — a one-line count of how many Advanced Options were customized. Each of the 5 values is its own small tile (`rounded-lg border` + the same secondary fill used by form fields), laid out 2-per-row on tablet/desktop and 1-per-row on mobile; a value that hasn't been set yet (empty keyword, no category, default Article Settings) is styled in a softer, neutral `text-muted-foreground` tone — never destructive/warning colors — so it reads as "not filled in yet," not as an error. Purely derived from state that already exists on the page; nothing here is sent to the API.
+
+## 6. Submit
+
+The error box (if any) uses a left accent bar (`border-l-4 border-l-destructive`) so it stays clearly visible without being alarming. The "Generate Article" button is full-width on mobile and right-aligned at its natural width on larger screens — never a sticky/fixed footer, just a wide, in-flow button.
+
+Submit button reads "Generate Article" and its loading label warns generation can take up to a minute (2-3 AI text calls + up to 4 image calls, synchronous) — an extra summary call for External Source mode. Unchanged from before this reorg.
 
 ---
 

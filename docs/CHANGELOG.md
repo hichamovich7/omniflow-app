@@ -18,6 +18,55 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-040: WordPress Generator (`/wordpress/blog-post`) reorg
+
+### Added
+
+* Reorganized `/wordpress/blog-post` into 6 stacked blocks: Project Context (Project, WordPress connection status, Language, Category, matching Content Stream(s)) → Article Source (Keyword/External Source) → Article Settings (Article Type/Size/Tone of Voice) → Advanced Options (Point of View, Target Country, Hook Brief, Structure, SEO Keywords, External Linking — collapsed by default) → Generation Summary (read-only recap) → submit.
+* Two new read-only, informational elements in Project Context: a WordPress connection status row (`Badge` "Connected"/"Not connected" + the site URL shown separately, or a "Connect WordPress" link to `/projects/[id]/edit`) and the matching Content Stream(s) for the selected category (derived from the existing `content_streams.wordpress_category_id` column, Phase 2a — no new relation, several matches all shown, never one picked arbitrarily).
+* `lib/wordpress/project-context.ts` (`findSiteForProject`, `findContentStreamsForCategory` — pure lookups) and `lib/wordpress/article-form-labels.ts` (centralized label maps).
+* `article-form.tsx` split into `components/wordpress/article-form-{project-context,source,settings,advanced,summary}.tsx` — state and submit/suggest-keywords handlers stay in `article-form.tsx`, unchanged.
+* `tests/renderer/wordpress-project-context.spec.ts`: 9 new offline tests. `tests/playwright/wordpress-blog-post.spec.ts`: gated browser tests (section order, project switch, not-connected warning, stream badge, Advanced Options default-collapsed/openable + `aria-expanded`/keyboard focus, both source modes, validation/submit unchanged, mobile overflow + full-width submit button).
+
+### Visual finish (same task)
+
+* Replaced the single giant `bg-card` wrapper around the whole form — which made every section blend into the form and into each other — with one real card per section: new `components/wordpress/article-form-section-card.tsx` (`ArticleFormSectionCard` + shared `SectionHeading`), giving each of the 5 blocks a step number ("01"–"05"), a `bg-primary/10` violet icon square, a visible title, a description, and content separated from the header by a `border-t`.
+* Project Context and Generation Summary get a `border-primary/30` + `ring-primary/10` accent to read as "active context"/"recap" — the app's one existing accent color, never a different tint per section.
+* Advanced Options' `Collapsible` trigger reuses the same header inside a real `<button>` (visible hover/focus-visible ring, `aria-expanded`, rotating chevron); its Structure/SEO Keywords/External Linking sub-boxes moved from `bg-card/60` (invisible once nested in a `bg-card` parent) to `bg-muted/30`.
+* Error box gained a `border-l-4 border-l-destructive` accent bar; submit button is full-width on mobile (`w-full sm:w-auto`), no sticky footer; hero vertical padding trimmed (`pt-8 sm:pt-16` → `pt-6 sm:pt-10`).
+* Generation Summary restyled as a label/value grid; a value that hasn't been set yet is shown in neutral `text-muted-foreground`, never destructive/warning colors.
+* Only existing Tailwind/shadcn semantic tokens used (`bg-background`, `bg-card`, `bg-muted`, `border-border`, `primary`, `destructive`) — no hex codes, no new dependency.
+
+### Accessibility pass (same task, guided by the `ui-ux-pro-max` skill)
+
+* Step numbers and Generation Summary's label captions bumped from `text-muted-foreground/50`/`/70` to full `text-muted-foreground` — low-opacity small text was a contrast risk the skill's Accessibility checklist flags directly.
+* All purely decorative icons introduced by this task (section icons, chevron, spinner, tag-remove `X`) marked `aria-hidden="true"` — each already has an adjacent visible label or an `aria-label` on its own button, so the icon would otherwise be redundant/confusing to screen readers.
+* Advanced Options' chevron rotation gained `motion-reduce:transition-none` to respect `prefers-reduced-motion` (High-severity item in the skill's Animation checklist) — scoped to the one transform-animation this task introduced, not a global change.
+* "Connect WordPress" link gained an explicit `focus-visible:ring-2 ring-primary/50` to match the app's existing ring-based focus style instead of relying only on the generic browser outline.
+* Verified already-compliant (no change needed): `SelectTrigger`'s existing `disabled:opacity-50 disabled:cursor-not-allowed` + `focus-visible:ring-3` styling, the WordPress/Content Stream status conveyed via badge text (never color alone), and heading order (`h1` hero → `h2` per section, no skipped level).
+* Two skill recommendations deliberately **not** applied here, to respect this task's "no functional/architecture change" boundary: migrating the form to shadcn's `Form`/`react-hook-form`/`FormField` pattern (the stack guide's own suggestion — would replace the existing `useState` + Zod `safeParse` architecture), and adding `cursor-pointer` to the `Collapsible` trigger button (would make it the only button in the app with a pointer cursor, since no `Button`/`globals.css` rule sets this app-wide today).
+
+### Surface hierarchy pass (same task) — four distinct levels
+
+The visual finish above still left the page background, the form area, and each card too close in value (`bg-background` 0.985L vs `bg-card` 1.0L in light mode — numerically almost identical). This pass adds a fourth, intermediate surface plus stronger field-level fill, without touching those two shared tokens:
+
+* **Workspace** (`components/wordpress/article-form.tsx`): the five steps are now wrapped in one `bg-muted/60 rounded-2xl p-4 sm:p-6` panel. `bg-muted` in this app's tokens is already a very slightly violet-hued neutral (`oklch(0.97 0.003 293)` light / `oklch(0.20 0.008 293)` dark) — reused as-is rather than inventing a new tint. It reads as a recessed panel, not another white card. Hero spacing trimmed once more (`mb-8` → `mb-6`) to tighten the gap into the now-visible panel.
+* **Cards** (`article-form-section-card.tsx`): border bumped `border-border/60` → `border-border` (and the accent ring `ring-primary/10` → `ring-primary/15`) for a more visible edge against the new tinted workspace; the header row gained its own `bg-primary/5` fill (previously transparent, inheriting `bg-card`) so it reads as a distinct zone before the `border-t` divider, which was also bumped to full `border-border`. Icon square `bg-primary/10` → `bg-primary/15` to stay legible against the now-tinted header.
+* **Fields** (`article-form-project-context.tsx`, `article-form-source.tsx`, `article-form-settings.tsx`, `category-select.tsx`): new `FIELD_SURFACE_CLASS`/`SELECT_SURFACE_CLASS` exports from `article-form-section-card.tsx` (`bg-muted/70 dark:bg-muted/40[ dark:hover:bg-muted/50]`) applied via each `Input`/`Textarea`/`SelectTrigger`'s existing `className` prop — a per-usage override, not an edit to those shared components, so no other page is affected. `CategorySelect` gained one optional `triggerClassName` prop (default `undefined`, every other caller unaffected) so Project Context can apply the same tint to it. The WordPress connection-status row's own tint bumped `border-border/50 bg-muted/40` → `border-border/70 bg-muted/70` to read as more contrasted against the card body, per the design brief.
+* **Advanced Options** (`article-form-advanced.tsx`): closed-state trigger now shares the same `bg-primary/5` header fill as the static cards (`hover:bg-primary/10`, up from `hover:bg-muted/40`, for a clearer interactive hint); its three sub-boxes bumped `border-border/60 bg-muted/30` → `border-border bg-muted/40`; the open panel's content wrapper gained an explicit `bg-card` (the "white body" once opened).
+* **Generation Summary** (`article-form-summary.tsx`): each of the 5 values (Source, Project, Language, Category, Article Settings) is now its own tile — `rounded-lg border border-border/70` + `FIELD_SURFACE_CLASS` — inside the existing `grid-cols-1 sm:grid-cols-2` grid (1 column mobile, 2 desktop/tablet, unchanged breakpoint). `dt`/`dd` stay valid inside `dl` (HTML5 explicitly allows a wrapping `div` around a `dt`+`dd` pair).
+* Still exclusively existing semantic tokens (`bg-muted`, `bg-primary`, `border-border`, `bg-card`) at higher opacities/strengths — no hex, no new color, no gradient/glassmorphism/decorative effect, dark mode covered by explicit `dark:` overrides where a shared component's own default would otherwise have won.
+
+### Preserved
+
+* No field, label, default value, or validation rule changed, no Zod schema/API payload/prompt/rate-limit/generation/saving/publishing change, no migration, no new article↔Content Stream relation, no new dependency. The WordPress site and Content Stream lists are fetched once server-side for every owned project (already RLS-scoped) — switching Project client-side never triggers a new fetch.
+
+### Validation
+
+* TypeScript OK, ESLint OK (0 issues), offline renderer suite 138/138 (129 previous + 9 new), production build OK (no new API route; `/wordpress/blog-post` unchanged in the route list), new gated Playwright suite correctly skips without `PLAYWRIGHT_STORAGE_STATE`, not bypassed. Which project has a connected site or a stream-mapped category depends on the test account's real data — those 3 browser tests self-skip when the account doesn't currently have that state. See `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §14d for the full record.
+
+---
+
 ## TASK-FIX-039 (Phase 2a.1): Content Streams management UI
 
 ### Added

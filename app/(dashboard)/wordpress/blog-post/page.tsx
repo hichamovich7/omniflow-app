@@ -16,15 +16,25 @@ export default async function WordPressBlogPostPage() {
     .order('created_at', { ascending: false });
 
   const list = projects ?? [];
+  const projectIds = list.map((p) => p.id);
 
-  const { data: categoriesData } =
-    list.length > 0
-      ? await supabase
-          .from('wordpress_categories')
-          .select('*')
-          .in('project_id', list.map((p) => p.id))
-          .order('name')
-      : { data: [] };
+  // Project Context (TASK-FIX-040) reads the WordPress connection
+  // status and any matching Content Stream(s) for whichever project the
+  // user picks in the client — fetched once here, for every owned project,
+  // so switching projects never needs a new client-side request. Both
+  // queries are additionally scoped by RLS (user_id = auth.uid()) on top of
+  // this project_id filter.
+  const [{ data: categoriesData }, { data: sitesData }, { data: streamsData }] =
+    projectIds.length > 0
+      ? await Promise.all([
+          supabase.from('wordpress_categories').select('*').in('project_id', projectIds).order('name'),
+          supabase.from('wordpress_sites').select('project_id, site_url').in('project_id', projectIds),
+          supabase
+            .from('content_streams')
+            .select('id, project_id, name, wordpress_category_id, status')
+            .in('project_id', projectIds),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
 
   return (
     <PageContainer narrow>
@@ -40,7 +50,12 @@ export default async function WordPressBlogPostPage() {
           </Link>
         </EmptyState>
       ) : (
-        <ArticleForm projects={list} categories={categoriesData ?? []} />
+        <ArticleForm
+          projects={list}
+          categories={categoriesData ?? []}
+          sites={sitesData ?? []}
+          contentStreams={streamsData ?? []}
+        />
       )}
     </PageContainer>
   );

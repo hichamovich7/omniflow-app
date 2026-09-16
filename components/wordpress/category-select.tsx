@@ -6,6 +6,7 @@ import { Loader2, Plus, Settings, Pencil, Trash2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -39,6 +40,10 @@ interface CategorySelectProps {
   value: string; // '' = Uncategorized
   onChange: (categoryId: string) => void;
   onCategoriesChange: (categories: CategoryOption[]) => void;
+  /** Optional visual override for the trigger only (e.g. a secondary-tinted
+   * fill on /wordpress/blog-post) — purely presentational, no behavior
+   * change, and every other caller is unaffected when it's omitted. */
+  triggerClassName?: string;
 }
 
 export function CategorySelect({
@@ -47,6 +52,7 @@ export function CategorySelect({
   value,
   onChange,
   onCategoriesChange,
+  triggerClassName,
 }: CategorySelectProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -66,7 +72,7 @@ export function CategorySelect({
     <>
       <div className="flex min-w-0 items-center gap-1.5">
         <Select value={value || NONE_VALUE} onValueChange={handleValueChange}>
-          <SelectTrigger id="category" className="w-full min-w-0">
+          <SelectTrigger id="category" className={cn('w-full min-w-0', triggerClassName)}>
             <span className="min-w-0 truncate text-sm">{selected?.name ?? 'Uncategorized'}</span>
           </SelectTrigger>
           <SelectContent>
