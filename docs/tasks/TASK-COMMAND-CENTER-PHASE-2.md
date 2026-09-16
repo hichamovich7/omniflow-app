@@ -783,12 +783,14 @@ migration. No commit, no push.
 
 ## 14a. Security hardening (2026-09-16) — RLS `WITH CHECK` added before first apply
 
-**Migration 030 was edited directly, not superseded by a 031.** It had not
-been applied to any shared/deployed environment (no Supabase CLI or Docker
-available in this environment at any point, and no shared apply happened) —
-editing it in place is correct per the brief, and matches this project's own
-migration-immutability rule (which applies only *after* a migration has
-actually shipped).
+**Migration 030 was edited directly, not superseded by a 031, at the time
+this section was written.** The assumption below — that 030 "had not been
+applied to any shared/deployed environment" — was correct given every
+signal available at the time (no Supabase CLI or Docker in this
+environment, no shared apply performed by this agent). **It turned out to
+be wrong about the live database's actual state: see §14b, which
+supersedes this paragraph and explains why the correction had to become a
+new migration, 031, instead of a further edit to 030.**
 
 ### 1. Cause of the risk
 
@@ -1023,3 +1025,48 @@ edit, no commit, no push. Only `supabase/migrations/030_add_content_streams.sql`
 and documentation (`docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md`,
 `docs/DATABASE.md`, `docs/CHANGELOG.md`) were touched for this hardening
 pass.
+
+## 14b. Migration 031 — correcting the live database (2026-09-16)
+
+**Discovery, reported by the founder, that supersedes §14a's assumption:**
+`content_streams` and `content_stream_boards` already existed on the linked
+Supabase project — `030_add_content_streams.sql` had, at some point, already
+been applied there **manually, via the SQL Editor**, and specifically the
+**pre-hardening version**: the live policies on both tables currently have
+`with_check = null` (`USING`-only), not the hardened `WITH CHECK` clauses
+that §14a added to the local copy of 030 before this was known.
+
+**Confirmed root cause:** `supabase_migrations.schema_migrations` — the
+table the Supabase CLI/tracked-migration mechanism uses to record which
+migration files have been applied — **does not exist** on this project.
+This means no migration, including 030 itself, has ever gone through the
+tracked mechanism (`supabase db push` / `supabase migration up`); every
+migration in this repository's history has so far only ever been run by
+hand, one `.sql` file's contents pasted into the SQL Editor at a time. This
+also explains why an earlier attempt to answer "is 030 registered as an
+applied migration" from this agent's environment (§14's own tooling
+limitations, and the follow-up push-preparation task) could get no further
+than confirming the *table* exists via a PostgREST permission-denied probe
+— that check cannot and did not reveal the *policy* text, which is where
+the actual gap turned out to be.
+
+**Why this becomes a new migration, 031, instead of a further edit to
+030:** §14a's edit-030-in-place approach was correct only as long as 030
+had never reached a live database. Now that it demonstrably has — with a
+different (weaker) policy body than what's currently written in the local
+file — 030 must be treated as already shipped and immutable from this
+point forward, per this project's own migration-immutability convention.
+The correction is `supabase/migrations/031_harden_content_streams_rls.sql`:
+`DROP POLICY IF EXISTS` + `CREATE POLICY` (same names, same `USING`, adding
+back the exact `WITH CHECK` text) for both tables — additive, does not
+recreate either table, safe to run on the current live database (today's
+`with_check = null` state) and equally safe on any future environment where
+030 is applied fresh with the hardened text already in it (031 would just
+drop and recreate an identical policy — a no-op in effect).
+
+**Not done by this agent:** 031 was not executed against the live database
+in this session — no `supabase` CLI project link, no `SUPABASE_ACCESS_TOKEN`,
+and no direct Postgres credential exist in this environment (§14a/§14's own
+findings, unchanged). The exact SQL to paste into the Supabase SQL Editor is
+the contents of `031_harden_content_streams_rls.sql` itself, provided
+verbatim in this session's response.

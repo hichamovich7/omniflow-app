@@ -18,6 +18,23 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-039 (Phase 2a Correction): Harden live RLS via migration 031
+
+### Fixed
+
+* **Migration `030_add_content_streams.sql` had already been applied to the linked Supabase project manually, via the SQL Editor — with the original, pre-hardening policies (`with_check = null`).** The RLS hardening below documented as part of the "before first apply" pass never actually reached the live database, because 030 wasn't unapplied after all. Confirmed root cause: `supabase_migrations.schema_migrations` does not exist on this project, meaning no migration (030 included) has ever gone through the tracked Supabase migration mechanism — every migration so far has only ever been pasted into the SQL Editor by hand.
+* Added `supabase/migrations/031_harden_content_streams_rls.sql` — a corrective, **additive** migration. `030` is not modified (it must now be treated as already shipped/immutable) and neither table is recreated. For each of `content_streams` and `content_stream_boards`: `DROP POLICY IF EXISTS` on the exact existing policy name, then `CREATE POLICY` with the same name, the same `USING (user_id = auth.uid())`, and the same hardened `WITH CHECK` text already present in the local copy of 030 (byte-for-byte identical — diffed to confirm). Idempotent: safe to run against the current live database (today's weak policies) and equally safe on a future environment where 030 already shipped with the hardened text (031 would just replace an identical policy).
+
+### Preserved
+
+* No table recreation, no UI, no `tasks` table, no Pinterest/WordPress change, no new dependency.
+
+### Validation
+
+* TypeScript OK, ESLint OK (scoped), offline renderer suite 117/117 (unaffected — SQL-only change), `git diff --check` OK. **Migration 031 was not executed against the live database in this session** — no Supabase CLI project link, no access token, no direct Postgres credential in this environment. The exact SQL to paste into the Supabase SQL Editor is the contents of `031_harden_content_streams_rls.sql` itself. See docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md §14b for the full record.
+
+---
+
 ## TASK-FIX-039 (Phase 2a): Content Streams schema
 
 ### Added
@@ -36,7 +53,7 @@ No registrar cambios menores de formato o comentarios.
 * **RLS hardened on both tables before migration 030 was ever applied anywhere.** The original single `USING (user_id = auth.uid())` policy on each table only checked self-ownership of the row being written, never that a *referenced* row (`project_id`, `wordpress_category_id`, `board_id`, `content_stream_id`) belongs to the same caller/project — a direct Supabase/PostgREST call bypassing `lib/queries/content-streams.ts` could otherwise have attached a stream or a board link to another user's data.
 * Both policies now add an explicit `WITH CHECK` (kept alongside the unchanged `USING`, in the same `FOR ALL` policy — no new policy count, no new pattern): `content_streams` verifies via `EXISTS` that `project_id` belongs to the caller and, when set, that `wordpress_category_id` belongs to the caller **and** to that same project; `content_stream_boards` verifies via `EXISTS` that `content_stream_id` belongs to the caller and that `board_id` belongs to the caller **and** to that stream's own project — which also transitively forces all three `user_id`s involved to match.
 * No `SECURITY DEFINER` function was introduced — direct `EXISTS` against `projects`/`wordpress_categories`/`boards`/`content_streams` was sufficient and carries no recursion risk (none of those tables' own RLS policies reference `content_streams`/`content_stream_boards`).
-* Migration `030` was edited in place, not superseded by `031` — it had not been applied to any shared/deployed environment.
+* Migration `030` was edited in place at the time, on the understanding that it had not been applied to any shared/deployed environment. **That understanding turned out to be wrong — see the correction entry above.**
 * `isOwnedProject`/`isCategoryInProject`/`isBoardInProject` are unchanged and still run before every write, now explicitly documented as defense-in-depth/error-message quality rather than the security boundary.
 
 ### Preserved

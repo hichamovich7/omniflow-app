@@ -305,11 +305,24 @@ Groups a project's Pinterest/WordPress activity into named pillars (e.g. "Croche
 
 ## RLS
 
-**Hardened 2026-09-16** (before the first apply of migration 030 — see
+**Hardened 2026-09-16** in the local copy of migration 030 (see
 `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §14a for the full rationale).
 `USING` still protects existing-row visibility exactly like every other
-table in this schema; `WITH CHECK` is now stricter than `user_id = auth.uid()`
-alone, and is the actual security boundary — not the TypeScript layer:
+table in this schema; `WITH CHECK` is stricter than `user_id = auth.uid()`
+alone, and is meant to be the actual security boundary — not the TypeScript
+layer:
+
+**Live database note (2026-09-16, §14b):** 030 had already been applied to
+the linked Supabase project **manually**, before this `WITH CHECK` existed —
+the live policy currently has `with_check = null` (the original, weaker
+`USING`-only version). `supabase_migrations.schema_migrations` doesn't exist
+on this project, confirming no migration (030 or otherwise) has ever gone
+through the tracked mechanism; every migration so far was pasted into the
+SQL Editor by hand. The block below is now shipped as a separate corrective
+migration, `031_harden_content_streams_rls.sql` (`DROP POLICY IF EXISTS` +
+`CREATE POLICY`, same name, same `USING`), rather than a further edit to
+030 — treat 030 as immutable from here on, exactly as if it had shipped
+through the tracked mechanism, because it effectively has.
 
 ```sql
 USING (user_id = auth.uid())
@@ -364,8 +377,12 @@ Many-to-many join between `content_streams` and `boards` (TASK-FIX-039 Phase 2a)
 
 ## RLS
 
-**Hardened 2026-09-16** (same pass as `content_streams` above — see
-`docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §14a):
+**Hardened 2026-09-16** in the local copy of migration 030 (same pass as
+`content_streams` above — see `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md`
+§14a). **Live database note (§14b):** same situation as `content_streams` —
+the live policy currently has `with_check = null`; the block below ships as
+part of the same corrective `031_harden_content_streams_rls.sql`, not a
+further edit to 030:
 
 ```sql
 USING (user_id = auth.uid())
