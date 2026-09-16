@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
+import { listWordPressCategories } from '@/lib/queries/wordpress-categories';
+import { listContentStreams, listBoardOccupants, findBoardOccupant } from '@/lib/queries/content-streams';
+import { ContentStreamsSection } from '@/components/projects/content-streams-section';
 import { PageContainer } from '@/components/ui/page-container';
 import { Badge } from '@/components/ui/badge';
 import { ExpandableText } from '@/components/ui/expandable-text';
@@ -27,10 +30,36 @@ export default async function ProjectDetailPage({
 
   const wordpressSite = await getWordPressSiteByProjectId(supabase, project.id);
 
-  const [{ count: generationCount }, { data: wpGenerations }] = await Promise.all([
+  const [{ count: generationCount }, { data: wpGenerations }, contentStreams, categories, { data: projectBoards }] = await Promise.all([
     supabase.from('generations').select('id', { count: 'exact', head: true }).eq('project_id', project.id),
     supabase.from('wordpress_generations').select('id').eq('project_id', project.id),
+    listContentStreams(supabase, project.id),
+    listWordPressCategories(supabase, project.id),
+    supabase.from('boards').select('id, name').eq('project_id', project.id).order('name'),
   ]);
+
+  // Every content_stream_boards row for any board in THIS project — reused
+  // both to build the create/edit selector's "already in use" state and to
+  // resolve which board each existing stream card currently shows (Phase
+  // 2a.1). See docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md §11 §8.
+  const boardIds = (projectBoards ?? []).map((b) => b.id);
+  const boardOccupants = await listBoardOccupants(supabase, boardIds);
+
+  const boardOptions = (projectBoards ?? []).map((b) => {
+    const occupant = findBoardOccupant(boardOccupants, b.id);
+    return {
+      id: b.id,
+      name: b.name,
+      occupant: occupant ? { streamId: occupant.content_stream_id, streamName: occupant.content_stream_name } : null,
+    };
+  });
+
+  const streamBoardMap: Record<string, string | undefined> = {};
+  for (const row of boardOccupants) {
+    streamBoardMap[row.content_stream_id] = row.board_id;
+  }
+
+  const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name }));
 
   const wpGenerationIds = (wpGenerations ?? []).map((g) => g.id);
   const { count: articleCount } =
@@ -122,6 +151,14 @@ export default async function ProjectDetailPage({
           </div>
         )}
       </div>
+
+      <ContentStreamsSection
+        projectId={project.id}
+        streams={contentStreams}
+        categories={categoryOptions}
+        boards={boardOptions}
+        streamBoardMap={streamBoardMap}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-border/60 bg-card p-6">

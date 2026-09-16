@@ -1,6 +1,7 @@
 import { expect, test } from 'playwright/test';
 import { createContentStreamSchema, updateContentStreamSchema, contentStreamStatusSchema } from '@/lib/validations/content-streams';
-import { isOwnedProject, isCategoryInProject, isBoardInProject } from '@/lib/queries/content-streams';
+import { isOwnedProject, isCategoryInProject, isBoardInProject, findBoardOccupant, type BoardOccupant } from '@/lib/queries/content-streams';
+import { parseOptionalNonNegativeInt } from '@/components/projects/content-stream-form-dialog';
 
 /**
  * Data-contract tests for Command Center Phase 2a (content_streams +
@@ -211,4 +212,70 @@ test.describe('RLS-mirrored scenarios (TASK-FIX-039 security hardening)', () => 
    * §14a's SQL checklist, step 6, for the concrete statement to run against
    * a real Supabase project.
    */
+});
+
+/**
+ * Data-contract tests for Phase 2a.1 (the Content Streams management UI
+ * inside a project's own page). findBoardOccupant() is the single pure
+ * function that both the create/edit selector (client, disables an option)
+ * and the API routes (server, rejects the write) call to decide "is this
+ * board already claimed" — covering it here proves both call sites share
+ * one answer. parseOptionalNonNegativeInt() is the client-side mirror of
+ * the server's Zod non-negative-integer check for the three target fields.
+ */
+test.describe('findBoardOccupant (Phase 2a.1 board rule)', () => {
+  const streamA: BoardOccupant = { board_id: 'board-1', content_stream_id: 'stream-a', content_stream_name: 'Crochet Cats', status: 'active' };
+
+  test('a board with no links is free', () => {
+    expect(findBoardOccupant([], 'board-1')).toBeNull();
+  });
+
+  test('a board linked to an active stream is occupied', () => {
+    expect(findBoardOccupant([streamA], 'board-1')).toEqual(streamA);
+  });
+
+  test('a board linked to a warming or paused stream is still occupied', () => {
+    expect(findBoardOccupant([{ ...streamA, status: 'warming' }], 'board-1')).not.toBeNull();
+    expect(findBoardOccupant([{ ...streamA, status: 'paused' }], 'board-1')).not.toBeNull();
+  });
+
+  test('a board linked only to an archived stream is free — archiving is what releases it', () => {
+    expect(findBoardOccupant([{ ...streamA, status: 'archived' }], 'board-1')).toBeNull();
+  });
+
+  test('excludeStreamId lets a stream ignore its own existing link when editing itself', () => {
+    expect(findBoardOccupant([streamA], 'board-1', 'stream-a')).toBeNull();
+  });
+
+  test('excludeStreamId does not free a board occupied by a different stream', () => {
+    expect(findBoardOccupant([streamA], 'board-1', 'stream-b')).toEqual(streamA);
+  });
+
+  test('only matches the requested board_id, ignoring links on other boards', () => {
+    expect(findBoardOccupant([streamA], 'board-2')).toBeNull();
+  });
+});
+
+test.describe('parseOptionalNonNegativeInt (Phase 2a.1 target fields)', () => {
+  test('an empty or whitespace-only value is valid and null (target left unset)', () => {
+    expect(parseOptionalNonNegativeInt('')).toEqual({ value: null, valid: true });
+    expect(parseOptionalNonNegativeInt('   ')).toEqual({ value: null, valid: true });
+  });
+
+  test('zero and positive integers are valid', () => {
+    expect(parseOptionalNonNegativeInt('0')).toEqual({ value: 0, valid: true });
+    expect(parseOptionalNonNegativeInt('7')).toEqual({ value: 7, valid: true });
+  });
+
+  test('a negative integer is rejected', () => {
+    expect(parseOptionalNonNegativeInt('-1').valid).toBe(false);
+  });
+
+  test('a decimal value is rejected', () => {
+    expect(parseOptionalNonNegativeInt('1.5').valid).toBe(false);
+  });
+
+  test('a non-numeric value is rejected', () => {
+    expect(parseOptionalNonNegativeInt('abc').valid).toBe(false);
+  });
 });

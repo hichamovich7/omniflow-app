@@ -226,7 +226,18 @@ Route:
 
 Purpose:
 
-Read-only overview of a single Project: name, niche, default language, Brand Profile (truncated, expandable), WordPress connection status, quick stats (Pinterest generations, WordPress articles), and shortcut links to that Project's Pinterest History, WordPress History, and Categories (all pre-filtered to this Project). "Edit Project" links to the existing `/projects/[id]/edit` form.
+Overview of a single Project: name, niche, default language, Brand Profile (truncated, expandable), WordPress connection status, a Content Streams section (see below), quick stats (Pinterest generations, WordPress articles), and shortcut links to that Project's Pinterest History, WordPress History, and Categories (all pre-filtered to this Project). "Edit Project" links to the existing `/projects/[id]/edit` form.
+
+### Content Streams (TASK-FIX-039 Phase 2a.1)
+
+A card section between "WordPress Connection" and the usage-stats grid — no new tab, no new global navigation entry, since Content Streams belong to one Project.
+
+* Compact cards, one per content stream: name, a status badge (Active/Warming/Paused/Archived), the linked WordPress category (or "None"), the linked Pinterest board (or "None"), and the three raw targets (Pins / day, Articles / week, Buffer days) — no computed coverage/"missing pins" number is shown yet, since that still depends on real `pins.publish_date` data not wired up until Phase 2d.
+* Empty state: "No content streams yet" with an "Add content stream" button.
+* "Add content stream" / a card's pencil icon open the same compact `Dialog`: Name (required), WordPress Category select ("No WordPress category" + this Project's real categories, by id), Pinterest Board select ("No Pinterest board" + this Project's real boards, by id), Status select, and three number inputs for the targets (empty = unset, negative/decimal rejected before submit).
+* **Board rule**: while the "1 account = 1 board" experiment holds, a board already linked to another non-archived stream shows as a disabled option, labeled "(in use by \<stream name\>)" — archiving that other stream frees the board again. This is enforced server-side too, not just as a disabled option.
+* A card's Archive icon opens a light confirmation dialog (`Dialog`, not a full-page navigation) before calling the archive action — never a physical delete.
+* All of it is `sonner` toast-driven (success, warning for a partial create where the stream saved but the board link failed, error), keyboard-focusable, and dark-mode/responsive via the same tokens as the rest of the page.
 
 ---
 

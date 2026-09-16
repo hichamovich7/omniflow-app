@@ -4,12 +4,15 @@ Tracked in docs/TASKS.md as **TASK-FIX-039**. Follows
 `docs/tasks/TASK-COMMAND-CENTER-MVP.md` (Phase 1 / Phase 1.1 / Phase 1.1
 Hotfix), which this phase is designed to eventually replace the mock data of.
 
-**Implementation status (2026-09-16): Phase 2a only is implemented.**
-`content_streams` + `content_stream_boards` exist as real, migrated,
-RLS-protected tables with types and query functions — see §14. Everything
-else in this document (§5.3/§5.4 `tasks`/`task_occurrences`, §9 recurrence,
-§10 Next Best Action, Phases 2b–2e in §12) remains **discovery/design only**:
-no migration, no component, no API route, no UI for any of it yet.
+**Implementation status (2026-09-16): Phase 2a and Phase 2a.1 are
+implemented.** `content_streams` + `content_stream_boards` exist as real,
+migrated, RLS-hardened tables with types and query functions (§14/§14a/§14b),
+and a small management UI for them now lives inside each project's own page
+— create, edit, and archive, with API routes that re-verify ownership
+server-side (§14c). Everything else in this document (§5.3/§5.4
+`tasks`/`task_occurrences`, §9 recurrence, §10 Next Best Action, Phases
+2b–2e in §12) remains **discovery/design only**: no migration, no component,
+no API route, no UI for any of it yet.
 
 ---
 
@@ -590,6 +593,18 @@ in §5–§10:
 1. **Phase 2a** ✅ **Implemented (2026-09-16)** — Migration:
    `content_streams` + `content_stream_boards` only. RLS. No UI, no API
    route, no component change. See §14 for the full record.
+1a. **Phase 2a.1** ✅ **Implemented (2026-09-16)** — Small management UI for
+   `content_streams`, inside each project's own page (`/projects/[id]`):
+   create/edit/archive, a WordPress category picker and a Pinterest board
+   picker (both by real id, both scoped to the open project), the "one
+   board per active stream" rule enforced both client-side (disabled
+   option) and server-side (409 on write). `app/api/content-streams/*`
+   routes added. Still no `tasks` table, no automatic recommendation, no
+   Next Best Action, no Pinterest/WordPress logic change. See §14c for the
+   full record. This absorbs the "content-stream CRUD UI" line that Phase
+   2d (below) originally described — Phase 2d is now only about reading
+   real planned-pins/coverage numbers, not about building the CRUD UI,
+   which already exists as of this phase.
 2. **Phase 2b** — Persistent manual tasks. Migration: `tasks` (without
    `accepted_at` — resolved §11 §3 — and without `task_occurrences`;
    `content_stream_id`/`board_id` present but not yet required by any UI).
@@ -607,11 +622,11 @@ in §5–§10:
    `account_warming`/`account_analysis` routines keyed on `board_id` (§1.3a)
    become real, including the "Warm Crochet Sweater account" example in
    §5.3, and `weekly_review` (§11 §7) becomes a real recurring task.
-4. **Phase 2d** — Planned coverage. Wire `content_stream_id`/`board_id` for
-   real: content-stream CRUD UI (create/edit a stream under a project, pick
-   a category + one or more boards), and start reading real planned-pins /
-   next-planned-date / last-planned-date / planned-coverage / missing-pins
-   numbers (§1.3a "Planning Pinterest") instead of
+4. **Phase 2d** — Planned coverage. The content-stream CRUD UI already
+   exists (Phase 2a.1) — this phase is now only about wiring
+   `content_stream_id`/`board_id` into real reads: start showing real
+   planned-pins / next-planned-date / last-planned-date / planned-coverage /
+   missing-pins numbers (§1.3a "Planning Pinterest") instead of
    `MOCK_WEEKLY_PROGRESS`/parts of `MOCK_ACTIVE_PROJECTS`.
 5. **Phase 2e** — Automatic recommendations. `automatic` source tasks + the
    Next Best Action scoring function (§10) as a read-only suggestion feed.
@@ -656,9 +671,28 @@ philosophy (AGENT.md).
 **Update (2026-09-16):** `supabase/migrations/030_add_content_streams.sql`,
 `types/content-streams.ts`, `lib/validations/content-streams.ts`, and
 `lib/queries/content-streams.ts` are now created — see §14. Every other file
-above (`tasks`-related files, API routes, components, `docs/API.md`,
-`docs/UI_UX.md`) remains untouched; this was, and for those files still is, a
-discovery task only.
+above (`tasks`-related files, components, `docs/API.md`) remains untouched;
+this was, and for those files still is, a discovery task only.
+
+**Update (2026-09-16, Phase 2a.1):** `app/api/content-streams/route.ts` (+
+`[id]/route.ts`, `[id]/archive/route.ts`) are now created too — see §14c for
+the exact routes (they differ from the speculative `[id]/route.ts`-only
+shape above: archiving got its own `[id]/archive` action route instead of
+being folded into a generic `PATCH`, matching the `archiveContentStream()`
+function's own separation). A management UI now exists under
+`components/projects/` (`content-streams-section.tsx`,
+`content-stream-card.tsx`, `content-stream-form-dialog.tsx`,
+`archive-content-stream-dialog.tsx`) and is wired into
+`app/(dashboard)/projects/[id]/page.tsx` — not the speculative
+`app/(dashboard)/content-streams/` standalone page guessed above; the
+brief's own explicit instruction was to integrate into the existing project
+page rather than add new global navigation. `docs/UI_UX.md` is updated
+(§14c); `docs/API.md` is intentionally **not** updated, matching this
+phase's explicit documentation scope (§14c). Also note: the migration
+numbered `031` in this speculative list assumed it would be `tasks` — the
+real `031` (already shipped, see §14b) is an RLS hardening fix for
+`content_streams`/`content_stream_boards`, unrelated to `tasks`. A future
+`tasks` migration will need to start at `032` or later.
 
 ## 14. Phase 2a implementation record (2026-09-16)
 
@@ -1065,8 +1099,180 @@ recreate either table, safe to run on the current live database (today's
 drop and recreate an identical policy — a no-op in effect).
 
 **Not done by this agent:** 031 was not executed against the live database
-in this session — no `supabase` CLI project link, no `SUPABASE_ACCESS_TOKEN`,
-and no direct Postgres credential exist in this environment (§14a/§14's own
-findings, unchanged). The exact SQL to paste into the Supabase SQL Editor is
-the contents of `031_harden_content_streams_rls.sql` itself, provided
-verbatim in this session's response.
+by this agent in the session that wrote it — no `supabase` CLI project
+link, no `SUPABASE_ACCESS_TOKEN`, and no direct Postgres credential exist in
+this environment (§14a/§14's own findings, unchanged). The exact SQL was
+provided verbatim for a manual SQL Editor paste. **Update (2026-09-16,
+confirmed by the founder): 031 has since been executed manually, and both
+tables' live policies now carry the hardened `WITH CHECK` text.** The live
+database and the local migration files are consistent as of this
+confirmation — the ambiguity this section originally raised is resolved.
+
+## 14c. Phase 2a.1 implementation record (2026-09-16) — Content Streams management UI
+
+**Scope actually implemented:** a small CRUD UI for `content_streams`
+inside each project's own page. No new migration, no `tasks` table, no
+automatic recommendation, no Next Best Action, no Pinterest/WordPress
+logic change, no seed data.
+
+### Location chosen
+
+`app/(dashboard)/projects/[id]/page.tsx` (the existing project detail
+page) — a new "Content Streams" card section, placed between the existing
+"WordPress Connection" section and the Pinterest/WordPress usage-stats
+grid. No new global navigation entry, no new top-level route: the brief
+explicitly asked to integrate into the existing project page rather than
+build a standalone `/content-streams` section, and the project page's
+existing pattern (stacked `rounded-2xl border bg-card` sections, no tabs)
+already fit a new section cleanly without needing tabs.
+
+### Files created
+
+* `app/api/content-streams/route.ts` — `POST` (create, plus optional board
+  link in the same request).
+* `app/api/content-streams/[id]/route.ts` — `PATCH` (name/category/status/
+  targets, plus an optional board change).
+* `app/api/content-streams/[id]/archive/route.ts` — `POST` (archive only,
+  calls `archiveContentStream()` directly, mirroring that function's own
+  separation from `updateContentStream()`).
+* `components/projects/content-streams-section.tsx` — list, empty state,
+  wires the two dialogs below.
+* `components/projects/content-stream-card.tsx` — compact card (name,
+  status badge, category, board, the three targets, Edit/Archive buttons).
+* `components/projects/content-stream-form-dialog.tsx` — Create/Edit
+  dialog (reused for both — `editing` prop present or absent).
+* `components/projects/archive-content-stream-dialog.tsx` — light
+  confirmation, mirrors `components/projects/delete-project-dialog.tsx`'s
+  exact shape but calls the archive route (soft status change) instead of
+  a hard `DELETE`.
+* `tests/renderer/content-streams.spec.ts` — extended, +12 offline tests
+  (`findBoardOccupant`, `parseOptionalNonNegativeInt`).
+* `tests/playwright/content-streams.spec.ts` — new, gated browser tests
+  (see "Tests" below for what they cover and what they explicitly don't).
+
+### Files modified
+
+* `app/(dashboard)/projects/[id]/page.tsx` — fetches `content_streams`,
+  the project's `wordpress_categories` (existing `listWordPressCategories()`),
+  the project's `boards` (plain inline query, matching the existing
+  `/boards` page's own convention of not wrapping every list read in a
+  query-file function), and every board's current occupant
+  (`listBoardOccupants()`, new — see below); renders
+  `<ContentStreamsSection>`.
+* `lib/queries/content-streams.ts` — added `listBoardOccupants()` (async,
+  DB) and `findBoardOccupant()` (pure, unit-tested) — the single shared
+  decision both the create/edit selector (client: disables an option) and
+  the API routes (server: rejects the write with `409 board_taken`) call,
+  so there is exactly one definition of "already in use," not two that
+  could drift apart.
+* `lib/utils/status.ts` — added `contentStreamStatusToBadgeVariant()`,
+  alongside the file's existing per-domain status→badge mappings.
+
+### Create / Edit / Archive flow
+
+* **Create**: `POST /api/content-streams` validates the core fields with
+  the existing, unchanged `createContentStreamSchema`, separately validates
+  an optional `boardId` (UUID shape, then availability), and — only if the
+  board is free — calls `createContentStream()`. If a board was requested,
+  `linkBoardToContentStream()` runs *after* the stream is created. If that
+  link call fails, the response still reports `201` (the stream is real)
+  but with `boardLinked: false` and a `boardWarning` message; the client
+  shows `toast.warning(...)` instead of a plain success toast — the
+  partial state is never presented as a full success, per the brief.
+* **Edit**: `PATCH /api/content-streams/[id]` re-fetches the stream and
+  checks `existingStream.user_id === user.id` before touching anything
+  (matching `app/api/boards/[id]/route.ts`'s exact pattern). A board
+  change is detected via `Object.prototype.hasOwnProperty.call(body,
+  'boardId')` (so "board field not touched" and "board explicitly cleared
+  to null" are distinguishable), validated for availability *before* any
+  write, then applied by unlinking whatever the stream currently points at
+  and linking the new one — never creating a second link, since the old
+  one is removed first. No duplicate stream is ever created; this is
+  always the same row being updated.
+* **Archive**: a light `Dialog` confirmation
+  (`archive-content-stream-dialog.tsx`) calling `POST
+  /api/content-streams/[id]/archive`, which calls `archiveContentStream()`
+  (itself `updateContentStream(..., { status: 'archived' })`) — never a
+  physical `DELETE`. Archiving a stream also implicitly frees its board
+  for reuse elsewhere, since `findBoardOccupant()` never treats an
+  `archived` stream as an occupant (§11 §8's own resolution, reused as-is
+  here, not reinterpreted).
+
+### Board rule — validated where
+
+* **Client (UX only)**: the board `Select` disables any option whose
+  `occupant.streamId` differs from the stream currently being edited (or
+  from nothing, in create mode) — `content-stream-form-dialog.tsx`, driven
+  by the `boards` prop the page computes once per render from
+  `listBoardOccupants()` + `findBoardOccupant()`.
+* **Server (the actual boundary)**: both `POST /api/content-streams` and
+  `PATCH /api/content-streams/[id]` re-run the exact same
+  `listBoardOccupants()` + `findBoardOccupant()` pair immediately before
+  writing anything, and reject with `409 board_taken` and a message naming
+  the occupying stream if the board is taken — regardless of what the
+  disabled-option UI did or didn't prevent client-side. A direct API call
+  bypassing the form entirely is bound by this the same way.
+* **Schema**: unchanged — `content_stream_boards` stays N:N (§5.2/§11 §8).
+  This phase only adds application-layer enforcement of the "one active
+  stream per board" experiment rule on top of that flexible schema, exactly
+  as §11 §8 called for; no unique index or trigger was added.
+
+### Security controls
+
+* Every route re-verifies the session (`supabase.auth.getUser()`) and
+  either re-fetches the target row's `user_id` directly (edit/archive,
+  matching `app/api/boards/[id]/route.ts`) or delegates to
+  `createContentStream()`/`updateContentStream()`, which already call
+  `isOwnedProject()`/`isCategoryInProject()`/`isBoardInProject()`
+  internally (§14, unchanged in this phase). The client-sent `projectId`
+  on create is never trusted as-is — `createContentStream()` re-fetches
+  that exact project row and checks `project.user_id === user.id` before
+  using it for anything.
+* No `service_role` key is used anywhere in this phase — every route uses
+  the same cookie-scoped `createClient()` (`lib/supabase/server.ts`) every
+  other authenticated route in this codebase uses, so RLS (§14a's
+  `WITH CHECK`, confirmed live per §14b) applies to every query these
+  routes make, in addition to the application-level checks above — RLS
+  remains the final boundary, not a fallback that's assumed unreachable.
+
+### Tests executed
+
+| Check | Result |
+| --- | --- |
+| `npx tsc --noEmit` | Pass |
+| `npx eslint` (all new/changed files) | Pass (two issues found and fixed during development: a `react-hooks/set-state-in-effect` warning, resolved by switching the form's prefill from an effect to a `key`-forced remount + lazy `useState` initializers; one unescaped apostrophe) |
+| `npx playwright test --project=renderer` | **129/129 pass** (117 previous + 12 new: `findBoardOccupant` × 7, `parseOptionalNonNegativeInt` × 5) |
+| `npx playwright test` (full suite) | 129 passed, 52 skipped (new gated browser cases + all pre-existing auth-gated cases, correctly skipped, not bypassed) |
+| `npx next build` | Pass — `/api/content-streams`, `/api/content-streams/[id]`, `/api/content-streams/[id]/archive` appear as new routes; `/projects/[id]` unchanged in the route list |
+
+`tests/playwright/content-streams.spec.ts` (gated, needs
+`PLAYWRIGHT_STORAGE_STATE` and a real project) covers: the empty state and
+its "Add content stream" button, opening/closing the Create dialog without
+creating anything, an empty name being rejected before any request is
+sent, negative and decimal target values being rejected before submit, and
+a full create → edit (rename + status change) → archive round trip.
+
+**Explicitly not covered by the browser suite, and why:** "category from
+another project rejected," "board from another project rejected," and
+"board already used by an active stream rejected" all need known
+cross-project fixtures (a second project with its own category/board) that
+this suite has no way to seed — seeding is explicitly forbidden by this
+phase's own constraints. These three are covered instead as offline
+pure-function tests already in `tests/renderer/content-streams.spec.ts`
+(`isCategoryInProject`, `isBoardInProject`, `findBoardOccupant`), which
+are the exact functions the API routes call to enforce them, plus a direct
+reading of `app/api/content-streams/route.ts` and `[id]/route.ts` to
+confirm those functions are actually wired in before every write. This is
+a signaled limitation, not a silently dropped test.
+
+### Remaining limitations
+
+* No live authenticated browser session in this environment — the gated
+  Playwright cases above were written and reviewed, not executed.
+* No computed "missing pins"/coverage number is shown anywhere in this UI
+  — per the brief's own instruction not to surface calculated metrics that
+  aren't reliable yet; that remains Phase 2d.
+* The board picker only ever manages a single board per stream in the UI
+  (matching the current 1-account-per-board experiment), even though
+  `content_stream_boards` stays N:N in the schema — consistent with §5.1's
+  own framing, not a new decision.

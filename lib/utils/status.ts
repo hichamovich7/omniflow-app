@@ -24,3 +24,12 @@ export function publishStatusToBadgeVariant(status: string) {
     default: return 'secondary' as const;
   }
 }
+
+export function contentStreamStatusToBadgeVariant(status: string) {
+  switch (status) {
+    case 'active': return 'success' as const;
+    case 'warming': return 'warning' as const;
+    case 'archived': return 'outline' as const;
+    default: return 'secondary' as const; // paused
+  }
+}

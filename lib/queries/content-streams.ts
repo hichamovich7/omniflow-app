@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ContentStream, ContentStreamBoard, ContentStreamInsert } from '@/types/content-streams';
+import type { ContentStream, ContentStreamBoard, ContentStreamInsert, ContentStreamStatus } from '@/types/content-streams';
 import type { CreateContentStreamInput, UpdateContentStreamInput } from '@/lib/validations/content-streams';
 
 export type ContentStreamOwnershipErrorCode = 'project_forbidden' | 'category_forbidden' | 'board_forbidden';
@@ -178,6 +178,57 @@ export async function linkBoardToContentStream(
 
   if (error) throw error;
   return data as ContentStreamBoard;
+}
+
+export interface BoardOccupant {
+  board_id: string;
+  content_stream_id: string;
+  content_stream_name: string;
+  status: ContentStreamStatus;
+}
+
+/**
+ * Every content stream currently linked to any of the given boards, for the
+ * "one board per active stream" experiment rule (TASK-COMMAND-CENTER-PHASE-2.md
+ * §11 §8 — application-layer only, never a DB constraint). Fetches once for
+ * a whole project's boards; findBoardOccupant() below decides per-board.
+ */
+export async function listBoardOccupants(supabase: SupabaseClient, boardIds: string[]): Promise<BoardOccupant[]> {
+  if (boardIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from('content_stream_boards')
+    .select('board_id, content_stream_id, content_streams(name, status)')
+    .in('board_id', boardIds);
+
+  return ((data ?? []) as unknown as Array<{
+    board_id: string;
+    content_stream_id: string;
+    content_streams: { name: string; status: ContentStreamStatus } | null;
+  }>).map((row) => ({
+    board_id: row.board_id,
+    content_stream_id: row.content_stream_id,
+    content_stream_name: row.content_streams?.name ?? '',
+    status: row.content_streams?.status ?? 'archived',
+  }));
+}
+
+/**
+ * Pure decision, unit-testable without a real Supabase client: a board is
+ * "taken" only by a non-archived stream other than `excludeStreamId` (the
+ * stream being edited, so it never blocks itself on its own current board).
+ * `archived` never occupies a board — archiving is exactly what frees it.
+ */
+export function findBoardOccupant(
+  occupants: BoardOccupant[],
+  boardId: string,
+  excludeStreamId?: string
+): BoardOccupant | null {
+  return (
+    occupants.find(
+      (o) => o.board_id === boardId && o.content_stream_id !== excludeStreamId && o.status !== 'archived'
+    ) ?? null
+  );
 }
 
 export async function unlinkBoardFromContentStream(

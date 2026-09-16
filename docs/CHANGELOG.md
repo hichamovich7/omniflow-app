@@ -18,6 +18,27 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-039 (Phase 2a.1): Content Streams management UI
+
+### Added
+
+* A "Content Streams" section on each project's own page (`/projects/[id]`), between "WordPress Connection" and the usage-stats grid: compact cards (name, status badge, WordPress category, Pinterest board, the three raw targets), an empty state ("No content streams yet" + "Add content stream"), and a compact Create/Edit `Dialog` reused for both — Name, WordPress Category select, Pinterest Board select, Status select, and three optional non-negative-integer targets.
+* `app/api/content-streams/route.ts` (create, with an optional board link in the same request), `app/api/content-streams/[id]/route.ts` (edit, including changing the linked board), `app/api/content-streams/[id]/archive/route.ts` (archive — a soft status change, never a physical delete).
+* `components/projects/content-streams-section.tsx`, `content-stream-card.tsx`, `content-stream-form-dialog.tsx`, `archive-content-stream-dialog.tsx` — the archive dialog mirrors `delete-project-dialog.tsx`'s exact confirmation shape.
+* `lib/queries/content-streams.ts`: `listBoardOccupants()` and the pure `findBoardOccupant()` — the single shared decision both the picker (client, disables an option) and the API routes (server, `409 board_taken`) use for the "one board per active stream" experiment rule, so the two can't drift apart. `lib/utils/status.ts`: `contentStreamStatusToBadgeVariant()`.
+* `tests/renderer/content-streams.spec.ts`: +12 offline tests. `tests/playwright/content-streams.spec.ts`: new gated browser tests (empty state, open/close, empty-name rejection, negative/decimal target rejection, full create→edit→archive flow).
+
+### Preserved
+
+* No new migration, no `tasks` table, no automatic recommendation, no Next Best Action, no Pinterest/WordPress logic change, no seed data, no new dependency. `content_stream_boards` stays N:N in the schema — the "one board per active stream" rule is application-layer only, exactly as already decided in `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §11 §8.
+* No client-sent `project_id`/`board_id`/`wordpress_category_id` is ever trusted — every route re-verifies the session and re-checks ownership server-side (`isOwnedProject`/`isCategoryInProject`/`isBoardInProject`, unchanged from Phase 2a), and no `service_role` key is used anywhere in this UI — RLS remains the final boundary.
+
+### Validation
+
+* TypeScript OK, ESLint OK (one `react-hooks/set-state-in-effect` warning and one unescaped apostrophe found and fixed during development), offline renderer suite 129/129 (117 previous + 12 new), full Playwright suite 129 passed / 52 skipped (new gated cases correctly skip without `PLAYWRIGHT_STORAGE_STATE`, not bypassed), production build OK (`/api/content-streams` + 2 sub-routes appear as new routes). Cross-project rejection scenarios (category/board from another project, board already claimed by an active stream) are not exercised by the browser suite — no way to seed the needed cross-project fixtures without violating this phase's own "no seed data" constraint — but are covered as offline tests of the exact functions the API routes call. See `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §14c for the full record.
+
+---
+
 ## TASK-FIX-039 (Phase 2a Correction): Harden live RLS via migration 031
 
 ### Fixed
