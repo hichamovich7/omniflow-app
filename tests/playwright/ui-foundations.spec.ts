@@ -45,7 +45,7 @@ test.describe('UI foundations', () => {
     await expect(page.getByText('Pins Created')).toBeVisible();
     await expect(page.getByText('Articles Generated')).toBeVisible();
 
-    // Today's Priorities: up to 3 items, plus the discreet local-only "Add priority" affordance.
+    // Today's Priorities: up to 3 items, plus the discreet local-only Add/Replace affordance.
     await expect(page.getByRole('heading', { name: "Today's Priorities" })).toBeVisible();
     await expect(page.getByText('Finish "Free Crochet Cat Patterns"')).toBeVisible();
     await expect(page.getByText('Create 7 Crochet Sweater pins')).toBeVisible();
@@ -98,21 +98,111 @@ test.describe('UI foundations', () => {
     }
   });
 
-  test('the "+ Add priority" button is actually visible and usable, not just present in markup (TASK-FIX-038 Phase 1.1 Hotfix)', async ({ page }) => {
+  test('the priority action button is visible and usable — "Add priority" below the limit, "Replace a priority" at it (TASK-FIX-038 Phase 1.1 Hotfix)', async ({ page }) => {
     await page.goto('/dashboard');
-    const addButton = page.getByRole('button', { name: 'Add priority' });
+    // The mock data ships exactly 3 priorities (the pinned limit), so the
+    // button already reads "Replace a priority" on a fresh load — this is
+    // the deliberate follow-up to the Hotfix, not a regression of it.
+    const actionButton = page.getByRole('button', { name: /^(Add priority|Replace a priority)$/ });
     // toBeVisible() checks real computed visibility (display/opacity/size), not just DOM presence.
-    await expect(addButton).toBeVisible();
-    await expect(addButton).toBeEnabled();
+    await expect(actionButton).toBeVisible();
+    await expect(actionButton).toBeEnabled();
+    await expect(actionButton).toHaveText('Replace a priority');
 
-    await addButton.click();
+    await actionButton.click();
     const input = page.getByPlaceholder('New priority…');
     await expect(input).toBeVisible();
     await input.fill('Ship the hotfix');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+    const submit = page.getByRole('button', { name: 'Replace', exact: true });
+    // A replace target is required — submit stays disabled until one is chosen.
+    await expect(submit).toBeDisabled();
+    await page.getByRole('combobox', { name: 'Priority to replace' }).click();
+    await page.getByRole('option').first().click();
+    await expect(submit).toBeEnabled();
+    await submit.click();
+
     await expect(page.getByText('Ship the hotfix')).toBeVisible();
+    // Replacing never changes the pinned count.
+    await expect(page.getByRole('list').getByRole('listitem')).toHaveCount(3);
     // Never implies persistence.
     await expect(page.getByText("Preview only — changes aren't saved yet.")).toBeVisible();
+  });
+
+  test('editing a priority title: Save applies the new title, Cancel keeps the old one, empty is rejected', async ({ page }) => {
+    await page.goto('/dashboard');
+    const firstPriority = page.getByRole('list').getByRole('listitem').filter({ hasText: 'Finish "Free Crochet Cat Patterns"' });
+    await firstPriority.getByRole('button', { name: /^Edit/ }).click();
+
+    const editInput = firstPriority.locator('input');
+    await expect(editInput).toHaveValue('Finish "Free Crochet Cat Patterns"');
+
+    // Cancel must restore the original title, not just close the field.
+    await editInput.fill('This should not stick');
+    await firstPriority.getByRole('button', { name: 'Cancel editing' }).click();
+    await expect(page.getByText('Finish "Free Crochet Cat Patterns"')).toBeVisible();
+    await expect(page.getByText('This should not stick')).not.toBeVisible();
+
+    // An empty title must never be saveable.
+    await firstPriority.getByRole('button', { name: /^Edit/ }).click();
+    await firstPriority.locator('input').fill('   ');
+    await expect(firstPriority.getByRole('button', { name: 'Save title' })).toBeDisabled();
+
+    // A real edit replaces the title.
+    await firstPriority.locator('input').fill('Publish the Crochet Cat batch');
+    await firstPriority.getByRole('button', { name: 'Save title' }).click();
+    await expect(page.getByText('Publish the Crochet Cat batch')).toBeVisible();
+    await expect(page.getByText('Finish "Free Crochet Cat Patterns"')).not.toBeVisible();
+  });
+
+  test('a priority\'s project selector lists real projects, offers "No project", and never crashes on a stale id', async ({ page }) => {
+    await page.goto('/dashboard');
+    const firstPriority = page.getByRole('list').getByRole('listitem').first();
+    const projectBadge = firstPriority.getByRole('combobox');
+    await expect(projectBadge).toBeVisible();
+    await expect(projectBadge).toHaveText('No project');
+
+    await projectBadge.click();
+    await expect(page.getByRole('option', { name: 'No project' })).toBeVisible();
+    // At least one real project option must be offered (seeded per-account, not asserted by name).
+    await expect(page.getByRole('option').filter({ hasNotText: 'No project' }).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // The page must not crash regardless of what the mock data starts with —
+    // covered structurally by resolvePriorityProjectName()'s offline tests
+    // (tests/renderer/dashboard-command-center.spec.ts) for the actual
+    // stale-id fallback, since the mock priorities ship with no projectId.
+    await expect(page.getByRole('main')).toBeVisible();
+  });
+
+  test('replacing a priority lets the title include an optional project, and never exceeds the 3-priority limit', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Replace a priority' }).click();
+
+    // A replace target is mandatory once at the limit — submit must not be
+    // clickable, and no priority may be silently added on top of the 3.
+    const submit = page.getByRole('button', { name: 'Replace', exact: true });
+    await expect(submit).toBeDisabled();
+
+    await page.getByPlaceholder('New priority…').fill('Research new niche');
+    await expect(submit).toBeDisabled(); // title alone is still not enough
+
+    await page.getByRole('combobox', { name: 'Priority to replace' }).click();
+    await page.getByRole('option', { name: 'Validate the first POD niche' }).click();
+
+    const addProjectBadge = page.getByRole('combobox', { name: 'Project for new priority' });
+    await addProjectBadge.click();
+    const firstRealProject = page.getByRole('option').filter({ hasNotText: 'No project' }).first();
+    await firstRealProject.click();
+
+    await expect(submit).toBeEnabled();
+    await submit.click();
+
+    await expect(page.getByText('Research new niche')).toBeVisible();
+    await expect(page.getByText('Validate the first POD niche')).not.toBeVisible();
+    // The count never grows past the limit — this is a replace, not an addition.
+    await expect(page.getByRole('list').getByRole('listitem')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Replace a priority' })).toBeVisible();
   });
 
   test('"Next action" is visible on every Active Project card, matched or not (TASK-FIX-038 Phase 1.1 Hotfix)', async ({ page }) => {

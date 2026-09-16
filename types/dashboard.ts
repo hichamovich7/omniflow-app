@@ -29,6 +29,14 @@ export interface PriorityItem {
   id: string;
   label: string;
   done: boolean;
+  /** Optional link to a real project by id — never by name. Missing/null = no project. */
+  projectId?: string | null;
+}
+
+/** Minimal shape needed to populate a project picker — never the full Project row. */
+export interface ProjectOption {
+  id: string;
+  name: string;
 }
 
 export type ProjectStatus = 'on-track' | 'at-risk' | 'paused';

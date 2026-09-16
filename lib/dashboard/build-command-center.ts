@@ -1,4 +1,4 @@
-import type { CommandCenterKpi, ProjectProgress } from '@/types/dashboard';
+import type { CommandCenterKpi, PriorityItem, ProjectOption, ProjectProgress } from '@/types/dashboard';
 import { MOCK_ACTIVE_PROJECTS, MOCK_KPIS } from '@/lib/dashboard/command-center-mock';
 
 export interface RealCommandCenterStats {
@@ -32,21 +32,29 @@ export function buildCommandCenterKpis(real: RealCommandCenterStats): CommandCen
   ];
 }
 
-interface RealProjectRef {
-  id: string;
-  name: string;
-}
-
 /**
  * Links a mocked Active Project card to its real Supabase project only when
  * the name matches exactly (case-insensitive) — never fabricates a link for
  * a project that doesn't actually exist for this user.
  */
-export function resolveActiveProjects(realProjects: RealProjectRef[]): ProjectProgress[] {
+export function resolveActiveProjects(realProjects: ProjectOption[]): ProjectProgress[] {
   return MOCK_ACTIVE_PROJECTS.map((project) => {
     const match = realProjects.find(
       (real) => real.name.trim().toLowerCase() === project.name.trim().toLowerCase()
     );
     return match ? { ...project, href: `/projects/${match.id}` } : project;
   });
+}
+
+/**
+ * Resolves a Today's Priorities item's project badge label by real id only
+ * (never by name — TASK-FIX-038 project-selector prototype). Falls back to
+ * "No project" both when `projectId` is unset and when it points at a
+ * project that no longer exists (e.g. deleted since the priority was
+ * created) — never throws, never fabricates a name.
+ */
+export function resolvePriorityProjectName(item: Pick<PriorityItem, 'projectId'>, projects: ProjectOption[]): string {
+  if (!item.projectId) return 'No project';
+  const match = projects.find((project) => project.id === item.projectId);
+  return match ? match.name : 'No project';
 }

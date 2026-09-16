@@ -4,13 +4,15 @@ import { TodayPriorities } from '@/components/dashboard/today-priorities';
 import { ProjectProgressCard } from '@/components/dashboard/project-progress-card';
 import { WeeklyProgress } from '@/components/dashboard/weekly-progress';
 import { MOCK_TODAY_PRIORITIES, MOCK_WEEKLY_PROGRESS } from '@/lib/dashboard/command-center-mock';
-import type { CommandCenterKpi, ProjectProgress } from '@/types/dashboard';
+import type { CommandCenterKpi, ProjectOption, ProjectProgress } from '@/types/dashboard';
 
 interface CommandCenterSectionProps {
   /** Mock goal KPIs merged with the Dashboard page's real Supabase counts — see lib/dashboard/build-command-center.ts */
   kpis: CommandCenterKpi[];
   /** Mock Active Projects, linked to a real project href when the name matches — see lib/dashboard/build-command-center.ts */
   activeProjects: ProjectProgress[];
+  /** The Dashboard page's already-fetched real projects (id, name only) — passed down for Today's Priorities' project picker, never re-queried. */
+  projects: ProjectOption[];
 }
 
 /**
@@ -19,7 +21,7 @@ interface CommandCenterSectionProps {
  * yet); KPIs and Active Projects are partly real, resolved by the caller.
  * See docs/tasks/TASK-COMMAND-CENTER-MVP.md.
  */
-export function CommandCenterSection({ kpis, activeProjects }: CommandCenterSectionProps) {
+export function CommandCenterSection({ kpis, activeProjects, projects }: CommandCenterSectionProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -30,7 +32,7 @@ export function CommandCenterSection({ kpis, activeProjects }: CommandCenterSect
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
-          <TodayPriorities priorities={MOCK_TODAY_PRIORITIES} />
+          <TodayPriorities priorities={MOCK_TODAY_PRIORITIES} projects={projects} />
         </div>
         <div className="space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between gap-2">

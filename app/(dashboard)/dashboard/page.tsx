@@ -204,7 +204,7 @@ export default async function DashboardPage() {
           <p className="text-label">Overview</p>
           <h2 className="text-section-title mt-1">Command Center</h2>
         </div>
-        <CommandCenterSection kpis={commandCenterKpis} activeProjects={activeProjects} />
+        <CommandCenterSection kpis={commandCenterKpis} activeProjects={activeProjects} projects={realProjects} />
       </div>
 
       {/* Quick Actions */}
