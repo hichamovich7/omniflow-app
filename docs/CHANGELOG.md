@@ -39,6 +39,10 @@ No registrar cambios menores de formato o comentarios.
 
 * AI Integrated no longer offers the TASK-013 reference upload: the image was never sent to the image model (only a Vision text analysis ran), which suggested an influence that did not exist. The form shows "Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model." and `POST /api/pinterest/generate` rejects any `referenceImageUrl` for `ai-integrated` and `photo-only` (HTTP 400, before Vision or a provider). Legacy Composite keeps the existing reference mechanism unchanged. Real reference support remains TASK-042.
 
+### UI (2026-09-21)
+
+* Reorganized the `/pinterest` form into five compact, labelled sections following the real workflow: Project context (Project, Language / read-only Effective language, Pins) → Board → Keyword → Generation mode → AI Integrated settings, each with at most one help sentence. The AI Integrated reference "coming soon" note moved to the end of the AI Integrated settings. Legacy Composite's Reference Image and "Text in Images" controls moved under Generation mode, unchanged. Selected mode cards gain a check icon and keep their Recommended/Legacy badge inside the card (wrapping header with a non-shrinking badge, so it never overlaps a neighbouring card), the read-only language is a real read-only input, and fields stack full-width on mobile. No field, default, validation, Zod schema, payload, route, export or provider change.
+
 ### Unchanged
 
 * Legacy `photo` / `text-overlay` rendering, Quality Gate, recomposition, credits, database schema, `.env.local`, and provider/model selection (server-owned only).

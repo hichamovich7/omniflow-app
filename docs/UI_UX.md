@@ -336,6 +336,16 @@ If a content analysis was carried over from Research, a small indicator ("Using 
 
 ## Input Section
 
+The form is grouped into five compact sections that follow the real workflow, top to bottom (2026-09-21 — order and grouping only; no field, default, validation or payload changed):
+
+1. **Project context** — Project, Language (a read-only "Effective language" in AI Integrated) and Pins. Help: "Choose the project this content belongs to. The language is inherited from the project."
+2. **Board** — optional. Help: "Choose the Pinterest board for these Pins, or leave it blank to decide later."
+3. **Keyword** — the main search phrase. Help: "Use the main search phrase your Pins should target."
+4. **Generation mode** — AI Integrated / Photo Only / Legacy Composite. In Legacy Composite the pre-existing Reference Image and "Text in Images" controls appear here, unchanged.
+5. **AI Integrated settings** — only when AI Integrated is selected. Help: "Choose how the final Pinterest visual and its text should be created." Ends with the discreet reference "coming soon" note.
+
+Each section has a visible heading and at most one help sentence; on mobile every field stacks full-width. No Link, URL or destination field exists in this form. The field descriptions below are unchanged.
+
 Fields:
 
 ### Keyword
@@ -440,7 +450,7 @@ Three toggle cards (aria-pressed): AI Integrated (Recommended, default) / Photo 
 * **AI Integrated** — the server-configured image model creates photo, typography and CTA together. No model or provider control is ever shown. Progressive-disclosure panel: Creative format (Hero Pin / Pattern Guide / Editorial Story / AI chooses), Pinterest strategy (AI recommends / Balanced angles / Manual, with an Angle select only for Manual), Headline (Generate with AI / Use exact text), Subtitle and CTA (Generate with AI / Use exact text / None), Maximum text lines (2-6) and per-field importance (High / Medium / Low). Exact-text fields are required and capped at 120 characters.
 * **Photo Only** — clean photograph, no text or graphic layer, no extra settings.
 * **Legacy Composite** — the pre-existing SVG/Sharp headline + CTA workflow, unchanged, including the "Text in Images" selector below.
-* Reference Image: the TASK-013 upload (style analysis only) is shown in Legacy Composite only. In AI Integrated it is replaced by the note "Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model."; Photo Only shows nothing. Real reference support is planned in TASK-042.
+* Reference Image: the TASK-013 upload (style analysis only) is shown in Legacy Composite only. In AI Integrated a discreet note at the end of the AI Integrated settings says "Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model."; Photo Only shows nothing. Real reference support is planned in TASK-042.
 * In AI Integrated the Language field becomes a read-only "Effective language" showing the language inherited from the selected Project; the server derives it again and does not trust the client value.
 * Pin cards and the detail dialog identify the resulting mode. AI Integrated and Photo Only show a visual-review reminder, not legacy template/position/Quality Gate placeholders. Batch Review only calculates layout-template diagnostics for Legacy Composite Pins; mixed batches disclose this scope.
 

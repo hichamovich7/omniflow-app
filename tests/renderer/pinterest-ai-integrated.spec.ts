@@ -496,6 +496,56 @@ test('the form only offers and sends a reference in Legacy Composite, and tells 
   expect(form).toContain("generationMode === 'ai-integrated' && (");
 });
 
+test('the form follows the workflow order with one help sentence per section and no link field', () => {
+  const form = readFileSync('components/pinterest/pin-form.tsx', 'utf8');
+  const at = (needle: string) => form.indexOf(needle);
+
+  const sections = [
+    'id="project-context-heading"',
+    'id="board-heading"',
+    'id="keyword-heading"',
+    'id="generation-mode-heading"',
+    'id="ai-integrated-settings"',
+  ].map(at);
+  expect(sections.every((index) => index > -1)).toBe(true);
+  expect(sections).toEqual([...sections].sort((a, b) => a - b));
+
+  for (const help of [
+    'Choose the project this content belongs to. The language is inherited from the project.',
+    'Choose the Pinterest board for these Pins, or leave it blank to decide later.',
+    'Use the main search phrase your Pins should target.',
+    'Choose how the final Pinterest visual and its text should be created.',
+  ]) {
+    expect(form.match(new RegExp(help.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
+  }
+
+  // Project context keeps Project, Language (read-only when AI Integrated) and Pins together.
+  const context = form.slice(sections[0], sections[1]);
+  for (const field of ['id="project"', 'id="language"', 'id="pins"', 'Effective language']) {
+    expect(context).toContain(field);
+  }
+  expect(context).toContain('readOnly');
+
+  // Existing board example and keyword placeholder are preserved.
+  expect(form).toContain('e.g. Boho Bathroom Ideas — leave blank to let AI decide');
+  expect(form).toContain('e.g. small bathroom storage ideas');
+
+  // Legacy-only controls stay inside Generation mode, not in the AI Integrated settings.
+  const modeSection = form.slice(sections[3], sections[4]);
+  expect(modeSection).toContain('Reference Image (optional)');
+  expect(modeSection).toContain('Text in Images');
+
+  // The "coming soon" note lives inside AI Integrated settings only, after its controls.
+  const aiSection = form.slice(sections[4], at('{error && ('));
+  expect(aiSection).toContain('data-testid="ai-integrated-reference-notice"');
+  expect(aiSection.indexOf('importance')).toBeLessThan(aiSection.indexOf('ai-integrated-reference-notice'));
+  expect(form.match(/data-testid="ai-integrated-reference-notice"/g)).toHaveLength(1);
+  expect(form.slice(0, sections[4])).not.toContain('coming soon');
+
+  // No Link / URL / destination field was added.
+  expect(form).not.toMatch(/htmlFor="(?:link|url|destination)/i);
+});
+
 // --- Exact provider contract (offline: fetch is stubbed, no paid call) -------
 
 const PROVIDER_ENV_KEYS = [

@@ -80,7 +80,7 @@ export const guideSections: GuideSection[] = [
     icon: Sparkles,
     summary: 'The core feature: turn a keyword into a batch of SEO-optimized Pinterest pins with titles, descriptions, keywords, and image prompts.',
     points: [
-      'Enter a keyword, choose a language and how many pins to generate (1 to 30).',
+      'The form follows your workflow: pick the Project and how many Pins to generate (1 to 30), optionally choose a Board, enter the main Keyword, then choose how the images are created (Generation mode).',
       'Optionally set a Board — leave it blank to let the AI suggest a board per pin.',
       'If you arrived from Research → Analyze, you\'ll see a "Using content analysis from Research" indicator confirming that context is active.',
       'Choose a Generation mode. "AI Integrated" (recommended, the default) has the AI create the final image with its headline, subtitle, and call-to-action already designed into it. "Photo Only" gives you a clean photograph with no text. "Legacy Composite" keeps the original workflow where the text and banners are added on top of the photo afterwards.',

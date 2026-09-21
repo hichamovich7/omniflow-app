@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Sparkles, Sparkle } from 'lucide-react';
+import { Check, Info, Loader2, Sparkles, Sparkle } from 'lucide-react';
 import { generatePinsSchema, TEXT_OVERLAY_MODES } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, PINS_OPTIONS } from '@/types/pinterest';
@@ -133,6 +133,37 @@ function IntegratedTextControl({
         />
       )}
     </div>
+  );
+}
+
+function FormSection({
+  id,
+  title,
+  help,
+  helpId,
+  className,
+  children,
+}: {
+  id: string;
+  title: string;
+  help?: string;
+  helpId?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={id}
+      className={cn('space-y-3 rounded-xl border border-border/60 p-4', className)}
+    >
+      <div>
+        <h2 id={id} className="text-sm font-semibold">{title}</h2>
+        {help && (
+          <p id={helpId} className="mt-0.5 text-xs text-muted-foreground">{help}</p>
+        )}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -315,27 +346,158 @@ export function PinForm({ projects, boards }: PinFormProps) {
       {/* Form */}
       <form
         onSubmit={handleSubmit}
-        className="space-y-5 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8"
+        className="space-y-4 rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-8"
       >
-        <div className="space-y-1.5">
-          <Label htmlFor="keyword" className="text-xs font-medium text-muted-foreground">
-            Keyword
-          </Label>
-          <Input
-            id="keyword"
-            placeholder="e.g. small bathroom storage ideas"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            maxLength={200}
-            required
-            disabled={loading}
-            className="h-12 text-sm placeholder:text-muted-foreground/40"
-          />
-        </div>
+        {/* 1. Project context */}
+        <FormSection
+          id="project-context-heading"
+          title="Project context"
+          help="Choose the project this content belongs to. The language is inherited from the project."
+          helpId="project-context-help"
+        >
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+            <div className="space-y-1.5">
+              <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
+                Project
+              </Label>
+              <Select value={projectId} onValueChange={(v) => v && handleProjectChange(v)}>
+                <SelectTrigger id="project" className="w-full" aria-describedby="project-context-help">
+                  <span className="truncate text-sm">
+                    {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-medium text-muted-foreground">Generation mode</legend>
-          <div className="grid gap-2 md:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
+                {generationMode === 'ai-integrated' ? 'Effective language' : 'Language'}
+              </Label>
+              {generationMode === 'ai-integrated' ? (
+                <Input
+                  id="language"
+                  readOnly
+                  value={LANGUAGE_LABELS[effectiveProjectLanguage]}
+                  title="Inherited from the selected project"
+                  className="w-full cursor-default bg-muted/40 sm:w-32"
+                />
+              ) : (
+                <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
+                  <SelectTrigger id="language" className="w-full sm:w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <SelectItem key={lang} value={lang}>
+                        {LANGUAGE_LABELS[lang]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="pins" className="text-xs font-medium text-muted-foreground">
+                Pins
+              </Label>
+              <Select
+                value={String(pinsRequested)}
+                onValueChange={(v) => v && setPinsRequested(Number(v) as PinsOption)}
+              >
+                <SelectTrigger id="pins" className="w-full sm:w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PINS_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} {n === 1 ? 'Pin' : 'Pins'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 2. Board */}
+        <FormSection
+          id="board-heading"
+          title="Board"
+          help="Choose the Pinterest board for these Pins, or leave it blank to decide later."
+          helpId="board-help"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
+              Board (optional)
+            </Label>
+            <Combobox
+              items={boardOptions.map((b) => b.name)}
+              inputValue={board}
+              onInputValueChange={(value) => setBoard(value)}
+            >
+              <ComboboxInputGroup className="h-12">
+                <ComboboxInput
+                  id="board"
+                  placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
+                  maxLength={100}
+                  disabled={loading}
+                  aria-describedby="board-help"
+                  className="text-sm placeholder:text-muted-foreground/40"
+                />
+                <ComboboxIcon />
+              </ComboboxInputGroup>
+              <ComboboxPopup>
+                <ComboboxEmpty>
+                  {board.trim() ? `Create "${board.trim()}"` : 'No boards yet — type to create one'}
+                </ComboboxEmpty>
+                <ComboboxList>
+                  {(item) => (
+                    <ComboboxItem key={item as string} value={item}>
+                      {item as string}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxPopup>
+            </Combobox>
+          </div>
+        </FormSection>
+
+        {/* 3. Keyword */}
+        <FormSection
+          id="keyword-heading"
+          title="Keyword"
+          help="Use the main search phrase your Pins should target."
+          helpId="keyword-help"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="keyword" className="text-xs font-medium text-muted-foreground">
+              Keyword
+            </Label>
+            <Input
+              id="keyword"
+              placeholder="e.g. small bathroom storage ideas"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              maxLength={200}
+              required
+              disabled={loading}
+              aria-describedby="keyword-help"
+              className="h-12 text-sm placeholder:text-muted-foreground/40"
+            />
+          </div>
+        </FormSection>
+
+        {/* 4. Generation mode */}
+        <FormSection id="generation-mode-heading" title="Generation mode">
+          <div role="group" aria-labelledby="generation-mode-heading" className="grid gap-2 md:grid-cols-3">
             {MODE_OPTIONS.map((option) => {
               const selected = generationMode === option.value;
               return (
@@ -346,17 +508,20 @@ export function PinForm({ projects, boards }: PinFormProps) {
                   disabled={loading}
                   onClick={() => setGenerationMode(option.value)}
                   className={cn(
-                    'min-h-24 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
+                    'min-h-24 min-w-0 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
                     selected
-                      ? 'border-primary bg-primary/5'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
                       : 'border-border/60 hover:border-border hover:bg-muted/30'
                   )}
                 >
-                  <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                    {option.label}
+                  <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 text-sm font-medium">
+                    <span className="flex min-w-0 items-center gap-1.5 break-words">
+                      {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
+                      {option.label}
+                    </span>
                     {option.badge && (
                       <span className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        'ml-auto shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold',
                         option.value === 'ai-integrated'
                           ? 'bg-primary/10 text-primary'
                           : 'bg-muted text-muted-foreground'
@@ -372,17 +537,55 @@ export function PinForm({ projects, boards }: PinFormProps) {
               );
             })}
           </div>
-        </fieldset>
 
-        {generationMode === 'ai-integrated' && (
-          <section className="space-y-4 rounded-xl border border-primary/20 bg-primary/[0.025] p-4" aria-labelledby="ai-integrated-settings">
-            <div>
-              <h2 id="ai-integrated-settings" className="text-sm font-semibold">AI Integrated settings</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                The server-configured image model creates the final Pin. No SVG/Sharp text layer is added.
-              </p>
+          {generationMode === 'legacy-composite' && (
+            <div className="space-y-4 border-t border-border/60 pt-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Reference Image (optional)</Label>
+                <ReferenceImageUpload value={referenceImageUrl} onChange={setReferenceImageUrl} disabled={loading} />
+                <p className="text-xs text-muted-foreground">
+                  Analyzed for style only (color palette, materials, mood, lighting) — never copied as a composition.
+                </p>
+              </div>
+
+              {showLegacyTextOverlayMode && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="text-overlay-mode" className="text-xs font-medium text-muted-foreground">
+                    Text in Images
+                  </Label>
+                  <Select
+                    value={textOverlayMode}
+                    onValueChange={(v) => v && setTextOverlayMode(v as TextOverlayMode)}
+                  >
+                    <SelectTrigger id="text-overlay-mode" className="w-full sm:w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TEXT_OVERLAY_MODES.map((mode) => (
+                        <SelectItem key={mode} value={mode}>
+                          {TEXT_OVERLAY_LABELS[mode]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">{TEXT_OVERLAY_LABELS[textOverlayMode]}:</span>{' '}
+                    {TEXT_OVERLAY_DESCRIPTIONS[textOverlayMode]}
+                  </p>
+                </div>
+              )}
             </div>
+          )}
+        </FormSection>
 
+        {/* 5. AI Integrated settings */}
+        {generationMode === 'ai-integrated' && (
+          <FormSection
+            id="ai-integrated-settings"
+            title="AI Integrated settings"
+            help="Choose how the final Pinterest visual and its text should be created."
+            className="space-y-4 border-primary/20 bg-primary/[0.025]"
+          >
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="creative-format" className="text-xs text-muted-foreground">Creative format</Label>
@@ -480,166 +683,16 @@ export function PinForm({ projects, boards }: PinFormProps) {
                 </div>
               ))}
             </div>
-          </section>
-        )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
-            Board (optional)
-          </Label>
-          <Combobox
-            items={boardOptions.map((b) => b.name)}
-            inputValue={board}
-            onInputValueChange={(value) => setBoard(value)}
-          >
-            <ComboboxInputGroup className="h-12">
-              <ComboboxInput
-                id="board"
-                placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
-                maxLength={100}
-                disabled={loading}
-                className="text-sm placeholder:text-muted-foreground/40"
-              />
-              <ComboboxIcon />
-            </ComboboxInputGroup>
-            <ComboboxPopup>
-              <ComboboxEmpty>
-                {board.trim() ? `Create "${board.trim()}"` : 'No boards yet — type to create one'}
-              </ComboboxEmpty>
-              <ComboboxList>
-                {(item) => (
-                  <ComboboxItem key={item as string} value={item}>
-                    {item as string}
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxPopup>
-          </Combobox>
-        </div>
-
-        {generationMode === 'legacy-composite' && (
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Reference Image (optional)</Label>
-            <ReferenceImageUpload value={referenceImageUrl} onChange={setReferenceImageUrl} disabled={loading} />
-            <p className="text-xs text-muted-foreground">
-              Analyzed for style only (color palette, materials, mood, lighting) — never copied as a composition.
-            </p>
-          </div>
-        )}
-
-        {generationMode === 'ai-integrated' && (
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">Reference Image</Label>
             <p
               role="note"
               data-testid="ai-integrated-reference-notice"
-              className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2.5 text-sm text-foreground/80"
+              className="flex items-start gap-2 border-t border-primary/10 pt-3 text-xs text-muted-foreground"
             >
-              Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model.
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model.</span>
             </p>
-          </div>
-        )}
-
-        <div
-          className={cn(
-            'grid gap-4',
-            showLegacyTextOverlayMode ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto]'
-          )}
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
-              Project
-            </Label>
-            <Select value={projectId} onValueChange={(v) => v && handleProjectChange(v)}>
-              <SelectTrigger id="project">
-                <span className="truncate text-sm">
-                  {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
-              {generationMode === 'ai-integrated' ? 'Effective language' : 'Language'}
-            </Label>
-            {generationMode === 'ai-integrated' ? (
-              <div id="language" className="flex h-9 w-32 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm" title="Inherited from the selected project">
-                {LANGUAGE_LABELS[effectiveProjectLanguage]}
-              </div>
-            ) : (
-              <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
-                <SelectTrigger id="language" className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <SelectItem key={lang} value={lang}>
-                      {LANGUAGE_LABELS[lang]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="pins" className="text-xs font-medium text-muted-foreground">
-              Pins
-            </Label>
-            <Select
-              value={String(pinsRequested)}
-              onValueChange={(v) => v && setPinsRequested(Number(v) as PinsOption)}
-            >
-              <SelectTrigger id="pins" className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PINS_OPTIONS.map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n} {n === 1 ? 'Pin' : 'Pins'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {showLegacyTextOverlayMode && (
-            <div className="space-y-1.5">
-              <Label htmlFor="text-overlay-mode" className="text-xs font-medium text-muted-foreground">
-                Text in Images
-              </Label>
-              <Select
-                value={textOverlayMode}
-                onValueChange={(v) => v && setTextOverlayMode(v as TextOverlayMode)}
-              >
-                <SelectTrigger id="text-overlay-mode" className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TEXT_OVERLAY_MODES.map((mode) => (
-                    <SelectItem key={mode} value={mode}>
-                      {TEXT_OVERLAY_LABELS[mode]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        {showLegacyTextOverlayMode && (
-          <p className="-mt-3 text-xs text-muted-foreground">
-            <span className="font-medium">{TEXT_OVERLAY_LABELS[textOverlayMode]}:</span>{' '}
-            {TEXT_OVERLAY_DESCRIPTIONS[textOverlayMode]}
-          </p>
+          </FormSection>
         )}
 
         {error && (
