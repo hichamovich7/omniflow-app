@@ -56,7 +56,7 @@ export async function generateImage({
         model,
         prompt,
         size,
-        ...(isIntegrated ? { quality: 'high' as const, preserveOriginal: true } : {}),
+        ...(isIntegrated ? { quality: 'high' as const } : {}),
       });
     case 'openrouter':
       return generateImageOpenRouter({

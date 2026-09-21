@@ -535,6 +535,20 @@ All cases are offline. `npm run test:renderer` is not defined in `package.json`;
 
 ---
 
+# Pinterest Image Metadata Stripping
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-image-metadata.spec.ts --project=renderer --reporter=list
+```
+
+Coverage: a PNG carrying a synthetic C2PA `caBX` chunk and an XMP `iTXt` chunk is re-encoded without either and with byte-identical pixels; a JPEG loses its EXIF block and a file flagged "rotate 90°" is rotated for real; the sanitizer still rejects non-2:3, empty, unreadable and unsupported (TIFF) images; and the real `POST /api/pinterest/generate-images` route, executed with Supabase, the rate limiter and the provider replaced, uploads a metadata-free image for AI Integrated and Photo Only (one file, no raw companion) while Legacy Composite stays metadata-free. With the fix reverted, the two new-mode route tests fail.
+
+All cases are offline; no provider or network call is possible.
+
+---
+
 # Image Analysis
 
 ---

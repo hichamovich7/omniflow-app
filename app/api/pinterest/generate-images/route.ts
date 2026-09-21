@@ -34,7 +34,7 @@ import {
   buildAiIntegratedImagePrompt,
   generationModeForVisualFormat,
   readAiIntegratedMetadata,
-  validateFinalPinterestImage,
+  sanitizeFinalPinterestImage,
 } from '@/lib/pinterest/ai-integrated';
 
 const requestSchema = z.object({
@@ -209,7 +209,12 @@ export async function POST(request: Request) {
         let outputContentType = 'image/png';
 
         if (generationMode !== 'legacy-composite') {
-          const technical = await validateFinalPinterestImage(rawImageBuffer);
+          // Strip embedded metadata (EXIF, XMP, C2PA content credentials —
+          // TASK-FIX-033) by re-encoding the provider file, then validate it.
+          // No pixel changes and no text or banner is ever drawn on this path.
+          const sanitized = await sanitizeFinalPinterestImage(rawImageBuffer);
+          imageBuffer = sanitized.buffer;
+          const technical = sanitized.technical;
           outputFormat = technical.format === 'jpeg' ? 'jpg' : technical.format;
           outputContentType = technical.format === 'jpeg'
             ? 'image/jpeg'

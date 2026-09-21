@@ -200,7 +200,7 @@ test('new modes are isolated while historical formats remain Legacy Composite', 
   expect(route).toContain("if (generationMode !== 'legacy-composite')");
   expect(route).toContain('imageBuffer = await compositeBanner(');
   expect(route).toContain('composeHeadlineWithQualityGate({');
-  expect(route).toContain('validateFinalPinterestImage(rawImageBuffer)');
+  expect(route).toContain('sanitizeFinalPinterestImage(rawImageBuffer)');
 });
 
 test('legacy requests without generationMode stay Legacy Composite; Photo Only carries no text settings', () => {
@@ -350,7 +350,7 @@ test('AI Integrated dispatch happens before any legacy renderer call in the imag
   expect(elseIndex).toBeGreaterThan(start);
 
   const newModeBranch = route.slice(start, elseIndex);
-  expect(newModeBranch).toContain('validateFinalPinterestImage(rawImageBuffer)');
+  expect(newModeBranch).toContain('sanitizeFinalPinterestImage(rawImageBuffer)');
   for (const legacyCall of [
     'compositeBanner',
     'composeHeadlineWithQualityGate',

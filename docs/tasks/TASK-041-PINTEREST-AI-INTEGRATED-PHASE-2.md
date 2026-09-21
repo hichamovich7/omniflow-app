@@ -26,8 +26,8 @@ No route, table, storage bucket, credit rule, provider, package, or public model
 
 | UI mode | Persisted `pins.visual_format` | Image prompt | Post-processing |
 | --- | --- | --- | --- |
-| AI Integrated | `ai-integrated` | Exact final headline/subtitle/CTA plus creative direction and strict no-extra-text constraints | Sharp metadata validation only; no SVG, banner or text composition |
-| Photo Only | `photo-only` | Existing photographic prompt and blanket no-text constraint | Sharp metadata validation only; no SVG, banner or text composition |
+| AI Integrated | `ai-integrated` | Exact final headline/subtitle/CTA plus creative direction and strict no-extra-text constraints | Sharp metadata stripping (EXIF/XMP/C2PA) and technical validation; no SVG, banner or text composition |
+| Photo Only | `photo-only` | Existing photographic prompt and blanket no-text constraint | Sharp metadata stripping (EXIF/XMP/C2PA) and technical validation; no SVG, banner or text composition |
 | Legacy Composite | Existing `photo` / `text-overlay` | Existing photographic prompt | Existing CTA, headline, template selection, Quality Gate and source-companion behavior unchanged |
 
 The two new values are safe without a migration because migration 018 defines `pins.visual_format` as unconstrained `text`; application-level Zod/TypeScript validation is the existing repository convention.
@@ -124,7 +124,7 @@ POST https://openrouter.ai/api/v1/images
 }
 ```
 
-No `size`, reference image, fallback model or user-controlled field is sent, and the API key stays in the `Authorization` header only. The returned bytes are stored unchanged (the OpenAI adapter's metadata-stripping re-encode is skipped through `preserveOriginal`, and no Sharp composition runs). Legacy `photo` / `photo-only` requests keep `{ model, prompt, size }` (OpenRouter) or `{ model, prompt, n, size, quality: "low" }` (OpenAI), byte for byte as before.
+No `size`, reference image, fallback model or user-controlled field is sent, and the API key stays in the `Authorization` header only. The provider file is re-encoded by `sanitizeFinalPinterestImage()` before storage, which strips EXIF, XMP and the C2PA content-credentials manifest (TASK-FIX-033) without changing a pixel; no Sharp composition runs. Legacy `photo` / `photo-only` requests keep `{ model, prompt, size }` (OpenRouter) or `{ model, prompt, n, size, quality: "low" }` (OpenAI), byte for byte as before.
 
 Real-world check against the Phase 1.2 benchmark output: the four shortlisted models returned 1024×1536, 1024×1536, 1366×2048 and 1696×2528 (ratios 0.6667-0.6709), all inside the ±0.01 technical tolerance. The configured model returns exactly 1024×1536.
 
@@ -139,7 +139,7 @@ Real-world check against the Phase 1.2 benchmark output: the four shortlisted mo
 | CTA "Save the Pin!" banner | Never | Never | Always |
 | Headline template / Quality Gate / recomposition | Never | Never | Unchanged |
 | Language | Inherited from the owned project | Requested | Requested |
-| Post-processing | Sharp metadata validation only | Sharp metadata validation only | Existing renderer |
+| Post-processing | Sharp metadata stripping (EXIF/XMP/C2PA) and technical validation | Sharp metadata stripping (EXIF/XMP/C2PA) and technical validation | Existing renderer |
 
 ## Verification results (2026-09-21)
 
@@ -154,7 +154,7 @@ The 2026-09-21 continuation also checked every `visual_format` reader. `PinDiagn
 ## Known limits and follow-ups (not implemented — outside this task)
 
 - `quality: "high"` and `aspect_ratio: "2:3"` are verified for the configured OpenAI model. Phase 1 showed Gemini/Qwen endpoints advertise `resolution` rather than `quality`; if `AI_IMAGE_MODEL_TEXT` is later pointed at one of them, capability-aware parameter resolution (the benchmark runner already has it) would need to move into the production adapter. No fallback was invented.
-- Text fidelity of the generated image (exact spelling, mobile legibility) is a property of the model and can only be judged visually; Sharp validates format/ratio/size, never the typography. A real-image review on a first `AI Integrated` generation is recommended before relying on it at scale.
+- Text fidelity of the generated image (exact spelling, mobile legibility) is a property of the model and can only be judged visually; Sharp strips metadata and validates format/ratio/size, never the typography. A real-image review on a first `AI Integrated` generation is recommended before relying on it at scale.
 - The resolved text is persisted before the image request, but there is no dedicated human approval/edit screen for AI-generated Headline, Subtitle or CTA in this phase. `Use exact text` is the only way to guarantee a user-specified string before generation.
 - Pattern Guide grounding is currently expressed as a prompt constraint, not a deterministic server-side proof that the supplied content contains a complete pattern. Do not treat generated steps/materials as verified source facts.
 - Credits are not touched: the Pinterest routes do not consume credits today, and this task adds no credit logic.
@@ -193,3 +193,24 @@ Rejection covers any present value: a URL, a malformed URL, an empty string or `
 - `npx playwright test --project=renderer`: 178 passed. The AI Integrated spec has 29 cases; 6 cover this correction: AI Integrated valid without a reference; AI Integrated rejects URL/malformed/empty/null with the exact message and path; Photo Only stays reference-free; Legacy Composite keeps its behavior, including payloads without `generationMode`; route ordering proves Vision is reachable only after validation and only for Legacy Composite; form source check.
 - `npm run build`: pass.
 - No Vision, OpenRouter or image call was made: every check is a schema or static test.
+
+## Addendum — metadata stripping for the new modes (2026-09-22)
+
+### Problem
+
+TASK-FIX-033 removes embedded metadata (including the C2PA content-credentials manifest) from generated images, but only inside the OpenAI adapter (`sharp(...).png()`), and the legacy compositing re-encoded every image as a side effect. The first AI Integrated / Photo Only implementation skipped both — it stored the provider's bytes unchanged (`preserveOriginal`, Sharp used only to read dimensions) — so those images kept their metadata. Inspecting the Phase 1 originals showed a `caBX` C2PA chunk (~22-24 KB) in the configured `openai/gpt-image-2.5-flare` output, in `sunburst` and in Gemini (plus XMP); Qwen only had a small text chunk.
+
+### Fix
+
+- `sanitizeFinalPinterestImage()` in `lib/pinterest/ai-integrated.ts` re-encodes the provider file with Sharp (no `.withMetadata()`), then validates it: PNG is re-encoded losslessly (identical pixels); JPEG/WebP at quality 95 with EXIF orientation applied first, so a rotated file is not turned sideways.
+- `POST /api/pinterest/generate-images` calls it in the `ai-integrated` / `photo-only` branch and uploads the result. Nothing is drawn or composed, the raw file is never stored for these modes, and the legacy branch, its raw source companion and the OpenAI adapter's re-encode are untouched.
+- The now-unused `preserveOriginal` option of the OpenAI adapter was removed.
+
+### Verification
+
+`tests/renderer/pinterest-image-metadata.spec.ts` (offline): a PNG carrying a synthetic `caBX` C2PA chunk and an XMP `iTXt` chunk comes out with neither and with byte-identical pixels; a JPEG loses its EXIF and stays upright; the 2:3 / format / empty / unreadable checks still apply; and the real image route, run with Supabase and the provider replaced, uploads a metadata-free image for both new modes. With the fix reverted, the two new-mode route tests fail.
+
+### Not covered
+
+- Images already stored keep their metadata; only new generations are cleaned.
+- Legacy `text-overlay` pins also store a raw "source companion" file used for recomposition; it is the provider file as returned and is not stripped (pre-existing, outside this fix).

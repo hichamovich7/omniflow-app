@@ -18,6 +18,23 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: embedded metadata (C2PA, EXIF, XMP) kept on AI Integrated and Photo Only images
+
+### Cause
+
+TASK-FIX-033 strips image metadata inside the OpenAI adapter, and the legacy SVG/Sharp compositing re-encoded every image as a side effect. The AI Integrated and Photo Only path skips the compositing, and TASK-041 also bypassed the adapter's re-encode (`preserveOriginal`), so the provider's bytes were stored as returned. The configured `openai/gpt-image-2.5-flare` output carries a C2PA manifest (`caBX` chunk, ~22 KB) that therefore reached Supabase Storage and the exported Pins.
+
+### Fixed
+
+* `sanitizeFinalPinterestImage()` (`lib/pinterest/ai-integrated.ts`) re-encodes the provider file with Sharp before storage: no EXIF, XMP or C2PA remains; PNG stays pixel-identical, JPEG/WebP are re-encoded at quality 95 with EXIF orientation applied. It then validates the result (readable, 2:3, allowed format). Nothing is drawn.
+* `POST /api/pinterest/generate-images` uses it for `ai-integrated` and `photo-only`; Legacy Composite is unchanged.
+* Removed the unused `preserveOriginal` option of the OpenAI adapter.
+* `tests/renderer/pinterest-image-metadata.spec.ts`: 6 offline cases, including the real route with a provider image carrying a C2PA chunk.
+
+### Not covered
+
+* Images already stored keep their metadata. The legacy raw "source companion" file kept for recomposition is not stripped (pre-existing).
+
 ## Fix: `POST /api/pinterest/generate` — "The AI returned a response that wasn't valid JSON"
 
 ### Cause
@@ -39,14 +56,14 @@ The route called `JSON.parse` directly on the planning model's text. In producti
 
 * Generation mode selector in `/pinterest`; `AI Integrated` is the recommended default for new generations, `Legacy Composite` keeps the SVG/Sharp renderer for compatibility.
 * AI Integrated settings: Creative format, Pinterest strategy (+ manual Angle), Headline/Subtitle/CTA text modes, Maximum text lines, importance, and an inherited read-only Effective language.
-* `lib/pinterest/ai-integrated.ts`: contract resolution, private `_pinterestAiIntegrated` metadata, the image prompt (approved text only, no extra text/logo/watermark) and Sharp technical validation.
+* `lib/pinterest/ai-integrated.ts`: contract resolution, private `_pinterestAiIntegrated` metadata, the image prompt (approved text only, no extra text/logo/watermark) and Sharp metadata stripping plus technical validation.
 * `pins.visual_format` accepts `ai-integrated` and `photo-only` (no migration — unconstrained text column).
 * `tests/renderer/pinterest-ai-integrated.spec.ts`: 29 offline cases, including exact provider payloads with a stubbed `fetch`, metadata compatibility and mode-label coverage.
 
 ### Changed
 
-* `generatePinsSchema` is a discriminated union on `generationMode` (default `legacy-composite`); the OpenRouter/OpenAI adapters accept optional `quality` / `aspect_ratio` / `preserveOriginal`, used only by `ai-integrated`.
-* `POST /api/pinterest/generate-images` dispatches on the stored mode before any composition step; the new paths store the provider's original bytes.
+* `generatePinsSchema` is a discriminated union on `generationMode` (default `legacy-composite`); the OpenRouter/OpenAI adapters accept optional `quality` / `aspect_ratio`, used only by `ai-integrated`.
+* `POST /api/pinterest/generate-images` dispatches on the stored mode before any composition step; the new paths store the provider file re-encoded without embedded metadata (see the metadata fix above).
 * In-app Guide (`lib/guide/content.ts`) and API/DATABASE/UI_UX/PROJECT/TESTING docs updated.
 * Pin cards/details/review now label AI Integrated, Photo Only and Legacy Composite explicitly. New modes no longer show irrelevant legacy template/position/Quality Gate badges; batch layout diagnostics are limited to legacy Pins.
 

@@ -204,8 +204,8 @@ The route dispatches on the stored `visual_format` before any composition step (
 
 | `visual_format` | Model routing | Prompt | After the provider returns |
 | --- | --- | --- | --- |
-| `ai-integrated` | `AI_IMAGE_MODEL_TEXT` via OpenRouter; body `{ model, prompt, aspect_ratio: "2:3", quality: "high" }` | `buildAiIntegratedImagePrompt()` — exact approved headline/subtitle/CTA, creative-format direction, strict no-extra-text constraint | Sharp validates only (readable, `png`/`jpeg`/`webp`, ratio 2:3 ±0.01, non-empty). Original bytes are stored unchanged; no SVG, banner or text is drawn |
-| `photo-only` | `AI_IMAGE_PROVIDER` / `AI_IMAGE_MODEL` (unchanged) | `buildImagePrompt()` (blanket no-text constraint) | Same technical validation only; no CTA banner, no headline |
+| `ai-integrated` | `AI_IMAGE_MODEL_TEXT` via OpenRouter; body `{ model, prompt, aspect_ratio: "2:3", quality: "high" }` | `buildAiIntegratedImagePrompt()` — exact approved headline/subtitle/CTA, creative-format direction, strict no-extra-text constraint | Sharp re-encodes the file to strip all embedded metadata (EXIF, XMP, C2PA content credentials — TASK-FIX-033; pixels unchanged), then validates it (readable, `png`/`jpeg`/`webp`, ratio 2:3 ±0.01, non-empty). The metadata-free file is stored; no SVG, banner or text is drawn |
+| `photo-only` | `AI_IMAGE_PROVIDER` / `AI_IMAGE_MODEL` (unchanged) | `buildImagePrompt()` (blanket no-text constraint) | Same metadata stripping and validation; no CTA banner, no headline |
 | `photo` / `text-overlay` (Legacy Composite) | Unchanged | Unchanged | Unchanged: CTA banner, headline template selection, Quality Gate and raw source companion |
 
 An `ai-integrated` pin whose `image_analysis` lacks a valid `_pinterestAiIntegrated` contract fails that pin instead of guessing text. Local recomposition routes stay restricted to legacy `text-overlay` pins.

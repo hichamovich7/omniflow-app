@@ -290,7 +290,7 @@ AI Engine → IMAGE role → OpenAI gpt-image-1
 ↓
 Generated Image
 ↓
-Metadata Stripped (TASK-FIX-033 — `lib/ai/providers/openai.ts` re-encodes the buffer through sharp before returning it, removing gpt-image-1's embedded C2PA content-credentials manifest and any EXIF/XMP; same PNG format, no other pipeline change)
+Metadata Stripped (TASK-FIX-033 — `lib/ai/providers/openai.ts` re-encodes the buffer through sharp before returning it, removing gpt-image-1's embedded C2PA content-credentials manifest and any EXIF/XMP; same PNG format, no other pipeline change). AI Integrated and Photo Only images skip the legacy compositing that also re-encoded them, so `sanitizeFinalPinterestImage()` (`lib/pinterest/ai-integrated.ts`, called from `POST /api/pinterest/generate-images`) strips the same metadata for those two modes (TASK-041)
 ↓
 Supabase Storage (generated-images bucket)
 ↓

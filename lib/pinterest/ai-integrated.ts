@@ -209,3 +209,46 @@ export async function validateFinalPinterestImage(
     aspectRatio,
   };
 }
+
+/**
+ * Removes every piece of embedded metadata from the provider's final image —
+ * EXIF, XMP and the C2PA / Content Credentials manifest (PNG `caBX` chunk) —
+ * exactly as TASK-FIX-033 does for the OpenAI adapter and as the legacy
+ * compositing implicitly does. Sharp keeps metadata only when `.withMetadata()`
+ * is requested, so a plain re-encode drops it.
+ *
+ * Nothing is drawn or composed: PNG is re-encoded losslessly (identical
+ * pixels), JPEG/WebP at high quality with EXIF orientation applied first. The
+ * result is then validated (readable, 2:3, allowed format) like any final Pin.
+ */
+export async function sanitizeFinalPinterestImage(
+  imageBuffer: Buffer
+): Promise<{ buffer: Buffer; technical: TechnicalImageValidation }> {
+  if (imageBuffer.byteLength === 0) throw new Error('Image provider returned an empty file');
+
+  let format: string | undefined;
+  try {
+    format = (await sharp(imageBuffer).metadata()).format;
+  } catch {
+    throw new Error('Image provider returned an unreadable image');
+  }
+
+  const pipeline = sharp(imageBuffer).rotate();
+  let encoded: sharp.Sharp;
+  switch (format) {
+    case 'png':
+      encoded = pipeline.png();
+      break;
+    case 'jpeg':
+      encoded = pipeline.jpeg({ quality: 95, chromaSubsampling: '4:4:4' });
+      break;
+    case 'webp':
+      encoded = pipeline.webp({ quality: 95 });
+      break;
+    default:
+      throw new Error(`Unsupported generated image format: ${format ?? 'unknown'}`);
+  }
+
+  const buffer = await encoded.toBuffer();
+  return { buffer, technical: await validateFinalPinterestImage(buffer) };
+}
