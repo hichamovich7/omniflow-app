@@ -18,6 +18,21 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: `POST /api/pinterest/generate` — "The AI returned a response that wasn't valid JSON"
+
+### Cause
+
+The route called `JSON.parse` directly on the planning model's text. In production an AI Integrated request (7 pins, German) failed with `SyntaxError: Unterminated string in JSON at position 11038`: the response was cut off inside a string. It matches the output-token ceiling — `estimateMaxTokens(7)` was 2550 (350 per pin) and 11038 characters is about 4.3 characters per token — while AI Integrated adds an `integratedText` object to every pin and the provider's `finish_reason: length` was ignored. The malformed text reached the generic error handler as a 500.
+
+### Fixed
+
+* `lib/pinterest/generation-plan.ts` — `parsePinterestGenerationPlan()`: accepts a complete JSON value, optionally inside a Markdown code fence or plain text; rejects truncated, empty, non-JSON, ambiguous or Zod-invalid responses with a controlled `PinterestPlanError`. It never repairs, closes or completes JSON and never invents pins. Validation uses the existing Zod schema.
+* `POST /api/pinterest/generate` now answers **422** `invalid_pin_plan` ("The AI could not create a complete Pin plan. No images were generated. Please try again.") and stops before any board, pin or image work. Server logs keep bounded diagnostics only (kind, length, short redacted preview).
+* Planning prompt (`pinterest-pins-v10`): demands one strictly valid JSON object, no Markdown, no text around it, escaped quotes, every pin completed. The data contract and generated copy are unchanged.
+* `estimateMaxTokens()` gives AI Integrated extra headroom for `integratedText` (150 tokens per pin); Legacy Composite and Photo Only keep their exact budget.
+* OpenRouter provider logs a warning when a response stops because of `max_tokens` (diagnostic only, behavior unchanged).
+* `tests/renderer/pinterest-generation-plan.spec.ts`: 15 offline cases, including the real route with stubbed dependencies.
+
 ## TASK-041 Phase 2: Pinterest generation modes (AI Integrated / Photo Only / Legacy Composite)
 
 ### Added

@@ -172,8 +172,11 @@ invalid_json
 insufficient_credits
 invalid_language
 invalid_analysis
+invalid_pin_plan
 generation_failed
 ```
+
+`invalid_pin_plan` (HTTP **422**): the planning model's response was not a complete, valid Pin plan — truncated (for example cut off by the output-token limit), not JSON, ambiguous, or valid JSON that fails the existing Zod contract. The message is `The AI could not create a complete Pin plan. No images were generated. Please try again.` The plan is parsed by `parsePinterestGenerationPlan()` (`lib/pinterest/generation-plan.ts`), which accepts a complete JSON value optionally wrapped in a Markdown code fence or plain text, and **never repairs** a truncated response. When it fails, no board is created, no pin is written and no image request is made; the generation row is marked `failed`, and only bounded diagnostics (kind, length, short preview) are logged server-side — never the full response.
 
 ---
 

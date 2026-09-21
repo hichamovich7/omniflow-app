@@ -521,6 +521,20 @@ Latest validation (2026-09-21): TypeScript OK, ESLint OK, renderer 178/178, prod
 
 ---
 
+# Pinterest Generation Plan Parsing
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-generation-plan.spec.ts --project=renderer --reporter=list
+```
+
+Coverage: `parsePinterestGenerationPlan()` accepts a raw JSON plan, a Markdown `json` block and plain text around a complete object; rejects — without repairing — truncated JSON (the production `Unterminated string in JSON at position 11038` case), empty or non-JSON text, ambiguous text and syntactically valid JSON that fails the Zod contract; errors are generic with bounded, redacted diagnostics. Also covers the planning prompt's strict-JSON instructions, the larger token budget for AI Integrated only (`estimateMaxTokens`), and the real `POST /api/pinterest/generate` route executed with Supabase, the AI engine, the rate limiter and the board query replaced: an invalid plan returns 422 `invalid_pin_plan` in both AI Integrated and Legacy Composite, writes no pin, creates no board and calls neither an image provider nor `fetch`; valid plans still persist for both modes.
+
+All cases are offline. `npm run test:renderer` is not defined in `package.json`; the equivalent is `npx playwright test --project=renderer`.
+
+---
+
 # Image Analysis
 
 ---

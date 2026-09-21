@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateText, analyzeImage } from '@/lib/ai/engine';
 import { getRoleConfig } from '@/lib/ai/config';
-import { generatePinsSchema, openRouterPinsResponseSchema, BANNER_TEMPLATES } from '@/lib/validations/pinterest';
+import { generatePinsSchema, BANNER_TEMPLATES } from '@/lib/validations/pinterest';
 import type { BannerTemplate } from '@/lib/validations/pinterest';
 import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
 import { imageStyleAnalysisSchema } from '@/lib/validations/vision';
@@ -16,6 +16,12 @@ import {
   selectHeadlineTemplateForAngle,
   validatePinterestStrategyBatch,
 } from '@/lib/pinterest/strategy';
+import {
+  PIN_PLAN_FAILURE_MESSAGE,
+  PinterestPlanError,
+  parsePinterestGenerationPlan,
+} from '@/lib/pinterest/generation-plan';
+import type { PinterestGenerationPlan } from '@/lib/pinterest/generation-plan';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
@@ -260,23 +266,32 @@ export async function POST(request: Request) {
         { role: 'system', content: system },
         { role: 'user', content: userPrompt },
       ],
-      maxTokens: estimateMaxTokens(pinsRequested),
+      maxTokens: estimateMaxTokens(pinsRequested, {
+        integratedText: generationMode === 'ai-integrated',
+      }),
     });
 
-    const json = JSON.parse(content);
-    const validated = openRouterPinsResponseSchema.safeParse(json);
-
-    if (!validated.success) {
-      console.error(`[${PROMPT_ID}] Response validation failed:`, validated.error.issues);
-      const errorMessage = 'AI returned an invalid response format. Try again.';
-      await supabase.from('generations').update({ status: 'failed', error_message: errorMessage }).eq('id', generation.id);
+    // The plan must be complete and valid before anything else happens: no
+    // board is created, no pin is written and no image is ever requested for a
+    // response that cannot be trusted (it is never repaired or completed).
+    let plan: PinterestGenerationPlan;
+    try {
+      plan = parsePinterestGenerationPlan(content);
+    } catch (planError) {
+      if (!(planError instanceof PinterestPlanError)) throw planError;
+      // Bounded diagnostics only — never the full raw response.
+      console.error(`[${PROMPT_ID}] Pin plan rejected:`, planError.diagnostics());
+      await supabase
+        .from('generations')
+        .update({ status: 'failed', error_message: PIN_PLAN_FAILURE_MESSAGE })
+        .eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
-        { data: null, error: { message: errorMessage, code: 'generation_failed' } },
-        { status: 500 }
+        { data: null, error: { message: PIN_PLAN_FAILURE_MESSAGE, code: 'invalid_pin_plan' } },
+        { status: 422 }
       );
     }
 
-    const resolvedPins = validated.data.pins.map((pin) => ({
+    const resolvedPins = plan.pins.map((pin) => ({
       ...pin,
       angle: aiIntegrated
         ? resolvePinAngle(aiIntegrated.strategy, aiIntegrated.manualAngle, pin.angle)

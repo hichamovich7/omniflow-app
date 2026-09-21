@@ -411,6 +411,7 @@ Stripe Working                  ⬚ TASK-012
 * Correction 2026-09-21: the TASK-013 reference upload is removed from `AI Integrated` (replaced by a "coming soon" note) and rejected server-side for `ai-integrated` / `photo-only` before any Vision call; `Legacy Composite` unchanged. See the addendum in the Phase 2 task file.
 * Phase 2 continuation (2026-09-21): Pin cards/details/review display clear mode labels; AI Integrated and Photo Only never display unavailable legacy templates or Quality Gate states. Batch Review layout metrics apply only to Legacy Composite Pins. Historical Pins without `_pinterestAiIntegrated` remain readable.
 * Form reorganization 2026-09-21: `/pinterest` is grouped into Project context → Board → Keyword → Generation mode → AI Integrated settings with one help sentence per section (presentation only; no field, default, validation, payload or route change). See `docs/UI_UX.md`.
+* Production fix: `POST /api/pinterest/generate` no longer `JSON.parse`s the planning response directly. A truncated plan (`Unterminated string in JSON at position 11038` for 7 German AI Integrated pins, cut by the output-token ceiling) is now rejected by `parsePinterestGenerationPlan()` with HTTP 422 `invalid_pin_plan` before any pin or image work; AI Integrated gets a larger output budget for `integratedText`. See `docs/CHANGELOG.md`.
 * Full record: `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-2.md`.
 
 ## [TASK-041] Pinterest AI Integrated — Phase 1/1.1 Model Benchmark + Safe Preflight — 2026-09-20

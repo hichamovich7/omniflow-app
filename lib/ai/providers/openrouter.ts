@@ -132,6 +132,15 @@ async function chatCompletionOnce({
       throw new Error('OpenRouter returned empty response');
     }
 
+    // Diagnostic only: a response cut off by max_tokens is returned unchanged
+    // (callers that need strict JSON reject it rather than repair it), but the
+    // cause should be visible in the server logs.
+    if (choice?.finish_reason === 'length') {
+      console.warn(
+        `OpenRouter response stopped by max_tokens (model=${model}, max_tokens=${maxTokens}, chars=${content.length})`
+      );
+    }
+
     return content;
   } finally {
     clearTimeout(timeout);

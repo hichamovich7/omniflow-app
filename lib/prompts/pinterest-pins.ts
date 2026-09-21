@@ -7,7 +7,7 @@ import type { AiIntegratedSettings } from '@/lib/pinterest/ai-integrated';
 import type { PinterestGenerationMode } from '@/types/pinterest';
 import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
 
-export const PROMPT_ID = 'pinterest-pins-v9';
+export const PROMPT_ID = 'pinterest-pins-v10';
 
 interface PromptContext {
   keyword: string;
@@ -200,6 +200,8 @@ Rules:
 - All text content (title, description, keywords, board, overlayText) must be in ${langName}. Image prompts must always be in English regardless of the content language.
 - Before finalizing, verify that title and description together never fully answer the question or reveal the complete technique — if they do, rewrite the description to remove the giveaway detail while keeping it compelling.
 
+Output format (strict): return exactly one complete, strictly valid JSON object and nothing else. Do not use Markdown or code fences, and do not add explanations, comments, or any text before or after the JSON. Do not use trailing commas. Escape every double quote inside a string value as \\" and never put a raw line break inside a string value. Complete every pin and close every string, array, and object.
+
 Respond with this exact JSON structure:
 {
   "pins": [
@@ -220,8 +222,17 @@ Respond with this exact JSON structure:
   return { system, user };
 }
 
-export function estimateMaxTokens(pinsRequested: number): number {
-  const tokensPerPin = 350;
+// AI Integrated asks for an extra `integratedText` object (headline, subtitle,
+// CTA) on every pin. A 7-pin German plan was cut off by the 350-token-per-pin
+// budget mid-string (unterminated JSON at ~11k characters), so that mode gets
+// headroom for it. This is a ceiling, not a target: unused tokens cost nothing.
+const INTEGRATED_TEXT_TOKENS_PER_PIN = 150;
+
+export function estimateMaxTokens(
+  pinsRequested: number,
+  options: { integratedText?: boolean } = {}
+): number {
+  const tokensPerPin = 350 + (options.integratedText ? INTEGRATED_TEXT_TOKENS_PER_PIN : 0);
   const overhead = 100;
   return pinsRequested * tokensPerPin + overhead;
 }
