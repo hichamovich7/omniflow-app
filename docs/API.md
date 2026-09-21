@@ -119,6 +119,26 @@ Creates one generation request and produces Pinterest content using AI.
 
 `textOverlayMode` is optional, defaults to `auto` (TASK-034). One of `auto` (the AI decides `photo` vs `text-overlay` per pin), `always` (every pin forced to `text-overlay`), `never` (every pin forced to `photo`). Only meaningful for projects whose `niche` allows text overlay (`lib/ai/niche-visual-conventions.ts`) — for any other niche the server ignores the submitted value and always uses `never`. Each generated pin stores the resolved `visual_format` (`photo` / `text-overlay`) and, when applicable, `overlay_text` — both consumed by `POST /api/pinterest/generate-images` to route the image call and build its prompt.
 
+`generationMode` is optional and defaults to `legacy-composite`, so every pre-existing client payload keeps its exact behavior (TASK-041 Phase 2). It is a discriminated union: `legacy-composite` (the fields above, including `textOverlayMode`), `photo-only` (no text settings; the server forces `textOverlayMode = never`, stores `visual_format = photo-only`), or `ai-integrated` (requires an `aiIntegrated` object). No request field selects a provider or a model — image routing stays server-owned (`AI_IMAGE_PROVIDER`, `AI_IMAGE_MODEL`, `AI_IMAGE_MODEL_TEXT`); unknown top-level keys are dropped and unknown `aiIntegrated` keys are rejected. `referenceImageUrl` (TASK-013) is accepted only for `legacy-composite` (and for payloads without `generationMode`); for `ai-integrated` and `photo-only` any present value is rejected with HTTP 400 `invalid_request` before any Vision or provider call, because a reference is not yet sent to the image model (TASK-042).
+
+```json
+{
+  "generationMode": "ai-integrated",
+  "aiIntegrated": {
+    "creativeFormat": "hero-pin | pattern-guide | editorial-story | ai-chooses",
+    "strategy": "ai-recommends | balanced | manual",
+    "manualAngle": "curiosity | problem-solution | listicle | discovery | article-promise",
+    "headline": { "mode": "generate" } | { "mode": "exact", "text": "..." },
+    "subtitle": { "mode": "generate" } | { "mode": "exact", "text": "..." } | { "mode": "none" },
+    "cta": { "mode": "generate" } | { "mode": "exact", "text": "..." } | { "mode": "none" },
+    "maximumTextLines": 4,
+    "importance": { "headline": "high", "subtitle": "medium", "cta": "low" }
+  }
+}
+```
+
+`manualAngle` is required when `strategy = manual` and forbidden otherwise. Exact strings are 1-120 characters and their line count cannot exceed `maximumTextLines` (2-6). For `ai-integrated` the server ignores the submitted `language` and uses the owned project's `default_language` (falling back to the submitted value only when the stored one is unsupported). The FAST role returns the final `integratedText` (`headline` / `subtitle` / `cta`) for `Generate` fields; the server substitutes exact strings verbatim, checks presence and the line budget, and persists the resolved contract under `pins.image_analysis._pinterestAiIntegrated`. `strategy = manual` applies the chosen angle to every pin; balanced angle coverage is enforced only for `balanced` and legacy modes.
+
 `generations.reference_image_url` exists in the database schema but has no corresponding request field yet — deferred to TASK-013 (Image Analysis).
 
 ## Response
@@ -176,6 +196,16 @@ Generate images for all pins in a generation.
 ## Description
 
 Batch generates Pinterest-optimized images. Processes up to 10 pins per batch with max 3 concurrent requests. Supports image versioning — each call creates a new version without overwriting existing images. Pins with `visual_format = photo` use OpenAI (gpt-image-1, or `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL`); pins with `visual_format = text-overlay` always route through OpenRouter to `AI_IMAGE_MODEL_TEXT` instead, with `overlay_text` rendered explicitly in the prompt (TASK-034).
+
+The route dispatches on the stored `visual_format` before any composition step (TASK-041 Phase 2):
+
+| `visual_format` | Model routing | Prompt | After the provider returns |
+| --- | --- | --- | --- |
+| `ai-integrated` | `AI_IMAGE_MODEL_TEXT` via OpenRouter; body `{ model, prompt, aspect_ratio: "2:3", quality: "high" }` | `buildAiIntegratedImagePrompt()` — exact approved headline/subtitle/CTA, creative-format direction, strict no-extra-text constraint | Sharp validates only (readable, `png`/`jpeg`/`webp`, ratio 2:3 ±0.01, non-empty). Original bytes are stored unchanged; no SVG, banner or text is drawn |
+| `photo-only` | `AI_IMAGE_PROVIDER` / `AI_IMAGE_MODEL` (unchanged) | `buildImagePrompt()` (blanket no-text constraint) | Same technical validation only; no CTA banner, no headline |
+| `photo` / `text-overlay` (Legacy Composite) | Unchanged | Unchanged | Unchanged: CTA banner, headline template selection, Quality Gate and raw source companion |
+
+An `ai-integrated` pin whose `image_analysis` lacks a valid `_pinterestAiIntegrated` contract fails that pin instead of guessing text. Local recomposition routes stay restricted to legacy `text-overlay` pins.
 
 ## Request
 

@@ -142,10 +142,13 @@ interface ImageGenerationOptions {
   model: string;
   prompt: string;
   size: string;
+  quality?: 'low' | 'medium' | 'high';
+  aspectRatio?: '2:3';
 }
 
 interface OpenRouterImageResponseData {
   b64_json?: string;
+  url?: string;
 }
 
 interface OpenRouterImageResponse {
@@ -156,6 +159,8 @@ export async function generateImage({
   model,
   prompt,
   size,
+  quality,
+  aspectRatio,
 }: ImageGenerationOptions): Promise<Buffer> {
   const apiKey = process.env.OPENROUTER_IMAGE_API_KEY;
   if (!apiKey) {
@@ -172,7 +177,12 @@ export async function generateImage({
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model, prompt, size }),
+      body: JSON.stringify({
+        model,
+        prompt,
+        ...(aspectRatio ? { aspect_ratio: aspectRatio } : { size }),
+        ...(quality ? { quality } : {}),
+      }),
       signal: controller.signal,
     });
 
@@ -192,11 +202,20 @@ export async function generateImage({
     const json = (await res.json()) as OpenRouterImageResponse;
     const imageData = json.data?.[0];
 
-    if (!imageData?.b64_json) {
+    if (imageData?.b64_json) {
+      return Buffer.from(imageData.b64_json, 'base64');
+    }
+    if (imageData?.url) {
+      const imageResponse = await fetch(imageData.url);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download OpenRouter image: ${imageResponse.status}`);
+      }
+      return Buffer.from(await imageResponse.arrayBuffer());
+    }
+    if (!imageData) {
       throw new Error('No image data in OpenRouter response');
     }
-
-    return Buffer.from(imageData.b64_json, 'base64');
+    throw new Error('OpenRouter response contains neither b64_json nor url');
   } finally {
     clearTimeout(timeout);
   }

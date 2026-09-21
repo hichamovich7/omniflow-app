@@ -2,6 +2,7 @@ import { getRoleConfig } from '../config';
 import type { AIProvider } from '../types';
 import { generateImage as generateImageOpenAI } from '../providers/openai';
 import { generateImage as generateImageOpenRouter } from '../providers/openrouter';
+import type { PinVisualFormat } from '@/types/database';
 
 export interface ResolvedImageModel {
   provider: AIProvider;
@@ -21,8 +22,8 @@ export interface ResolvedImageModel {
 // not a value silently baked into the code that can drift from what the
 // operator believes is configured. Reuses the existing
 // OPENROUTER_IMAGE_API_KEY — no new provider key.
-export function resolveImageModel(visualFormat: 'photo' | 'text-overlay' = 'photo'): ResolvedImageModel {
-  if (visualFormat === 'text-overlay') {
+export function resolveImageModel(visualFormat: PinVisualFormat = 'photo'): ResolvedImageModel {
+  if (visualFormat === 'text-overlay' || visualFormat === 'ai-integrated') {
     const model = process.env.AI_IMAGE_MODEL_TEXT?.trim();
     if (!model) {
       throw new Error(
@@ -38,7 +39,7 @@ export function resolveImageModel(visualFormat: 'photo' | 'text-overlay' = 'phot
 interface GenerateImageParams {
   prompt: string;
   size: string;
-  visualFormat?: 'photo' | 'text-overlay';
+  visualFormat?: PinVisualFormat;
 }
 
 export async function generateImage({
@@ -47,12 +48,25 @@ export async function generateImage({
   visualFormat = 'photo',
 }: GenerateImageParams): Promise<Buffer> {
   const { provider, model } = resolveImageModel(visualFormat);
+  const isIntegrated = visualFormat === 'ai-integrated';
 
   switch (provider) {
     case 'openai':
-      return generateImageOpenAI({ model, prompt, size });
+      return generateImageOpenAI({
+        model,
+        prompt,
+        size,
+        ...(isIntegrated ? { quality: 'high' as const, preserveOriginal: true } : {}),
+      });
     case 'openrouter':
-      return generateImageOpenRouter({ model, prompt, size });
+      return generateImageOpenRouter({
+        model,
+        prompt,
+        size,
+        ...(isIntegrated
+          ? { quality: 'high' as const, aspectRatio: '2:3' as const }
+          : {}),
+      });
     default:
       throw new Error(`Unsupported image provider: ${provider}`);
   }

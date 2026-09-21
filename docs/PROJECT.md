@@ -213,6 +213,13 @@ Proveedor:
 * Formato: 1024x1536 (vertical Pinterest)
 * Concurrencia limitada: máximo 3 simultáneas, máximo 10 por lote
 
+Modos de generación Pinterest (TASK-041 Phase 2):
+
+* AI Integrated (recomendado, por defecto): el modelo de imagen configurado en el servidor genera foto, tipografía y CTA juntos; el texto final se resuelve y persiste antes de generar la imagen y no se dibuja ningún texto con SVG/Sharp. Aún no existe una pantalla dedicada de aprobación humana para el texto generado por IA
+* Photo Only: fotografía limpia sin texto
+* Legacy Composite: flujo anterior (foto + banners SVG/Sharp), conservado por compatibilidad
+* El usuario nunca elige proveedor ni modelo; los define el servidor (`AI_IMAGE_PROVIDER`, `AI_IMAGE_MODEL`, `AI_IMAGE_MODEL_TEXT`)
+
 ---
 
 # History

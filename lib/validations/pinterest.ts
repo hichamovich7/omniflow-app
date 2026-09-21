@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { PINTEREST_ANGLES, SUPPORTED_LANGUAGES, PINS_OPTIONS } from '@/types/pinterest';
+import {
+  PINTEREST_ANGLES,
+  PINTEREST_CREATIVE_FORMATS,
+  PINTEREST_GENERATION_MODES,
+  PINTEREST_STRATEGIES,
+  PINTEREST_TEXT_IMPORTANCE,
+  SUPPORTED_LANGUAGES,
+  PINS_OPTIONS,
+} from '@/types/pinterest';
 
 export const TEXT_OVERLAY_MODES = ['auto', 'always', 'never'] as const;
 export type TextOverlayMode = (typeof TEXT_OVERLAY_MODES)[number];
@@ -28,7 +36,7 @@ export const BANNER_TEMPLATES = [
 ] as const;
 export type BannerTemplate = (typeof BANNER_TEMPLATES)[number];
 
-export const generatePinsSchema = z.object({
+const generatePinsBaseSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
   language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
@@ -40,15 +48,119 @@ export const generatePinsSchema = z.object({
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),
   pinterestUrl: z.string().trim().url('Invalid Pinterest URL').optional(),
   analysisId: z.string().uuid('Invalid analysis ID').optional(),
-  // Supabase Storage public URL from POST /api/pinterest/reference-image —
-  // see app/api/pinterest/generate/route.ts for the VISION analysis step.
-  referenceImageUrl: z.string().trim().url('Invalid reference image URL').optional(),
-  // Whether the AI decides photo vs. text-overlay per pin ('auto'), or it's
-  // forced uniformly across the whole generation. Server clamps this to
-  // 'never' when the project's niche doesn't allow text overlay at all —
-  // see getNicheVisualConvention() / app/api/pinterest/generate/route.ts.
+});
+
+// Supabase Storage public URL from POST /api/pinterest/reference-image —
+// see app/api/pinterest/generate/route.ts for the VISION analysis step. Only
+// Legacy Composite keeps this legacy mechanism (TASK-013), unchanged.
+const legacyReferenceImageUrlSchema = z
+  .string()
+  .trim()
+  .url('Invalid reference image URL')
+  .optional();
+
+// AI Integrated and Photo Only never accept a reference: the image is not sent
+// to the image model yet (TASK-042), so accepting one would only trigger a
+// Vision analysis the user cannot see. Any present value — even null or an
+// empty string, from an obsolete client or a crafted request — is a validation
+// error, raised before the route can reach Vision or a provider.
+export const AI_INTEGRATED_REFERENCE_UNSUPPORTED_MESSAGE =
+  'Reference images are not supported in AI Integrated yet. Remove the reference image and try again.';
+export const PHOTO_ONLY_REFERENCE_UNSUPPORTED_MESSAGE =
+  'Reference images are not supported in Photo Only mode. Remove the reference image and try again.';
+
+const generatedTextSchema = z.object({ mode: z.literal('generate') }).strict();
+const exactTextSchema = z.object({
+  mode: z.literal('exact'),
+  text: z.string().trim().min(1, 'Exact text is required').max(120, 'Exact text is too long'),
+}).strict();
+const noTextSchema = z.object({ mode: z.literal('none') }).strict();
+
+export const headlineTextSchema = z.discriminatedUnion('mode', [
+  generatedTextSchema,
+  exactTextSchema,
+]);
+export const optionalIntegratedTextSchema = z.discriminatedUnion('mode', [
+  generatedTextSchema,
+  exactTextSchema,
+  noTextSchema,
+]);
+
+export const aiIntegratedSettingsSchema = z
+  .object({
+    creativeFormat: z.enum(PINTEREST_CREATIVE_FORMATS),
+    strategy: z.enum(PINTEREST_STRATEGIES),
+    manualAngle: z.enum(PINTEREST_ANGLES).optional(),
+    headline: headlineTextSchema,
+    subtitle: optionalIntegratedTextSchema,
+    cta: optionalIntegratedTextSchema,
+    maximumTextLines: z.coerce.number().int().min(2).max(6),
+    importance: z.object({
+      headline: z.enum(PINTEREST_TEXT_IMPORTANCE),
+      subtitle: z.enum(PINTEREST_TEXT_IMPORTANCE),
+      cta: z.enum(PINTEREST_TEXT_IMPORTANCE),
+    }).strict(),
+  })
+  .strict()
+  .superRefine((settings, ctx) => {
+    if (settings.strategy === 'manual' && !settings.manualAngle) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['manualAngle'],
+        message: 'Manual angle is required when Pinterest strategy is Manual',
+      });
+    }
+    if (settings.strategy !== 'manual' && settings.manualAngle) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['manualAngle'],
+        message: 'Manual angle is only allowed when Pinterest strategy is Manual',
+      });
+    }
+    const exactLineCount = [settings.headline, settings.subtitle, settings.cta]
+      .filter((field): field is Extract<typeof field, { mode: 'exact' }> => field.mode === 'exact')
+      .reduce((count, field) => count + field.text.split(/\r?\n/).length, 0);
+    if (exactLineCount > settings.maximumTextLines) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['maximumTextLines'],
+        message: 'Exact text contains more lines than Maximum text lines allows',
+      });
+    }
+  });
+
+const aiIntegratedRequestSchema = generatePinsBaseSchema.extend({
+  generationMode: z.literal(PINTEREST_GENERATION_MODES[0]),
+  aiIntegrated: aiIntegratedSettingsSchema,
+  referenceImageUrl: z.never({ message: AI_INTEGRATED_REFERENCE_UNSUPPORTED_MESSAGE }).optional(),
+});
+
+const photoOnlyRequestSchema = generatePinsBaseSchema.extend({
+  generationMode: z.literal(PINTEREST_GENERATION_MODES[1]),
+  referenceImageUrl: z.never({ message: PHOTO_ONLY_REFERENCE_UNSUPPORTED_MESSAGE }).optional(),
+});
+
+const legacyCompositeRequestSchema = generatePinsBaseSchema.extend({
+  generationMode: z.literal(PINTEREST_GENERATION_MODES[2]),
+  referenceImageUrl: legacyReferenceImageUrlSchema,
+  // Existing behavior is intentionally scoped to Legacy Composite.
   textOverlayMode: z.enum(TEXT_OVERLAY_MODES).default('auto'),
 });
+
+export const generatePinsSchema = z.preprocess(
+  (input) => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+    const candidate = input as Record<string, unknown>;
+    return candidate.generationMode
+      ? candidate
+      : { ...candidate, generationMode: 'legacy-composite' };
+  },
+  z.discriminatedUnion('generationMode', [
+    aiIntegratedRequestSchema,
+    photoOnlyRequestSchema,
+    legacyCompositeRequestSchema,
+  ])
+);
 
 const pinResponseSchema = z
   .object({
@@ -60,6 +172,11 @@ const pinResponseSchema = z
     image_prompt: z.string(),
     visualFormat: z.enum(['photo', 'text-overlay']),
     overlayText: z.string().max(80).optional(),
+    integratedText: z.object({
+      headline: z.string().trim().min(1).max(120),
+      subtitle: z.string().trim().min(1).max(120).optional(),
+      cta: z.string().trim().min(1).max(60).optional(),
+    }).strict().optional(),
     // Kept optional for compatibility with earlier model responses. Phase 4
     // derives the Headline template from angle; the CTA remains model-chosen
     // and is clamped against the niche's allowed list server-side.

@@ -503,6 +503,24 @@ Current local validation (2026-09-13): TypeScript OK, ESLint OK, focused Creativ
 
 ---
 
+# Pinterest AI Integrated Generation Modes (TASK-041 Phase 2)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-ai-integrated.spec.ts tests/renderer/ai-image-model.spec.ts --project=renderer --reporter=list
+```
+
+Coverage: request contract per mode (legacy default, Photo Only, AI Integrated, no client model/provider, `None` only for Subtitle/CTA, manual-angle and line-budget rules), exact/generated/none text resolution, inherited language, private metadata round trip, creative-format directions (Pattern Guide never invents steps, Editorial Story 75-80 % photo), the FAST prompt for integrated text, the integrated prompt's ban on any extra text and on renderer vocabulary, the Photo Only no-text constraint, static proof that the new-mode branch of the image route calls no SVG/Sharp composition while the legacy branch still does, recomposition gating, and the exact provider payloads (`aspect_ratio 2:3` + `quality high` for AI Integrated; unchanged bodies for Legacy/Photo Only).
+
+All cases are offline: `fetch` is stubbed, no paid image request is possible. Text fidelity of a real generated image is a manual visual check — Sharp never reads typography.
+
+Reference images (2026-09-21): AI Integrated accepts no `referenceImageUrl` (any URL, malformed URL, empty string or `null` is rejected with the exact message and path, before Vision or a provider), Photo Only stays reference-free, Legacy Composite (and payloads without `generationMode`) keep the existing reference behavior, static checks prove the Vision step is only reachable after validation and only for Legacy Composite, and the form offers/sends a reference only in Legacy Composite while showing the "coming soon" note in AI Integrated. All offline; no Vision or provider call.
+
+Latest validation (2026-09-21): TypeScript OK, ESLint OK, renderer 178/178, production build OK. The continuation added offline checks for full metadata serialization, historical Pins without the private key, and clear generation-mode labels in the card/detail/review readers.
+
+---
+
 # Image Analysis
 
 ---

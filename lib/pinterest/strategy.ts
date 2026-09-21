@@ -197,10 +197,13 @@ function validateGroundedClaims(
 export function validatePinterestStrategyBatch(
   pins: PinterestStrategyPin[],
   pinsRequested: number,
-  sourceEvidence = ''
+  sourceEvidence = '',
+  options: { enforceBalancedAngles?: boolean } = {}
 ): PinterestStrategyIssue[] {
   return [
-    ...validateAngleCoverage(pins, pinsRequested),
+    ...(options.enforceBalancedAngles === false
+      ? []
+      : validateAngleCoverage(pins, pinsRequested)),
     ...validateTitleDiversity(pins),
     ...validateTenPinVariants(pins, pinsRequested),
     ...validateGroundedClaims(pins, sourceEvidence),

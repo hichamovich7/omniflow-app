@@ -7,11 +7,20 @@ import { Loader2, Sparkles, Sparkle } from 'lucide-react';
 import { generatePinsSchema, TEXT_OVERLAY_MODES } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, PINS_OPTIONS } from '@/types/pinterest';
-import type { SupportedLanguage, PinsOption } from '@/types/pinterest';
+import type {
+  SupportedLanguage,
+  PinsOption,
+  PinterestAngle,
+  PinterestCreativeFormat,
+  PinterestGenerationMode,
+  PinterestStrategy,
+  PinterestTextImportance,
+} from '@/types/pinterest';
 import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ReferenceImageUpload } from '@/components/pinterest/reference-image-upload';
 import {
@@ -52,6 +61,81 @@ const TEXT_OVERLAY_DESCRIPTIONS: Record<TextOverlayMode, string> = {
   never: 'Headline overlays are disabled. The Save CTA is still added to every image.',
 };
 
+type RequiredTextMode = 'generate' | 'exact';
+type OptionalTextMode = RequiredTextMode | 'none';
+
+const MODE_OPTIONS: Array<{
+  value: PinterestGenerationMode;
+  label: string;
+  description: string;
+  badge?: string;
+}> = [
+  {
+    value: 'ai-integrated',
+    label: 'AI Integrated',
+    description: 'AI creates the final photo, typography, and CTA together.',
+    badge: 'Recommended',
+  },
+  {
+    value: 'photo-only',
+    label: 'Photo Only',
+    description: 'A clean photographic image with no text or graphic overlay.',
+  },
+  {
+    value: 'legacy-composite',
+    label: 'Legacy Composite',
+    description: 'Keeps the existing SVG/Sharp headline and CTA workflow.',
+    badge: 'Legacy',
+  },
+];
+
+function IntegratedTextControl({
+  label,
+  mode,
+  onModeChange,
+  text,
+  onTextChange,
+  allowNone,
+  disabled,
+}: {
+  label: string;
+  mode: OptionalTextMode;
+  onModeChange: (mode: OptionalTextMode) => void;
+  text: string;
+  onTextChange: (text: string) => void;
+  allowNone?: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border border-border/60 bg-background/60 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+        <Select value={mode} onValueChange={(value) => value && onModeChange(value as OptionalTextMode)}>
+          <SelectTrigger className="h-9 w-40" aria-label={`${label} mode`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="generate">Generate with AI</SelectItem>
+            <SelectItem value="exact">Use exact text</SelectItem>
+            {allowNone && <SelectItem value="none">None</SelectItem>}
+          </SelectContent>
+        </Select>
+      </div>
+      {mode === 'exact' && (
+        <Textarea
+          value={text}
+          onChange={(event) => onTextChange(event.target.value)}
+          placeholder={`Exact ${label.toLowerCase()} text`}
+          maxLength={120}
+          required
+          disabled={disabled}
+          className="min-h-20 resize-y"
+        />
+      )}
+    </div>
+  );
+}
+
 interface BoardOption {
   id: string;
   name: string;
@@ -86,14 +170,36 @@ export function PinForm({ projects, boards }: PinFormProps) {
     (defaultProject?.default_language as SupportedLanguage) ?? 'en'
   );
   const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
+  const [generationMode, setGenerationMode] = useState<PinterestGenerationMode>('ai-integrated');
   const [textOverlayMode, setTextOverlayMode] = useState<TextOverlayMode>('auto');
+  const [creativeFormat, setCreativeFormat] = useState<PinterestCreativeFormat>('ai-chooses');
+  const [strategy, setStrategy] = useState<PinterestStrategy>('ai-recommends');
+  const [manualAngle, setManualAngle] = useState<PinterestAngle>('curiosity');
+  const [headlineMode, setHeadlineMode] = useState<RequiredTextMode>('generate');
+  const [headlineText, setHeadlineText] = useState('');
+  const [subtitleMode, setSubtitleMode] = useState<OptionalTextMode>('generate');
+  const [subtitleText, setSubtitleText] = useState('');
+  const [ctaMode, setCtaMode] = useState<OptionalTextMode>('generate');
+  const [ctaText, setCtaText] = useState('');
+  const [maximumTextLines, setMaximumTextLines] = useState(4);
+  const [headlineImportance, setHeadlineImportance] = useState<PinterestTextImportance>('high');
+  const [subtitleImportance, setSubtitleImportance] = useState<PinterestTextImportance>('medium');
+  const [ctaImportance, setCtaImportance] = useState<PinterestTextImportance>('low');
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const selectedProject = projects.find((p) => p.id === projectId);
+  const effectiveProjectLanguage = (
+    selectedProject?.default_language && SUPPORTED_LANGUAGES.includes(
+      selectedProject.default_language as SupportedLanguage
+    )
+      ? selectedProject.default_language
+      : language
+  ) as SupportedLanguage;
   const nicheConvention = getNicheVisualConvention(selectedProject?.niche);
   const showTextOverlayMode = nicheConvention?.allowTextOverlay ?? false;
+  const showLegacyTextOverlayMode = generationMode === 'legacy-composite' && showTextOverlayMode;
 
   function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
@@ -112,18 +218,53 @@ export function PinForm({ projects, boards }: PinFormProps) {
     e.preventDefault();
     setError(null);
 
-    const parsed = generatePinsSchema.safeParse({
+    const basePayload = {
       projectId,
       keyword,
-      language,
+      language: generationMode === 'ai-integrated' ? effectiveProjectLanguage : language,
       pinsRequested,
       board: board.trim() || undefined,
       websiteUrl,
       pinterestUrl,
       analysisId,
-      textOverlayMode: showTextOverlayMode ? textOverlayMode : 'auto',
-      referenceImageUrl: referenceImageUrl ?? undefined,
-    });
+    };
+    const parsed = generatePinsSchema.safeParse(
+      generationMode === 'ai-integrated'
+        ? {
+            ...basePayload,
+            generationMode,
+            aiIntegrated: {
+              creativeFormat,
+              strategy,
+              ...(strategy === 'manual' ? { manualAngle } : {}),
+              headline: headlineMode === 'exact'
+                ? { mode: 'exact', text: headlineText }
+                : { mode: 'generate' },
+              subtitle: subtitleMode === 'exact'
+                ? { mode: 'exact', text: subtitleText }
+                : { mode: subtitleMode },
+              cta: ctaMode === 'exact'
+                ? { mode: 'exact', text: ctaText }
+                : { mode: ctaMode },
+              maximumTextLines,
+              importance: {
+                headline: headlineImportance,
+                subtitle: subtitleImportance,
+                cta: ctaImportance,
+              },
+            },
+          }
+        : generationMode === 'photo-only'
+          ? { ...basePayload, generationMode }
+          : {
+              ...basePayload,
+              generationMode,
+              // The legacy style-analysis reference is Legacy Composite only.
+              // Stale state from another mode is never sent.
+              referenceImageUrl: referenceImageUrl ?? undefined,
+              textOverlayMode: showTextOverlayMode ? textOverlayMode : 'auto',
+            }
+    );
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
       return;
@@ -192,6 +333,156 @@ export function PinForm({ projects, boards }: PinFormProps) {
           />
         </div>
 
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-medium text-muted-foreground">Generation mode</legend>
+          <div className="grid gap-2 md:grid-cols-3">
+            {MODE_OPTIONS.map((option) => {
+              const selected = generationMode === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={selected}
+                  disabled={loading}
+                  onClick={() => setGenerationMode(option.value)}
+                  className={cn(
+                    'min-h-24 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border/60 hover:border-border hover:bg-muted/30'
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                    {option.label}
+                    {option.badge && (
+                      <span className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        option.value === 'ai-integrated'
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-muted text-muted-foreground'
+                      )}>
+                        {option.badge}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1.5 block text-xs leading-relaxed text-muted-foreground">
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {generationMode === 'ai-integrated' && (
+          <section className="space-y-4 rounded-xl border border-primary/20 bg-primary/[0.025] p-4" aria-labelledby="ai-integrated-settings">
+            <div>
+              <h2 id="ai-integrated-settings" className="text-sm font-semibold">AI Integrated settings</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The server-configured image model creates the final Pin. No SVG/Sharp text layer is added.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="creative-format" className="text-xs text-muted-foreground">Creative format</Label>
+                <Select value={creativeFormat} onValueChange={(value) => value && setCreativeFormat(value as PinterestCreativeFormat)}>
+                  <SelectTrigger id="creative-format"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hero-pin">Hero Pin</SelectItem>
+                    <SelectItem value="pattern-guide">Pattern Guide</SelectItem>
+                    <SelectItem value="editorial-story">Editorial Story</SelectItem>
+                    <SelectItem value="ai-chooses">AI chooses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pinterest-strategy" className="text-xs text-muted-foreground">Pinterest strategy</Label>
+                <Select value={strategy} onValueChange={(value) => value && setStrategy(value as PinterestStrategy)}>
+                  <SelectTrigger id="pinterest-strategy"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ai-recommends">AI recommends</SelectItem>
+                    <SelectItem value="balanced">Balanced angles</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {strategy === 'manual' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="manual-angle" className="text-xs text-muted-foreground">Angle</Label>
+                <Select value={manualAngle} onValueChange={(value) => value && setManualAngle(value as PinterestAngle)}>
+                  <SelectTrigger id="manual-angle"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="curiosity">Curiosity</SelectItem>
+                    <SelectItem value="problem-solution">Problem → Solution</SelectItem>
+                    <SelectItem value="listicle">Listicle</SelectItem>
+                    <SelectItem value="discovery">Discovery</SelectItem>
+                    <SelectItem value="article-promise">Article Promise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid gap-3">
+              <IntegratedTextControl
+                label="Headline"
+                mode={headlineMode}
+                onModeChange={(mode) => setHeadlineMode(mode as RequiredTextMode)}
+                text={headlineText}
+                onTextChange={setHeadlineText}
+                disabled={loading}
+              />
+              <IntegratedTextControl
+                label="Subtitle"
+                mode={subtitleMode}
+                onModeChange={setSubtitleMode}
+                text={subtitleText}
+                onTextChange={setSubtitleText}
+                allowNone
+                disabled={loading}
+              />
+              <IntegratedTextControl
+                label="CTA"
+                mode={ctaMode}
+                onModeChange={setCtaMode}
+                text={ctaText}
+                onTextChange={setCtaText}
+                allowNone
+                disabled={loading}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="maximum-text-lines" className="text-xs text-muted-foreground">Maximum text lines</Label>
+                <Select value={String(maximumTextLines)} onValueChange={(value) => value && setMaximumTextLines(Number(value))}>
+                  <SelectTrigger id="maximum-text-lines"><SelectValue /></SelectTrigger>
+                  <SelectContent>{[2, 3, 4, 5, 6].map((value) => <SelectItem key={value} value={String(value)}>{value}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {([
+                ['Headline', headlineImportance, setHeadlineImportance],
+                ['Subtitle', subtitleImportance, setSubtitleImportance],
+                ['CTA', ctaImportance, setCtaImportance],
+              ] as const).map(([label, value, setter]) => (
+                <div key={label} className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{label} importance</Label>
+                  <Select value={value} onValueChange={(next) => next && setter(next as PinterestTextImportance)}>
+                    <SelectTrigger aria-label={`${label} importance`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="space-y-1.5">
           <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
             Board (optional)
@@ -226,18 +517,33 @@ export function PinForm({ projects, boards }: PinFormProps) {
           </Combobox>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-muted-foreground">Reference Image (optional)</Label>
-          <ReferenceImageUpload value={referenceImageUrl} onChange={setReferenceImageUrl} disabled={loading} />
-          <p className="text-xs text-muted-foreground">
-            Analyzed for style only (color palette, materials, mood, lighting) — never copied as a composition.
-          </p>
-        </div>
+        {generationMode === 'legacy-composite' && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Reference Image (optional)</Label>
+            <ReferenceImageUpload value={referenceImageUrl} onChange={setReferenceImageUrl} disabled={loading} />
+            <p className="text-xs text-muted-foreground">
+              Analyzed for style only (color palette, materials, mood, lighting) — never copied as a composition.
+            </p>
+          </div>
+        )}
+
+        {generationMode === 'ai-integrated' && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">Reference Image</Label>
+            <p
+              role="note"
+              data-testid="ai-integrated-reference-notice"
+              className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2.5 text-sm text-foreground/80"
+            >
+              Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model.
+            </p>
+          </div>
+        )}
 
         <div
           className={cn(
             'grid gap-4',
-            showTextOverlayMode ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto]'
+            showLegacyTextOverlayMode ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto]'
           )}
         >
           <div className="space-y-1.5">
@@ -262,20 +568,26 @@ export function PinForm({ projects, boards }: PinFormProps) {
 
           <div className="space-y-1.5">
             <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
-              Language
+              {generationMode === 'ai-integrated' ? 'Effective language' : 'Language'}
             </Label>
-            <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
-              <SelectTrigger id="language" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <SelectItem key={lang} value={lang}>
-                    {LANGUAGE_LABELS[lang]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {generationMode === 'ai-integrated' ? (
+              <div id="language" className="flex h-9 w-32 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm" title="Inherited from the selected project">
+                {LANGUAGE_LABELS[effectiveProjectLanguage]}
+              </div>
+            ) : (
+              <Select value={language} onValueChange={(v) => v && setLanguage(v as SupportedLanguage)}>
+                <SelectTrigger id="language" className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <SelectItem key={lang} value={lang}>
+                      {LANGUAGE_LABELS[lang]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -299,7 +611,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
             </Select>
           </div>
 
-          {showTextOverlayMode && (
+          {showLegacyTextOverlayMode && (
             <div className="space-y-1.5">
               <Label htmlFor="text-overlay-mode" className="text-xs font-medium text-muted-foreground">
                 Text in Images
@@ -323,7 +635,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
           )}
         </div>
 
-        {showTextOverlayMode && (
+        {showLegacyTextOverlayMode && (
           <p className="-mt-3 text-xs text-muted-foreground">
             <span className="font-medium">{TEXT_OVERLAY_LABELS[textOverlayMode]}:</span>{' '}
             {TEXT_OVERLAY_DESCRIPTIONS[textOverlayMode]}

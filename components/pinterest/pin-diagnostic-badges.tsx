@@ -7,6 +7,17 @@ import type { PinQualityStatus } from '@/lib/pinterest/quality-gate';
 import type { PinterestAngle } from '@/types/pinterest';
 import type { Pin } from '@/types/database';
 
+const GENERATION_MODE_LABELS: Record<Pin['visual_format'], string> = {
+  'ai-integrated': 'AI Integrated',
+  'photo-only': 'Photo Only',
+  photo: 'Legacy Composite',
+  'text-overlay': 'Legacy Composite',
+};
+
+export function getPinGenerationModeLabel(visualFormat: Pin['visual_format']): string {
+  return GENERATION_MODE_LABELS[visualFormat];
+}
+
 const ANGLE_LABELS: Record<PinterestAngle, string> = {
   curiosity: 'Curiosity',
   'problem-solution': 'Problem → Solution',
@@ -33,37 +44,48 @@ export function PinDiagnosticBadges({
   pin,
   showWarnings = true,
 }: {
-  pin: Pick<Pin, 'image_analysis' | 'title_banner_template'>;
+  pin: Pick<Pin, 'visual_format' | 'image_analysis' | 'title_banner_template'>;
   showWarnings?: boolean;
 }) {
   const diagnostics = getPinCreativeDiagnostics(pin);
+  const isLegacy = pin.visual_format === 'photo' || pin.visual_format === 'text-overlay';
   const warningLabels = diagnostics.warnings.slice(0, 2).map((warning) =>
     CREATIVE_WARNING_LABELS[warning]
   );
 
   return (
     <div className="flex flex-wrap gap-1.5" data-testid="pin-creative-diagnostics">
+      <Badge variant="outline" className="bg-background/70 text-[10px] font-medium">
+        {getPinGenerationModeLabel(pin.visual_format)}
+      </Badge>
       <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
         {diagnostics.angle ? ANGLE_LABELS[diagnostics.angle] : 'Angle unavailable'}
       </Badge>
-      <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
-        {diagnostics.template ? formatCreativeLabel(diagnostics.template) : 'Template unavailable'}
-      </Badge>
-      <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
-        {diagnostics.position ? formatCreativeLabel(diagnostics.position) : 'Position unavailable'}
-      </Badge>
-      <Badge
-        variant={diagnostics.status ? QUALITY_VARIANTS[diagnostics.status] : 'outline'}
-        className="text-[10px]"
-      >
-        {diagnostics.status ?? 'Not evaluated'}
-      </Badge>
-      {showWarnings && warningLabels.map((warning) => (
+      {isLegacy && <>
+        <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
+          {diagnostics.template ? formatCreativeLabel(diagnostics.template) : 'Template unavailable'}
+        </Badge>
+        <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
+          {diagnostics.position ? formatCreativeLabel(diagnostics.position) : 'Position unavailable'}
+        </Badge>
+        <Badge
+          variant={diagnostics.status ? QUALITY_VARIANTS[diagnostics.status] : 'outline'}
+          className="text-[10px]"
+        >
+          {diagnostics.status ?? 'Not evaluated'}
+        </Badge>
+      </>}
+      {!isLegacy && (
+        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+          Visual review needed
+        </Badge>
+      )}
+      {isLegacy && showWarnings && warningLabels.map((warning) => (
         <Badge key={warning} variant="outline" className="text-[10px] text-muted-foreground">
           {warning}
         </Badge>
       ))}
-      {showWarnings && diagnostics.warnings.length > warningLabels.length && (
+      {isLegacy && showWarnings && diagnostics.warnings.length > warningLabels.length && (
         <Badge variant="outline" className="text-[10px] text-muted-foreground">
           +{diagnostics.warnings.length - warningLabels.length}
         </Badge>

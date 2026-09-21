@@ -3,6 +3,8 @@ import type { SupportedLanguage } from '@/types/pinterest';
 import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
 import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
+import type { AiIntegratedSettings } from '@/lib/pinterest/ai-integrated';
+import type { PinterestGenerationMode } from '@/types/pinterest';
 import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
 
 export const PROMPT_ID = 'pinterest-pins-v9';
@@ -13,6 +15,8 @@ interface PromptContext {
   pinsRequested: number;
   niche?: string | null;
   textOverlayMode: TextOverlayMode;
+  generationMode?: PinterestGenerationMode;
+  aiIntegrated?: AiIntegratedSettings;
   brandProfile?: string;
   analysisContext?: string;
   /** From buildImageAnalysisContext() (TASK-013) — additive to the niche's
@@ -99,8 +103,11 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
 
   const referenceStyleInstruction = ctx.referenceStyleGuidance ? ` ${ctx.referenceStyleGuidance}` : '';
 
+  const isAiIntegrated = ctx.generationMode === 'ai-integrated' && Boolean(ctx.aiIntegrated);
+  const isLegacyComposite = !ctx.generationMode || ctx.generationMode === 'legacy-composite';
+
   const overlayFieldInstruction =
-    effectiveTextOverlayMode === 'never'
+    !isLegacyComposite || effectiveTextOverlayMode === 'never'
       ? `- visualFormat: always set this to "photo". Do not include an overlayText field.`
       : effectiveTextOverlayMode === 'always'
         ? `- visualFormat: always set this to "text-overlay".
@@ -121,18 +128,42 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
     .map((t) => `"${t}" (${BANNER_TEMPLATE_DESCRIPTIONS[t]})`)
     .join(', ');
 
-  const bannerTemplateInstruction =
-    `- ctaBannerTemplate: choose the visual shape for the bottom "save this pin" CTA banner, one of: ${bannerTemplateOptions}. Base the choice on the scene's mood and how long the CTA text is likely to be — never pick "pill" for anything longer than a very short 2-4 word phrase.` +
+  const bannerTemplateInstruction = !isLegacyComposite
+    ? '- Do not include titleBannerTemplate or ctaBannerTemplate. This mode does not use the legacy renderer.'
+    : `- ctaBannerTemplate: choose the visual shape for the bottom "save this pin" CTA banner, one of: ${bannerTemplateOptions}. Base the choice on the scene's mood and how long the CTA text is likely to be — never pick "pill" for anything longer than a very short 2-4 word phrase.` +
     (effectiveTextOverlayMode !== 'never'
       ? `\n- Do not include titleBannerTemplate. The server selects the Headline template deterministically from angle and the niche's allowed templates.`
       : '');
 
-  const angleDistributionInstruction =
-    ctx.pinsRequested === 5
+  const angleDistributionInstruction = ctx.aiIntegrated?.strategy === 'manual'
+    ? `Use the "${ctx.aiIntegrated.manualAngle}" angle for every pin.`
+    : ctx.aiIntegrated?.strategy === 'ai-recommends'
+      ? 'Choose the strongest grounded angle for each pin. Diversity is desirable, but do not force equal distribution.'
+      : ctx.pinsRequested === 5
       ? 'Use each of the five angles exactly once in this batch.'
       : ctx.pinsRequested === 10
         ? 'Use each of the five angles exactly twice. The two pins sharing an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
         : 'Balance the five angles across the batch and use every angle once before repeating one whenever the batch size allows it.';
+
+  const integratedTextInstruction = isAiIntegrated && ctx.aiIntegrated
+    ? `- integratedText: final on-image strings in ${langName}. ${
+        ctx.aiIntegrated.headline.mode === 'exact'
+          ? `headline must be exactly ${JSON.stringify(ctx.aiIntegrated.headline.text)}.`
+          : 'Generate a concise, compelling headline.'
+      } ${
+        ctx.aiIntegrated.subtitle.mode === 'none'
+          ? 'Omit subtitle.'
+          : ctx.aiIntegrated.subtitle.mode === 'exact'
+            ? `subtitle must be exactly ${JSON.stringify(ctx.aiIntegrated.subtitle.text)}.`
+            : 'Generate a concise supporting subtitle.'
+      } ${
+        ctx.aiIntegrated.cta.mode === 'none'
+          ? 'Omit cta.'
+          : ctx.aiIntegrated.cta.mode === 'exact'
+            ? `cta must be exactly ${JSON.stringify(ctx.aiIntegrated.cta.text)}.`
+            : 'Generate a short action-oriented CTA.'
+      } The combined visible text must fit within ${ctx.aiIntegrated.maximumTextLines} lines. Exact strings are immutable.`
+    : '';
 
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
 
@@ -147,6 +178,7 @@ For each pin, provide:
 - image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre (e.g. "architectural photography", "editorial interior photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include camera settings or lighting instructions.${compositionInstruction}${styleGuidanceInstruction}${referenceStyleInstruction}
 ${overlayFieldInstruction}
 ${bannerTemplateInstruction}
+${integratedTextInstruction}
 
 Rules:
 - Each pin must be unique. Do not repeat titles, descriptions, or image scenes.
@@ -180,7 +212,7 @@ Respond with this exact JSON structure:
       "image_prompt": "...",
       "visualFormat": "photo",
       "overlayText": "...",
-      "ctaBannerTemplate": "clean-band"
+      "ctaBannerTemplate": "clean-band"${isAiIntegrated ? ',\n      "integratedText": { "headline": "...", "subtitle": "...", "cta": "..." }' : ''}
     }
   ]
 }`;

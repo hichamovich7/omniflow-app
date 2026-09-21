@@ -10,6 +10,27 @@ export const PINTEREST_ANGLES = [
 ] as const;
 export type PinterestAngle = (typeof PINTEREST_ANGLES)[number];
 
+export const PINTEREST_GENERATION_MODES = [
+  'ai-integrated',
+  'photo-only',
+  'legacy-composite',
+] as const;
+export type PinterestGenerationMode = (typeof PINTEREST_GENERATION_MODES)[number];
+
+export const PINTEREST_CREATIVE_FORMATS = [
+  'hero-pin',
+  'pattern-guide',
+  'editorial-story',
+  'ai-chooses',
+] as const;
+export type PinterestCreativeFormat = (typeof PINTEREST_CREATIVE_FORMATS)[number];
+
+export const PINTEREST_STRATEGIES = ['ai-recommends', 'balanced', 'manual'] as const;
+export type PinterestStrategy = (typeof PINTEREST_STRATEGIES)[number];
+
+export const PINTEREST_TEXT_IMPORTANCE = ['high', 'medium', 'low'] as const;
+export type PinterestTextImportance = (typeof PINTEREST_TEXT_IMPORTANCE)[number];
+
 export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   en: 'English',
   de: 'Deutsch',

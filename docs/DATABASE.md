@@ -205,14 +205,14 @@ Stores generated Pinterest pins.
 | board          | text                     | Suggested board (AI free text, denormalized) |
 | board_id       | uuid nullable FK → boards.id | Real board entity, auto-linked at generation time (TASK-025). ON DELETE SET NULL |
 | image_prompt   | text                     | Prompt for image generation |
-| image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` plus private Pinterest metadata keys for the structured angle (`_pinterestStrategy`) and latest accepted Quality Gate result (`_pinterestCreativeDiagnostics`: status/warnings/template/position). Same text column; no schema migration |
+| image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` plus private Pinterest metadata keys for the structured angle (`_pinterestStrategy`) and latest accepted Quality Gate result (`_pinterestCreativeDiagnostics`: status/warnings/template/position) and — for `visual_format = ai-integrated` only — the resolved AI Integrated contract (`_pinterestAiIntegrated`: effective `language`, validated `settings`, final `text` headline/subtitle/cta; TASK-041 Phase 2). Same text column; no schema migration |
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
 | link_url       | text nullable            | Website destination        |
 | publish_date   | timestamptz nullable     | Schedule date              |
-| visual_format  | text                     | `photo` / `text-overlay` (TASK-034). NOT NULL DEFAULT `photo`. Validated in application layer, not a DB enum/CHECK |
-| overlay_text   | text nullable            | On-image hook text (5-8 words), set only when `visual_format = text-overlay` (TASK-034) |
+| visual_format  | text                     | `photo` / `text-overlay` (Legacy Composite, TASK-034) plus `ai-integrated` / `photo-only` (TASK-041 Phase 2 — no migration: the column is unconstrained `text`). NOT NULL DEFAULT `photo`. Validated in application layer (`PinVisualFormat`), not a DB enum/CHECK. Existing rows are never rewritten |
+| overlay_text   | text nullable            | On-image hook text (5-8 words), set only when `visual_format = text-overlay` (TASK-034). Always null for `ai-integrated` / `photo-only` |
 | title_banner_template | text nullable      | Static SVG shape (`lib/pinterest/banner-templates/`) for the top title-hook banner: `clean-band` / `ribbon` / `pill` / `torn-paper` / `corner-tag` (TASK-FIX-024). Set only when `visual_format = text-overlay`. Validated in application layer, not a DB enum/CHECK |
-| cta_banner_template   | text nullable      | Same shape enum as above, for the bottom "save this pin" CTA banner — set on every pin regardless of `visual_format` (TASK-FIX-024) |
+| cta_banner_template   | text nullable      | Same shape enum as above, for the bottom "save this pin" CTA banner — set on every legacy pin (`photo` / `text-overlay`) (TASK-FIX-024); null for `ai-integrated` / `photo-only`, which never use the SVG/Sharp renderer |
 | created_at     | timestamptz              |                            |
 | updated_at     | timestamptz              |                            |
 

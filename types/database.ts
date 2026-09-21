@@ -60,7 +60,7 @@ export type BoardInsert = Omit<Board, 'id' | 'created_at' | 'updated_at'> & {
   id?: string;
 };
 
-export type PinVisualFormat = 'photo' | 'text-overlay';
+export type PinVisualFormat = 'photo' | 'text-overlay' | 'ai-integrated' | 'photo-only';
 export type PinBannerTemplate =
   | 'clean-band'
   | 'ribbon'

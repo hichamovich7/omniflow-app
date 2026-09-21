@@ -37,6 +37,15 @@ test('text-overlay uses the configured AI_IMAGE_MODEL_TEXT via OpenRouter', () =
   });
 });
 
+test('AI Integrated uses the configured AI_IMAGE_MODEL_TEXT and never exposes a model selector', () => {
+  process.env.AI_IMAGE_MODEL_TEXT = 'some-vendor/server-owned-text-model';
+
+  expect(resolveImageModel('ai-integrated')).toEqual({
+    provider: 'openrouter',
+    model: 'some-vendor/server-owned-text-model',
+  });
+});
+
 test('text-overlay throws naming AI_IMAGE_MODEL_TEXT when the variable is unset', () => {
   delete process.env.AI_IMAGE_MODEL_TEXT;
 

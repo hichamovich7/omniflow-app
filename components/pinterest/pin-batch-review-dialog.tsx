@@ -21,7 +21,10 @@ interface PinBatchReviewDialogProps {
 }
 
 export function PinBatchReviewDialog({ pins, onClose, onChangeLayout }: PinBatchReviewDialogProps) {
-  const diagnostics = diagnoseCreativeBatch(pins);
+  const legacyPins = pins.filter((pin) =>
+    pin.visual_format === 'photo' || pin.visual_format === 'text-overlay'
+  );
+  const diagnostics = diagnoseCreativeBatch(legacyPins);
   const summaries = [
     { label: 'Templates', value: diagnostics.templateCount, icon: Shapes },
     { label: 'Layout combinations', value: diagnostics.combinationCount, icon: LayoutDashboard },
@@ -35,12 +38,12 @@ export function PinBatchReviewDialog({ pins, onClose, onChangeLayout }: PinBatch
         <DialogHeader className="border-b px-5 pb-4 pt-5 pr-12">
           <DialogTitle>Batch Review</DialogTitle>
           <DialogDescription>
-            Review creative coverage and open weak Pins without regenerating their source image.
+            Review Pins and, for Legacy Composite layouts, open weak Pins without regenerating their source image.
           </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-y-auto px-5 pb-5">
-          <div className="grid grid-cols-2 gap-2 py-4 lg:grid-cols-4" aria-label="Batch diversity diagnostics">
+          {legacyPins.length > 0 && <div className="grid grid-cols-2 gap-2 py-4 lg:grid-cols-4" aria-label="Legacy Composite layout diagnostics">
             {summaries.map(({ label, value, icon: Icon }) => (
               <div key={label} className="rounded-lg border bg-muted/30 p-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -50,9 +53,15 @@ export function PinBatchReviewDialog({ pins, onClose, onChangeLayout }: PinBatch
                 <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
               </div>
             ))}
-          </div>
+          </div>}
 
-          {diagnostics.missingAngles.length > 0 && (
+          {legacyPins.length !== pins.length && (
+            <p className="mb-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              AI Integrated and Photo Only Pins do not use legacy templates or the SVG/Sharp Quality Gate. Review their images visually.
+            </p>
+          )}
+
+          {legacyPins.length > 0 && diagnostics.missingAngles.length > 0 && (
             <p className="mb-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
               Missing angles: {diagnostics.missingAngles.join(', ')}
             </p>

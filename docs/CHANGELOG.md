@@ -18,6 +18,31 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-041 Phase 2: Pinterest generation modes (AI Integrated / Photo Only / Legacy Composite)
+
+### Added
+
+* Generation mode selector in `/pinterest`; `AI Integrated` is the recommended default for new generations, `Legacy Composite` keeps the SVG/Sharp renderer for compatibility.
+* AI Integrated settings: Creative format, Pinterest strategy (+ manual Angle), Headline/Subtitle/CTA text modes, Maximum text lines, importance, and an inherited read-only Effective language.
+* `lib/pinterest/ai-integrated.ts`: contract resolution, private `_pinterestAiIntegrated` metadata, the image prompt (approved text only, no extra text/logo/watermark) and Sharp technical validation.
+* `pins.visual_format` accepts `ai-integrated` and `photo-only` (no migration — unconstrained text column).
+* `tests/renderer/pinterest-ai-integrated.spec.ts`: 29 offline cases, including exact provider payloads with a stubbed `fetch`, metadata compatibility and mode-label coverage.
+
+### Changed
+
+* `generatePinsSchema` is a discriminated union on `generationMode` (default `legacy-composite`); the OpenRouter/OpenAI adapters accept optional `quality` / `aspect_ratio` / `preserveOriginal`, used only by `ai-integrated`.
+* `POST /api/pinterest/generate-images` dispatches on the stored mode before any composition step; the new paths store the provider's original bytes.
+* In-app Guide (`lib/guide/content.ts`) and API/DATABASE/UI_UX/PROJECT/TESTING docs updated.
+* Pin cards/details/review now label AI Integrated, Photo Only and Legacy Composite explicitly. New modes no longer show irrelevant legacy template/position/Quality Gate badges; batch layout diagnostics are limited to legacy Pins.
+
+### Fixed (2026-09-21)
+
+* AI Integrated no longer offers the TASK-013 reference upload: the image was never sent to the image model (only a Vision text analysis ran), which suggested an influence that did not exist. The form shows "Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model." and `POST /api/pinterest/generate` rejects any `referenceImageUrl` for `ai-integrated` and `photo-only` (HTTP 400, before Vision or a provider). Legacy Composite keeps the existing reference mechanism unchanged. Real reference support remains TASK-042.
+
+### Unchanged
+
+* Legacy `photo` / `text-overlay` rendering, Quality Gate, recomposition, credits, database schema, `.env.local`, and provider/model selection (server-owned only).
+
 ## TASK-FIX-040: WordPress Generator (`/wordpress/blog-post`) reorg
 
 ### Added

@@ -429,6 +429,21 @@ Default:
 
 ---
 
+### Generation mode (TASK-041 Phase 2)
+
+Type:
+
+```txt
+Three toggle cards (aria-pressed): AI Integrated (Recommended, default) / Photo Only / Legacy Composite (Legacy badge)
+```
+
+* **AI Integrated** — the server-configured image model creates photo, typography and CTA together. No model or provider control is ever shown. Progressive-disclosure panel: Creative format (Hero Pin / Pattern Guide / Editorial Story / AI chooses), Pinterest strategy (AI recommends / Balanced angles / Manual, with an Angle select only for Manual), Headline (Generate with AI / Use exact text), Subtitle and CTA (Generate with AI / Use exact text / None), Maximum text lines (2-6) and per-field importance (High / Medium / Low). Exact-text fields are required and capped at 120 characters.
+* **Photo Only** — clean photograph, no text or graphic layer, no extra settings.
+* **Legacy Composite** — the pre-existing SVG/Sharp headline + CTA workflow, unchanged, including the "Text in Images" selector below.
+* Reference Image: the TASK-013 upload (style analysis only) is shown in Legacy Composite only. In AI Integrated it is replaced by the note "Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model."; Photo Only shows nothing. Real reference support is planned in TASK-042.
+* In AI Integrated the Language field becomes a read-only "Effective language" showing the language inherited from the selected Project; the server derives it again and does not trust the client value.
+* Pin cards and the detail dialog identify the resulting mode. AI Integrated and Photo Only show a visual-review reminder, not legacy template/position/Quality Gate placeholders. Batch Review only calculates layout-template diagnostics for Legacy Composite Pins; mixed batches disclose this scope.
+
 ### Text in Images
 
 Type:
@@ -436,6 +451,8 @@ Type:
 ```txt
 Select (Auto / Always / Never)
 ```
+
+Shown only in Legacy Composite mode (and only for text-overlay-capable Niches).
 
 Required:
 

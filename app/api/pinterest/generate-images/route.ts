@@ -30,6 +30,12 @@ import { promisePool } from '@/lib/utils/promise-pool';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
+import {
+  buildAiIntegratedImagePrompt,
+  generationModeForVisualFormat,
+  readAiIntegratedMetadata,
+  validateFinalPinterestImage,
+} from '@/lib/pinterest/ai-integrated';
 
 const requestSchema = z.object({
   generationId: z.string().uuid(),
@@ -178,87 +184,108 @@ export async function POST(request: Request) {
           .limit(1);
 
         const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
+        const generationMode = generationModeForVisualFormat(pin.visual_format);
+        const integratedMetadata = generationMode === 'ai-integrated'
+          ? readAiIntegratedMetadata(pin.image_analysis)
+          : null;
+        if (generationMode === 'ai-integrated' && !integratedMetadata) {
+          throw new Error('AI Integrated pin is missing its validated rendering contract');
+        }
         const { model: imageModel } = resolveImageModel(pin.visual_format);
         const rawImageBuffer = await generateImage({
-          prompt: buildImagePrompt(pin, nextVersion),
+          prompt: integratedMetadata
+            ? buildAiIntegratedImagePrompt(pin, integratedMetadata, nextVersion)
+            : buildImagePrompt(pin, nextVersion),
           size: IMAGE_CONFIG.size,
           visualFormat: pin.visual_format,
         });
 
-        const { accentColor, textColor } = await extractAccentColor(rawImageBuffer);
-        const ctaText = pickCtaMessage(pin.language, index);
-        let imageBuffer = await compositeBanner(
-          rawImageBuffer,
-          ctaText,
-          'bottom',
-          accentColor,
-          textColor,
-          pin.cta_banner_template ?? 'clean-band'
-        );
-
+        let imageBuffer = rawImageBuffer;
         let selectedHeadlineTemplate = pin.title_banner_template ?? 'clean-band';
         let selectedHeadlinePosition: 'top' | 'bottom' | undefined;
         let creativeDiagnostics: PersistedCreativeDiagnostics | null = null;
-        let headlineComposed = false;
         const angle = readPinterestStrategyAngle(pin.image_analysis);
+        let outputFormat = 'png';
+        let outputContentType = 'image/png';
 
-        // Provider calls remain concurrent. Only this small local decision is
-        // ordered, making repetition penalties stable for the whole batch.
-        await previousSelection;
-        if (pin.visual_format === 'text-overlay' && pin.overlay_text && angle) {
-          const selection = await selectHeadlineTemplate(
-            {
+        if (generationMode !== 'legacy-composite') {
+          const technical = await validateFinalPinterestImage(rawImageBuffer);
+          outputFormat = technical.format === 'jpeg' ? 'jpg' : technical.format;
+          outputContentType = technical.format === 'jpeg'
+            ? 'image/jpeg'
+            : `image/${technical.format}`;
+          releaseSelection();
+        } else {
+          const { accentColor, textColor } = await extractAccentColor(rawImageBuffer);
+          const ctaText = pickCtaMessage(pin.language, index);
+          imageBuffer = await compositeBanner(
+            rawImageBuffer,
+            ctaText,
+            'bottom',
+            accentColor,
+            textColor,
+            pin.cta_banner_template ?? 'clean-band'
+          );
+          let headlineComposed = false;
+
+          // Provider calls remain concurrent. Only this small local decision is
+          // ordered, making repetition penalties stable for the whole batch.
+          await previousSelection;
+          if (pin.visual_format === 'text-overlay' && pin.overlay_text && angle) {
+            const selection = await selectHeadlineTemplate(
+              {
+                imageBuffer,
+                text: pin.overlay_text,
+                angle,
+                accentColor,
+                allowedTemplates: allowedBannerTemplates,
+              },
+              selectionHistory
+            );
+            const composition = await composeHeadlineWithQualityGate({
               imageBuffer,
               text: pin.overlay_text,
               angle,
               accentColor,
+              textColor,
+              selectedTemplate: selection.template,
+              selectedPosition: selection.position,
               allowedTemplates: allowedBannerTemplates,
-            },
-            selectionHistory
-          );
-          const composition = await composeHeadlineWithQualityGate({
-            imageBuffer,
-            text: pin.overlay_text,
-            angle,
-            accentColor,
-            textColor,
-            selectedTemplate: selection.template,
-            selectedPosition: selection.position,
-            allowedTemplates: allowedBannerTemplates,
-            history: qualityHistory,
-          });
-          imageBuffer = composition.buffer;
-          selectedHeadlineTemplate = composition.template;
-          selectedHeadlinePosition = composition.position;
-          creativeDiagnostics = {
-            status: composition.quality.status,
-            warnings: composition.quality.issues.map((issue) => issue.code),
-            template: composition.template,
-            position: composition.position,
-          };
-          headlineComposed = true;
-          selectionHistory.push({
-            angle,
-            template: composition.template,
-            position: composition.position,
-          });
-          qualityHistory.push(composition.historyItem);
-        }
-        releaseSelection();
+              history: qualityHistory,
+            });
+            imageBuffer = composition.buffer;
+            selectedHeadlineTemplate = composition.template;
+            selectedHeadlinePosition = composition.position;
+            creativeDiagnostics = {
+              status: composition.quality.status,
+              warnings: composition.quality.issues.map((issue) => issue.code),
+              template: composition.template,
+              position: composition.position,
+            };
+            headlineComposed = true;
+            selectionHistory.push({
+              angle,
+              template: composition.template,
+              position: composition.position,
+            });
+            qualityHistory.push(composition.historyItem);
+          }
+          releaseSelection();
 
-        if (pin.visual_format === 'text-overlay' && pin.overlay_text && !headlineComposed) {
-          imageBuffer = await compositeBanner(
-            imageBuffer,
-            pin.overlay_text,
-            'top',
-            accentColor,
-            textColor,
-            selectedHeadlineTemplate,
-            selectedHeadlinePosition
-          );
+          if (pin.visual_format === 'text-overlay' && pin.overlay_text && !headlineComposed) {
+            imageBuffer = await compositeBanner(
+              imageBuffer,
+              pin.overlay_text,
+              'top',
+              accentColor,
+              textColor,
+              selectedHeadlineTemplate,
+              selectedHeadlinePosition
+            );
+          }
         }
 
-        const filePath = `${user.id}/${pin.id}/${nextVersion}.png`;
+        const filePath = `${user.id}/${pin.id}/${nextVersion}.${outputFormat}`;
         const sourcePath = getPinSourceStoragePath(filePath);
         const storesRecompositionSource =
           pin.visual_format === 'text-overlay' && Boolean(pin.overlay_text && angle);
@@ -274,7 +301,7 @@ export async function POST(request: Request) {
 
         const { error: uploadError } = await supabase.storage
           .from('generated-images')
-          .upload(filePath, imageBuffer, { contentType: 'image/png' });
+          .upload(filePath, imageBuffer, { contentType: outputContentType });
 
         if (uploadError) {
           if (storesRecompositionSource) {

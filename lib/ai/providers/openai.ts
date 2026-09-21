@@ -4,6 +4,8 @@ interface ImageGenerationOptions {
   model: string;
   prompt: string;
   size: string;
+  quality?: 'low' | 'medium' | 'high';
+  preserveOriginal?: boolean;
 }
 
 interface ImageResponseData {
@@ -36,7 +38,7 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Bu
         prompt: options.prompt,
         n: 1,
         size: options.size,
-        quality: 'low',
+        quality: options.quality ?? 'low',
       }),
       signal: controller.signal,
     });
@@ -68,6 +70,11 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Bu
     } else {
       throw new Error('Response contains neither url nor b64_json');
     }
+
+    // AI Integrated must keep the provider's original final artwork. Sharp is
+    // used later only to inspect it technically; legacy calls keep the
+    // historical metadata-stripping re-encode unchanged.
+    if (options.preserveOriginal) return rawBuffer;
 
     // Re-encode through sharp before returning — strips all embedded metadata
     // (EXIF/XMP and gpt-image-1's C2PA content-credentials manifest) since

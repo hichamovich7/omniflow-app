@@ -6,6 +6,10 @@
 
 # ACTIVE TASK
 
+TASK-041 Phase 2 (Pinterest AI Integrated — generation modes in `/pinterest`) is implemented, validated and committed locally (not pushed): `AI Integrated` (default, recommended), `Photo Only` and `Legacy Composite` (unchanged SVG/Sharp renderer, kept for compatibility and history). The model is never user-selectable — it stays server-owned via `AI_IMAGE_PROVIDER` / `AI_IMAGE_MODEL` / `AI_IMAGE_MODEL_TEXT`. No route, table, migration, provider or dependency was added; the resolved contract lives in `pins.image_analysis._pinterestAiIntegrated`. The 2026-09-21 continuation clarified mode labels in Pin details/review and restricted layout diagnostics to legacy Pins. TypeScript, ESLint, the offline renderer suite (178/178) and the production build pass; no paid image call was made. Correction 2026-09-21: `AI Integrated` no longer accepts a reference image (it was never sent to the image model, only analyzed by Vision) — the form shows a "coming soon" note and the server rejects it before Vision; `Photo Only` stays reference-free; `Legacy Composite` keeps the TASK-013 mechanism. TASK-042 remains the full implementation. See `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-2.md`. Do not commit automatically.
+
+TASK-041 (Pinterest AI Integrated — Phases 1/1.1/1.2 model benchmark, safe preflight and limited real run) is implemented locally. Phase 1.2 completed the explicitly authorized 8-call benchmark: two fixtures × four exact models, 8/8 images generated, zero references, zero retries, provider-returned total cost $0.5239775, with originals/metadata/summary and a human-review HTML comparison stored under the Git-ignored `.benchmark-output/`. It does not change `/pinterest`, production routes, database, credits, or the SVG/Sharp legacy renderer. See `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-1.md`. Do not run another `--execute` without new explicit user authorization and do not commit automatically.
+
 TASK-FIX-040 (WordPress Generator reorg + visual finish + surface hierarchy pass — `/wordpress/blog-post`, a first targeted UX/UI pass, not part of the Command Center Phase 2 phase numbering below) is implemented and committed locally (not pushed): Project Context / Article Source / Article Settings / Advanced Options (collapsed by default) / Generation Summary, each now a real card (`rounded-2xl border border-border bg-card shadow-sm`) with a numbered step, a violet-tinted icon and header, a visible title and description, sitting inside a `bg-muted/60` workspace panel — replacing both the previous always-visible layout and the single giant `bg-card` wrapper that made every section blend together. No field removed, no default value, validation rule, Zod schema, API payload, prompt, rate limit, generation, saving, or publishing change. The WordPress connection status and any Content Stream(s) matching the selected category are surfaced read-only (informational only, derived from the existing `content_streams.wordpress_category_id` column — no new relation, no article↔Content Stream link created). TypeScript, ESLint, the offline test suite (138/138), and the production build all pass; the gated browser tests (10) correctly skip without `PLAYWRIGHT_STORAGE_STATE` (not bypassed). See docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md §14d for the cross-reference note (this is a separate task, not a Phase 2 sub-phase — "Phase 2b" already names something else there: persistent manual tasks).
 
 TASK-FIX-039 (Command Center Phase 2) — design doc's 8 open decisions are resolved (founder, 2026-09-16). **Phase 2a** (migration 030: `content_streams` + `content_stream_boards`, RLS hardened via migration 031 — confirmed applied live) and **Phase 2a.1** (a small Content Streams management UI inside each project's own page: create/edit/archive, `app/api/content-streams/*` routes, the "one board per active stream" rule enforced both client- and server-side) are implemented. No `tasks`/`task_occurrences`/`pinterest_accounts` table, no automatic recommendation, no Next Best Action, no Pinterest/WordPress logic change — Phases 2b–2e remain design-only. TypeScript, ESLint, the offline test suite (129/129), and the production build all pass; the new gated browser tests for the Phase 2a.1 UI correctly skip without `PLAYWRIGHT_STORAGE_STATE` (not bypassed). Do not commit automatically. See docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md (§14/§14a/§14b/§14c) for the full record.
@@ -343,6 +347,40 @@ Control de acceso admin basado en `profiles.role`; `/admin/users` permite ver ac
 
 ---
 
+## [TASK-042] Pinterest AI Integrated — One Reference Image per Generation
+
+### Status: PLANNED (documented follow-up of TASK-041 Phase 2 — not started, not the active task)
+
+### Goal
+
+Let the user optionally attach a single reference image to an `AI Integrated` Pinterest generation and send it to the server-configured image model as a visual reference (style, composition or subject — never a copy of the image or its text). No reference means the current `AI Integrated` behavior: same prompt, same provider payload, no Vision call, no additional cost.
+
+### Scope
+
+```txt
+One reference per generation; AI Integrated only (never Photo Only / Legacy Composite)
+Model/provider stay server-owned (AI_IMAGE_PROVIDER / AI_IMAGE_MODEL / AI_IMAGE_MODEL_TEXT) — no public selector
+Strict server validation: real file type, size, dimensions, ownership; metadata stripped
+No key, durable/signed URL, path or private content in any API response, log or error
+Pin detail shows that a reference was used, without exposing its content
+No reference library, no shared folder, no migration in the initial task
+Legacy renderer (SVG/Sharp) and historical generations untouched
+```
+
+### Depends On
+
+TASK-041 Phase 2. Builds on, without replacing, the existing TASK-013 reference upload (Vision style analysis).
+
+### Open Decisions
+
+Storage (temporary vs persistent), retention, weight limit, accepted formats, dimension bounds, behavior when the configured model does not support references, interaction with the existing Vision analysis, and others — see `docs/tasks/TASK-042-PINTEREST-AI-REFERENCE-PER-GENERATION.md`.
+
+### Success Criteria
+
+An AI Integrated generation with one valid reference sends it to the provider and follows its guidance without copying it; without a reference nothing changes; legacy paths and history are unchanged; no sensitive data is exposed; tests, TypeScript, ESLint and build pass; documentation and the in-app Guide are updated. Full detail: `docs/tasks/TASK-042-PINTEREST-AI-REFERENCE-PER-GENERATION.md`.
+
+---
+
 # MVP RELEASE CHECKLIST
 
 ```txt
@@ -361,6 +399,33 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-041] Pinterest AI Integrated — Phase 2 Generation Modes — 2026-09-20
+
+* `/pinterest` now offers a Generation mode: `AI Integrated` (default, Recommended), `Photo Only`, and `Legacy Composite` (badged Legacy). AI Integrated exposes Creative format, Pinterest strategy (+ manual Angle), Headline / Subtitle / CTA text modes (Generate with AI / Use exact text / None where allowed), Maximum text lines, per-field importance, and a read-only Effective language inherited from the project.
+* Strict server contract: `generatePinsSchema` is a discriminated union on `generationMode` (missing value = `legacy-composite`, so old payloads are unchanged). No client field can select a provider or model.
+* AI Integrated pins persist `visual_format = ai-integrated` and the resolved final text under `image_analysis._pinterestAiIntegrated`; the image prompt quotes the approved strings and bans any other text, logo or watermark. Sharp only validates the returned file (readable format, 2:3 ±0.01, non-empty); no SVG/Sharp text or banner is ever drawn on the new paths.
+* `Photo Only` persists `visual_format = photo-only` (no text, no banner). Legacy `photo` / `text-overlay` branches, recomposition gating and Quality Gate are untouched.
+* No migration (`pins.visual_format` is unconstrained text), no new route/table/provider/package, no `.env.local` change. Guide, API, DATABASE, UI_UX, PROJECT and TESTING documentation updated.
+* Validation: tsc, ESLint, renderer 178/178 (29 AI Integrated offline cases; provider calls use a stubbed `fetch`), production build. No paid image request.
+* Correction 2026-09-21: the TASK-013 reference upload is removed from `AI Integrated` (replaced by a "coming soon" note) and rejected server-side for `ai-integrated` / `photo-only` before any Vision call; `Legacy Composite` unchanged. See the addendum in the Phase 2 task file.
+* Phase 2 continuation (2026-09-21): Pin cards/details/review display clear mode labels; AI Integrated and Photo Only never display unavailable legacy templates or Quality Gate states. Batch Review layout metrics apply only to Legacy Composite Pins. Historical Pins without `_pinterestAiIntegrated` remain readable.
+* Full record: `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-2.md`.
+
+## [TASK-041] Pinterest AI Integrated — Phase 1/1.1 Model Benchmark + Safe Preflight — 2026-09-20
+
+* Added `scripts/pinterest-ai-benchmark.ts`, a standalone Node 22 TypeScript runner with strict dry-run default and explicit `--execute` opt-in.
+* Candidate models come only from the active image environment configuration or exact repeated `--model provider:model-id` arguments; duplicate ids are removed and no aliases are invented.
+* Execute mode performs OpenRouter model discovery before generation, checks advertised 2:3/reference/quality capabilities, sends `quality=high` when supported and never sends `low`.
+* Added the four requested Crochet/Home Decor fixtures with exact EN/DE typography and no invented CTA for fixtures that do not define one.
+* Provider images are saved unchanged under Git-ignored `.benchmark-output/`; Sharp only records technical metadata and never composes text.
+* Added nullable human evaluation fields and PASS/NEEDS_REVIEW/FAIL calculation. A generated image starts at NEEDS_REVIEW; technical ratio inspection alone can never mark it PASS.
+* Added offline coverage for CLI parsing, fixtures, configured-model deduplication, dry-run network isolation and evaluation calculation.
+* No database, migration, credit, UI, production route, prompt-engine or legacy renderer change. No paid execution, commit or push.
+* Phase 1.1 adds a discovery-only `--preflight`, fixture-scoped references, four-model shortlist, endpoint capability validation, per-model parameter resolution and future-cost estimation. All four exact slugs passed the live discovery preflight on 2026-09-20; no image endpoint was called.
+* Phase 1.2 adds explicit fixture filtering, a required hard `--max-calls` ceiling, per-result manual-review criteria, `benchmark-summary.json`, and a local comparison page. The authorized run attempted exactly 8 calls, generated 8 images, recorded 0 failures and returned a total provider cost of $0.5239775. No reference or retry was used.
+* Renumbered from the provisional TASK-038 to TASK-041 because TASK-FIX-038, TASK-FIX-039 and TASK-FIX-040 already occupy those numeric suffixes; 041 is the first suffix free across both task namespaces.
+* Full implementation record: `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-1.md`.
 
 ## [TASK-FIX-040] WordPress Generator Reorg — 2026-09-16
 

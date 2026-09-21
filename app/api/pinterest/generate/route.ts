@@ -19,6 +19,12 @@ import {
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
+import {
+  attachAiIntegratedMetadata,
+  resolveEffectiveLanguage,
+  resolveAiIntegratedText,
+  resolvePinAngle,
+} from '@/lib/pinterest/ai-integrated';
 
 // Defense in depth (TASK-FIX-024), same mechanism as the allowTextOverlay
 // clamp in lib/prompts/pinterest-pins.ts: the prompt only asks the AI to pick
@@ -107,19 +113,30 @@ export async function POST(request: Request) {
   const {
     projectId,
     keyword,
-    language,
+    language: requestedLanguage,
     pinsRequested,
     board,
     websiteUrl,
     pinterestUrl,
     analysisId,
-    textOverlayMode,
-    referenceImageUrl,
+    generationMode,
   } = parsed.data;
+  // The schema already rejects a reference for the other modes; this is a
+  // second guard so the Vision step below can only ever run for Legacy
+  // Composite (TASK-013 behavior, unchanged).
+  const referenceImageUrl = generationMode === 'legacy-composite'
+    ? parsed.data.referenceImageUrl
+    : undefined;
+  const textOverlayMode = generationMode === 'legacy-composite'
+    ? parsed.data.textOverlayMode
+    : 'never';
+  const aiIntegrated = generationMode === 'ai-integrated'
+    ? parsed.data.aiIntegrated
+    : undefined;
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id, description, niche, user_id')
+    .select('id, description, niche, user_id, default_language')
     .eq('id', projectId)
     .single();
 
@@ -136,6 +153,12 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  const language = resolveEffectiveLanguage(
+    generationMode,
+    requestedLanguage,
+    project.default_language
+  );
 
   let analysisContext: string | null = null;
 
@@ -224,6 +247,8 @@ export async function POST(request: Request) {
       pinsRequested,
       niche: project.niche,
       textOverlayMode,
+      generationMode,
+      aiIntegrated,
       brandProfile: buildBrandProfileContext(project.description),
       analysisContext: analysisContext ?? undefined,
       referenceStyleGuidance,
@@ -251,10 +276,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const resolvedPins = validated.data.pins.map((pin) => ({
+      ...pin,
+      angle: aiIntegrated
+        ? resolvePinAngle(aiIntegrated.strategy, aiIntegrated.manualAngle, pin.angle)
+        : pin.angle,
+    }));
+
     const strategyIssues = validatePinterestStrategyBatch(
-      validated.data.pins,
+      resolvedPins,
       pinsRequested,
-      [keyword, analysisContext].filter(Boolean).join('\n')
+      [keyword, analysisContext].filter(Boolean).join('\n'),
+      {
+        enforceBalancedAngles:
+          !aiIntegrated || aiIntegrated.strategy === 'balanced',
+      }
     );
     if (strategyIssues.length > 0) {
       console.error(`[${PROMPT_ID}] Strategy validation failed:`, strategyIssues);
@@ -269,7 +305,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const pinsGenerated = validated.data.pins.length;
+    const pinsGenerated = resolvedPins.length;
 
     if (pinsGenerated < pinsRequested) {
       console.warn(
@@ -278,8 +314,8 @@ export async function POST(request: Request) {
     }
 
     const boardNames = board
-      ? validated.data.pins.map(() => board)
-      : validated.data.pins.map((pin) => pin.board);
+      ? resolvedPins.map(() => board)
+      : resolvedPins.map((pin) => pin.board);
 
     const boardIdByName = await findOrCreateBoardIds(supabase, projectId, user.id, boardNames);
 
@@ -290,9 +326,24 @@ export async function POST(request: Request) {
 
     const angleOccurrences = new Map<string, number>();
 
-    const pinsToInsert = validated.data.pins.map((pin, i) => {
+    const pinsToInsert = resolvedPins.map((pin, i) => {
       const angleOccurrence = angleOccurrences.get(pin.angle) ?? 0;
       angleOccurrences.set(pin.angle, angleOccurrence + 1);
+
+      const legacyVisualFormat = pin.visualFormat;
+      const visualFormat = generationMode === 'ai-integrated'
+        ? 'ai-integrated'
+        : generationMode === 'photo-only'
+          ? 'photo-only'
+          : legacyVisualFormat;
+      const strategyMetadata = attachPinterestStrategyMetadata(imageAnalysisJson, pin.angle);
+      const persistedAnalysis = aiIntegrated
+        ? attachAiIntegratedMetadata(strategyMetadata, {
+            language,
+            settings: aiIntegrated,
+            text: resolveAiIntegratedText(aiIntegrated, pin.integratedText),
+          })
+        : strategyMetadata;
 
       return {
         generation_id: generation.id,
@@ -303,23 +354,26 @@ export async function POST(request: Request) {
         board: boardNames[i],
         board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
         image_prompt: pin.image_prompt,
-        visual_format: pin.visualFormat,
-        overlay_text: pin.overlayText ?? null,
+        visual_format: visualFormat,
+        overlay_text: generationMode === 'legacy-composite' ? pin.overlayText ?? null : null,
         // Angle stays transient in Phase 4: it selects an existing persisted
         // template value without requiring a new pins column or migration.
         title_banner_template:
-          pin.visualFormat === 'text-overlay'
+          generationMode === 'legacy-composite' && legacyVisualFormat === 'text-overlay'
             ? selectHeadlineTemplateForAngle(
                 pin.angle,
                 angleOccurrence,
                 allowedBannerTemplates
               )
             : null,
-        cta_banner_template: clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates),
+        cta_banner_template:
+          generationMode === 'legacy-composite'
+            ? clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates)
+            : null,
         // Reuse the existing JSON text column so image rendering can recover
         // the structured angle without a schema migration. Reference-style
         // fields remain unchanged at the top level for compatibility.
-        image_analysis: attachPinterestStrategyMetadata(imageAnalysisJson, pin.angle),
+        image_analysis: persistedAnalysis,
       };
     });
 

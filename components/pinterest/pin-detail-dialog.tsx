@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
+import { getPinGenerationModeLabel } from './pin-diagnostic-badges';
 
 interface PinDetailDialogProps {
   pin: Pin;
@@ -45,6 +46,9 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
         </DialogHeader>
 
         <div className="space-y-4">
+          <Badge variant="outline" className="w-fit text-xs">
+            {getPinGenerationModeLabel(pin.visual_format)}
+          </Badge>
           {pin.media_url ? (
             <div className="relative aspect-2/3 w-full overflow-hidden rounded-lg bg-muted" data-testid="pin-detail-preview">
               <Image

@@ -5,6 +5,7 @@ import {
   buildVariationDirective,
   IMAGE_PROMPT_ID,
 } from './presets';
+import type { PinVisualFormat } from '@/types/database';
 
 export { IMAGE_PROMPT_ID };
 
@@ -19,7 +20,7 @@ export interface PinterestPackage {
   keywords: string;
   board: string;
   image_prompt: string;
-  visual_format: 'photo' | 'text-overlay';
+  visual_format: PinVisualFormat;
   overlay_text: string | null;
   language: string;
 }
