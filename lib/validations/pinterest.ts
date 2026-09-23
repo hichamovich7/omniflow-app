@@ -36,6 +36,27 @@ export const BANNER_TEMPLATES = [
 ] as const;
 export type BannerTemplate = (typeof BANNER_TEMPLATES)[number];
 
+// "/" is Pinterest's own Board/Section separator (see lib/csv/pinterest.ts),
+// so it — along with "\" and any line break or control character — can never
+// appear inside a section name. Trimmed; an empty/whitespace-only value
+// becomes undefined (stored as null), same convention as `board`.
+export const BOARD_SECTION_FORBIDDEN_CHARS = /[\\/\r\n\x00-\x1F\x7F]/;
+export const BOARD_SECTION_REQUIRES_BOARD_MESSAGE =
+  'Select a board before entering a board section.';
+
+const boardSectionSchema = z
+  .string()
+  .max(100, 'Board section is too long')
+  .optional()
+  .transform((value) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : undefined;
+  })
+  .refine(
+    (value) => value === undefined || !BOARD_SECTION_FORBIDDEN_CHARS.test(value),
+    { message: 'Board section cannot contain "/", "\\", or line breaks.' }
+  );
+
 const generatePinsBaseSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
@@ -45,6 +66,7 @@ const generatePinsBaseSchema = z.object({
     { message: 'Invalid number of pins' }
   ),
   board: z.string().trim().max(100, 'Board name is too long').optional(),
+  boardSection: boardSectionSchema,
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),
   pinterestUrl: z.string().trim().url('Invalid Pinterest URL').optional(),
   analysisId: z.string().uuid('Invalid analysis ID').optional(),
@@ -155,11 +177,21 @@ export const generatePinsSchema = z.preprocess(
       ? candidate
       : { ...candidate, generationMode: 'legacy-composite' };
   },
-  z.discriminatedUnion('generationMode', [
-    aiIntegratedRequestSchema,
-    photoOnlyRequestSchema,
-    legacyCompositeRequestSchema,
-  ])
+  z
+    .discriminatedUnion('generationMode', [
+      aiIntegratedRequestSchema,
+      photoOnlyRequestSchema,
+      legacyCompositeRequestSchema,
+    ])
+    .superRefine((data, ctx) => {
+      if (data.boardSection && !data.board) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['boardSection'],
+          message: BOARD_SECTION_REQUIRES_BOARD_MESSAGE,
+        });
+      }
+    })
 );
 
 const pinResponseSchema = z

@@ -20,6 +20,16 @@ export function formatPinterestPublishDate(dateString: string | null): string {
   return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
 }
 
+// Pinterest's own Bulk Upload convention: "Board" alone, or "Board/Section"
+// when the pin has a section within that board. Always the existing
+// "Pinterest board" column — never a separate column — and never
+// "/Section" alone when the pin has no board.
+export function formatPinterestBoardCell(pin: Pin): string {
+  const boardName = pin.board;
+  const boardSection = pin.board_section;
+  return boardName && boardSection ? `${boardName}/${boardSection}` : boardName ?? '';
+}
+
 export function generatePinterestCsv(pins: Pin[]): string {
   const headers = [
     'Title',
@@ -34,7 +44,7 @@ export function generatePinterestCsv(pins: Pin[]): string {
   const rows = pins.map((pin) => [
     escapeCsvField(pin.title),
     pin.media_url ?? '',
-    escapeCsvField(pin.board),
+    escapeCsvField(formatPinterestBoardCell(pin)),
     escapeCsvField(pin.description),
     pin.link_url ?? '',
     formatPinterestPublishDate(pin.publish_date),

@@ -82,6 +82,7 @@ export const guideSections: GuideSection[] = [
     points: [
       'The form follows your workflow: pick the Project and how many Pins to generate (1 to 30), optionally choose a Board, enter the main Keyword, then choose how the images are created (Generation mode).',
       'Optionally set a Board — leave it blank to let the AI suggest a board per pin.',
+      'Right after Board, you can optionally set a Board section — a sub-section inside that board (e.g. "Appetizers" inside "Summer Eats"). It stays empty by default and requires a Board to be set first; the CSV export writes it as "Board/Section" in the same Pinterest board column, never a separate column.',
       'If you arrived from Research → Analyze, you\'ll see a "Using content analysis from Research" indicator confirming that context is active.',
       'Choose a Generation mode. "AI Integrated" (recommended, the default) has the AI create the final image with its headline, subtitle, and call-to-action already designed into it. "Photo Only" gives you a clean photograph with no text. "Legacy Composite" keeps the original workflow where the text and banners are added on top of the photo afterwards.',
       'In AI Integrated mode you can pick a Creative format (Hero Pin, Pattern Guide, Editorial Story, or let the AI choose), a Pinterest strategy (AI recommends, Balanced angles, or a Manual angle), and for the Headline, Subtitle, and CTA either let the AI write them or type the exact text you want (Subtitle and CTA can also be left out). You can also set the maximum number of text lines and how prominent each text is.',
@@ -122,6 +123,7 @@ export const guideSections: GuideSection[] = [
     points: [
       'Boards are created automatically the first time their name is used for a Project — no manual setup required.',
       'Open a Board to see every pin generated for it and export just that board\'s pins as CSV.',
+      'If some pins have a Board section set, filter chips (All / each section / No section) appear above the pin grid to browse just one section at a time.',
     ],
   },
   {

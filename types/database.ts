@@ -81,6 +81,7 @@ export interface Pin {
   keywords: string;
   board: string;
   board_id: string | null;
+  board_section: string | null;
   image_prompt: string;
   image_analysis: string | null;
   media_url: string | null;
@@ -116,9 +117,10 @@ export type GenerationInsert = Omit<Generation, 'id' | 'created_at' | 'updated_a
   error_message?: string | null;
 };
 
-export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at' | 'board_id'> & {
+export type PinInsert = Omit<Pin, 'id' | 'created_at' | 'updated_at' | 'board_id' | 'board_section'> & {
   id?: string;
   board_id?: string | null;
+  board_section?: string | null;
 };
 
 export type ResearchSourceType = 'keyword' | 'website' | 'blog' | 'pinterest';

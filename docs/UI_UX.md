@@ -413,6 +413,44 @@ When left blank, the AI suggests a board per pin (auto-linked as before). When f
 
 ---
 
+### Board Section
+
+Type:
+
+```txt
+Text Input (placed immediately after Board)
+```
+
+Required:
+
+```txt
+No
+```
+
+Label:
+
+```txt
+Board section (optional)
+```
+
+Placeholder:
+
+```txt
+e.g. Appetizers — leave blank if this board has no section
+```
+
+Help text:
+
+```txt
+Optional Pinterest section inside the selected board.
+```
+
+Empty by default. Requires Board to be filled — entering a section without a Board shows: `Select a board before entering a board section.` Exported as `Board/Section` in the CSV's existing "Pinterest board" column (never a separate column); a Board with no Section exports as before.
+
+Displayed (read-only) in the Pin table's board badge as `Board / Section`, and as a filter (All / each section / No section) above the pin grid on a Board's detail page (`/boards/[id]`) — client-side only, filtering pins already loaded for that board.
+
+---
+
 ### Number Of Pins
 
 Type:

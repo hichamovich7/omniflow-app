@@ -18,6 +18,34 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Add: Board Section display in the Pin table and Board detail page
+
+### Added
+
+* `components/pinterest/pin-table.tsx`: the board badge now appends `/ <section>` when `pin.board_section` is set — display only, no data change.
+* `components/boards/board-pin-grid.tsx` (new): a small client-side filter (chips: All / each distinct section / No section) above the Board detail page's pin grid, replacing the previous static grid. Read-only — filters what's already fetched, no new query, no URL param.
+* `app/(dashboard)/boards/[id]/page.tsx` renders `BoardPinGrid` instead of a plain grid.
+
+### Not covered
+
+* No edit capability — see TASK-043 (PLANNED) for letting users add/change `board_section` on an existing pin.
+
+## Add: optional Board Section for Pinterest CSV export
+
+### Added
+
+* `board_section` optional field in `/pinterest`, placed immediately after Board — label "Board section (optional)", empty by default, requires Board to be filled (`Select a board before entering a board section.` otherwise).
+* Migration 032: nullable `pins.board_section text`, additive only, no backfill, no DB CHECK (length/forbidden-character rules validated at the Zod layer, same convention as migrations 018/025/026/027).
+* `lib/validations/pinterest.ts`: `boardSection` trimmed, max 100 chars, empty string becomes `undefined` (stored as `null`), rejects `/`, `\`, line breaks and control characters (`/` is Pinterest's own Board/Section separator), rejects a section without a `board` via a cross-field `superRefine` on the request union.
+* `app/api/pinterest/generate/route.ts`: the same `board_section` is persisted on every pin of the batch, same convention as `board` (never AI-suggested per pin).
+* `lib/csv/pinterest.ts`: `formatPinterestBoardCell()` exports `board/board_section` (or `board` alone) in the existing `Pinterest board` column — never a separate `Board_Section` column, never `/Section` with no board. Pins without a section, including every pin generated before this change, export exactly as before.
+* Tests: `tests/renderer/pinterest-csv.spec.ts` (CSV formatting) and `tests/renderer/pinterest-board-section.spec.ts` (Zod contract + batch route propagation with stubbed Supabase/AI engine).
+
+### Not covered
+
+* No Board/Section is ever created in Supabase or sent to Pinterest by OmniFlow — Pinterest creates it at CSV import time, per its own rule.
+* No change to Pin editing (no such UI exists for `board` either), image generation, providers, or scheduling.
+
 ## Fix: embedded metadata (C2PA, EXIF, XMP) kept on AI Integrated and Photo Only images
 
 ### Cause

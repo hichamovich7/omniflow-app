@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-041 (Pinterest Board Section) is implemented locally, not yet validated against a live Supabase/OpenRouter environment: an optional `Board section (optional)` text field in `/pinterest`, placed immediately after Board, empty by default, requiring Board to be filled (`Select a board before entering a board section.` otherwise). Migration 032 adds nullable `pins.board_section text` (additive only, no backfill, no DB CHECK — validated at the Zod layer, same convention as migrations 018/025/026/027). `boardSection` is trimmed, max 100 chars, empty string becomes `null`, rejects `/` (Pinterest's own Board/Section separator), `\`, line breaks and control characters. The generate route persists the same `boardSection` on every pin of the batch, same convention as `board` (never AI-suggested per pin, never touching the real Board name). CSV export (`lib/csv/pinterest.ts`) writes `Board/Section` (or `Board` alone) into the existing `Pinterest board` column — never a separate `Board_Section` column. No Board/Section is created in Supabase or sent to Pinterest by OmniFlow — Pinterest creates it at CSV import time. TypeScript, ESLint, the offline renderer suite (216/216) and the production build pass. See CHANGELOG.md "Add: optional Board Section for Pinterest CSV export". 2026-09-23 continuation: the board_section value is now surfaced (display-only) in the Pin table's board badge (`Board / Section`) and as filter chips (All / each section / No section) above the pin grid on a Board's detail page (`components/boards/board-pin-grid.tsx`) — no new query, no edit capability (see TASK-043 for that). See CHANGELOG.md "Add: Board Section display in the Pin table and Board detail page". Do not commit automatically.
+
 TASK-041 Phase 2 (Pinterest AI Integrated — generation modes in `/pinterest`) is implemented, validated and committed locally (not pushed): `AI Integrated` (default, recommended), `Photo Only` and `Legacy Composite` (unchanged SVG/Sharp renderer, kept for compatibility and history). The model is never user-selectable — it stays server-owned via `AI_IMAGE_PROVIDER` / `AI_IMAGE_MODEL` / `AI_IMAGE_MODEL_TEXT`. No route, table, migration, provider or dependency was added; the resolved contract lives in `pins.image_analysis._pinterestAiIntegrated`. The 2026-09-21 continuation clarified mode labels in Pin details/review and restricted layout diagnostics to legacy Pins. TypeScript, ESLint, the offline renderer suite (178/178) and the production build pass; no paid image call was made. Correction 2026-09-21: `AI Integrated` no longer accepts a reference image (it was never sent to the image model, only analyzed by Vision) — the form shows a "coming soon" note and the server rejects it before Vision; `Photo Only` stays reference-free; `Legacy Composite` keeps the TASK-013 mechanism. TASK-042 remains the full implementation. See `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-2.md`. Do not commit automatically.
 
 TASK-041 (Pinterest AI Integrated — Phases 1/1.1/1.2 model benchmark, safe preflight and limited real run) is implemented locally. Phase 1.2 completed the explicitly authorized 8-call benchmark: two fixtures × four exact models, 8/8 images generated, zero references, zero retries, provider-returned total cost $0.5239775, with originals/metadata/summary and a human-review HTML comparison stored under the Git-ignored `.benchmark-output/`. It does not change `/pinterest`, production routes, database, credits, or the SVG/Sharp legacy renderer. See `docs/tasks/TASK-041-PINTEREST-AI-INTEGRATED-PHASE-1.md`. Do not run another `--execute` without new explicit user authorization and do not commit automatically.
@@ -378,6 +380,39 @@ Storage (temporary vs persistent), retention, weight limit, accepted formats, di
 ### Success Criteria
 
 An AI Integrated generation with one valid reference sends it to the provider and follows its guidance without copying it; without a reference nothing changes; legacy paths and history are unchanged; no sensitive data is exposed; tests, TypeScript, ESLint and build pass; documentation and the in-app Guide are updated. Full detail: `docs/tasks/TASK-042-PINTEREST-AI-REFERENCE-PER-GENERATION.md`.
+
+---
+
+## [TASK-043] Pinterest Board Section — Edit On Existing Pins
+
+### Status: PLANNED (documented follow-up of TASK-FIX-041 — not started, not the active task)
+
+### Goal
+
+Let the user add or change `board_section` on a Pin that already exists (generated before or after TASK-FIX-041), instead of only being able to set it at generation time. Requested 2026-09-23 after TASK-FIX-041 shipped, since old Pins have no way to get a section applied retroactively.
+
+### Scope
+
+```txt
+Small inline edit control (input + Save) in the Pin detail view (components/pinterest/pin-detail-dialog.tsx)
+New PATCH /api/pinterest/pins/[id] route — updates board_section only, never board
+Reuses the exact same boardSection Zod validation as generation (trim, max 100,
+forbidden "/", "\", line breaks/control chars, empty string -> null)
+Ownership check via the pin's generation_id -> generations.user_id chain
+Since pins.board is NOT NULL, every existing pin already has a board — no
+"section without board" case to handle for this edit path
+board / board_id remain non-editable, unchanged — same as today
+CSV export, database schema (beyond the already-shipped board_section column),
+image generation, providers and scheduling untouched
+```
+
+### Depends On
+
+TASK-FIX-041 (Pinterest Board Section — CHANGELOG.md "Add: optional Board Section for Pinterest CSV export"), which added the `board_section` column and its validation rules.
+
+### Success Criteria
+
+A user can open an existing Pin's detail, add or edit its Board section, and save it; the CSV export immediately reflects `Board/Section` for that Pin; invalid input (forbidden characters, over max length) is rejected with the same message as at generation time; `board`/`board_id` are never modified by this path; tests, TypeScript, ESLint and build pass; `docs/API.md`, `docs/UI_UX.md`, `docs/DATABASE.md` (if needed) and the in-app Guide are updated.
 
 ---
 

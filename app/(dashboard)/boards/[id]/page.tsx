@@ -5,7 +5,7 @@ import { getBoardWithPins } from '@/lib/queries/boards';
 import { PageContainer } from '@/components/ui/page-container';
 import { EmptyState } from '@/components/empty-state';
 import { BoardActions } from '@/components/boards/board-actions';
-import { BoardPinCard } from '@/components/boards/board-pin-card';
+import { BoardPinGrid } from '@/components/boards/board-pin-grid';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
 import { ArrowLeft, LayoutGrid } from 'lucide-react';
 
@@ -53,11 +53,7 @@ export default async function BoardDetailPage({
           icon={LayoutGrid}
         />
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {pins.map((pin) => (
-            <BoardPinCard key={pin.id} pin={pin} />
-          ))}
-        </div>
+        <BoardPinGrid pins={pins} />
       )}
     </PageContainer>
   );

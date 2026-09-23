@@ -122,6 +122,7 @@ export async function POST(request: Request) {
     language: requestedLanguage,
     pinsRequested,
     board,
+    boardSection,
     websiteUrl,
     pinterestUrl,
     analysisId,
@@ -368,6 +369,9 @@ export async function POST(request: Request) {
         keywords: pin.keywords,
         board: boardNames[i],
         board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
+        // Zod already rejects a boardSection without a manually-set board,
+        // so this only ever applies when every pin shares the same board.
+        board_section: boardSection ?? null,
         image_prompt: pin.image_prompt,
         visual_format: visualFormat,
         overlay_text: generationMode === 'legacy-composite' ? pin.overlayText ?? null : null,

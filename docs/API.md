@@ -104,6 +104,7 @@ Creates one generation request and produces Pinterest content using AI.
   "language": "de",
   "pinsRequested": 10,
   "board": "Boho Bathroom Ideas",
+  "boardSection": "Appetizers",
   "websiteUrl": "https://example.com",
   "pinterestUrl": "",
   "analysisId": "uuid",
@@ -112,6 +113,8 @@ Creates one generation request and produces Pinterest content using AI.
 ```
 
 `board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
+
+`boardSection` is optional and only meaningful together with `board`. Trimmed; an empty/whitespace-only value is treated as absent. Max 100 characters; rejected (HTTP 400 `invalid_request`) if it contains `/`, `\`, a line break, or another control character — `/` is Pinterest's own Board/Section separator (see the CSV export below). Rejected with the message `Select a board before entering a board section.` when present without `board`. When accepted, every generated pin in the batch stores the same `board_section` value (`pins.board_section`, migration 032) — it is never AI-suggested per pin, same convention as `board` itself.
 
 `websiteUrl`/`pinterestUrl` are optional (TASK-023). Normally carried over silently from a Research result via "Continue to Generate" — recorded on the generation for provenance only, not injected into the AI prompt.
 
@@ -1131,6 +1134,8 @@ past_date
 # POST /api/pinterest/export-csv
 
 Status: NOT IMPLEMENTED. CSV export is client-side via ExportCsvButton component (lib/csv/pinterest.ts).
+
+The `Pinterest board` column is `board` alone, or `board/board_section` when the pin has a section (`formatPinterestBoardCell()`) — never a separate `Board_Section` column, and never `/Section` with no board.
 
 ---
 

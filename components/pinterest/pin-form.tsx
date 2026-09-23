@@ -4,7 +4,11 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Check, Info, Loader2, Sparkles, Sparkle } from 'lucide-react';
-import { generatePinsSchema, TEXT_OVERLAY_MODES } from '@/lib/validations/pinterest';
+import {
+  generatePinsSchema,
+  TEXT_OVERLAY_MODES,
+  BOARD_SECTION_REQUIRES_BOARD_MESSAGE,
+} from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, PINS_OPTIONS } from '@/types/pinterest';
 import type {
@@ -197,6 +201,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
   );
   const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
   const [board, setBoard] = useState('');
+  const [boardSection, setBoardSection] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>(
     (defaultProject?.default_language as SupportedLanguage) ?? 'en'
   );
@@ -244,10 +249,17 @@ export function PinForm({ projects, boards }: PinFormProps) {
   }
 
   const boardOptions = boards.filter((b) => b.project_id === projectId);
+  const boardSectionError =
+    boardSection.trim() && !board.trim() ? BOARD_SECTION_REQUIRES_BOARD_MESSAGE : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (boardSectionError) {
+      setError(boardSectionError);
+      return;
+    }
 
     const basePayload = {
       projectId,
@@ -255,6 +267,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
       language: generationMode === 'ai-integrated' ? effectiveProjectLanguage : language,
       pinsRequested,
       board: board.trim() || undefined,
+      boardSection: boardSection.trim() || undefined,
       websiteUrl,
       pinterestUrl,
       analysisId,
@@ -467,6 +480,29 @@ export function PinForm({ projects, boards }: PinFormProps) {
                 </ComboboxList>
               </ComboboxPopup>
             </Combobox>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="board-section" className="text-xs font-medium text-muted-foreground">
+              Board section (optional)
+            </Label>
+            <Input
+              id="board-section"
+              placeholder="e.g. Appetizers — leave blank if this board has no section"
+              value={boardSection}
+              onChange={(e) => setBoardSection(e.target.value)}
+              maxLength={100}
+              disabled={loading}
+              aria-describedby="board-section-help"
+              aria-invalid={!!boardSectionError}
+              className="h-12 text-sm placeholder:text-muted-foreground/40"
+            />
+            <p id="board-section-help" className="text-xs text-muted-foreground">
+              Optional Pinterest section inside the selected board.
+            </p>
+            {boardSectionError && (
+              <p className="text-xs text-destructive">{boardSectionError}</p>
+            )}
           </div>
         </FormSection>
 

@@ -204,6 +204,7 @@ Stores generated Pinterest pins.
 | keywords       | text                     | Comma separated keywords   |
 | board          | text                     | Suggested board (AI free text, denormalized) |
 | board_id       | uuid nullable FK → boards.id | Real board entity, auto-linked at generation time (TASK-025). ON DELETE SET NULL |
+| board_section  | text nullable            | Optional free-text Pinterest section inside `board` (migration 032). Set only when the user manually typed a `board` at generation time — never AI-suggested, never derived from `board_id`. No DB CHECK — max length and forbidden characters (`/`, `\`, line breaks — `/` is Pinterest's own Board/Section separator) validated at the Zod layer (`lib/validations/pinterest.ts`). Exported as `Board/Section` in the CSV's existing `Pinterest board` column (`lib/csv/pinterest.ts`), never a separate column |
 | image_prompt   | text                     | Prompt for image generation |
 | image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` plus private Pinterest metadata keys for the structured angle (`_pinterestStrategy`) and latest accepted Quality Gate result (`_pinterestCreativeDiagnostics`: status/warnings/template/position) and — for `visual_format = ai-integrated` only — the resolved AI Integrated contract (`_pinterestAiIntegrated`: effective `language`, validated `settings`, final `text` headline/subtitle/cta; TASK-041 Phase 2). Same text column; no schema migration |
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
