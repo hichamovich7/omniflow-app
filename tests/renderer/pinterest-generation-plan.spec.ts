@@ -10,6 +10,7 @@ import {
   buildPinterestPinsPrompt,
   estimateMaxTokens,
 } from '@/lib/prompts/pinterest-pins';
+import { resolvePinAngle } from '@/lib/pinterest/ai-integrated';
 
 // Offline by construction: the parser is pure and the route test replaces
 // Supabase, the AI engine, the rate limiter and the board query, and stubs
@@ -483,13 +484,20 @@ test('AI Integrated: a truncated plan returns 422, writes no pin and never reach
 
     assertNothingDownstreamHappened(harness);
 
-    // Server diagnostics are bounded and mention neither the full response nor a secret.
-    const logged = JSON.stringify(harness.errorLogs);
-    expect(logged).toContain('Pin plan rejected');
-    expect(logged).toContain('"kind":"truncated"');
-    expect(logged).toContain(`"responseLength":${truncated.length}`);
-    expect(logged.length).toBeLessThan(1500);
-    expect(logged).not.toContain(truncated.slice(400, 520));
+    // Server diagnostics are a single flattened string per console.error call
+    // (never a bare object) so log viewers that summarize/collapse
+    // non-primitive arguments (e.g. Vercel Runtime Logs) can't turn this into
+    // an opaque, unsearchable placeholder — only the outer array/string
+    // structure is JSON-escaped here, not the diagnostics payload itself.
+    expect(harness.errorLogs).toHaveLength(1);
+    expect(harness.errorLogs[0]).toHaveLength(1);
+    const loggedLine = harness.errorLogs[0][0];
+    expect(typeof loggedLine).toBe('string');
+    expect(loggedLine).toContain('Pin plan rejected');
+    expect(loggedLine).toContain('"kind":"truncated"');
+    expect(loggedLine).toContain(`"responseLength":${truncated.length}`);
+    expect((loggedLine as string).length).toBeLessThan(1500);
+    expect(loggedLine).not.toContain(truncated.slice(400, 520));
   });
 });
 
@@ -507,6 +515,108 @@ test('Legacy Composite: the same invalid plans are rejected the same way, before
       });
       assertNothingDownstreamHappened(harness);
     });
+  }
+});
+
+// --- Strategy validation failure (distinct from an invalid plan) --------------
+//
+// Production symptom: `[pinterest-pins-v10] Strategy validation failed: ...`
+// followed by a 500. An audit of the whole flow (pin-form -> payload ->
+// prompt -> AI response -> strategy validation -> route -> image generation)
+// found no "svg" field, schema or validation anywhere in this path for any
+// generationMode — `grep -rn "svg0"` across the repository returns nothing,
+// and AI Integrated's prompt explicitly excludes titleBannerTemplate /
+// ctaBannerTemplate (the only SVG-banner-related fields that exist at all,
+// legacy-composite only). What was real: `validatePinterestStrategyBatch`
+// failures were reported as a generic 500 with an object console.error
+// argument that some log viewers summarize/collapse into an unreadable
+// placeholder. Both are fixed here without touching any safeguard's logic.
+
+test('Strategy validation failure returns 422 invalid_strategy_plan (not 500), before any board, pin, image or credit work', async () => {
+  const duplicateTitlePlan = {
+    pins: [
+      pin(0, { angle: 'curiosity' }),
+      pin(0, { angle: 'problem-solution' }), // identical title -> near-duplicate-title
+      pin(2, { angle: 'listicle' }),
+      pin(3, { angle: 'discovery' }),
+      pin(4, { angle: 'article-promise' }),
+    ],
+  };
+
+  await withRoute(JSON.stringify(duplicateTitlePlan), async (harness) => {
+    const response = await harness.post(aiIntegratedRequest);
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    const expectedMessage = 'AI returned Pinterest content that failed strategy safeguards. Try again.';
+    expect(body.error).toEqual({ message: expectedMessage, code: 'invalid_strategy_plan' });
+
+    // Same downstream guarantee as an invalid plan: nothing beyond the
+    // generation row (created, then marked failed) ever happens.
+    expect(harness.events.map((event) => `${event.op}:${event.table}`)).toEqual([
+      'insert:generations',
+      'update:generations',
+    ]);
+    expect(harness.events.find((event) => event.table === 'pins')).toBeUndefined();
+    expect(harness.events[1].row).toMatchObject({ status: 'failed', error_message: expectedMessage });
+    // credits_used is set once, at generation creation, and never updated —
+    // no credit is ever debited for a rejected plan.
+    expect((harness.events[0].row as Record<string, unknown>).credits_used).toBe(0);
+    expect(harness.boardCalls).toBe(0);
+    expect(harness.imageCalls).toBe(0);
+    expect(harness.fetchCalls).toBe(0);
+
+    // The log line is a single flattened string carrying the real issue
+    // code in plain, directly greppable text — never an opaque object
+    // preview (the production symptom this diagnostic-logging fix targets).
+    expect(harness.errorLogs).toHaveLength(1);
+    const loggedLine = harness.errorLogs[0][0];
+    expect(typeof loggedLine).toBe('string');
+    expect(loggedLine).toContain('Strategy validation failed');
+    expect(loggedLine).toContain('"code":"near-duplicate-title"');
+    expect(loggedLine).not.toContain('svg');
+  });
+});
+
+test('AI Integrated + pattern-guide + ai-recommends, 7 pins (the reported production case): accepted, no angle-coverage enforcement, language follows the project default', async () => {
+  await withRoute(JSON.stringify(plan(7)), async (harness) => {
+    const response = await harness.post({
+      ...aiIntegratedRequest,
+      keyword: 'winter crochet sweater',
+      language: 'en', // requested; the project default below must win for AI Integrated
+      pinsRequested: 7,
+      aiIntegrated: { ...aiIntegratedSettings, creativeFormat: 'pattern-guide', strategy: 'ai-recommends' },
+    });
+    const body = await response.json();
+    expect(response.status).toBe(201);
+    expect(body.data).toMatchObject({ status: 'completed', pinsGenerated: 7 });
+    expect(harness.errorLogs).toHaveLength(0);
+    expect(harness.imageCalls).toBe(0);
+
+    const pinsInsert = harness.events.find((event) => event.table === 'pins' && event.op === 'insert');
+    const rows = pinsInsert?.row as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(7);
+    // plan(7) deliberately repeats 2 of the 5 angles (index 5 and 6 wrap
+    // around) — under a 'balanced' strategy this would fail angle-coverage,
+    // but ai-recommends must accept it, and 7 is not 5/10 either way.
+    expect(rows.every((row) => row.visual_format === 'ai-integrated')).toBe(true);
+    // No SVG/legacy-banner field is ever persisted for AI Integrated.
+    expect(
+      rows.every(
+        (row) =>
+          row.cta_banner_template === null &&
+          row.title_banner_template === null &&
+          row.overlay_text === null
+      )
+    ).toBe(true);
+    // AI Integrated resolves the effective language from the project's
+    // default language, not the client's requested one (resolveEffectiveLanguage).
+    expect(rows.every((row) => row.language === 'de')).toBe(true);
+  });
+});
+
+test('AI Integrated: every Pinterest angle is accepted by the manual-strategy resolver', () => {
+  for (const angle of ['curiosity', 'problem-solution', 'listicle', 'discovery', 'article-promise'] as const) {
+    expect(resolvePinAngle('manual', angle, 'curiosity')).toBe(angle);
   }
 });
 

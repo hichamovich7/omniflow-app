@@ -44,6 +44,9 @@ function clampBannerTemplate(
   return allowed[0];
 }
 
+// Bounded so a pathological batch never grows the log line unreasonably.
+const MAX_LOGGED_STRATEGY_ISSUES = 10;
+
 function classifyGenerationError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
 
@@ -280,8 +283,10 @@ export async function POST(request: Request) {
       plan = parsePinterestGenerationPlan(content);
     } catch (planError) {
       if (!(planError instanceof PinterestPlanError)) throw planError;
-      // Bounded diagnostics only — never the full raw response.
-      console.error(`[${PROMPT_ID}] Pin plan rejected:`, planError.diagnostics());
+      // Bounded diagnostics only — never the full raw response. A single
+      // flattened string argument (see the strategy-validation log below)
+      // so it stays legible in log viewers that collapse object arguments.
+      console.error(`[${PROMPT_ID}] Pin plan rejected: ${JSON.stringify(planError.diagnostics())}`);
       await supabase
         .from('generations')
         .update({ status: 'failed', error_message: PIN_PLAN_FAILURE_MESSAGE })
@@ -309,15 +314,27 @@ export async function POST(request: Request) {
       }
     );
     if (strategyIssues.length > 0) {
-      console.error(`[${PROMPT_ID}] Strategy validation failed:`, strategyIssues);
+      // A single flattened string argument — never a bare object — so the
+      // issue codes stay legible in log viewers that summarize/collapse
+      // non-primitive console.error arguments (they were previously opaque
+      // in production, e.g. Vercel Runtime Logs rendering an untruncated
+      // object preview as an unreadable placeholder).
+      console.error(
+        `[${PROMPT_ID}] Strategy validation failed: ${JSON.stringify(
+          strategyIssues.slice(0, MAX_LOGGED_STRATEGY_ISSUES)
+        )}`
+      );
+      // A controlled content-validation failure, not a server bug: same
+      // family as invalid_pin_plan above. No board, pin or image work has
+      // happened yet, and no credits were ever debited (credits_used: 0).
       const errorMessage = 'AI returned Pinterest content that failed strategy safeguards. Try again.';
       await supabase
         .from('generations')
         .update({ status: 'failed', error_message: errorMessage })
         .eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
-        { data: null, error: { message: errorMessage, code: 'generation_failed' } },
-        { status: 500 }
+        { data: null, error: { message: errorMessage, code: 'invalid_strategy_plan' } },
+        { status: 422 }
       );
     }
 
