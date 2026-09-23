@@ -108,6 +108,30 @@ export const optionalIntegratedTextSchema = z.discriminatedUnion('mode', [
   noTextSchema,
 ]);
 
+export type IntegratedTextElement = 'headline' | 'subtitle' | 'cta';
+
+// An element is on the image only when its text mode is not "none" AND its
+// importance is not "none". Everything that counts lines, builds prompts or
+// persists text goes through this single rule.
+export function isIntegratedTextEnabled(
+  settings: {
+    headline: { mode: string };
+    subtitle: { mode: string };
+    cta: { mode: string };
+    importance: Record<IntegratedTextElement, string>;
+  },
+  element: IntegratedTextElement
+): boolean {
+  return settings[element].mode !== 'none' && settings.importance[element] !== 'none';
+}
+
+const INTEGRATED_TEXT_ELEMENTS: readonly IntegratedTextElement[] = ['headline', 'subtitle', 'cta'];
+const INTEGRATED_TEXT_LABELS: Record<IntegratedTextElement, string> = {
+  headline: 'Headline',
+  subtitle: 'Subtitle',
+  cta: 'CTA',
+};
+
 export const aiIntegratedSettingsSchema = z
   .object({
     creativeFormat: z.enum(PINTEREST_CREATIVE_FORMATS),
@@ -139,7 +163,28 @@ export const aiIntegratedSettingsSchema = z
         message: 'Manual angle is only allowed when Pinterest strategy is Manual',
       });
     }
-    const exactLineCount = [settings.headline, settings.subtitle, settings.cta]
+    // Exact text on an element whose importance is None is contradictory: the
+    // element would be both required and disabled.
+    for (const element of INTEGRATED_TEXT_ELEMENTS) {
+      if (settings[element].mode === 'exact' && settings.importance[element] === 'none') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['importance', element],
+          message: `${INTEGRATED_TEXT_LABELS[element]} has exact text but its importance is None. Remove the text or choose another importance.`,
+        });
+      }
+    }
+    if (!INTEGRATED_TEXT_ELEMENTS.some((element) => isIntegratedTextEnabled(settings, element))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['importance'],
+        message: 'At least one of Headline, Subtitle or CTA must be enabled. Use Photo Only for an image without text.',
+      });
+    }
+    // Only enabled elements take up lines; a None element never consumes one.
+    const exactLineCount = INTEGRATED_TEXT_ELEMENTS
+      .filter((element) => isIntegratedTextEnabled(settings, element))
+      .map((element) => settings[element])
       .filter((field): field is Extract<typeof field, { mode: 'exact' }> => field.mode === 'exact')
       .reduce((count, field) => count + field.text.split(/\r?\n/).length, 0);
     if (exactLineCount > settings.maximumTextLines) {
@@ -205,7 +250,8 @@ const pinResponseSchema = z
     visualFormat: z.enum(['photo', 'text-overlay']),
     overlayText: z.string().max(80).optional(),
     integratedText: z.object({
-      headline: z.string().trim().min(1).max(120),
+      // Optional: Headline importance "none" omits it from the plan.
+      headline: z.string().trim().min(1).max(120).optional(),
       subtitle: z.string().trim().min(1).max(120).optional(),
       cta: z.string().trim().min(1).max(60).optional(),
     }).strict().optional(),

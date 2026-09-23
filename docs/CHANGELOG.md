@@ -18,6 +18,21 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Add: `None` importance for AI Integrated Headline, Subtitle and CTA
+
+### Added
+
+* `PINTEREST_TEXT_IMPORTANCE` gains `none` (`types/pinterest.ts`); the three importance selects in **AI Integrated settings** offer `None`, with the help line "None = do not generate this text element."
+* `None` disables the element everywhere: omitted from the planning prompt, dropped from the resolved text (persisted as `null`, so `_pinterestAiIntegrated.text.headline` is now nullable — older pins with a string still parse), and excluded from the image prompt (explicit "Do NOT render …" line, no placeholder). `Maximum text lines` counts enabled elements only.
+* Server rejects exact text on a `None` element and a request with every element disabled (400 `invalid_request`). The form empties/locks the exact text and mode when importance is set to `None`.
+* Single rule `isIntegratedTextEnabled()` (`lib/validations/pinterest.ts`). `integratedText.headline` is optional in the plan schema.
+
+* Inline alert (exact message above, `role="alert"`, no native dialog) in AI Integrated settings when Headline, Subtitle and CTA importance are all `None`; derived state, so it clears as soon as one is re-enabled. The form does not submit (no call to `/api/pinterest/generate`) and keeps the values. The server 400 `invalid_request` stays as the second line of defense.
+
+### Not changed
+
+* Legacy Composite, Photo Only, the SVG/Sharp renderer, references, scheduling, providers and the database (no migration). Behavior with the three elements enabled, and the defaults (high/medium/low), are identical.
+
 ## Add: Board Section display in the Pin table and Board detail page
 
 ### Added

@@ -1,7 +1,7 @@
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
-import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
+import { BANNER_TEMPLATES, isIntegratedTextEnabled } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import type { AiIntegratedSettings } from '@/lib/pinterest/ai-integrated';
 import type { PinterestGenerationMode } from '@/types/pinterest';
@@ -145,24 +145,43 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
         ? 'Use each of the five angles exactly twice. The two pins sharing an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
         : 'Balance the five angles across the batch and use every angle once before repeating one whenever the batch size allows it.';
 
+  // An element is omitted when its text mode is "none" or its importance is
+  // "none": the key must be absent from integratedText (never "None", "N/A" or
+  // an empty string), and the server drops it anyway.
+  const omittedKey = (element: 'headline' | 'subtitle' | 'cta') =>
+    ctx.aiIntegrated ? !isIntegratedTextEnabled(ctx.aiIntegrated, element) : false;
+
   const integratedTextInstruction = isAiIntegrated && ctx.aiIntegrated
     ? `- integratedText: final on-image strings in ${langName}. ${
-        ctx.aiIntegrated.headline.mode === 'exact'
-          ? `headline must be exactly ${JSON.stringify(ctx.aiIntegrated.headline.text)}.`
-          : 'Generate a concise, compelling headline.'
+        omittedKey('headline')
+          ? 'Omit headline.'
+          : ctx.aiIntegrated.headline.mode === 'exact'
+            ? `headline must be exactly ${JSON.stringify(ctx.aiIntegrated.headline.text)}.`
+            : 'Generate a concise, compelling headline.'
       } ${
-        ctx.aiIntegrated.subtitle.mode === 'none'
+        omittedKey('subtitle')
           ? 'Omit subtitle.'
           : ctx.aiIntegrated.subtitle.mode === 'exact'
             ? `subtitle must be exactly ${JSON.stringify(ctx.aiIntegrated.subtitle.text)}.`
             : 'Generate a concise supporting subtitle.'
       } ${
-        ctx.aiIntegrated.cta.mode === 'none'
+        omittedKey('cta')
           ? 'Omit cta.'
           : ctx.aiIntegrated.cta.mode === 'exact'
             ? `cta must be exactly ${JSON.stringify(ctx.aiIntegrated.cta.text)}.`
             : 'Generate a short action-oriented CTA.'
+      }${
+        (['headline', 'subtitle', 'cta'] as const).some(omittedKey)
+          ? ' An omitted key must be absent from integratedText — never write "None", "N/A", or an empty string for it.'
+          : ''
       } The combined visible text must fit within ${ctx.aiIntegrated.maximumTextLines} lines. Exact strings are immutable.`
+    : '';
+
+  const integratedTextExample = ctx.aiIntegrated
+    ? (['headline', 'subtitle', 'cta'] as const)
+        .filter((element) => !omittedKey(element))
+        .map((element) => `"${element}": "..."`)
+        .join(', ')
     : '';
 
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
@@ -214,7 +233,7 @@ Respond with this exact JSON structure:
       "image_prompt": "...",
       "visualFormat": "photo",
       "overlayText": "...",
-      "ctaBannerTemplate": "clean-band"${isAiIntegrated ? ',\n      "integratedText": { "headline": "...", "subtitle": "...", "cta": "..." }' : ''}
+      "ctaBannerTemplate": "clean-band"${isAiIntegrated ? `,\n      "integratedText": { ${integratedTextExample} }` : ''}
     }
   ]
 }`;

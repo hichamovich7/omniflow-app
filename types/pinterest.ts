@@ -28,7 +28,9 @@ export type PinterestCreativeFormat = (typeof PINTEREST_CREATIVE_FORMATS)[number
 export const PINTEREST_STRATEGIES = ['ai-recommends', 'balanced', 'manual'] as const;
 export type PinterestStrategy = (typeof PINTEREST_STRATEGIES)[number];
 
-export const PINTEREST_TEXT_IMPORTANCE = ['high', 'medium', 'low'] as const;
+// `none` disables the element entirely: it is not generated, not rendered and
+// not persisted (see isIntegratedTextEnabled in lib/validations/pinterest.ts).
+export const PINTEREST_TEXT_IMPORTANCE = ['high', 'medium', 'low', 'none'] as const;
 export type PinterestTextImportance = (typeof PINTEREST_TEXT_IMPORTANCE)[number];
 
 export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {

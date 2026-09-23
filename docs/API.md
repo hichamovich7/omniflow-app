@@ -135,10 +135,12 @@ Creates one generation request and produces Pinterest content using AI.
     "subtitle": { "mode": "generate" } | { "mode": "exact", "text": "..." } | { "mode": "none" },
     "cta": { "mode": "generate" } | { "mode": "exact", "text": "..." } | { "mode": "none" },
     "maximumTextLines": 4,
-    "importance": { "headline": "high", "subtitle": "medium", "cta": "low" }
+    "importance": { "headline": "high | medium | low | none", "subtitle": "medium", "cta": "low" }
   }
 }
 ```
+
+`importance.<element> = none` disables that element (Headline, Subtitle or CTA): it is not requested from the AI (the planning prompt says to omit the key), never persisted (`_pinterestAiIntegrated.text.<element>` is `null`, whatever the model returned) and never rendered (the image prompt asks for a composition without it). It counts for no line of `maximumTextLines`. Two combinations are rejected with HTTP 400 `invalid_request`: exact text on an element whose importance is `none`, and a request where Headline, Subtitle and CTA are all disabled (by text mode `none` or importance `none`) — use Photo Only for an image without text. Defaults and the behavior with all three elements enabled are unchanged.
 
 `manualAngle` is required when `strategy = manual` and forbidden otherwise. Exact strings are 1-120 characters and their line count cannot exceed `maximumTextLines` (2-6). For `ai-integrated` the server ignores the submitted `language` and uses the owned project's `default_language` (falling back to the submitted value only when the stored one is unsupported). The FAST role returns the final `integratedText` (`headline` / `subtitle` / `cta`) for `Generate` fields; the server substitutes exact strings verbatim, checks presence and the line budget, and persists the resolved contract under `pins.image_analysis._pinterestAiIntegrated`. `strategy = manual` applies the chosen angle to every pin; balanced angle coverage is enforced only for `balanced` and legacy modes.
 

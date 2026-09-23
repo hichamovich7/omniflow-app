@@ -342,7 +342,7 @@ The form is grouped into five compact sections that follow the real workflow, to
 2. **Board** — optional. Help: "Choose the Pinterest board for these Pins, or leave it blank to decide later."
 3. **Keyword** — the main search phrase. Help: "Use the main search phrase your Pins should target."
 4. **Generation mode** — AI Integrated / Photo Only / Legacy Composite. In Legacy Composite the pre-existing Reference Image and "Text in Images" controls appear here, unchanged.
-5. **AI Integrated settings** — only when AI Integrated is selected. Help: "Choose how the final Pinterest visual and its text should be created." Ends with the discreet reference "coming soon" note.
+5. **AI Integrated settings** — only when AI Integrated is selected. Help: "Choose how the final Pinterest visual and its text should be created." The Headline / Subtitle / CTA importance selects offer High, Medium, Low and **None**, with the help line "None = do not generate this text element." Choosing None empties and locks that element's exact text and mode (a note replaces them); the server also rejects the contradiction and a request with all three elements disabled. When all three importances are None an inline red alert (role="alert") shows "Headline, subtitle and CTA cannot all be set to None. Select at least one text element, or use Photo Only for an image without text."; it disappears as soon as one element is re-enabled, submission is blocked client-side (no request is sent) and the chosen values are kept. Ends with the discreet reference "coming soon" note.
 
 Each section has a visible heading and at most one help sentence; on mobile every field stacks full-width. No Link, URL or destination field exists in this form. The field descriptions below are unchanged.
 

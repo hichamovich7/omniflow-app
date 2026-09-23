@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { z } from 'zod';
-import { aiIntegratedSettingsSchema } from '@/lib/validations/pinterest';
+import { aiIntegratedSettingsSchema, isIntegratedTextEnabled } from '@/lib/validations/pinterest';
 import { LANGUAGE_LABELS, PINTEREST_ANGLES, SUPPORTED_LANGUAGES } from '@/types/pinterest';
 import type {
   PinterestAngle,
@@ -14,7 +14,9 @@ const AI_INTEGRATED_METADATA_KEY = '_pinterestAiIntegrated';
 export type AiIntegratedSettings = z.infer<typeof aiIntegratedSettingsSchema>;
 
 const resolvedTextSchema = z.object({
-  headline: z.string().trim().min(1).max(120),
+  // Null when Headline importance is None. Pins persisted before that option
+  // always carry a string, so they still parse.
+  headline: z.string().trim().min(1).max(120).nullable(),
   subtitle: z.string().trim().min(1).max(120).nullable(),
   cta: z.string().trim().min(1).max(60).nullable(),
 }).strict();
@@ -26,7 +28,7 @@ const persistedAiIntegratedSchema = z.object({
 }).strict();
 
 export interface GeneratedIntegratedText {
-  headline: string;
+  headline?: string;
   subtitle?: string;
   cta?: string;
 }
@@ -59,10 +61,18 @@ export function resolveAiIntegratedText(
   settings: AiIntegratedSettings,
   generated: GeneratedIntegratedText | undefined
 ): PersistedAiIntegrated['text'] {
+  // A disabled element (mode none or importance None) is dropped no matter what
+  // the model returned for it: never persisted, never rendered.
   const text = {
-    headline: resolveTextField(settings.headline, generated?.headline, 'headline') ?? '',
-    subtitle: resolveTextField(settings.subtitle, generated?.subtitle, 'subtitle'),
-    cta: resolveTextField(settings.cta, generated?.cta, 'CTA'),
+    headline: isIntegratedTextEnabled(settings, 'headline')
+      ? resolveTextField(settings.headline, generated?.headline, 'headline')
+      : null,
+    subtitle: isIntegratedTextEnabled(settings, 'subtitle')
+      ? resolveTextField(settings.subtitle, generated?.subtitle, 'subtitle')
+      : null,
+    cta: isIntegratedTextEnabled(settings, 'cta')
+      ? resolveTextField(settings.cta, generated?.cta, 'CTA')
+      : null,
   };
 
   const parsed = resolvedTextSchema.parse(text);
@@ -140,7 +150,10 @@ const IMPORTANCE_LABELS = {
   high: 'primary',
   medium: 'secondary',
   low: 'subtle',
+  none: 'omitted',
 } as const;
+
+const ELEMENT_LABELS = { headline: 'headline', subtitle: 'subtitle', cta: 'CTA' } as const;
 
 function quoteExact(value: string | null): string {
   return value === null ? 'NONE — render no element for this field' : JSON.stringify(value);
@@ -153,6 +166,20 @@ export function buildAiIntegratedImagePrompt(
 ): string {
   const { settings, text } = metadata;
   const language = LANGUAGE_LABELS[metadata.language as SupportedLanguage];
+  const elements = (['headline', 'subtitle', 'cta'] as const).filter((element) =>
+    isIntegratedTextEnabled(settings, element)
+  );
+  const disabled = (['headline', 'subtitle', 'cta'] as const).filter(
+    (element) => !elements.includes(element)
+  );
+  // Only mentioned when something is off, so a full three-element Pin keeps
+  // exactly the historical prompt.
+  const omission = disabled.length
+    ? `Do NOT render a ${disabled.map((element) => ELEMENT_LABELS[element]).join(' or a ')}: compose the layout without ${disabled.length > 1 ? 'those elements' : 'that element'}, leave no placeholder, empty box, or substitute wording such as "None" or "N/A".`
+    : '';
+  const hierarchy = disabled.length
+    ? `Keep a clear hierarchy between ${elements.map((element) => ELEMENT_LABELS[element]).join(' and ')}.`
+    : 'Keep a clear hierarchy between headline, subtitle, and CTA.';
   const variation = version > 1
     ? `Create a genuinely different photographic composition for version ${version}, while preserving every exact text string.`
     : '';
@@ -167,7 +194,8 @@ export function buildAiIntegratedImagePrompt(
     `Headline (${IMPORTANCE_LABELS[settings.importance.headline]}): ${quoteExact(text.headline)}`,
     `Subtitle (${IMPORTANCE_LABELS[settings.importance.subtitle]}): ${quoteExact(text.subtitle)}`,
     `CTA (${IMPORTANCE_LABELS[settings.importance.cta]}): ${quoteExact(text.cta)}`,
-    `Use no more than ${settings.maximumTextLines} total visible text lines. Keep a clear hierarchy between headline, subtitle, and CTA.`,
+    omission,
+    `Use no more than ${settings.maximumTextLines} total visible text lines. ${hierarchy}`,
     'Keep all approved text readable at mobile size and keep it clear of the main subject. Do not cover faces, hands, crochet stitches, yarn details, showers, vanities, bathtubs, or key decor features.',
     'For Crochet: show realistic stitches and yarn fibers in a warm craft or lifestyle environment. Do not reveal complete instructions or a full pattern in the Pin.',
     'STRICT TEXT CONSTRAINT: render only the approved text above. Add no other word, letter, number, caption, label, signature, pseudo-text, logo, brand mark, watermark, URL, hashtag, badge, or decorative writing anywhere in the image.',

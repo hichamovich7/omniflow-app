@@ -93,6 +93,9 @@ const MODE_OPTIONS: Array<{
   },
 ];
 
+const ALL_TEXT_NONE_MESSAGE =
+  'Headline, subtitle and CTA cannot all be set to None. Select at least one text element, or use Photo Only for an image without text.';
+
 function IntegratedTextControl({
   label,
   mode,
@@ -100,6 +103,7 @@ function IntegratedTextControl({
   text,
   onTextChange,
   allowNone,
+  importanceNone,
   disabled,
 }: {
   label: string;
@@ -108,13 +112,19 @@ function IntegratedTextControl({
   text: string;
   onTextChange: (text: string) => void;
   allowNone?: boolean;
+  /** Importance is None: the element is off, so its mode and exact text are locked. */
+  importanceNone?: boolean;
   disabled: boolean;
 }) {
   return (
     <div className="space-y-2 rounded-xl border border-border/60 bg-background/60 p-3">
       <div className="flex items-center justify-between gap-3">
         <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-        <Select value={mode} onValueChange={(value) => value && onModeChange(value as OptionalTextMode)}>
+        <Select
+          value={mode}
+          disabled={importanceNone}
+          onValueChange={(value) => value && onModeChange(value as OptionalTextMode)}
+        >
           <SelectTrigger className="h-9 w-40" aria-label={`${label} mode`}>
             <SelectValue />
           </SelectTrigger>
@@ -125,7 +135,12 @@ function IntegratedTextControl({
           </SelectContent>
         </Select>
       </div>
-      {mode === 'exact' && (
+      {importanceNone && (
+        <p className="text-xs text-muted-foreground">
+          Importance is None: this element will not be generated.
+        </p>
+      )}
+      {mode === 'exact' && !importanceNone && (
         <Textarea
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
@@ -248,13 +263,50 @@ export function PinForm({ projects, boards }: PinFormProps) {
     }
   }
 
+  // Importance None switches the element off. An exact text it may hold would
+  // contradict that (the server rejects the combination), so it is emptied and
+  // the mode reset instead of being silently kept.
+  function handleImportanceChange(
+    element: 'headline' | 'subtitle' | 'cta',
+    next: PinterestTextImportance
+  ) {
+    if (next === 'none') {
+      if (element === 'headline') {
+        setHeadlineMode('generate');
+        setHeadlineText('');
+      } else if (element === 'subtitle') {
+        setSubtitleMode('generate');
+        setSubtitleText('');
+      } else {
+        setCtaMode('generate');
+        setCtaText('');
+      }
+    }
+    if (element === 'headline') setHeadlineImportance(next);
+    else if (element === 'subtitle') setSubtitleImportance(next);
+    else setCtaImportance(next);
+  }
+
   const boardOptions = boards.filter((b) => b.project_id === projectId);
   const boardSectionError =
     boardSection.trim() && !board.trim() ? BOARD_SECTION_REQUIRES_BOARD_MESSAGE : null;
 
+  // Derived, never stored: the alert appears the moment the third element is
+  // set to None and disappears as soon as any one is re-enabled. The chosen
+  // values are left untouched so the user can simply correct one of them.
+  const allTextImportanceNone =
+    generationMode === 'ai-integrated' &&
+    headlineImportance === 'none' &&
+    subtitleImportance === 'none' &&
+    ctaImportance === 'none';
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // The inline alert already explains the problem; nothing is sent. The
+    // server keeps the same rule as a second line of defense (400 invalid_request).
+    if (allTextImportanceNone) return;
 
     if (boardSectionError) {
       setError(boardSectionError);
@@ -671,6 +723,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
                 onModeChange={(mode) => setHeadlineMode(mode as RequiredTextMode)}
                 text={headlineText}
                 onTextChange={setHeadlineText}
+                importanceNone={headlineImportance === 'none'}
                 disabled={loading}
               />
               <IntegratedTextControl
@@ -679,6 +732,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
                 onModeChange={setSubtitleMode}
                 text={subtitleText}
                 onTextChange={setSubtitleText}
+                importanceNone={subtitleImportance === 'none'}
                 allowNone
                 disabled={loading}
               />
@@ -688,6 +742,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
                 onModeChange={setCtaMode}
                 text={ctaText}
                 onTextChange={setCtaText}
+                importanceNone={ctaImportance === 'none'}
                 allowNone
                 disabled={loading}
               />
@@ -702,23 +757,40 @@ export function PinForm({ projects, boards }: PinFormProps) {
                 </Select>
               </div>
               {([
-                ['Headline', headlineImportance, setHeadlineImportance],
-                ['Subtitle', subtitleImportance, setSubtitleImportance],
-                ['CTA', ctaImportance, setCtaImportance],
-              ] as const).map(([label, value, setter]) => (
+                ['Headline', 'headline', headlineImportance],
+                ['Subtitle', 'subtitle', subtitleImportance],
+                ['CTA', 'cta', ctaImportance],
+              ] as const).map(([label, element, value]) => (
                 <div key={label} className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">{label} importance</Label>
-                  <Select value={value} onValueChange={(next) => next && setter(next as PinterestTextImportance)}>
+                  <Select
+                    value={value}
+                    onValueChange={(next) => next && handleImportanceChange(element, next as PinterestTextImportance)}
+                  >
                     <SelectTrigger aria-label={`${label} importance`}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground" data-testid="importance-none-help">
+              None = do not generate this text element.
+            </p>
+            {allTextImportanceNone && (
+              <div
+                role="alert"
+                data-testid="all-text-none-alert"
+                className="flex items-start gap-2 rounded-lg bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{ALL_TEXT_NONE_MESSAGE}</span>
+              </div>
+            )}
 
             <p
               role="note"
