@@ -113,7 +113,7 @@ The original `#2583FF` remains the vivid brand blue for rings and graphical high
 
 ### Chart palette
 
-Use at most five simultaneous series, in this order:
+OmniFlow has no chart yet (Charts v1 is deferred until an Analytics use case exists; see `docs/UI-ROADMAP.md`). The `--chart-1` … `--chart-5` tokens in `app/globals.css`, defined for both themes, are the palette reserved for future charts. Use them in this order, at most five simultaneous series:
 
 1. Blue `#1570EF`
 2. Purple `#7C3CFF`
@@ -121,7 +121,12 @@ Use at most five simultaneous series, in this order:
 4. Orange `#D97706`
 5. Cyan `#0891B2`
 
-Grid lines use `--border`; axes use `--subtle-foreground`; tooltips use `--surface-elevated` and `--shadow-sm`. Do not rely on red/green alone. Pair series with labels, shapes, or line styles and provide a textual or tabular equivalent for important data.
+Verified on the tokens (2026-09-25):
+
+- Every series reaches at least 3:1 against the `--card` surface in both themes. Light: 3.19–5.32:1, with orange lowest. Dark: 5.64–8.53:1.
+- `--chart-3` (green) and `--chart-4` (orange) have almost the same luminance (1.02–1.03:1 against each other in both themes), so they can look alike to people with red–green color blindness. When both appear in one chart, also tell them apart with direct labels, a different line style (e.g. dashed), a distinct marker, or an explicit legend.
+
+Future direction, not yet validated on a real chart: grid lines use `--border`; axes use `--subtle-foreground`; tooltips use `--surface-elevated` and `--shadow-sm`. Do not rely on red/green alone. Pair series with labels, shapes, or line styles and provide a textual or tabular equivalent for important data.
 
 ### Dark mode
 
@@ -356,7 +361,7 @@ Short, supplemental, and never required to complete an action. Use a dark neutra
 
 ### Charts
 
-Use quiet grid lines, labeled axes and units, nearby legends, exact-value tooltips, and 2 px lines. Area opacity stays below 16%. Reduce tick density and series count on small screens. Provide an accessible summary and a data table or export path for important datasets.
+Future direction only: no chart exists yet, so none of this has been implemented or validated. Use quiet grid lines, labeled axes and units, nearby legends, exact-value tooltips, and 2 px lines. Area opacity stays below 16%. Reduce tick density and series count on small screens. Provide an accessible summary and a data table or export path for important datasets.
 
 ### Icons
 

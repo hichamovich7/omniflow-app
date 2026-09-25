@@ -18,6 +18,17 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Docs: Charts v1 audit — implementation deferred
+
+### Changed
+
+* Charts UI audit completed: no chart or chart library exists yet, and Analytics is outside the current MVP, so chart implementation is deferred (`docs/UI-ROADMAP.md`).
+* `docs/DESIGN.md` records the checked contrast of the reserved `--chart-1…5` palette. Green and orange series need a non-color cue when used together. The other chart rules are marked as future direction.
+
+### Not changed
+
+* No application code, dependency, API, database, or product behavior change. No chart was added.
+
 ## UI: Data Metrics v1 — KPI cards and Progress
 
 ### Changed
