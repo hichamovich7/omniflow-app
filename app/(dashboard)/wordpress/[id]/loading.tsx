@@ -1,9 +1,9 @@
-import { PageContainer } from '@/components/ui/page-container';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function WordPressArticleLoading() {
   return (
-    <PageContainer>
+    <PageSkeleton label="Loading article">
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Skeleton className="h-7 w-7 rounded-lg" />
@@ -27,6 +27,6 @@ export default function WordPressArticleLoading() {
           <Skeleton className="h-4 w-2/3" />
         </div>
       </div>
-    </PageContainer>
+    </PageSkeleton>
   );
 }

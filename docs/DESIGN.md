@@ -386,7 +386,29 @@ Short, supplemental, and never required to complete an action. Use a dark neutra
 
 ### Loading, empty, error, and success states
 
-`PageState` should absorb the older `EmptyState` pattern. Skeletons mirror the final component geometry. Use spinners only for compact, short-lived actions. Error states include a recovery action when recovery is possible. Success feedback is concise and uses icon/text in addition to color.
+`PageState` (`components/shared/page-state`) is the canonical page- and section-level state. `EmptyState` is a thin wrapper that produces an `empty` `PageState`.
+
+- Look: compact and centred inside a dashed `--border` outline with no fill.
+- Icon: a 40 px tile holding a 20 px icon. The tile carries the tone:
+  - muted for empty, unavailable, and loading;
+  - `destructive-soft` for error;
+  - `warning-soft` for permission.
+- Text: an 18 / 600 title and a 14 px muted description.
+- Heading level: 2 inside a page, 3 under a titled section, 1 when the state replaces the page.
+- Action: at most one action, and only one that already exists. Never invent a CTA.
+- Variants: `empty`, `error`, `unavailable` ("Coming soon"), `permission-denied`, `loading`. Do not add a variant per message.
+- No data vs no results:
+  - "No data" says nothing exists yet and offers the existing create action.
+  - "No results" says the filters matched nothing ("No matching results", a search icon) and offers "Clear filters".
+  - Filtering decides which one shows; it is never changed for presentation.
+- Error: the error variant, with a "Try again" when a recovery exists. Never show stack traces or raw error messages. `role="alert"` is for error and permission states only.
+- Unavailable features: say so in text (a `Badge variant="outline"` "Soon", or the `unavailable` state). Never fade the whole item with stacked opacity; muted text stays at full token strength.
+- Loading:
+  - Route loading uses `PageSkeleton` (`components/skeletons/page-skeleton`): the page's own container, `aria-busy="true"`, and one `role="status"` message ("Loading projects").
+  - `Skeleton` blocks are `aria-hidden`, `--muted`, rounded like the content they stand in for, with a pulse that stops under reduced motion.
+  - Skeletons mirror the real page: same container width, header shape, grid columns, and card outlines.
+  - Use spinners only for compact, short-lived actions.
+- Success: feedback is a sonner toast (icon + text) and is concise. Completed or published work is a workflow status, not a success page.
 
 ### Charts
 
@@ -410,16 +432,16 @@ Lucide is the sole product icon library. Standard sizes are 14, 16, 18, 20, and 
 
 ## Main UI Files
 
-| Concern                      | Primary files                                                                                                                                                                                                                          |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Global tokens and typography | `app/globals.css`, `app/layout.tsx`                                                                                                                                                                                                    |
-| Application shell            | `app/(dashboard)/layout.tsx`, `components/layout/sidebar.tsx`, `components/layout/topbar.tsx`, `components/layout/mobile-nav.tsx`                                                                                                      |
-| Page layout and headers      | `components/ui/page-container.tsx`, `components/layout/page-header.tsx`, `components/shared/resource-header/resource-header.tsx`                                                                                                       |
-| Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                                                                                     |
-| Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                                                                            |
-| Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`, `components/ui/progress.tsx`, `components/shared/metric-card/` |
-| Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx`, `lib/utils/status.ts`                                   |
-| Representative feature UI    | `components/dashboard/`, `components/projects/`, `components/boards/`, `components/pinterest/`, `components/wordpress/`, `components/history/`, `components/research/`                                                                 |
+| Concern                      | Primary files                                                                                                                                                                                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Global tokens and typography | `app/globals.css`, `app/layout.tsx`                                                                                                                                                                                                            |
+| Application shell            | `app/(dashboard)/layout.tsx`, `components/layout/sidebar.tsx`, `components/layout/topbar.tsx`, `components/layout/mobile-nav.tsx`                                                                                                              |
+| Page layout and headers      | `components/ui/page-container.tsx`, `components/layout/page-header.tsx`, `components/shared/resource-header/resource-header.tsx`                                                                                                               |
+| Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                                                                                             |
+| Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                                                                                    |
+| Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`, `components/ui/progress.tsx`, `components/shared/metric-card/`         |
+| Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/skeletons/page-skeleton.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx`, `lib/utils/status.ts` |
+| Representative feature UI    | `components/dashboard/`, `components/projects/`, `components/boards/`, `components/pinterest/`, `components/wordpress/`, `components/history/`, `components/research/`                                                                         |
 
 ## Governance
 

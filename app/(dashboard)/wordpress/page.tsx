@@ -5,6 +5,7 @@ import { PinsSourceArticleForm } from '@/components/wordpress/pins-source-articl
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
 import { listWordPressCategories } from '@/lib/queries/wordpress-categories';
 import { EmptyState } from '@/components/empty-state';
+import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { FileText, ImageOff, Layers, LayoutTemplate, RefreshCw } from 'lucide-react';
@@ -50,20 +51,22 @@ function GeneratorCardItem({ card }: { card: GeneratorCard }) {
 
   if (!card.href) {
     return (
+      // Unavailable, not clickable: dashed outline and muted text at full token strength
+      // (no opacity stacking), and "Soon" as text, like the sidebar's badge.
       <div
         aria-disabled="true"
-        className="relative flex flex-col gap-3 rounded-2xl border border-border/60 bg-surface p-5 opacity-60 cursor-not-allowed"
+        className="relative flex flex-col gap-3 rounded-2xl border border-dashed border-border bg-card p-5 cursor-not-allowed"
       >
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
-          <Icon className="h-4.5 w-4.5 text-muted-foreground/50" />
+          <Icon className="h-4.5 w-4.5 text-muted-foreground" aria-hidden="true" />
         </div>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground/70">{card.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground/50">{card.description}</p>
+        <div className="pr-14">
+          <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{card.description}</p>
         </div>
-        <span className="absolute right-4 top-4 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/40">
+        <Badge variant="outline" className="absolute right-4 top-4">
           Soon
-        </span>
+        </Badge>
       </div>
     );
   }
