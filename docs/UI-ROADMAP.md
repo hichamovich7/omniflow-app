@@ -291,6 +291,15 @@ Status: **Complete** (2026-09-25, branch `feature/ui-data-metrics-v1`). Covers `
 - At 390 px, 2-column KPI labels such as "Articles Generated" can take two lines, and "/ 1000 €" wraps under "240 €". Both are intended wraps, not overflow.
 - Trend/delta: none exists. The rule is in DESIGN.md for when one is added.
 
+### Charts v1 — Deferred
+
+Status: **Deferred / Not implemented** (audit 2026-09-25, branch `feature/ui-charts-v1`). The two chart items above stay unchecked.
+
+- Audit: no chart library is installed (no Recharts, Chart.js, D3, visx, Nivo, Tremor, or similar in `package.json`), no chart, chart wrapper, or data-drawing SVG exists in `app/` or `components/`, and there is no Analytics route. The Dashboard and Project detail show KPI cards and progress bars only (Data Metrics v1).
+- The Analytics Dashboard is outside the current MVP (`docs/PROJECT.md`, `docs/TASKS.md`).
+- Only the `--chart-1` … `--chart-5` tokens exist, unused. Their contrast was checked and recorded under "Chart palette" in `docs/DESIGN.md`, including the green / orange rule.
+- Implementation is deferred until a real product need exists. No library, wrapper, demo page, or placeholder chart was added. When it starts, the axes, grid, tooltip, legend, heights, responsive behavior, and accessible summaries will be validated on real charts.
+
 ## Phase 5 — Product States
 
 - [ ] Skeletons match final card, table, and form geometry
