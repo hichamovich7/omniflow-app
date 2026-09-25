@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Settings, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Settings, Pencil, Trash2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,6 +56,9 @@ export function CategorySelect({
 }: CategorySelectProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  // "New Category" opens from a Select item that unmounts with the list, so
+  // the dialog returns focus to the Select trigger explicitly.
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const selected = categories.find((c) => c.id === value);
 
@@ -72,7 +75,7 @@ export function CategorySelect({
     <>
       <div className="flex min-w-0 items-center gap-1.5">
         <Select value={value || NONE_VALUE} onValueChange={handleValueChange}>
-          <SelectTrigger id="category" className={cn('w-full min-w-0', triggerClassName)}>
+          <SelectTrigger ref={triggerRef} id="category" className={cn('w-full min-w-0', triggerClassName)}>
             <span className="min-w-0 truncate text-sm">{selected?.name ?? 'Uncategorized'}</span>
           </SelectTrigger>
           <SelectContent>
@@ -105,6 +108,7 @@ export function CategorySelect({
       <CreateCategoryDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
+        finalFocus={triggerRef}
         projectId={projectId}
         onCreated={(category) => {
           onCategoriesChange([...categories, category]);
@@ -132,9 +136,12 @@ export function CreateCategoryDialog({
   onOpenChange,
   projectId,
   onCreated,
+  finalFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Element to focus on close when the opener is not a stable element (e.g. a Select item). */
+  finalFocus?: React.RefObject<HTMLElement | null>;
   projectId: string;
   onCreated: (category: CategoryOption) => void;
 }) {
@@ -179,9 +186,13 @@ export function CreateCategoryDialog({
     handleOpenChange(false);
   }
 
+  // `initialFocus` instead of `autoFocus`: autoFocus moves focus before the
+  // dialog records the element to return to, so closing landed on <body>.
+  const nameRef = useRef<HTMLInputElement>(null);
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent initialFocus={nameRef} finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>New Category</DialogTitle>
           <DialogDescription>Categories are scoped to this project.</DialogDescription>
@@ -189,13 +200,13 @@ export function CreateCategoryDialog({
         <div className="space-y-1.5">
           <Label htmlFor="new-category-name">Name</Label>
           <Input
+            ref={nameRef}
             id="new-category-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Home Decor"
             maxLength={60}
             disabled={loading}
-            autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -209,8 +220,8 @@ export function CreateCategoryDialog({
           <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleCreate} disabled={loading || !name.trim()}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+          <Button type="button" loading={loading} onClick={handleCreate} disabled={loading || !name.trim()}>
+            Create
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -360,10 +371,11 @@ export function CategoryManagerList({
                     type="button"
                     variant="destructive"
                     size="sm"
+                    loading={busyId === category.id}
                     onClick={() => handleDelete(category.id)}
                     disabled={busyId === category.id}
                   >
-                    {busyId === category.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Delete'}
+                    Delete
                   </Button>
                 </>
               ) : (

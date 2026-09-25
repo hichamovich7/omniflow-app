@@ -44,7 +44,7 @@ export function SectionHeading({ step, icon: Icon, title, description }: Section
               low-opacity small text as a contrast risk; the step number is
               redundant with the title so it stays visually secondary through
               size and font-mono alone, not through under-contrast color. */}
-          <span className="font-mono text-[11px] text-muted-foreground">{step}</span>
+          <span className="font-mono text-xs text-muted-foreground">{step}</span>
           <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         </div>
         {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}

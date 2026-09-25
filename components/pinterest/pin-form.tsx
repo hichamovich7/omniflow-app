@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Check, Info, Loader2, Sparkles, Sparkle } from 'lucide-react';
+import { Check, Info, Sparkles, Sparkle } from 'lucide-react';
 import {
   generatePinsSchema,
   TEXT_OVERLAY_MODES,
@@ -23,6 +23,9 @@ import type {
 import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { GeneratorHeader } from '@/components/shared/generator-header';
+import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -125,7 +128,7 @@ function IntegratedTextControl({
           disabled={importanceNone}
           onValueChange={(value) => value && onModeChange(value as OptionalTextMode)}
         >
-          <SelectTrigger className="h-9 w-40" aria-label={`${label} mode`}>
+          <SelectTrigger className="w-40" aria-label={`${label} mode`}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -391,15 +394,12 @@ export function PinForm({ projects, boards }: PinFormProps) {
   return (
     <div className="pt-4 sm:pt-6">
       {/* Hero */}
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-          <Sparkles className="h-5 w-5 text-primary" />
-        </div>
-        <h1 className="text-xl font-semibold tracking-tight">Pinterest Generator</h1>
-        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts.
-        </p>
-      </div>
+      <GeneratorHeader
+        icon={Sparkles}
+        title="Pinterest Generator"
+        description="Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts."
+        className="mb-6"
+      />
 
       {analysisId && (
         <div className="mb-5 flex items-center gap-2 rounded-lg bg-brand-accent/5 px-3 py-2 text-xs font-medium text-brand-accent">
@@ -508,7 +508,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
               inputValue={board}
               onInputValueChange={(value) => setBoard(value)}
             >
-              <ComboboxInputGroup className="h-12">
+              <ComboboxInputGroup className="h-11 md:h-10">
                 <ComboboxInput
                   id="board"
                   placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
@@ -547,7 +547,6 @@ export function PinForm({ projects, boards }: PinFormProps) {
               disabled={loading}
               aria-describedby="board-section-help"
               aria-invalid={!!boardSectionError}
-              className="h-12 text-sm placeholder:text-muted-foreground/40"
             />
             <p id="board-section-help" className="text-xs text-muted-foreground">
               Optional Pinterest section inside the selected board.
@@ -578,7 +577,6 @@ export function PinForm({ projects, boards }: PinFormProps) {
               required
               disabled={loading}
               aria-describedby="keyword-help"
-              className="h-12 text-sm placeholder:text-muted-foreground/40"
             />
           </div>
         </FormSection>
@@ -608,14 +606,9 @@ export function PinForm({ projects, boards }: PinFormProps) {
                       {option.label}
                     </span>
                     {option.badge && (
-                      <span className={cn(
-                        'ml-auto shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                        option.value === 'ai-integrated'
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted text-muted-foreground'
-                      )}>
+                      <Badge variant={option.value === 'ai-integrated' ? 'primary' : 'neutral'} className="ml-auto">
                         {option.badge}
-                      </span>
+                      </Badge>
                     )}
                   </span>
                   <span className="mt-1.5 block text-xs leading-relaxed text-muted-foreground">
@@ -782,14 +775,10 @@ export function PinForm({ projects, boards }: PinFormProps) {
               None = do not generate this text element.
             </p>
             {allTextImportanceNone && (
-              <div
-                role="alert"
-                data-testid="all-text-none-alert"
-                className="flex items-start gap-2 rounded-lg bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <Alert role="alert" data-testid="all-text-none-alert">
+                <Info aria-hidden="true" />
                 <span>{ALL_TEXT_NONE_MESSAGE}</span>
-              </div>
+              </Alert>
             )}
 
             <p
@@ -804,28 +793,13 @@ export function PinForm({ projects, boards }: PinFormProps) {
         )}
 
         {error && (
-          <div className="rounded-lg bg-destructive/5 px-3 py-2">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
+          <Alert>{error}</Alert>
         )}
 
         <div className="flex justify-end">
-          <Button
-            type="submit"
-            disabled={loading || projects.length === 0}
-            className="h-11 px-6 text-sm font-medium"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate Pins
-              </>
-            )}
+          <Button type="submit" size="lg" loading={loading} disabled={loading || projects.length === 0}>
+            <Sparkles data-icon="inline-start" />
+            Generate Pins
           </Button>
         </div>
       </form>

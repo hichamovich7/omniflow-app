@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -151,9 +151,13 @@ export function ContentStreamFormDialog({
     router.refresh();
   }
 
+  // `initialFocus` instead of `autoFocus`: autoFocus moves focus before the
+  // dialog records the element to return to, so closing landed on <body>.
+  const nameRef = useRef<HTMLInputElement>(null);
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" initialFocus={nameRef}>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{isEditMode ? 'Edit Content Stream' : 'Add Content Stream'}</DialogTitle>
@@ -166,13 +170,13 @@ export function ContentStreamFormDialog({
             <div className="space-y-1.5">
               <Label htmlFor="cs-name">Name</Label>
               <Input
+                ref={nameRef}
                 id="cs-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Crochet Cats"
                 maxLength={100}
                 disabled={loading}
-                autoFocus
               />
             </div>
 

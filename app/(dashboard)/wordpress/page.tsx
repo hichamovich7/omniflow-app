@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageContainer } from '@/components/ui/page-container';
+import { GeneratorHeader } from '@/components/shared/generator-header';
 import { PinsSourceArticleForm } from '@/components/wordpress/pins-source-article-form';
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
 import { listWordPressCategories } from '@/lib/queries/wordpress-categories';
@@ -74,7 +75,7 @@ function GeneratorCardItem({ card }: { card: GeneratorCard }) {
   return (
     <Link
       href={card.href}
-      className="group relative flex flex-col gap-3 rounded-2xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="group relative flex flex-col gap-3 rounded-2xl border border-border/60 bg-surface p-5 transition-[border-color,box-shadow] duration-150 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
         <Icon className="h-4.5 w-4.5 text-primary" />
@@ -148,15 +149,12 @@ export default async function WordPressPage({ searchParams }: WordPressPageProps
   return (
     <PageContainer>
       <div className="pt-8 sm:pt-16">
-        <div className="mb-10 text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-            <FileText className="h-6 w-6 text-primary" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">WordPress Generator</h1>
-          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Choose how you want to create your next WordPress article.
-          </p>
-        </div>
+        <GeneratorHeader
+          icon={FileText}
+          title="WordPress Generator"
+          description="Choose how you want to create your next WordPress article."
+          className="mb-10"
+        />
 
         <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
           {GENERATOR_CARDS.map((card) => (

@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { Loader2, FileText, ImageOff } from 'lucide-react';
+import { FileText, ImageOff } from 'lucide-react';
 import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { Button } from '@/components/ui/button';
+import { GeneratorHeader } from '@/components/shared/generator-header';
+import { Alert } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { CategorySelect, type CategoryOption } from '@/components/wordpress/category-select';
@@ -70,16 +72,17 @@ export function PinsSourceArticleForm({ pins, projectId, categories: initialCate
   return (
     <div className="pt-8 sm:pt-16">
       {/* Hero */}
-      <div className="mb-10 text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <FileText className="h-6 w-6 text-primary" />
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">WordPress Generator</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          Source: {pins.length} selected pin{pins.length === 1 ? '' : 's'}. AI will identify their common theme and
-          write one unified SEO article.
-        </p>
-      </div>
+      <GeneratorHeader
+        icon={FileText}
+        title="WordPress Generator"
+        description={
+          <>
+            Source: {pins.length} selected pin{pins.length === 1 ? '' : 's'}. AI will identify their common theme and
+            write one unified SEO article.
+          </>
+        }
+        className="mb-10"
+      />
 
       <form
         onSubmit={handleSubmit}
@@ -116,7 +119,7 @@ export function PinsSourceArticleForm({ pins, projectId, categories: initialCate
             onChange={(e) => setResearchNotes(e.target.value)}
             maxLength={2000}
             disabled={loading}
-            className="min-h-20 text-sm placeholder:text-muted-foreground/40"
+            className="min-h-20"
           />
         </div>
 
@@ -134,24 +137,14 @@ export function PinsSourceArticleForm({ pins, projectId, categories: initialCate
         </div>
 
         {error && (
-          <div className="rounded-lg bg-destructive/5 px-3 py-2">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
+          <Alert>{error}</Alert>
         )}
 
-        <div className="flex justify-end">
-          <Button type="submit" disabled={loading} className="h-11 px-6 text-sm font-medium">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating... (can take up to a minute)
-              </>
-            ) : (
-              <>
-                <FileText className="mr-2 h-4 w-4" />
-                Generate Article
-              </>
-            )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+          <p className="text-xs text-muted-foreground">Generation can take up to a minute.</p>
+          <Button type="submit" size="lg" loading={loading} disabled={loading} className="w-full sm:w-auto">
+            <FileText aria-hidden="true" data-icon="inline-start" />
+            Generate Article
           </Button>
         </div>
       </form>

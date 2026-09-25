@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
@@ -44,18 +44,9 @@ export function RegenerateGenerationButton({
   }
 
   return (
-    <Button size="sm" onClick={handleRegenerate} disabled={loading}>
-      {loading ? (
-        <>
-          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          Regenerating...
-        </>
-      ) : (
-        <>
-          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-          Regenerate
-        </>
-      )}
+    <Button size="sm" loading={loading} onClick={handleRegenerate} disabled={loading}>
+      <RefreshCw data-icon="inline-start" />
+      Regenerate
     </Button>
   );
 }

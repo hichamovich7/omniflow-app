@@ -111,7 +111,7 @@ export function ArticleSourceSection({
                 onChange={(e) => onResearchNotesChange(e.target.value)}
                 maxLength={2000}
                 disabled={loading}
-                className={`min-h-20 text-sm placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
+                className={`min-h-20 ${FIELD_SURFACE_CLASS}`}
               />
             </div>
           </>
@@ -162,9 +162,9 @@ export function ArticleSourceSection({
                   maxLength={MAX_PASTED_CONTENT_LENGTH}
                   required
                   disabled={loading}
-                  className={`min-h-40 text-sm placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
+                  className={`min-h-40 ${FIELD_SURFACE_CLASS}`}
                 />
-                <p className="text-right text-[11px] text-muted-foreground">
+                <p className="text-right text-xs text-muted-foreground">
                   {pastedContent.length} / {MAX_PASTED_CONTENT_LENGTH} characters
                 </p>
               </div>

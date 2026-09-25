@@ -247,7 +247,7 @@ Cards should usually use a border with no shadow or `shadow-xs`, never a heavy f
 - Deliberate: 250 ms maximum for dialogs and sheets.
 - Use opacity and transform; avoid animating dimensions and layout positions.
 - Respect `prefers-reduced-motion`.
-- No layout-shifting hover effects. Card translation is exceptional and should not be a global pattern.
+- No layout-shifting hover effects. Cards and tiles never translate on hover: link cards change border and gain `shadow-sm` only.
 
 ## Components
 
@@ -259,7 +259,14 @@ Primary uses blue with white text and a darker hover. Destructive uses a solid o
 
 Button focus-visible uses a solid 2 px `--ring` (or `--destructive` for destructive buttons) with a 2 px `--background` offset. A translucent halo is not enough on solid blue fills, especially in dark mode. Inputs keep the border-to-`--ring` treatment described under Borders.
 
-Button heights are `sm` 36 px, `default` 40 px, and `lg` 44 px, with a 44 px minimum touch target below `md` (48 px for `lg`). Buttons use a 10 px radius, 500 weight, 13–15 px labels, and icons sized to the button (14 / 16 / 18 px). A compact `xs` size (28 px, 12 px text) exists for dense in-dialog controls only; bulk and selection bars use `sm`. Disabled buttons are not faded copies of their variant: they keep full opacity on a muted surface with muted text and a not-allowed cursor, so the label stays readable while clearly inert.
+Button heights are `sm` 36 px, `default` 40 px, and `lg` 44 px, with a 44 px minimum touch target below `md` (48 px for `lg`). Buttons use a 10 px radius, 500 weight, 13–15 px labels, and icons sized to the button (14 / 16 / 18 px). A compact `xs` size (28 px, 12 px text) exists for dense in-dialog controls only (for example the Image Versions thumbnail grid or a secondary Copy); bulk and selection bars use `sm`, and form actions are never `xs`. Disabled buttons are not faded copies of their variant: they keep full opacity on a muted surface with muted text and a not-allowed cursor, so the label stays readable while clearly inert.
+
+Loading uses `<Button loading>` and never rewrites the label:
+
+- With a leading `data-icon="inline-start"` icon, the spinner takes the icon's place and the label stays visible.
+- Without one, the content stays in place (invisible, still the accessible name) under a centred spinner.
+- The button gets `aria-busy="true"`, so width and height never change. `disabled` stays the caller's decision; pass it when the action must not run twice.
+- Longer waits are explained next to the button (for example "Generation can take up to a minute."), not inside the label.
 
 ### Inputs and forms
 
@@ -279,6 +286,8 @@ Headers are typographic blocks, not cards: no surface, border, shadow, gradient,
 
 - `PageHeader` (main pages): title 28 / 34 px, 700, `-0.02em` (`text-page-title`); optional 13 px / 500 muted eyebrow; optional title-sized muted icon with no tile. The page container provides the 32 px gap below it.
 - `ResourceHeader` (detail and resource pages): title 22 / 28 px, 600 (`text-section-title`); optional ghost `icon-sm` back link with an accessible name, centred on the first title line; status uses `Badge` / `StatusBadge` only; metadata is 12 px / 500 muted.
+- `GeneratorHeader` (generator pages: Pinterest, the WordPress hub and forms): centred, 44 px `--selected` icon tile, title in `text-page-title`, 14 px muted description. It is mirrored by `CenteredHeaderSkeleton`. It is the only header with a tile.
+- Rendered user content (for example the article preview on `/wordpress/[id]`) never adds a second `h1`: its headings are shifted one level down for display only.
 - Descriptions are 14 / 20 px, 400, `--muted-foreground`, capped around 42 rem.
 - Actions sit at the right when there is room and wrap under the title otherwise, with an 8 px gap and never horizontal overflow.
 
@@ -408,6 +417,11 @@ Short, supplemental, and never required to complete an action. Use a dark neutra
   - `Skeleton` blocks are `aria-hidden`, `--muted`, rounded like the content they stand in for, with a pulse that stops under reduced motion.
   - Skeletons mirror the real page: same container width, header shape, grid columns, and card outlines.
   - Use spinners only for compact, short-lived actions.
+- Inline messages use `Alert` (`components/ui/alert`), never a hand-drawn box:
+  - `danger` for submit and validation errors, announced with `role="alert"`;
+  - `warning` for consequences to know before acting (for example deleting pins used by articles);
+  - `info` for neutral guidance.
+  - A soft semantic surface with a subtle same-hue border, 14 px text in the AA-safe shade, and an optional leading 16 px icon. There is no `success` variant: success is a toast.
 - Success: feedback is a sonner toast (icon + text) and is concise. Completed or published work is a workflow status, not a success page.
 
 ### Charts
@@ -423,6 +437,11 @@ Lucide is the sole product icon library. Standard sizes are 14, 16, 18, 20, and 
 - Normal text contrast: at least 4.5:1; large text and meaningful UI graphics: at least 3:1.
 - Visible 2–3 px focus state on every interactive element.
 - Keyboard order follows visual order; dialogs trap and restore focus.
+  - Dialogs return focus to their opener. Open a dialog's first field with `initialFocus={ref}`, never `autoFocus`, which moves focus before the dialog records its opener.
+  - When the opener disappears (a menu or Select item), pass `finalFocus` to a stable trigger.
+  - Do not remount a dialog on close.
+  - Nested interactive controls handle their own keys; a clickable card reacts to Enter / Space only when it is the target itself.
+- Hover-revealed actions are always visible below `lg`, and from `lg` they also appear on keyboard focus (`focus-within`).
 - Meaning is not communicated by color alone.
 - Disabled and read-only states are visually and semantically distinct.
 - Small-screen controls provide 44 px hit targets and at least 8 px separation.
@@ -437,7 +456,7 @@ Lucide is the sole product icon library. Standard sizes are 14, 16, 18, 20, and 
 | Global tokens and typography | `app/globals.css`, `app/layout.tsx`                                                                                                                                                                                                            |
 | Application shell            | `app/(dashboard)/layout.tsx`, `components/layout/sidebar.tsx`, `components/layout/topbar.tsx`, `components/layout/mobile-nav.tsx`                                                                                                              |
 | Page layout and headers      | `components/ui/page-container.tsx`, `components/layout/page-header.tsx`, `components/shared/resource-header/resource-header.tsx`                                                                                                               |
-| Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                                                                                             |
+| Core controls                | `components/ui/button.tsx`, `alert.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                                                                                |
 | Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                                                                                    |
 | Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`, `components/ui/progress.tsx`, `components/shared/metric-card/`         |
 | Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/skeletons/page-skeleton.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx`, `lib/utils/status.ts` |

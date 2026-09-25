@@ -117,7 +117,7 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
                 Copy
               </Button>
             </div>
-            <pre className="max-h-40 overflow-y-auto overscroll-contain whitespace-pre-wrap rounded-lg bg-muted p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            <pre className="max-h-40 overflow-y-auto overscroll-contain whitespace-pre-wrap rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed text-muted-foreground">
               {pin.image_prompt}
             </pre>
           </div>

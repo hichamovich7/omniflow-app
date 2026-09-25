@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Sparkles, RefreshCw, Layers, Loader2, FileText, LayoutTemplate, SlidersHorizontal } from 'lucide-react';
+import { Sparkles, RefreshCw, Layers, FileText, LayoutTemplate, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { ImageVersionsDialog } from './image-versions-dialog';
@@ -12,6 +12,7 @@ import { PinDetailDialog } from './pin-detail-dialog';
 import { PinBatchReviewDialog } from './pin-batch-review-dialog';
 import { PinDiagnosticBadges, formatCreativeLabel } from './pin-diagnostic-badges';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -96,7 +97,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
       <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-wrap items-end gap-2" aria-label="Creative diagnostic filters">
           <div className="space-y-1">
-            <label htmlFor="quality-filter" className="block text-[11px] font-medium text-muted-foreground">Quality</label>
+            <label htmlFor="quality-filter" className="block text-xs font-medium text-muted-foreground">Quality</label>
             <Select
               value={filters.quality}
               onValueChange={(value) => value && setFilters((current) => ({
@@ -104,7 +105,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                 quality: value as CreativeDiagnosticFilters['quality'],
               }))}
             >
-              <SelectTrigger id="quality-filter" className="h-9 min-w-32"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="quality-filter" className="min-w-32"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All statuses</SelectItem>
                 <SelectItem value="PASS">PASS</SelectItem>
@@ -114,7 +115,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
             </Select>
           </div>
           <div className="space-y-1">
-            <label htmlFor="angle-filter" className="block text-[11px] font-medium text-muted-foreground">Angle</label>
+            <label htmlFor="angle-filter" className="block text-xs font-medium text-muted-foreground">Angle</label>
             <Select
               value={filters.angle}
               onValueChange={(value) => value && setFilters((current) => ({
@@ -122,7 +123,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                 angle: value as PinterestAngle | 'ALL',
               }))}
             >
-              <SelectTrigger id="angle-filter" className="h-9 min-w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="angle-filter" className="min-w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All angles</SelectItem>
                 {PINTEREST_ANGLES.map((angle) => (
@@ -132,7 +133,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
             </Select>
           </div>
           <div className="space-y-1">
-            <label htmlFor="template-filter" className="block text-[11px] font-medium text-muted-foreground">Template</label>
+            <label htmlFor="template-filter" className="block text-xs font-medium text-muted-foreground">Template</label>
             <Select
               value={filters.template}
               onValueChange={(value) => value && setFilters((current) => ({
@@ -140,7 +141,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                 template: value as BannerTemplate | 'ALL',
               }))}
             >
-              <SelectTrigger id="template-filter" className="h-9 min-w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="template-filter" className="min-w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All templates</SelectItem>
                 {BANNER_TEMPLATES.map((template) => (
@@ -153,7 +154,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
             {filteredPins.length} of {pins.length}
           </span>
         </div>
-        <Button type="button" variant="outline" className="min-h-11" onClick={() => setBatchReviewOpen(true)}>
+        <Button type="button" variant="outline" onClick={() => setBatchReviewOpen(true)}>
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Batch Review
         </Button>
@@ -174,6 +175,9 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
               tabIndex={0}
               onClick={() => setDetailPin(pin)}
               onKeyDown={(e) => {
+                // Only the card itself: Enter/Space on its checkbox or image
+                // actions must reach those controls, not open the detail.
+                if (e.target !== e.currentTarget) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   setDetailPin(pin);
@@ -232,47 +236,54 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                     </a>
 
                     {/* Image action overlay */}
-                    <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                    {/* Always visible below lg (touch); from lg revealed on hover or keyboard focus. */}
+                    <div className="absolute right-2 top-2 z-10 flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100">
                       {pin.visual_format === 'text-overlay' && pin.overlay_text && (
-                        <button
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shadow-sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             setRecomposePin(pin);
                           }}
-                          className="flex h-8 items-center gap-1.5 rounded-md border border-border/80 bg-card/95 px-2 text-[11px] font-medium text-foreground shadow-sm transition-colors hover:bg-card"
                           aria-label={`Change layout for: ${pin.title}`}
                         >
-                          <LayoutTemplate className="h-3.5 w-3.5" />
-                          <span>Change layout</span>
-                        </button>
+                          <LayoutTemplate data-icon="inline-start" />
+                          Change layout
+                        </Button>
                       )}
-                      <button
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        className="shadow-sm"
+                        loading={isRegenerating}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRegenerate(pin.id);
                         }}
                         disabled={isRegenerating}
-                        className="flex h-7 w-7 items-center justify-center rounded-md bg-card/90 border border-border/80 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
                         aria-label={`Regenerate image for: ${pin.title}`}
                       >
-                        {isRegenerating ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        )}
-                      </button>
+                        <RefreshCw data-icon="inline-start" />
+                      </Button>
                       {versionCount > 1 && (
-                        <button
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shadow-sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             setVersionsPin({ id: pin.id, title: pin.title });
                           }}
-                          className="flex h-7 items-center gap-1 rounded-md bg-card/90 border border-border/80 px-1.5 text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
                           aria-label={`View ${versionCount} image versions`}
                         >
-                          <Layers className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-medium">{versionCount}</span>
-                        </button>
+                          <Layers data-icon="inline-start" />
+                          {versionCount}
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -280,7 +291,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                   <div className="flex aspect-2/3 w-full items-center justify-center bg-muted/50">
                     <div className="text-center">
                       <Sparkles className="mx-auto h-5 w-5 text-muted-foreground/30" />
-                      <p className="mt-1.5 text-[10px] text-muted-foreground/40">AI Generated</p>
+                      <p className="mt-1.5 text-xs text-muted-foreground">AI Generated</p>
                     </div>
                   </div>
                 )}
@@ -293,7 +304,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                   >
                     <FileText className="h-3.5 w-3.5" />
                     {usage.length > 1 && (
-                      <span className="text-[10px] font-medium">{usage.length}</span>
+                      <span className="text-xs font-medium">{usage.length}</span>
                     )}
                   </div>
                 )}
@@ -303,7 +314,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
               <div className="p-4 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-[13px] font-medium leading-snug line-clamp-2">{pin.title}</h3>
-                  <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+                  <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
                     {i + 1}
                   </span>
                 </div>
@@ -314,13 +325,15 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
 
                 <PinDiagnosticBadges pin={pin} />
 
-                <div className="flex items-center justify-between pt-0.5">
-                  <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {boardNames[pin.id] ?? 'No board assigned'}
-                    {pin.board_section && ` / ${pin.board_section}`}
-                  </span>
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <Badge variant="outline" className="min-w-0 justify-start">
+                    <span className="truncate">
+                      {boardNames[pin.id] ?? 'No board assigned'}
+                      {pin.board_section && ` / ${pin.board_section}`}
+                    </span>
+                  </Badge>
                   {pin.publish_date && (
-                    <span className="text-[11px] text-muted-foreground/70">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {formatDate(pin.publish_date)}
                     </span>
                   )}
@@ -328,7 +341,7 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
 
                 {activeImageModels[pin.id] && (
                   <p
-                    className="truncate font-mono text-[10px] text-muted-foreground/50"
+                    className="truncate font-mono text-xs text-muted-foreground"
                     title={`Generated with: ${activeImageModels[pin.id]}`}
                   >
                     {activeImageModels[pin.id]}

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { CheckCircle2, CircleX, LayoutTemplate, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -252,7 +253,7 @@ export function RecomposePinDialog({ pin, onClose }: RecomposePinDialogProps) {
                 }}
                 disabled={isApplying}
               >
-                <SelectTrigger id="recompose-template" className="h-11 w-full">
+                <SelectTrigger id="recompose-template" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -281,7 +282,7 @@ export function RecomposePinDialog({ pin, onClose }: RecomposePinDialogProps) {
                 }}
                 disabled={isApplying}
               >
-                <SelectTrigger id="recompose-position" className="h-11 w-full">
+                <SelectTrigger id="recompose-position" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -318,34 +319,30 @@ export function RecomposePinDialog({ pin, onClose }: RecomposePinDialogProps) {
                   )}
                 </div>
               ) : (
-                <div className="flex gap-2 rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
-                  {previewPending ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" /> : <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
+                <Alert variant="info">
+                  {previewPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <ShieldCheck aria-hidden="true" />}
                   <span>{previewPending ? 'Checking layout quality…' : 'Choose a layout to calculate its quality.'}</span>
-                </div>
+                </Alert>
               )}
 
               {previewError && (
-                <p role="alert" className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
-                  {previewError}
-                </p>
+                <Alert>{previewError}</Alert>
               )}
             </div>
 
             {error && (
-              <p role="alert" className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
-                {error}
-              </p>
+              <Alert>{error}</Alert>
             )}
           </div>
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" className="h-11" onClick={onClose} disabled={isApplying}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isApplying}>
             Cancel
           </Button>
-          <Button type="button" className="h-11" onClick={handleApply} disabled={isApplying || previewPending || !applyAllowed} data-testid="recomposition-apply">
-            {isApplying ? <Loader2 className="animate-spin" /> : <LayoutTemplate />}
-            {isApplying ? 'Applying…' : 'Apply'}
+          <Button type="button" loading={isApplying} onClick={handleApply} disabled={isApplying || previewPending || !applyAllowed} data-testid="recomposition-apply">
+            <LayoutTemplate data-icon="inline-start" />
+            Apply
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -180,9 +180,10 @@ export function WpImportCategoriesDialog({
           <Button
             type="button"
             onClick={handleImport}
+            loading={importing}
             disabled={importing || loading || checked.size === 0 || wpCategories.length === 0}
           >
-            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Import${checked.size > 0 ? ` (${checked.size})` : ''}`}
+            {`Import${checked.size > 0 ? ` (${checked.size})` : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>

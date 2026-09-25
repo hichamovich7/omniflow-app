@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ImageIcon, Loader2, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ImageIcon, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import type { ImageStatus } from '@/types/database';
@@ -75,25 +75,20 @@ export function GenerateImagesButton({
   }
 
   return (
-    <Button size="sm" onClick={handleGenerate} disabled={loading || count === 0}>
-      {loading ? (
+    <Button size="sm" loading={loading} onClick={handleGenerate} disabled={loading || count === 0}>
+      {isRegeneration ? (
         <>
-          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          Generating...
-        </>
-      ) : isRegeneration ? (
-        <>
-          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+          <RefreshCw data-icon="inline-start" />
           Regenerate ({count})
         </>
       ) : imageStatus === 'partial' || imageStatus === 'failed' ? (
         <>
-          <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
+          <AlertTriangle data-icon="inline-start" />
           Retry ({count})
         </>
       ) : (
         <>
-          <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
+          <ImageIcon data-icon="inline-start" />
           Generate Images ({count})
         </>
       )}

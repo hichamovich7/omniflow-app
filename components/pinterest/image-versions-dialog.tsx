@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { CheckCircle, Trash2, Loader2, X, ZoomIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -110,12 +111,10 @@ export function ImageVersionsDialog({
                 >
                   {/* Active badge */}
                   {v.is_active && (
-                    <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-primary px-1.5 py-0.5">
-                      <CheckCircle className="h-2.5 w-2.5 text-primary-foreground" />
-                      <span className="text-[9px] font-semibold text-primary-foreground uppercase tracking-wider">
-                        Active
-                      </span>
-                    </div>
+                    <Badge variant="primary" className="absolute left-2 top-2 z-10">
+                      <CheckCircle aria-hidden="true" />
+                      Active
+                    </Badge>
                   )}
 
                   {/* Thumbnail with preview trigger */}
@@ -141,7 +140,7 @@ export function ImageVersionsDialog({
 
                   {/* Footer */}
                   <div className="p-2 space-y-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground">
+                    <span className="text-xs font-medium text-muted-foreground">
                       v{v.version}
                     </span>
 
@@ -150,18 +149,13 @@ export function ImageVersionsDialog({
                         <Button
                           size="xs"
                           className="flex-1"
+                          loading={actionId === v.id}
                           onClick={() => handleSetActive(v.id)}
                           disabled={actionId !== null}
                           aria-label={`Use version ${v.version} as active image`}
                         >
-                          {actionId === v.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <>
-                              <CheckCircle className="mr-1 h-3 w-3" />
-                              Use this
-                            </>
-                          )}
+                          <CheckCircle data-icon="inline-start" />
+                          Use this
                         </Button>
                         {versions.length > 1 && (
                           <Button

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, Cog, Loader2, X } from 'lucide-react';
+import { ChevronRight, Cog, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -159,20 +159,20 @@ function TagInput({
           placeholder={atLimit ? `Limit reached (${maxCount})` : placeholder}
           disabled={disabled || atLimit}
           maxLength={maxLength}
-          className="h-9 flex-1 text-sm placeholder:text-muted-foreground/40"
+          className="flex-1"
         />
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={addValue}
           disabled={disabled || atLimit || !draft.trim()}
-          className="h-9 px-3"
+          aria-label="Add keyword"
         >
           +
         </Button>
       </div>
-      <p className="text-right text-[11px] text-muted-foreground">
+      <p className="text-right text-xs text-muted-foreground">
         {values.length} / {maxCount}
       </p>
     </div>
@@ -333,7 +333,7 @@ export function AdvancedOptionsSection({
           <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
             <div>
               <p className="text-xs font-medium">Structure</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Optional — shape the introduction and force specific elements on or off. Leave everything on
                 &quot;Non défini&quot; to keep the default behavior.
               </p>
@@ -352,7 +352,6 @@ export function AdvancedOptionsSection({
                     size="sm"
                     disabled={loading}
                     onClick={() => onHookBriefChange(preset.text)}
-                    className="h-7 px-2.5 text-[11px] font-normal"
                   >
                     {preset.label}
                   </Button>
@@ -365,9 +364,9 @@ export function AdvancedOptionsSection({
                 onChange={(e) => onHookBriefChange(e.target.value.slice(0, HOOK_BRIEF_MAX_LENGTH))}
                 maxLength={HOOK_BRIEF_MAX_LENGTH}
                 disabled={loading}
-                className="min-h-20 text-sm placeholder:text-muted-foreground/40"
+                className="min-h-20"
               />
-              <p className="text-right text-[11px] text-muted-foreground">
+              <p className="text-right text-xs text-muted-foreground">
                 {hookBrief.length} / {HOOK_BRIEF_MAX_LENGTH} characters
               </p>
             </div>
@@ -388,7 +387,7 @@ export function AdvancedOptionsSection({
           <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
             <div>
               <p className="text-xs font-medium">SEO Keywords</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Optional — keywords the article should naturally include. Leave empty to keep the default behavior.
               </p>
             </div>
@@ -402,18 +401,11 @@ export function AdvancedOptionsSection({
                   type="button"
                   variant="outline"
                   size="sm"
+                  loading={suggestingKeywords}
                   disabled={loading || suggestingKeywords || !keyword.trim() || seoKeywords.length >= SEO_KEYWORDS_MAX_COUNT}
                   onClick={onSuggestKeywords}
-                  className="h-7 px-2.5 text-[11px] font-normal"
                 >
-                  {suggestingKeywords ? (
-                    <>
-                      <Loader2 aria-hidden="true" className="mr-1.5 h-3 w-3 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    "Générer avec l'IA"
-                  )}
+                  Générer avec l&apos;IA
                 </Button>
               </div>
               <TagInput
@@ -425,7 +417,7 @@ export function AdvancedOptionsSection({
                 maxLength={SEO_KEYWORD_MAX_LENGTH}
                 placeholder="Type a keyword and press Enter"
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 AI suggestions are a language-model brainstorm of related terms — not real search-volume or SERP data.
               </p>
             </div>
@@ -434,7 +426,7 @@ export function AdvancedOptionsSection({
           <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
             <div>
               <p className="text-xs font-medium">External Linking</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Optional — specific sources to link to, in addition to the article&apos;s usual automatic external
                 link. Leave empty to keep the default behavior.
               </p>
@@ -450,9 +442,8 @@ export function AdvancedOptionsSection({
                 value={manualExternalUrls}
                 onChange={(e) => onManualExternalUrlsChange(e.target.value)}
                 disabled={loading}
-                className="h-11 text-sm placeholder:text-muted-foreground/40"
               />
-              <p className="text-[11px] text-muted-foreground">Comma-separated. Up to 10 URLs.</p>
+              <p className="text-xs text-muted-foreground">Comma-separated. Up to 10 URLs.</p>
             </div>
           </div>
         </div>
