@@ -197,12 +197,12 @@ New debt found (out of scope, not fixed):
 
 ## Phase 4 — Data Components
 
-- [ ] KPI cards and tabular figures
+- [x] KPI cards and tabular figures (Data Metrics v1)
 - [x] Filters and search bars (Data UI v1, batch 1)
 - [x] Data tables and row actions (Data UI v1, batch 1)
 - [x] Pagination (Data UI v1, batch 1)
 - [ ] Bulk actions
-- [ ] Progress indicators
+- [x] Progress indicators (Data Metrics v1)
 - [ ] Workflow statuses
 - [ ] Chart palette, grid, axes, legend, tooltip, loading, empty, and error states
 - [ ] Accessible chart summaries and data alternatives
@@ -247,6 +247,49 @@ Out of scope, documented:
 - Badge-like local components still inside the rows: `wordpress-usage-badge.tsx` (11 px, interactive) and `wp-send-status-badge.tsx`, already tracked under Badge.
 - Bulk selection bars still use `editorial/selection-action-bar.tsx` (13 px count, `xs` buttons), not the shared `BulkActions`. Tracked under "Bulk actions".
 - No list offers sorting today, so `aria-sort` is only supported by the primitive.
+
+### Data Metrics v1 (KPI Cards, Progress)
+
+Status: **Complete** (2026-09-25, branch `feature/ui-data-metrics-v1`). Covers `MetricCard`, `MetricGrid`, `Progress`, and `ProgressMetric`. No metric, value, order, number format, link, or query changed. Charts are not started.
+
+#### Audit
+
+- No shared KPI or progress component existed. The 7 dashboard KPIs (`kpi-card.tsx`) were a hand-built surface (`border-border/60 bg-surface p-4`). Values were 18 px / 600 without tabular figures, "Preview" was a 10 px uppercase span, and link cards moved up on hover (`-translate-y-0.5`).
+- There were four hand-drawn bars, none with `progressbar` semantics: KPI cards (6 px), Weekly Progress (4 px, a `--background` track inside `bg-muted/40` tiles), Active Project cards (6 px), and the trial banner (6 px).
+- Weekly Progress labels were 12 px uppercase `tracking-wider` at `muted-foreground/70`, and values 16 px / 600. At 768 px the labels wrapped and "240 € / 1000 €" broke over two lines.
+- On the project detail page, two stat cards used a 36 px icon tile, a 24 px / 600 value, and a 12 px label under it.
+- Grids: the KPIs went 2 → 3 → 4 columns by viewport, so the 7 cards left one trailing empty slot at 1440 / 1024 / 390 px and two at 768 px.
+- No trend or delta is displayed anywhere. `/credits` is a "Coming soon" empty state with no metrics. `/projects` cards only carry a metadata line, which is left alone.
+
+#### Final pattern
+
+- **`Progress`** (`components/ui/progress.tsx`): 6 px, full radius, `--muted` track, `--primary` fill, value clamped to `[0, max]` (a non-finite value or max renders an empty track, never an invalid ARIA value), and a 200 ms width transition (none with reduced motion). It is always `role="progressbar"` with `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, and it is named by its visible label. It has no semantic variants, because no consumer needs one yet.
+- **`MetricCard`** (`components/shared/metric-card`): `Card` with 16 px padding and 12 px gaps. The label is `text-label` (13 / 18 px, 500, muted, in the product's own case, never uppercase). The value is `text-kpi` (30 / 34 px, 700, tabular). An optional secondary value ("/ 25") is 14 px, muted, and tabular, and wraps under the value when narrow. The optional top-right slot holds a `Badge`, a 16 px muted icon (no tile), or a 16 px arrow on link cards. An optional bar is pinned to the bottom. A link card is one `<a>` with a hover border and `shadow-sm`, no translation, and the 2 px ring + offset on focus.
+- **`MetricGrid`**: columns follow the grid's own width (container query): 2 columns, then 3 from 576 px, then 4 from 896 px. The gap is 12 px, or 16 px from 3 columns. An incomplete last row is spread across the row instead of leaving empty slots. Spans come from the item count, so the order never changes.
+- **`ProgressMetric`**: label and value on one line (both 13 px / 500; the value is in the foreground color and tabular, the target muted), with the bar under them.
+- **Consumers:** dashboard KPIs (`kpi-card.tsx` → `MetricCard`, `command-center-section.tsx` → `MetricGrid`); Weekly Progress (now a `Card size="sm"` with 4 `ProgressMetric`, in 1 / 2 / 4 columns by width, without nested tiles); Active Project cards (progress block only); trial banner (bar only); project detail stat cards (`MetricCard` + icon, `MetricGrid`).
+
+#### Validation
+
+| Width | KPI grid                     | KPI card heights     | Weekly Progress | Project detail stats | Overflow |
+| ----- | ---------------------------- | -------------------- | --------------- | -------------------- | -------- |
+| 1440  | 4 + 3 (272 / 368 px)         | 120 / 98 px          | 4 columns       | 2 × 296 px           | none     |
+| 1024  | 3 + 3 + 1 (229 / 720 px)     | 120 / 98 px          | 2 columns       | 2 × 296 px           | none     |
+| 768   | 3 + 3 + 1 (229 / 720 px)     | 120 / 98 px          | 2 columns       | 2 × 304 px           | none     |
+| 390   | 2 + 2 + 2 + 1 (173 / 358 px) | 162 / 142 / 116 / 98 | 1 column        | 2 × 173 px           | none     |
+
+- Light and dark were checked at all four widths on `/dashboard` and `/projects/[id]`. In light, labels and secondary values have 4.79:1 contrast, the fill has 4.17:1 against the track, and the link arrow 3.49:1. In dark, the figures are 7.95:1, 5.64:1, and 5.74:1. The dark track (`#182235` on the card) is 1.09:1, visible without being bright.
+- Accessibility: 9 named `progressbar`s on the dashboard, with `aria-valuetext` where the raw number reads poorly ("240 € of 1000 €"). Active Project bars are named "<project> progress" so the two are distinguishable. KPI links read "Pins Created 422", "Articles Generated 8", and "Projects 3". "Preview" is `Badge` text, not color only. Keyboard focus shows the ring on KPI links in both themes.
+- Not seen live: the trial banner, because the test account is trial-exempt. It uses the same `Progress` and is covered by the type check and the build only.
+- Tests: `ui-foundations.spec.ts` 30 passed / 10 skipped (chromium + mobile-chrome). TypeScript, production build (43 pages), `git diff --check`, and ESLint on the changed files pass. Prettier passes on the new and rewritten files. The 4 partially edited files were already not Prettier-clean at HEAD and were not reformatted wholesale.
+
+#### Out of scope, documented
+
+- The "Pins Created" duplication (KPI + Weekly Progress) is still a pending product decision; the `test.fixme` is unchanged.
+- `pin-batch-review-dialog.tsx` diagnostics tiles (11 px labels) and the WordPress `article-form-summary.tsx` (11 px uppercase `dt`) are dialog/form summaries, not KPI cards. Migrate them with their pages.
+- `project-progress-card` and `project-card` still translate on hover (Card debt above).
+- At 390 px, 2-column KPI labels such as "Articles Generated" can take two lines, and "/ 1000 €" wraps under "240 €". Both are intended wraps, not overflow.
+- Trend/delta: none exists. The rule is in DESIGN.md for when one is added.
 
 ## Phase 5 — Product States
 
@@ -371,7 +414,7 @@ Local badge-like debt (not converted in this batch, migrate page by page):
 
 - `pin-diagnostic-badges.tsx`: 8 `Badge variant="outline"` with `text-[10px]` overrides, which keep them below 12 px.
 - Local spans that imitate badges instead of using `Badge`:
-  - dashboard KPI "Preview" (`kpi-card.tsx`, 10 px uppercase);
+  - ~~dashboard KPI "Preview" (`kpi-card.tsx`, 10 px uppercase)~~ now `Badge variant="neutral"` (Data Metrics v1);
   - ~~sidebar "Soon" (10 px uppercase)~~ now `Badge variant="outline"` (Application Shell v1);
   - project card category chip (`project-card.tsx`, primary pill);
   - `wordpress-usage-badge.tsx` (11 px, and it is interactive: hover state, link);
@@ -523,7 +566,7 @@ Card debt (not changed, migrate page by page):
 
 1. Probably intentional:
    - Auth cards: the centred logo header and local `h1.text-card-title`, kept for the heading level.
-   - Interactive link cards: `project-card`, `kpi-card`, `project-progress-card`, dashboard quick links, and WordPress hub tiles. They use a hover border, `shadow-sm`, and `-translate-y-0.5`. DESIGN.md calls card translation exceptional, so the product must confirm it.
+   - Interactive link cards: `project-card`, `project-progress-card`, dashboard quick links, and WordPress hub tiles. They use a hover border, `shadow-sm`, and `-translate-y-0.5`. DESIGN.md calls card translation exceptional, so the product must confirm it. (`kpi-card` is now a `MetricCard`: hover border and `shadow-sm`, no translation.)
    - Row-like list items: history, research, and WordPress history rows, and `table-skeleton`. They are rows, not cards.
 2. Legacy visual:
    - Translucent `border-border/60` on nearly all hand-built surfaces.
@@ -532,7 +575,7 @@ Card debt (not changed, migrate page by page):
    - Mixed paddings: `p-4`, `p-5`, `p-6`, `p-6 sm:p-8`, and `px-5 py-6 sm:px-7 sm:py-8`.
    - The admin `CardTitle text-sm font-medium` override.
    - A nested `bg-background/60` panel inside `pin-form`.
-3. To migrate to `Card`: Dashboard widgets (`today-priorities`, `weekly-progress`, the activity list), project detail sections (`content-streams-section`, `content-stream-card`), WordPress form sections and `publish-control` / `categories-manager` / `article-category-editor`, research and Pinterest forms, and the guide sections.
+3. To migrate to `Card`: Dashboard widgets (`today-priorities`, the activity list; `weekly-progress` done in Data Metrics v1), project detail sections (`content-streams-section`, `content-stream-card`), WordPress form sections and `publish-control` / `categories-manager` / `article-category-editor`, research and Pinterest forms, and the guide sections.
 
 ## PageHeader and ResourceHeader Batch
 

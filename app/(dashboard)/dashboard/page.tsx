@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { PageContainer } from '@/components/ui/page-container';
 import { StatusDot } from '@/components/ui/status-dot';
+import { Progress } from '@/components/ui/progress';
 import { buttonVariants } from '@/components/ui/button';
 import { PageState } from '@/components/shared/page-state';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
@@ -185,12 +186,7 @@ export default async function DashboardPage() {
             )}
           </div>
           {!trialLimitReached && (
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${Math.min(100, (trialUsed / trialLimit) * 100)}%` }}
-              />
-            </div>
+            <Progress className="mt-2" value={trialUsed} max={trialLimit} aria-label="Free generations used" />
           )}
         </div>
       )}

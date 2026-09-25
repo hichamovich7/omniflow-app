@@ -5,6 +5,7 @@ import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { listWordPressCategories } from '@/lib/queries/wordpress-categories';
 import { listContentStreams, listBoardOccupants, findBoardOccupant } from '@/lib/queries/content-streams';
 import { ContentStreamsSection } from '@/components/projects/content-streams-section';
+import { MetricCard, MetricGrid } from '@/components/shared/metric-card';
 import { PageContainer } from '@/components/ui/page-container';
 import { Badge } from '@/components/ui/badge';
 import { ExpandableText } from '@/components/ui/expandable-text';
@@ -160,22 +161,10 @@ export default async function ProjectDetailPage({
         streamBoardMap={streamBoardMap}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-border/60 bg-card p-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-            <Sparkles className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <p className="mt-3 text-2xl font-semibold tracking-tight">{generationCount ?? 0}</p>
-          <p className="text-xs text-muted-foreground">Pinterest generations</p>
-        </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <p className="mt-3 text-2xl font-semibold tracking-tight">{articleCount ?? 0}</p>
-          <p className="text-xs text-muted-foreground">WordPress articles</p>
-        </div>
-      </div>
+      <MetricGrid>
+        <MetricCard label="Pinterest generations" value={generationCount ?? 0} icon={Sparkles} />
+        <MetricCard label="WordPress articles" value={articleCount ?? 0} icon={FileText} />
+      </MetricGrid>
 
       <div className="rounded-2xl border border-border/60 bg-card p-6">
         <h2 className="text-sm font-medium">Quick Links</h2>
