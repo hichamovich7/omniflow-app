@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { DeleteArticlesDialog } from './delete-articles-dialog';
 
 interface WordPressHistoryRowActionsProps {
@@ -9,18 +10,23 @@ interface WordPressHistoryRowActionsProps {
   articleTitle: string;
 }
 
-export function WordPressHistoryRowActions({ generationId, articleTitle }: WordPressHistoryRowActionsProps) {
+export function WordPressHistoryRowActions({
+  generationId,
+  articleTitle,
+}: WordPressHistoryRowActionsProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <>
-      <button
+      <Button
+        variant="ghost"
+        size="icon-sm"
         onClick={() => setDeleteOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        className="text-muted-foreground hover:bg-destructive-soft hover:text-destructive"
         aria-label={`Delete article: ${articleTitle}`}
       >
-        <Trash2 className="h-4 w-4" />
-      </button>
+        <Trash2 />
+      </Button>
       <DeleteArticlesDialog
         articles={[{ generationId, title: articleTitle }]}
         open={deleteOpen}

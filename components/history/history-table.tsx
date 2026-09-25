@@ -1,7 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import {
+  DataList,
+  DataListCheckbox,
+  DataListRow,
+  dataListMetaClass,
+  MetaSeparator,
+} from '@/components/shared/data-list';
 import { HistoryActions } from './history-actions';
 import { WordPressUsageBadge } from './wordpress-usage-badge';
 import { useSelection } from '@/components/editorial/selection-provider';
@@ -30,7 +38,7 @@ export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps)
   const { isSelected, toggle } = useSelection();
 
   return (
-    <div className="space-y-3">
+    <DataList>
       {generations.map((gen) => {
         const projectName = Array.isArray(gen.projects)
           ? gen.projects[0]?.name
@@ -39,54 +47,62 @@ export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps)
         const selected = isSelected(gen.id);
 
         return (
-          <div
-            key={gen.id}
-            className="group flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3.5 transition-colors hover:border-border"
-          >
-            <label
-              className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded border transition-all ${
-                selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border/80 hover:border-border'
-              }`}
-              aria-label={`Select generation: ${gen.keyword}`}
-            >
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={() => toggle(gen.id)}
-                className="sr-only"
-              />
-              {selected && (
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                  <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </label>
-            <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
-            <Link href={`/pinterest/${gen.id}`} className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{gen.keyword}</p>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
-                {projectName && <span>{projectName}</span>}
-                {projectName && <span>·</span>}
-                <span>{LANGUAGE_LABELS[gen.language as SupportedLanguage] ?? gen.language}</span>
-                <span>·</span>
-                <span>{gen.pins_requested} pins</span>
-                <span>·</span>
-                <span>{timeAgo(gen.created_at)}</span>
+          <DataListRow key={gen.id} selected={selected}>
+            <DataListCheckbox
+              checked={selected}
+              onToggle={() => toggle(gen.id)}
+              label={`Select generation: ${gen.keyword}`}
+            />
+            {/* Title first; badges trail on desktop and wrap under the title below `md`. */}
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 md:flex-nowrap">
+              <Link
+                href={`/pinterest/${gen.id}`}
+                className="min-w-0 basis-full rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:flex-1 md:basis-0"
+              >
+                <p
+                  className="text-sm font-medium max-md:line-clamp-2 md:truncate"
+                  title={gen.keyword}
+                >
+                  {gen.keyword}
+                </p>
+                <p
+                  className={cn(
+                    'mt-0.5 md:truncate [&>span:not([aria-hidden])]:whitespace-nowrap',
+                    dataListMetaClass
+                  )}
+                >
+                  {projectName && (
+                    <>
+                      <span>{projectName}</span>
+                      <MetaSeparator />
+                    </>
+                  )}
+                  <span>{LANGUAGE_LABELS[gen.language as SupportedLanguage] ?? gen.language}</span>
+                  <MetaSeparator />
+                  <span className="tabular-nums">{gen.pins_requested} pins</span>
+                  <MetaSeparator />
+                  <span>{timeAgo(gen.created_at)}</span>
+                </p>
+              </Link>
+              <div className="flex flex-wrap items-center gap-1.5 md:shrink-0">
+                <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
+                {usage && (
+                  <WordPressUsageBadge
+                    usedPinCount={usage.usedPinCount}
+                    totalPinCount={usage.totalPinCount}
+                    articles={usage.articles}
+                  />
+                )}
               </div>
-            </Link>
-            {usage && (
-              <WordPressUsageBadge
-                usedPinCount={usage.usedPinCount}
-                totalPinCount={usage.totalPinCount}
-                articles={usage.articles}
-              />
-            )}
-            <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <HistoryActions generationId={gen.id} keyword={gen.keyword} wordpressArticles={usage?.articles} />
             </div>
-          </div>
+            <HistoryActions
+              generationId={gen.id}
+              keyword={gen.keyword}
+              wordpressArticles={usage?.articles}
+            />
+          </DataListRow>
         );
       })}
-    </div>
+    </DataList>
   );
 }

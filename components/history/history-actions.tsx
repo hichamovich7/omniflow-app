@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MoreHorizontal, Eye, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,10 +59,10 @@ export function HistoryActions({ generationId, keyword, wordpressArticles }: His
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-          aria-label="Generation actions"
+          render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" />}
+          aria-label={`Actions for ${keyword}`}
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <MoreHorizontal />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => router.push(`/pinterest/${generationId}`)}>
