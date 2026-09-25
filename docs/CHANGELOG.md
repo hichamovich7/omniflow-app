@@ -18,6 +18,18 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Actions & Status v1 — Bulk actions and Workflow statuses
+
+### Changed
+
+* One bulk-selection bar (`BulkActions`) on History, WordPress History, Boards, and Pinterest generations: named region, "N selected" count, 36 px buttons (44 px on mobile), labelled "Clear". The count is announced to screen readers, and after "Clear" keyboard focus returns to the list.
+* Workflow statuses show readable, sentence-case labels ("Completed", "Failed", "Published", "On track", "Sent as draft") from one shared mapping, instead of raw lowercase values. Unknown values show a readable neutral label.
+* Statuses are no longer shown by color alone: Recent activity links include the status text for screen readers, and content-stream badges in the WordPress form show the status next to the name.
+
+### Not changed
+
+* No selection, deletion, confirmation, status value, API, or database change.
+
 ## Docs: Charts v1 audit — implementation deferred
 
 ### Changed

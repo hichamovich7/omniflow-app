@@ -7,7 +7,6 @@ import { UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import {
   Dialog,
@@ -17,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { publishStatusToBadgeVariant } from '@/lib/utils/status';
+import { StatusBadge } from '@/components/shared/status';
 import type { PublishMode } from '@/lib/validations/wordpress-publish';
 import type { WordPressArticle } from '@/types/wordpress';
 
@@ -153,7 +152,7 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Badge variant={publishStatusToBadgeVariant(article.publish_status)}>{article.publish_status}</Badge>
+        <StatusBadge status={article.publish_status} />
         {article.published_at && (
           <span className="text-muted-foreground">{new Date(article.published_at).toLocaleString()}</span>
         )}

@@ -1,6 +1,5 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { contentStreamStatusToBadgeVariant } from '@/lib/utils/status';
+import { StatusBadge } from '@/components/shared/status';
 import { Pencil, Archive } from 'lucide-react';
 import type { ContentStream } from '@/types/content-streams';
 
@@ -26,9 +25,7 @@ export function ContentStreamCard({ stream, categoryName, boardName, onEdit, onA
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{stream.name}</p>
-          <Badge variant={contentStreamStatusToBadgeVariant(stream.status)} className="mt-1.5 capitalize">
-            {stream.status}
-          </Badge>
+          <StatusBadge status={stream.status} className="mt-1.5" />
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button type="button" variant="ghost" size="icon-sm" onClick={onEdit} aria-label={`Edit "${stream.name}"`}>

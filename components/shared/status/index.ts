@@ -1,1 +1,2 @@
-export { StatusBadge, type WorkflowStatus } from './status-badge';
+export { StatusBadge } from './status-badge';
+export type { WorkflowStatus } from '@/lib/utils/status';

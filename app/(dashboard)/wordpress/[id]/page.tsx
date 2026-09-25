@@ -15,12 +15,11 @@ import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
 import { PublishControl } from '@/components/wordpress/publish-control';
 import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
 import { ArticleCategoryEditor } from '@/components/wordpress/article-category-editor';
-import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
-import { statusToBadgeVariant } from '@/lib/utils/status';
+import { StatusBadge } from '@/components/shared/status';
 
 export default async function WordPressArticlePage({
   params,
@@ -69,9 +68,7 @@ export default async function WordPressArticlePage({
               )}
               <span className="text-border">·</span>
               <span>{timeAgo(generation.created_at)}</span>
-              <Badge variant={statusToBadgeVariant(generation.status)} className="ml-0.5">
-                {generation.status}
-              </Badge>
+              <StatusBadge status={generation.status} className="ml-0.5" />
             </div>
             {article && <WpSendStatusBadge article={article} siteUrl={wordpressSite?.site_url} />}
           </div>

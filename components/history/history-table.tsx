@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import {
   DataList,
   DataListCheckbox,
@@ -16,7 +15,7 @@ import { useSelection } from '@/components/editorial/selection-provider';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
-import { statusToBadgeVariant } from '@/lib/utils/status';
+import { StatusBadge } from '@/components/shared/status';
 import type { GenerationWordPressUsage } from '@/lib/queries/wordpress-usage';
 
 interface GenerationRow {
@@ -85,7 +84,7 @@ export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps)
                 </p>
               </Link>
               <div className="flex flex-wrap items-center gap-1.5 md:shrink-0">
-                <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
+                <StatusBadge status={gen.status} />
                 {usage && (
                   <WordPressUsageBadge
                     usedPinCount={usage.usedPinCount}

@@ -1,31 +1,18 @@
 import Link from 'next/link';
-import { Badge, type badgeVariants } from '@/components/ui/badge';
 import { ProgressMetric } from '@/components/shared/metric-card';
-import type { VariantProps } from 'class-variance-authority';
-import type { ProjectProgress, ProjectStatus } from '@/types/dashboard';
+import { StatusBadge } from '@/components/shared/status';
+import type { ProjectProgress } from '@/types/dashboard';
 
 interface ProjectProgressCardProps {
   project: ProjectProgress;
 }
-
-const STATUS_LABELS: Record<ProjectStatus, string> = {
-  'on-track': 'On Track',
-  'at-risk': 'At Risk',
-  paused: 'Paused',
-};
-
-const STATUS_BADGE_VARIANTS: Record<ProjectStatus, VariantProps<typeof badgeVariants>['variant']> = {
-  'on-track': 'success',
-  'at-risk': 'warning',
-  paused: 'outline',
-};
 
 export function ProjectProgressCard({ project }: ProjectProgressCardProps) {
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-card-title">{project.name}</h3>
-        <Badge variant={STATUS_BADGE_VARIANTS[project.status]}>{STATUS_LABELS[project.status]}</Badge>
+        <StatusBadge status={project.status} />
       </div>
 
       <ProgressMetric
