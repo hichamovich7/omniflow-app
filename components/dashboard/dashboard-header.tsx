@@ -20,6 +20,7 @@ export function DashboardHeader({ greeting, userName, date, summary, credits }: 
       <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
       <ResourceHeader
         title={`${greeting}${userName ? `, ${userName}` : ''}`}
+        size="page"
         status={<Badge variant="outline">{credits.toLocaleString()} credits</Badge>}
         metadata={
           <div className="space-y-0.5">

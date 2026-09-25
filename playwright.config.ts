@@ -7,7 +7,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000',
+    // `localhost`, not `127.0.0.1`: Next 16 dev blocks cross-origin dev assets
+    // for other hosts, so pages never hydrate. The env var still wins.
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [

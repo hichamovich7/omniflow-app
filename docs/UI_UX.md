@@ -76,6 +76,8 @@ Account
   Settings
 ```
 
+The sidebar ends with a small footer showing the running app version (`v0.1.0`, Geist Mono, `text-xs`, muted). The value comes from `package.json` `version`, exposed as `NEXT_PUBLIC_APP_VERSION` in `next.config.ts` and inlined at build time. Because the mobile navigation sheet reuses `SidebarContent`, the version also shows at the bottom of the mobile menu. To change the displayed version, bump `version` in `package.json`.
+
 ---
 
 ## Top Bar

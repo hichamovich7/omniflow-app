@@ -23,7 +23,8 @@ export default async function ProjectsPage() {
       <section className="rounded-2xl border border-border/60 bg-surface px-5 py-6 shadow-sm sm:px-7 sm:py-8">
         <ResourceHeader
           title="Projects"
-          metadata={<span>Organize your content, brand profile, and generation history by project.</span>}
+          size="page"
+          description="Organize your content, brand profile, and generation history by project."
           actions={<Link href="/projects/new" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'min-h-11 px-4')}><Plus className="h-4 w-4" />New Project</Link>}
         />
       </section>
