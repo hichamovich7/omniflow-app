@@ -139,14 +139,61 @@ Exit criterion: a lightweight component showcase or representative route demonst
 
 ## Phase 3 — Application Shell
 
-- [ ] Apply canvas and surface tokens
-- [ ] Standardize sidebar width, item geometry, section labels, and active state
-- [ ] Standardize topbar height, spacing, border, and responsive behavior
-- [ ] Align `PageContainer`, `PageHeader`, and `ResourceHeader`
-- [ ] Verify mobile sheet navigation and 44 px touch targets
-- [ ] Verify focus order and focus restoration after navigation/overlays
+Status: **Complete** (2026-09-25, branch `feature/ui-application-shell-v1`), except page-dialog focus, which is tracked per page.
+
+### Application Shell v1 — Complete
+
+- **Sidebar:** 240 px from `lg`, 40 px items, 16 px icons, 10 px radius, 12 px section labels, `--selected` + `--primary-hover` active state, `aria-current="page"` on the single most specific match, "Soon" as `Badge`.
+- **Topbar:** 56 px below `lg`, 64 px from `lg`, opaque `--sidebar` surface and border, 16 / 24 / 32 px gutters.
+- **PageContainer:** `default` 1280 px and `narrow` 672 px, 16 / 24 / 32 px gutters.
+- **Mobile navigation:** 288 px Sheet, 44 px targets, visible Close, closes only when a link is chosen.
+- **Responsive shell:** desktop shell from 1024 px (`lg`). 19 private routes checked at 1440 / 1280 / 1024 / 768 / 390 in light and dark: all 200, correct shell geometry, no page overflow, no clipped element outside a scroll region.
+- **Focus restoration (mobile):** Escape, Close, overlay, and link navigation all return focus to "Open menu". The initial focus is the brand link. The user menu returns focus to its trigger on Escape.
+
+Global validation fixes: when two nav links prefix-matched (`/wordpress` and `/wordpress/history`), both were highlighted and both got `aria-current`. Only the longest match is active now. The decorative "O" logo tile is `aria-hidden`, so the brand link reads "OmniFlow AI Content OS".
+
+- [x] Apply canvas and surface tokens (shell: sidebar, topbar, mobile sheet)
+- [x] Standardize sidebar width, item geometry, section labels, and active state
+- [x] Standardize topbar height, spacing, border, and responsive behavior
+- [x] Align `PageContainer`, `PageHeader`, and `ResourceHeader`
+- [x] Verify mobile sheet navigation and 44 px touch targets
+- [x] Verify focus order and focus restoration for the mobile navigation
+- [ ] Focus restoration after page dialogs (tracked in the Dialog batch, fixed per page)
 
 Exit criterion: all private routes inherit one stable shell at every target width.
+
+### Application Shell v1 — Batch 1
+
+Changed: `components/layout/sidebar.tsx`, `topbar.tsx`, `mobile-nav.tsx`, `user-menu.tsx` (trigger only), `components/ui/page-container.tsx`, `app/(dashboard)/layout.tsx`. No route, navigation item, or product behavior changed.
+
+- **Sidebar:** 256 → 240 px (DESIGN target; the longest row, "Facebook" + "Soon", still fits). Opaque `--sidebar` surface, full `--sidebar-border`, no shadow. Items 40 px (44 px in the mobile sheet), 14 px text, 16 px icons, 12 px gap, 10 px radius. Active: `--selected` fill, `--primary` icon, `--primary-hover` label (5.4:1 in both themes; `--primary` was 4.1 / 4.3:1), `aria-current="page"`, and no more left indicator bar. Hover `--surface-muted`. Section and group labels 10 → 12 px at full `--muted-foreground` (4.8:1). "Soon" is `Badge variant="outline"`. Brand row 72 → 56/64 px, aligned with the topbar. Flat brand mark (no gradient or shadow), and the 9 px uppercase "AI CONTENT OS" tagline is now 12 px "AI Content OS". `nav` is labelled "Main".
+- **Topbar:** 72 → 56 px below `lg`, 64 px from `lg`. Same surface and border as the sidebar (it used to be translucent `bg-background/80` with `backdrop-blur`). Gutters 16 / 24 / 32 px, matching `PageContainer`. Below `lg` it shows the menu trigger and brand. The credits pill is `Badge variant="neutral"` with tabular figures. The avatar is 32 px inside a 44 px touch target below `lg`.
+- **PageContainer:** already used by every `(dashboard)` route, with `default` (1280 px) and `narrow` (672 px) matching DESIGN. Only change: the 24 px tablet gutter (`md:px-6 lg:px-8`, which was 32 px from `md`). No new variant. Nothing needs one: at 1440 px the default content is 1200 px wide, under the 1280 px cap.
+- **Navigation breakpoint `md` → `lg`.** At 768 px the old shell left 512 px of content next to the sidebar (KPI grid in 3 cramped columns). Now the sheet takes over below 1024 px, so 768 px gets the full width (720 px inside the gutters). At 1024 px the sidebar leaves 784 px, which is enough for every baseline page.
+- **Mobile sheet:** 288 px wide, `--sidebar` surface, standard close button (44 × 44) turned back on so touch screen-reader users have a dismiss control. It closes only when a link is activated: it used to close on any click, including group toggles and disabled "Soon" rows.
+- **Layout:** `h-screen` → `h-dvh`, so mobile browser bars no longer cut off the bottom of the fixed shell.
+
+Validation (dev server, authenticated real data, Playwright scripts in the session scratchpad):
+
+| Width | Sidebar | Topbar | Content (dashboard) | Gutter | Menu trigger | Overflow |
+| ----- | ------- | ------ | ------------------- | ------ | ------------ | -------- |
+| 1440  | 240     | 64     | 1200                | 32     | hidden       | none     |
+| 1280  | 240     | 64     | 1040                | 32     | hidden       | none     |
+| 1024  | 240     | 64     | 784                 | 32     | hidden       | none     |
+| 768   | sheet   | 56     | 768                 | 24     | 44 × 44      | none     |
+| 390   | sheet   | 56     | 390                 | 16     | 44 × 44      | none     |
+
+- Pages: Dashboard, Projects, Project detail, WordPress blog post, in light and dark at every width above. Narrow pages stay 672 px from 1024 px up.
+- Focus: opening the sheet by keyboard focuses the brand link. Escape, the close button, a backdrop click, and link navigation all return focus to "Open menu". Group toggles and disabled rows keep the sheet open. On desktop, Tab goes brand → Dashboard → Projects (`aria-current`) → Research → Pinterest toggle → items, with a visible 2 px ring.
+- Dark: navy `--sidebar` (`#0f1828`) for the sidebar, topbar, and sheet, never pure black. Active fill `#17375f`.
+- Tests: `ui-foundations.spec.ts` 30 passed / 10 skipped (only a breakpoint comment was updated). TypeScript, production build, `git diff --check`, and ESLint/Prettier on changed files pass.
+
+New debt found (out of scope, not fixed):
+
+- The dashboard greeting card still repeats the credits already shown in the topbar (known from Phase 0, dashboard rollout).
+- "Research" sits alone between Workspace and Pinterest with no section label (IA decision in `docs/DECISIONS.md`, left as is).
+- **Page-level horizontal scroll at 390 px** inside `<main>` (the document itself does not overflow): `/research` (433 px), `/wordpress/history` (571 px), `/wordpress/categories` (532 px), `/wordpress/[id]` (515 px, article table). The widths are identical on `cea0cb5` without the shell changes, and the shell does not change the 390 px content width. Fix with each page rollout or the Data UI phase.
+- History rows (`/history`, `/wordpress/history`) wrap metadata word by word at 390 px. Data UI phase.
 
 ## Phase 4 — Data Components
 
@@ -257,8 +304,8 @@ Side effects and migration debt found in this batch (not fixed here):
 
 - **Local `max-w-md` / `max-w-lg` now apply on desktop.** Before, `sm:max-w-sm` silently overrode them, so every such dialog was 384 px. They now render at their intended width: Content Stream, Schedule, and Generate WordPress at 448 px; Image Versions and Pin Detail at 512 px. Dialogs that only set `sm:max-w-*` (Recompose, Pin Batch Review) are now capped at 384 px on viewports under 640 px (previously full width minus 32 px). Phones at 390 px are unaffected.
 - **Focus does not return to the opener.** No dialog in the app uses `DialogTrigger`; they are all opened from a plain `Button` with controlled `open` state. After Escape or Close, focus falls back to `<body>`. This is identical before and after this batch. The mobile navigation Sheet, which does use `SheetTrigger`, returns focus correctly. Fix per dialog during page rollout, either by using `DialogTrigger` or by passing `finalFocus`.
-- **The mobile navigation Sheet's `w-64` has no effect.** The base `data-[side=left]:w-3/4` selector has higher specificity, so the menu is 75 % wide (293 px at 390 px). This was already the case before this batch.
-- **The Sheet's header, footer, and close button are untested in real use.** The only Sheet usage (mobile navigation) sets `showCloseButton={false}` and `p-0` and renders a hidden title, so those slots are verified by code review only.
+- ~~**The mobile navigation Sheet's `w-64` has no effect.**~~ Resolved in Application Shell v1: the menu uses `data-[side=left]:w-72` (288 px).
+- **The Sheet's header and footer are untested in real use.** ~~Close button~~ now used by the mobile navigation (Application Shell v1). The header and footer slots are still verified by code review only.
 
 ## Badge Batch
 
@@ -286,7 +333,7 @@ Local badge-like debt (not converted in this batch, migrate page by page):
 - `pin-diagnostic-badges.tsx`: 8 `Badge variant="outline"` with `text-[10px]` overrides, which keep them below 12 px.
 - Local spans that imitate badges instead of using `Badge`:
   - dashboard KPI "Preview" (`kpi-card.tsx`, 10 px uppercase);
-  - sidebar "Soon" (10 px uppercase);
+  - ~~sidebar "Soon" (10 px uppercase)~~ now `Badge variant="outline"` (Application Shell v1);
   - project card category chip (`project-card.tsx`, primary pill);
   - `wordpress-usage-badge.tsx` (11 px, and it is interactive: hover state, link);
   - `pin-form.tsx` 10 px pill;

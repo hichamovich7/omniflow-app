@@ -9,7 +9,7 @@ test.describe('UI foundations', () => {
   test('dashboard smoke test exposes the workspace shell', async ({ page, isMobile }) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('main')).toBeVisible();
-    // Below `md` the sidebar (and its OmniFlow brand link) is hidden by design;
+    // Below `lg` the sidebar is hidden by design (the topbar carries the brand);
     // the shell is reached through the "Open menu" button instead.
     if (isMobile) {
       await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();

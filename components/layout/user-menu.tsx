@@ -39,11 +39,14 @@ export function UserMenu({ email, creditsBalance }: UserMenuProps) {
 
   return (
     <DropdownMenu>
+      {/* 32 px avatar inside a 44 px touch target below `lg`. */}
       <DropdownMenuTrigger
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group/avatar flex size-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:size-8"
         aria-label="User menu"
       >
-        {initials}
+        <span className="flex size-8 items-center justify-center rounded-full bg-selected text-xs font-medium text-primary transition-colors group-hover/avatar:bg-primary/15">
+          {initials}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuGroup>

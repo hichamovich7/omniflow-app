@@ -21,14 +21,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .single();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-dvh overflow-hidden bg-background">
       <ScrollLock />
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar
-          email={user.email ?? ''}
-          creditsBalance={profile?.credits_balance ?? 0}
-        />
+        <Topbar email={user.email ?? ''} creditsBalance={profile?.credits_balance ?? 0} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
