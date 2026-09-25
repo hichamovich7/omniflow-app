@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { KpiCard } from '@/components/dashboard/kpi-card';
+import { MetricGrid } from '@/components/shared/metric-card';
 import { TodayPriorities } from '@/components/dashboard/today-priorities';
 import { ProjectProgressCard } from '@/components/dashboard/project-progress-card';
 import { WeeklyProgress } from '@/components/dashboard/weekly-progress';
@@ -24,11 +25,11 @@ interface CommandCenterSectionProps {
 export function CommandCenterSection({ kpis, activeProjects, projects }: CommandCenterSectionProps) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <MetricGrid>
         {kpis.map((kpi) => (
           <KpiCard key={kpi.id} kpi={kpi} />
         ))}
-      </div>
+      </MetricGrid>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">

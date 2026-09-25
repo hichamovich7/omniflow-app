@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Badge, type badgeVariants } from '@/components/ui/badge';
+import { ProgressMetric } from '@/components/shared/metric-card';
 import type { VariantProps } from 'class-variance-authority';
 import type { ProjectProgress, ProjectStatus } from '@/types/dashboard';
 
@@ -27,18 +28,12 @@ export function ProjectProgressCard({ project }: ProjectProgressCardProps) {
         <Badge variant={STATUS_BADGE_VARIANTS[project.status]}>{STATUS_LABELS[project.status]}</Badge>
       </div>
 
-      <div className="mt-4 space-y-1.5">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Progress</span>
-          <span>{project.progressPercent}%</span>
-        </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${project.progressPercent}%` }}
-          />
-        </div>
-      </div>
+      <ProgressMetric
+        className="mt-4"
+        label="Progress"
+        value={`${project.progressPercent}%`}
+        progress={{ value: project.progressPercent, max: 100, label: `${project.name} progress` }}
+      />
 
       <p className="mt-3 text-sm">
         <span className="text-muted-foreground">{project.mainKpiLabel}: </span>

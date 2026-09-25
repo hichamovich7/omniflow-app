@@ -299,6 +299,32 @@ Use a quiet header, 44–48 px rows, horizontal separators, row hover, selected 
 
 `Pagination` (`components/shared/pagination`) is a labelled `nav` with "Page X of Y" in tabular figures, plus outline `sm` Previous / Next (36 px, 44 px below `md`) with `rel="prev"` / `rel="next"`. The unavailable end renders as an `aria-disabled` button, not a dead link. Previous / Next only, so it never overflows at 390 px. Add numbered pages only for long lists, and collapse them below `sm`.
 
+### KPI cards and progress
+
+- `MetricCard` (`components/shared/metric-card`):
+  - A `Card` with 16 px padding and 12 px gaps.
+  - Label: `text-label` (13 / 18 px, 500, `--muted-foreground`), in the product's own case. Never uppercase or tracked.
+  - Value: `text-kpi` (30 / 34 px, 700, tabular figures).
+  - Optional secondary value (for example "/ 25"): 14 px, muted, tabular. It wraps under the value when space runs out.
+  - Top-right slot: a `Badge`, a 16 px muted icon with no tile, or a 16 px arrow on link cards. Only a badge may wrap under the label.
+  - A progress bar, when present, sits at the bottom so the cards in a row line up.
+  - Link cards are a single link. On hover they change border and gain `shadow-sm`, without translation. On focus they show the 2 px ring with offset.
+- `MetricGrid`:
+  - Columns follow the grid's own width: 2, 3 from 576 px, and 4 from 896 px.
+  - Gaps are 12 px, then 16 px from 3 columns.
+  - An incomplete last row spreads across the row instead of leaving empty slots, and the order never changes.
+- `Progress` (`components/ui/progress.tsx`):
+  - 6 px tall, full radius, `--muted` track, `--primary` fill, value clamped to its range.
+  - It is always a `progressbar` with min / max / now, named by its visible label.
+  - Add `aria-valuetext` when the raw number reads poorly ("240 € of 1000 €").
+  - The value is always shown as text too, so color is never the only signal.
+  - Add success / warning / danger fills only when a consumer needs them.
+- `ProgressMetric`: the label and the value sit on one line, both 13 px / 500. The value uses the foreground color and tabular figures, with its target muted. The bar goes underneath.
+- Trend and delta (none shipped yet):
+  - 12–13 px text, with an optional 12–14 px icon.
+  - Success or danger only when the direction is good or bad for that specific metric; otherwise neutral.
+  - Never implied by color alone.
+
 ### Sidebar
 
 - Light surface with a subtle right border.
@@ -350,16 +376,16 @@ Lucide is the sole product icon library. Standard sizes are 14, 16, 18, 20, and 
 
 ## Main UI Files
 
-| Concern                      | Primary files                                                                                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Global tokens and typography | `app/globals.css`, `app/layout.tsx`                                                                                                                                           |
-| Application shell            | `app/(dashboard)/layout.tsx`, `components/layout/sidebar.tsx`, `components/layout/topbar.tsx`, `components/layout/mobile-nav.tsx`                                             |
-| Page layout and headers      | `components/ui/page-container.tsx`, `components/layout/page-header.tsx`, `components/shared/resource-header/resource-header.tsx`                                              |
-| Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                            |
-| Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                   |
-| Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`        |
-| Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx` |
-| Representative feature UI    | `components/dashboard/`, `components/projects/`, `components/boards/`, `components/pinterest/`, `components/wordpress/`, `components/history/`, `components/research/`        |
+| Concern                      | Primary files                                                                                                                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Global tokens and typography | `app/globals.css`, `app/layout.tsx`                                                                                                                                                                                                    |
+| Application shell            | `app/(dashboard)/layout.tsx`, `components/layout/sidebar.tsx`, `components/layout/topbar.tsx`, `components/layout/mobile-nav.tsx`                                                                                                      |
+| Page layout and headers      | `components/ui/page-container.tsx`, `components/layout/page-header.tsx`, `components/shared/resource-header/resource-header.tsx`                                                                                                       |
+| Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                                                                                     |
+| Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                                                                            |
+| Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`, `components/ui/progress.tsx`, `components/shared/metric-card/` |
+| Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx`                                                          |
+| Representative feature UI    | `components/dashboard/`, `components/projects/`, `components/boards/`, `components/pinterest/`, `components/wordpress/`, `components/history/`, `components/research/`                                                                 |
 
 ## Governance
 

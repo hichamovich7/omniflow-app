@@ -18,6 +18,20 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Data Metrics v1 — KPI cards and Progress
+
+### Changed
+
+* Dashboard KPI cards use the shared `MetricCard`: `Card` surface, 13 px label, 30 px tabular value, "Preview" as a `Badge`, no hover translation.
+* KPI grids (`MetricGrid`) fill their last row instead of leaving empty slots: 2 / 3 / 4 columns by available width.
+* One `Progress` primitive (6 px, `progressbar` semantics, named) replaces the four hand-drawn bars: KPI cards, Weekly Progress, Active Projects, and the trial banner.
+* Weekly Progress is a `Card` with label · value · bar rows (no more 12 px uppercase labels). It no longer breaks "240 € / 1000 €" at 768 px.
+* Project detail stat cards use `MetricCard` with a 16 px icon instead of a 36 px tile.
+
+### Not changed
+
+* No metric, value, order, number format, link, query, API, or database change. Charts are untouched.
+
 ## UI: Data UI v1 — Table, Filters, Pagination
 
 ### Changed
