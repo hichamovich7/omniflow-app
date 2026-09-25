@@ -802,3 +802,17 @@ Si alguna prueba falla:
 ```txt id="6j8zvt"
 La tarea NO está completada.
 ```
+
+---
+
+# TASK-FIX-043 — Planned streams + manual publishing activity
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/stream-planned-and-activity.spec.ts --project=renderer --reporter=list
+```
+
+Offline (29 cases): `planned` validation, create and Planned → Warming / Active through `createContentStream` / `updateContentStream` (in-memory Supabase stub), no urgency / focus / active-project / weekly-target / coverage row for Planned streams, the Planned badge, the activity Zod schema, add / update (upsert, no duplicate) / note, ownership (403 / 404, nothing written), future dates refused, "Mark target met" = `target_pins_per_day`, external activity reaching Target met, Created / Planned counters unchanged, future planned Pins computed normally, and static checks of migrations 035 (unique key, `published_count >= 0`, source CHECK, RLS `WITH CHECK` on stream ownership) and 036.
+
+Live RLS enforcement (a user B session cannot read or write user A's rows) needs a real Postgres and stays a manual check after applying 035/036. Gated browser cases (skip without `PLAYWRIGHT_STORAGE_STATE`): create a Planned stream and move it to Active (`tests/playwright/content-streams.spec.ts`), open / cancel the Publishing activity modal (`tests/playwright/dashboard.spec.ts`).

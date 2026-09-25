@@ -54,7 +54,8 @@ auth.users
         │
         │  wordpress_category_id references wordpress_categories, nullable
         │
-        └── content_stream_boards (join table) → boards
+        ├── content_stream_boards (join table) → boards
+        └── content_stream_publishing_activity (TASK-FIX-043, one row per stream + local day)
 ```
 
 ```
@@ -302,7 +303,7 @@ Topic-pillar grouping under a project (TASK-FIX-039 Phase 2a, discovery in `docs
 | target_pins_per_day        | integer                            | nullable, CHECK >= 0 |
 | target_articles_per_week   | integer                            | nullable, CHECK >= 0 |
 | target_buffer_days         | integer                            | nullable, CHECK >= 0 |
-| status                     | text                                | NOT NULL DEFAULT 'active', CHECK IN ('active','warming','paused','archived') |
+| status                     | text                                | NOT NULL DEFAULT 'active', CHECK IN ('active','planned','warming','paused','archived') — `planned` added by migration 036 (TASK-FIX-043) |
 | created_at                 | timestamptz                        | |
 | updated_at                 | timestamptz                        | |
 
@@ -424,6 +425,64 @@ file.
 (content_stream_id, board_id) PRIMARY KEY
 (board_id)
 (user_id)
+```
+
+---
+
+## Status values
+
+* `active` — running; measured against its targets, can be recommended.
+* `planned` (migration `036_add_content_stream_planned_status.sql`, TASK-FIX-043) — prepared for a future start, not started yet. Never counted as an active project, never measured for coverage, never recommended or used as Today's focus; listed in its own "Planned" section on the dashboard. Can move to `warming` or `active` at any time (no transition rule is enforced). Unrelated to a Pin's planned `publish_date`.
+* `warming` — started, ramping up; low-urgency buffer review only.
+* `paused` — no coverage expected.
+* `archived` — hidden from the dashboard; frees its board.
+
+Migration 036 only drops and re-adds the `content_streams_status_check` constraint (the name Postgres gave 030's inline CHECK) with the five values; no row changes.
+
+---
+
+# content_stream_publishing_activity
+
+Pins published **outside OmniFlow** (by hand or with another tool) for one content stream on one local day (TASK-FIX-043, migration `035_add_stream_publishing_activity.sql`). OmniFlow never talks to Pinterest, so this is a user-entered count, always read back as manual/external data.
+
+## Columns
+
+| Column            | Type                          | Description |
+| ----------------- | ----------------------------- | ----------- |
+| id                | uuid PK                       | |
+| user_id           | uuid FK → profiles.id         | NOT NULL, ON DELETE CASCADE — always the session user |
+| content_stream_id | uuid FK → content_streams.id  | NOT NULL, ON DELETE CASCADE |
+| activity_date     | date                          | NOT NULL — local calendar day; the API refuses future days |
+| published_count   | integer                       | NOT NULL, CHECK >= 0 (Zod also caps it at 1000) |
+| note              | text                          | nullable, CHECK length <= 500 |
+| source            | text                          | NOT NULL DEFAULT 'manual', CHECK IN ('manual','external') |
+| created_at        | timestamptz                   | |
+| updated_at        | timestamptz                   | trigger `update_updated_at_column()` |
+
+`UNIQUE (user_id, content_stream_id, activity_date)` — one row per stream and day; saving again updates it (upsert on that key), never a duplicate.
+
+## Purpose
+
+Lets today's cell of the dashboard "Publishing coverage" grid count Pins published elsewhere: `effective = Pins planned in OmniFlow for today + published_count`. It never touches `pins` — no `publish_date` change, no pin row — so the Created / Planned counters and any real Pinterest statistic stay untouched. Future days are always measured on OmniFlow's planned Pins only. In the buffer maths, external activity only fills today's gap to `target_pins_per_day` (never future days).
+
+## RLS
+
+```sql
+USING (user_id = auth.uid())
+WITH CHECK (
+  user_id = auth.uid()
+  AND EXISTS (SELECT 1 FROM content_streams cs WHERE cs.id = content_stream_id AND cs.user_id = auth.uid())
+)
+```
+
+Same hardened shape as 031 / 033: a direct PostgREST call cannot attach activity to another user's stream. `assertStreamOwnedBy` in `lib/queries/stream-publishing-activity.ts` runs first as defense-in-depth.
+
+## Indexes
+
+```sql
+(user_id, content_stream_id, activity_date) UNIQUE
+(content_stream_id)
+(user_id, activity_date)
 ```
 
 ---

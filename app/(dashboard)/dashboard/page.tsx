@@ -27,7 +27,8 @@ import {
 import { buildContentCoverage, buildWeekPlan } from '@/lib/dashboard/build-content-coverage';
 import { buildRecommendations, pickFocusRecommendation } from '@/lib/dashboard/build-recommendations';
 import { buildSundayReviewStatus } from '@/lib/dashboard/build-sunday-review';
-import { startOfLocalWeek } from '@/lib/dashboard/local-date';
+import { startOfLocalWeek, toLocalDayKey } from '@/lib/dashboard/local-date';
+import { listPublishingActivityFrom } from '@/lib/queries/stream-publishing-activity';
 import {
   countPinLifecycle,
   countTasksCompletedThisMonth,
@@ -84,6 +85,7 @@ export default async function DashboardPage() {
     dashboardTasks,
     tasksCompletedThisMonth,
     weeklyReviewData,
+    externalActivity,
   ] = await Promise.all([
     supabase.from('generations').select('id', { count: 'exact', head: true }),
     supabase.from('pins').select('id', { count: 'exact', head: true }),
@@ -113,6 +115,8 @@ export default async function DashboardPage() {
     listDashboardTasks(supabase, userId, now),
     countTasksCompletedThisMonth(supabase, userId, now),
     loadWeeklyReview(supabase, userId, now),
+    // Manual / external publishing activity (migration 035) — only today's counts toward coverage.
+    listPublishingActivityFrom(supabase, toLocalDayKey(now)),
   ]);
 
   const unscheduledByBoard = await countUnscheduledPinsByBoard(supabase, [
@@ -135,7 +139,7 @@ export default async function DashboardPage() {
     tasksCompletedThisMonth,
   });
 
-  const coverage = buildContentCoverage({ streams, plannedPins, unscheduledByBoard, now });
+  const coverage = buildContentCoverage({ streams, plannedPins, unscheduledByBoard, externalActivity, now });
   const sundayReview = buildSundayReviewStatus({ now, ...weeklyReviewData });
   const recommendations = buildRecommendations(coverage, sundayReview);
   const focus = pickFocusRecommendation(recommendations);

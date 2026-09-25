@@ -1,4 +1,4 @@
-import type { ContentStreamStatus } from '@/types/content-streams';
+import type { ContentStreamStatus, PublishingActivitySource } from '@/types/content-streams';
 import type { TaskType } from '@/types/tasks';
 
 /**
@@ -57,7 +57,7 @@ export interface WeeklyProgressStats {
 // Content stream coverage (Phase 2d) — computed from real pins.publish_date.
 // ---------------------------------------------------------------------------
 
-export type StreamHealth = 'on-track' | 'needs-content' | 'create-now' | 'warming' | 'paused' | 'needs-setup';
+export type StreamHealth = 'on-track' | 'needs-content' | 'create-now' | 'warming' | 'paused' | 'planned' | 'needs-setup';
 
 export interface StreamBoardRef {
   id: string;
@@ -67,8 +67,21 @@ export interface StreamBoardRef {
 export interface CoverageDay {
   /** Local YYYY-MM-DD. */
   date: string;
+  /** Pins planned in OmniFlow (pins.publish_date) — never includes external activity. */
   planned: number;
-  /** full = meets target pins/day, partial = some but below target, empty = nothing planned. */
+  /**
+   * Pins the user recorded as published manually / with another tool
+   * (content_stream_publishing_activity). Only counted up to today: future
+   * days always use OmniFlow's planned Pins, so this is 0 after today.
+   */
+  external: number;
+  /** Note saved with the external activity, if any. */
+  externalNote: string | null;
+  /** How the external count was reported; null when there is none. */
+  externalSource: PublishingActivitySource | null;
+  /** planned + external — what the level below is measured on. */
+  effective: number;
+  /** full = meets target pins/day, partial = some but below target, empty = nothing. Measured on `effective`. */
   level: 'full' | 'partial' | 'empty';
   /** Inside the stream's target buffer window (today … today + buffer − 1). */
   inBuffer: boolean;
@@ -94,6 +107,8 @@ export interface ContentStreamCoverage {
   /** Last day of the unbroken run of days (from today) that each have ≥ 1 planned pin. */
   coveredThrough: string | null;
   daysCovered: number;
+  /** Pins recorded as published outside OmniFlow today (manual / external), never part of plannedPins. */
+  externalToday: number;
   /** Pins on the stream's boards that have no publish_date yet. */
   unscheduledPins: number;
   /** A board of this stream is also linked to another non-archived stream (§11 §8) — coverage is ambiguous. */

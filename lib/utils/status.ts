@@ -21,6 +21,7 @@ const STATUS_PRESENTATION = {
   published: { label: 'Published', tone: 'success' },
   // Content streams.
   active: { label: 'Active', tone: 'success' },
+  planned: { label: 'Planned', tone: 'primary' },
   warming: { label: 'Warming', tone: 'warning' },
   paused: { label: 'Paused', tone: 'neutral' },
   archived: { label: 'Archived', tone: 'outline' },

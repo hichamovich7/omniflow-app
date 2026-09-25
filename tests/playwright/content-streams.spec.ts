@@ -104,4 +104,28 @@ test.describe('Content Streams (project page, Phase 2a.1)', () => {
     await expect(page.getByText(renamed)).toBeVisible();
     await expect(page.getByText('archived', { exact: true }).first()).toBeVisible();
   });
+
+  // TASK-FIX-043 — Planned status: create as Planned, badge shown, then start it (Planned → Active), then archive (cleanup).
+  test('create a Planned stream, see its Planned badge, then move it to Active', async ({ page }) => {
+    await gotoFirstProject(page);
+    const name = `QA planned ${Date.now()}`;
+
+    await page.getByRole('button', { name: 'Add content stream' }).first().click();
+    await page.getByLabel('Name').fill(name);
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Planned', exact: true }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await expect(page.getByText('Content stream created')).toBeVisible();
+    await expect(page.getByText('Planned', { exact: true }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: `Edit "${name}"` }).click();
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Active', exact: true }).click();
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('Content stream updated')).toBeVisible();
+
+    await page.getByRole('button', { name: `Archive "${name}"` }).click();
+    await page.getByRole('button', { name: 'Archive', exact: true }).click();
+    await expect(page.getByText('Content stream archived')).toBeVisible();
+  });
 });

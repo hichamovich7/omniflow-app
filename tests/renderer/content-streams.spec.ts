@@ -83,8 +83,8 @@ test.describe('content_streams validation (TASK-FIX-039 Phase 2a)', () => {
     ).toBe(false);
   });
 
-  test('accepts every one of the four allowed statuses', () => {
-    for (const status of ['active', 'warming', 'paused', 'archived']) {
+  test('accepts every one of the five allowed statuses', () => {
+    for (const status of ['active', 'planned', 'warming', 'paused', 'archived']) {
       expect(contentStreamStatusSchema.safeParse(status).success).toBe(true);
     }
   });

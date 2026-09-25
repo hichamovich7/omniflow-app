@@ -47,7 +47,8 @@ function coveredPhrase(daysCovered: number): string {
 export function buildStreamRecommendations(stream: ContentStreamCoverage): Recommendation[] {
   const common = base(stream);
 
-  if (stream.health === 'paused' || stream.health === 'on-track') return [];
+  // Planned streams are not started yet: never an urgency, never a focus.
+  if (stream.health === 'paused' || stream.health === 'planned' || stream.health === 'on-track') return [];
 
   if (stream.sharedBoard) {
     return [

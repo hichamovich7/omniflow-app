@@ -1449,6 +1449,53 @@ server_error
 
 ---
 
+# PUT /api/content-streams/[id]/publishing-activity
+
+Records — or updates — how many Pins were published outside OmniFlow for this content stream on one day (TASK-FIX-043, table `content_stream_publishing_activity`). Upsert on `(user_id, content_stream_id, activity_date)`: saving the same day again updates the row. Never writes to `pins`.
+
+## Request
+
+```json
+{
+  "activityDate": "2026-09-25",
+  "publishedCount": 5,
+  "note": "Created and published with another tool",
+  "source": "external"
+}
+```
+
+* `activityDate` — local `YYYY-MM-DD`, a real date, today or earlier (future days are covered by OmniFlow's planned Pins only).
+* `publishedCount` — integer 0–1000.
+* `note` — optional, trimmed, max 500 chars; empty becomes `null`.
+* `source` — `manual` (default) or `external`.
+
+Checks, in order: session (`401`), UUID (`400`), Zod body (`400`), stream exists (`404`) and belongs to the caller (`403`), date not in the future (`400`). RLS `WITH CHECK` enforces the same ownership in the database.
+
+## Response
+
+```json
+{ "data": { "activity": { "id": "uuid", "content_stream_id": "uuid", "activity_date": "2026-09-25", "published_count": 5, "note": "…", "source": "external", "...": "..." } }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+forbidden
+future_date
+server_error
+```
+
+## Content stream status (`POST /api/content-streams`, `PATCH /api/content-streams/[id]`)
+
+`status` accepts `active`, `planned`, `warming`, `paused`, `archived` (`planned` added by TASK-FIX-043 / migration 036). Any transition is allowed, including `planned → warming` and `planned → active`.
+
+---
+
 # POST /api/research
 
 Research a topic from a keyword, website, or blog using Firecrawl.

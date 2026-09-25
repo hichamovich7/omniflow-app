@@ -18,6 +18,24 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+---
+
+# [3.0.0] - 2026-09-26
+
+## TASK-FIX-043: Manual publishing activity and Planned content streams
+
+### Added
+
+* Publishing coverage: click today's cell of a stream to record Pins published outside OmniFlow ("Publishing activity" modal: Pins published today, **Mark target met** — fills in the stream's Pins/day target —, published with another tool or by hand, note). Saving again the same day updates the entry.
+* Today's cell counts planned + externally published Pins, so external activity can reach "Target met". A green dot and "Published externally: 5" (with the note behind an info icon) keep external Pins visibly separate; a fifth count, *Published externally* (today), sits next to Created / Planned / Planned date passed / Unscheduled.
+* `content_stream_publishing_activity` table (migration 035: one row per user + stream + day, `published_count >= 0`, `source` manual / external, RLS with stream ownership check) and `PUT /api/content-streams/[id]/publishing-activity`.
+* `Planned` content stream status (migration 036) in Add / Edit Content Stream: a stream prepared for later and not started yet. Listed under "Planned" in the dashboard's Content streams, with a Planned badge on the dashboard and project pages. Switch it to Warming or Active when you start.
+
+### Changed
+
+* Planned streams never count as active projects, never raise an urgent alert, are never recommended or used as Today's focus, and get no coverage row or weekly target.
+* External activity fills only today's gap in a stream's buffer. It never changes `pins.publish_date`, any Pin, the Created or Planned counters, or Pinterest statistics; future days are still measured on OmniFlow's planned Pins.
+
 ## TASK-FIX-042: Operational Command Center
 
 ### Added

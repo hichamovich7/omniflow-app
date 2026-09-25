@@ -20,7 +20,8 @@ import type { ContentStreamStatus } from '@/types/content-streams';
 const NO_CATEGORY_VALUE = 'none';
 const NO_BOARD_VALUE = 'none';
 
-const STATUS_OPTIONS: ContentStreamStatus[] = ['active', 'warming', 'paused', 'archived'];
+// `planned` = prepared for later, not started: it can move to warming or active at any time.
+export const STATUS_OPTIONS: ContentStreamStatus[] = ['active', 'planned', 'warming', 'paused', 'archived'];
 
 export interface CategoryOption {
   id: string;

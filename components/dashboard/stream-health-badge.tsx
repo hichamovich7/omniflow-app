@@ -9,6 +9,7 @@ export const STREAM_HEALTH_PRESENTATION: Record<StreamHealth, { label: string; v
   'create-now': { label: 'Create now', variant: 'danger' },
   warming: { label: 'Warming', variant: 'purple' },
   paused: { label: 'Paused', variant: 'neutral' },
+  planned: { label: 'Planned', variant: 'outline' },
   'needs-setup': { label: 'Needs setup', variant: 'outline' },
 };
 

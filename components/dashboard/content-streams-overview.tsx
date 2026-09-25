@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PageState } from '@/components/shared/page-state';
 import { StreamHealthBadge } from '@/components/dashboard/stream-health-badge';
 import { formatDayKeyShort } from '@/lib/dashboard/local-date';
+import { cn } from '@/lib/utils';
 import type { ContentStreamCoverage } from '@/types/dashboard';
 
 interface ContentStreamsOverviewProps {
@@ -39,8 +40,20 @@ function boardNames(stream: ContentStreamCoverage): string {
   return stream.boards.length > 0 ? stream.boards.map((board) => board.name).join(', ') : 'No board linked';
 }
 
-/** Every non-archived content stream with its real planning numbers. */
-export function ContentStreamsOverview({ coverage }: ContentStreamsOverviewProps) {
+/**
+ * Splits live streams from `planned` ones (prepared for later, not started).
+ * Planned streams keep their own section: no coverage numbers, no action.
+ */
+export function splitPlannedStreams(coverage: ContentStreamCoverage[]): { live: ContentStreamCoverage[]; planned: ContentStreamCoverage[] } {
+  return {
+    live: coverage.filter((stream) => stream.health !== 'planned'),
+    planned: coverage.filter((stream) => stream.health === 'planned'),
+  };
+}
+
+/** Every non-archived content stream with its real planning numbers; planned streams listed apart. */
+export function ContentStreamsOverview({ coverage: allStreams }: ContentStreamsOverviewProps) {
+  const { live: coverage, planned } = splitPlannedStreams(allStreams);
   return (
     <section aria-labelledby="content-streams-title" className="space-y-3">
       <div className="flex items-end justify-between gap-2">
@@ -55,7 +68,7 @@ export function ContentStreamsOverview({ coverage }: ContentStreamsOverviewProps
         </Link>
       </div>
 
-      {coverage.length === 0 ? (
+      {allStreams.length === 0 ? (
         <PageState
           variant="empty"
           title="No content streams yet"
@@ -69,8 +82,11 @@ export function ContentStreamsOverview({ coverage }: ContentStreamsOverviewProps
         />
       ) : (
         <>
+          {coverage.length === 0 && (
+            <p className="text-sm text-muted-foreground">No active stream yet — only planned ones.</p>
+          )}
           {/* Desktop */}
-          <div className="hidden overflow-hidden rounded-xl border border-border/60 bg-surface md:block">
+          <div className={cn('hidden overflow-hidden rounded-xl border border-border/60 bg-surface', coverage.length > 0 && 'md:block')}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -151,6 +167,35 @@ export function ContentStreamsOverview({ coverage }: ContentStreamsOverviewProps
               );
             })}
           </ul>
+
+          {planned.length > 0 && (
+            <div className="space-y-2 pt-1" aria-labelledby="planned-streams-title">
+              <h3 id="planned-streams-title" className="text-sm font-medium">
+                Planned <span className="text-muted-foreground">· not started yet</span>
+              </h3>
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {planned.map((stream) => (
+                  <li
+                    key={stream.streamId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border bg-surface px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{stream.streamName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {stream.projectName} · {streamTargetLabel(stream)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <StreamHealthBadge health={stream.health} />
+                      <Link href={`/projects/${stream.projectId}`} className={buttonVariants({ variant: 'ghost', size: 'xs' })}>
+                        Start
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
     </section>

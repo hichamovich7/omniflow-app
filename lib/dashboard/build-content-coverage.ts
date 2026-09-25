@@ -1,4 +1,4 @@
-import type { ContentStreamStatus } from '@/types/content-streams';
+import type { ContentStreamStatus, PublishingActivitySource } from '@/types/content-streams';
 import type { ContentStreamCoverage, CoverageDay, StreamBoardRef, StreamHealth, WeekDayPlan } from '@/types/dashboard';
 import { addDaysToKey, addLocalDays, daysBetweenKeys, startOfLocalWeek, toLocalDayKey } from '@/lib/dashboard/local-date';
 
@@ -13,6 +13,11 @@ import { addDaysToKey, addLocalDays, daysBetweenKeys, startOfLocalWeek, toLocalD
  * - past date = pins.publish_date is set and already passed. OmniFlow never
  *               talks to the Pinterest API, so this is *not* confirmation that
  *               the pin was published (§1.3).
+ * - external  = a count the user typed in (content_stream_publishing_activity,
+ *               migration 035) for Pins published outside OmniFlow. It fills
+ *               today's objective only (effective = planned + external); it
+ *               never changes `plannedPins`, pins.publish_date, or any pin.
+ *               Future days always use OmniFlow's planned Pins alone.
  */
 
 export const COVERAGE_HORIZON_DAYS = 14;
@@ -34,13 +39,40 @@ export interface PlannedPinInput {
   publishDate: string;
 }
 
+export interface ExternalActivityInput {
+  streamId: string;
+  /** Local YYYY-MM-DD. */
+  activityDate: string;
+  publishedCount: number;
+  note: string | null;
+  source: PublishingActivitySource;
+}
+
 export interface CoverageInput {
   streams: StreamInput[];
   /** Every pin with a publish_date on or after the start of the current week. */
   plannedPins: PlannedPinInput[];
   /** board_id → count of pins with publish_date IS NULL. */
   unscheduledByBoard: Record<string, number>;
+  /** Manual / external publishing activity. Entries after today are ignored. */
+  externalActivity?: ExternalActivityInput[];
   now: Date;
+}
+
+/** Level of one day, measured on planned + external Pins. */
+export function computeDayLevel(effective: number, target: number): CoverageDay['level'] {
+  if (effective === 0) return 'empty';
+  return target > 0 && effective < target ? 'partial' : 'full';
+}
+
+/**
+ * Pins that external activity takes off the buffer: only today's gap to the
+ * daily target (never more), so a large external count can never fake
+ * coverage for future days.
+ */
+export function computeExternalBufferCredit(target: number | null, plannedToday: number, externalToday: number): number {
+  if (!target || target <= 0) return 0;
+  return Math.min(externalToday, Math.max(0, target - plannedToday));
 }
 
 export function computeRequiredBuffer(targetPinsPerDay: number | null, targetBufferDays: number | null): number | null {
@@ -88,6 +120,8 @@ export function computeStreamHealth(input: {
   daysCovered: number;
 }): StreamHealth {
   if (input.status === 'paused') return 'paused';
+  // Not started yet: never urgent, never measured against its targets.
+  if (input.status === 'planned') return 'planned';
   if (input.status === 'warming') return 'warming';
   if (!input.configured || input.missingPins == null) return 'needs-setup';
   if (input.missingPins === 0) return 'on-track';
@@ -95,7 +129,13 @@ export function computeStreamHealth(input: {
   return input.daysCovered <= 1 ? 'create-now' : 'needs-content';
 }
 
-export function buildContentCoverage({ streams, plannedPins, unscheduledByBoard, now }: CoverageInput): ContentStreamCoverage[] {
+export function buildContentCoverage({
+  streams,
+  plannedPins,
+  unscheduledByBoard,
+  externalActivity = [],
+  now,
+}: CoverageInput): ContentStreamCoverage[] {
   const todayKey = toLocalDayKey(now);
   const liveStreams = streams.filter((stream) => stream.status !== 'archived');
 
@@ -114,11 +154,25 @@ export function buildContentCoverage({ streams, plannedPins, unscheduledByBoard,
       .filter((iso) => toLocalDayKey(new Date(iso)) >= todayKey);
 
     const byDay = countPinsByDay(upcoming);
-    const { coveredThrough, daysCovered } = computeCoveredThrough(byDay, todayKey);
     const lastPlannedDate = [...byDay.keys()].sort().at(-1) ?? null;
+
+    // External activity only ever applies up to today (never to a future day).
+    const externalByDay = new Map<string, { count: number; note: string | null; source: PublishingActivitySource }>();
+    for (const entry of externalActivity) {
+      if (entry.streamId !== stream.id || entry.activityDate > todayKey) continue;
+      externalByDay.set(entry.activityDate, { count: entry.publishedCount, note: entry.note, source: entry.source });
+    }
+    const externalToday = externalByDay.get(todayKey)?.count ?? 0;
+
+    // Coverage walks planned + today's external Pins; `plannedPins` itself stays OmniFlow-only.
+    const effectiveByDay = new Map(byDay);
+    if (externalToday > 0) effectiveByDay.set(todayKey, (byDay.get(todayKey) ?? 0) + externalToday);
+    const { coveredThrough, daysCovered } = computeCoveredThrough(effectiveByDay, todayKey);
+
     const requiredBuffer = computeRequiredBuffer(stream.targetPinsPerDay, stream.targetBufferDays);
     const plannedCount = upcoming.length;
-    const missingPins = computeMissingPins(requiredBuffer, plannedCount);
+    const externalCredit = computeExternalBufferCredit(stream.targetPinsPerDay, byDay.get(todayKey) ?? 0, externalToday);
+    const missingPins = computeMissingPins(requiredBuffer, plannedCount + externalCredit);
     const configured = requiredBuffer != null && stream.boards.length > 0;
     const unscheduledPins = stream.boards.reduce((sum, board) => sum + (unscheduledByBoard[board.id] ?? 0), 0);
 
@@ -127,8 +181,18 @@ export function buildContentCoverage({ streams, plannedPins, unscheduledByBoard,
     const days: CoverageDay[] = Array.from({ length: COVERAGE_HORIZON_DAYS }, (_, offset) => {
       const date = addDaysToKey(todayKey, offset);
       const planned = byDay.get(date) ?? 0;
-      const level: CoverageDay['level'] = planned === 0 ? 'empty' : target > 0 && planned < target ? 'partial' : 'full';
-      return { date, planned, level, inBuffer: offset < bufferDays };
+      const external = externalByDay.get(date);
+      const effective = planned + (external?.count ?? 0);
+      return {
+        date,
+        planned,
+        external: external?.count ?? 0,
+        externalNote: external?.note ?? null,
+        externalSource: external?.source ?? null,
+        effective,
+        level: computeDayLevel(effective, target),
+        inBuffer: offset < bufferDays,
+      };
     });
 
     return {
@@ -146,6 +210,7 @@ export function buildContentCoverage({ streams, plannedPins, unscheduledByBoard,
       lastPlannedDate,
       coveredThrough,
       daysCovered,
+      externalToday,
       unscheduledPins,
       sharedBoard: stream.boards.some((board) => (boardStreamCount.get(board.id) ?? 0) > 1),
       health: computeStreamHealth({ status: stream.status, configured, missingPins, daysCovered }),
@@ -177,14 +242,15 @@ export function buildWeekPlan({ coverage, plannedPins, dueTasks, now }: WeekPlan
   const toSchedule = new Map<string, number>();
   const toCreate = new Map<string, number>();
   for (const stream of coverage) {
-    if (stream.health === 'paused' || stream.health === 'warming' || stream.health === 'needs-setup' || stream.sharedBoard) continue;
+    if (stream.health === 'paused' || stream.health === 'planned' || stream.health === 'warming' || stream.health === 'needs-setup' || stream.sharedBoard) continue;
     const target = stream.targetPinsPerDay ?? 0;
     if (target <= 0) continue;
     let pool = stream.unscheduledPins;
     for (const key of weekKeys) {
       if (key < todayKey) continue;
       const offset = daysBetweenKeys(todayKey, key);
-      const planned = offset < stream.days.length ? stream.days[offset].planned : 0;
+      // Today's external activity fills today's gap too; later days use planned Pins only.
+      const planned = offset < stream.days.length ? stream.days[offset].effective : 0;
       const gap = Math.max(0, target - planned);
       const fromPool = Math.min(pool, gap);
       pool -= fromPool;

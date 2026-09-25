@@ -62,4 +62,17 @@ test.describe('Command Center dashboard', () => {
     const card = page.locator('#sunday-review');
     await expect(card.getByText(/Due Sunday|Due soon|Overdue|Done this week/)).toBeVisible();
   });
+
+  // TASK-FIX-043 — opens and cancels the modal only (no write).
+  test("today's coverage cell opens the Publishing activity modal, and Cancel saves nothing", async ({ page }) => {
+    const cell = page.getByRole('button', { name: /Record publishing activity/ }).first();
+    test.skip(!(await cell.isVisible().catch(() => false)), 'No active content stream with a coverage row.');
+    await cell.click();
+    await expect(page.getByRole('heading', { name: 'Publishing activity' })).toBeVisible();
+    await expect(page.getByLabel('Pins published today')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Mark target met' })).toBeVisible();
+    await expect(page.getByLabel('Note')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('heading', { name: 'Publishing activity' })).not.toBeVisible();
+  });
 });
