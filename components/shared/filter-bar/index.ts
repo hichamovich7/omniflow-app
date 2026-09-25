@@ -1,1 +1,1 @@
-export { FilterBar } from './filter-bar';
+export { FilterBar, FilterBarSearch, filterSelectClass } from './filter-bar';

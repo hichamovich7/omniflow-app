@@ -18,6 +18,20 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Data UI v1 — Table, Filters, Pagination
+
+### Changed
+
+* `Table` primitive: quiet 40 px header, 44 px rows, horizontal separators, `selected` rows (API unchanged).
+* History and WordPress History render as one separated list (`DataList`): title first, badges trailing, `Checkbox` selection, always-visible named row actions, 12 px metadata. Board cards use the same checkbox.
+* Filters use the shared `FilterBar` (named group, named search and selects, 2-column grid on phones, no local height overrides).
+* Pagination is one shared, labelled component. The three existing components are wrappers.
+* WordPress History no longer scrolls horizontally at 390 px.
+
+### Not changed
+
+* No query, URL param, selection, delete, export, API, or database change.
+
 ## UI: Application Shell v1 (sidebar, topbar, page container, mobile navigation)
 
 ### Changed

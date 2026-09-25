@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { LayoutGrid } from 'lucide-react';
 import { BoardActions } from './board-actions';
 import { useSelection } from '@/components/editorial/selection-provider';
+import { DataListCheckbox } from '@/components/shared/data-list';
+import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/utils/format-date';
 
 interface BoardCardProps {
@@ -14,31 +16,37 @@ interface BoardCardProps {
   createdAt: string;
 }
 
-export function BoardCard({ boardId, boardName, projectName, pinCount, createdAt }: BoardCardProps) {
+export function BoardCard({
+  boardId,
+  boardName,
+  projectName,
+  pinCount,
+  createdAt,
+}: BoardCardProps) {
   const { isSelected, toggle } = useSelection();
   const selected = isSelected(boardId);
 
   return (
     <div
       className={`group relative rounded-xl border bg-card p-5 transition-colors ${
-        selected ? 'border-primary/40 ring-1 ring-primary/20' : 'border-border/60 hover:border-border'
+        selected
+          ? 'border-primary/40 ring-1 ring-primary/20'
+          : 'border-border/60 hover:border-border'
       }`}
     >
-      <label
-        className={`absolute left-3 top-3 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded border transition-all ${
-          selected
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-border/80 bg-card/90 opacity-0 group-hover:opacity-100'
-        }`}
-        aria-label={`Select board: ${boardName}`}
-      >
-        <input type="checkbox" checked={selected} onChange={() => toggle(boardId)} className="sr-only" />
-        {selected && (
-          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+      {/* Always visible below `lg` (touch); from `lg` it appears on hover or keyboard focus. */}
+      <div
+        className={cn(
+          'absolute top-1.5 left-1.5 z-10 transition-opacity motion-reduce:transition-none',
+          !selected && 'lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100'
         )}
-      </label>
+      >
+        <DataListCheckbox
+          checked={selected}
+          onToggle={() => toggle(boardId)}
+          label={`Select board: ${boardName}`}
+        />
+      </div>
 
       <div className="absolute right-3 top-3">
         <BoardActions boardId={boardId} boardName={boardName} redirectAfterDelete="/boards" />
@@ -50,11 +58,15 @@ export function BoardCard({ boardId, boardName, projectName, pinCount, createdAt
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{boardName}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground truncate">{projectName ?? 'No project'}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground truncate">
+            {projectName ?? 'No project'}
+          </p>
         </div>
       </Link>
-      <div className="mt-4 flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span>{pinCount} pin{pinCount !== 1 ? 's' : ''}</span>
+      <div className="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+        <span>
+          {pinCount} pin{pinCount !== 1 ? 's' : ''}
+        </span>
         <span>·</span>
         <span>{timeAgo(createdAt)}</span>
       </div>

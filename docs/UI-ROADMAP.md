@@ -198,9 +198,9 @@ New debt found (out of scope, not fixed):
 ## Phase 4 — Data Components
 
 - [ ] KPI cards and tabular figures
-- [ ] Filters and search bars
-- [ ] Data tables and row actions
-- [ ] Pagination
+- [x] Filters and search bars (Data UI v1, batch 1)
+- [x] Data tables and row actions (Data UI v1, batch 1)
+- [x] Pagination (Data UI v1, batch 1)
 - [ ] Bulk actions
 - [ ] Progress indicators
 - [ ] Workflow statuses
@@ -208,6 +208,45 @@ New debt found (out of scope, not fixed):
 - [ ] Accessible chart summaries and data alternatives
 
 Exit criterion: Pinterest and WordPress history screens share the same data-component language.
+
+### Data UI v1 — Batch 1 (Table, Filters, Pagination)
+
+Status: **Complete** (2026-09-25, branch `feature/ui-data-v1`). No query, param, selection, or action logic changed.
+
+#### Data UI v1 — Batch 1 Complete
+
+- **Table:** 40 px / 12 px / 600 header, 44 px rows, 12 px padding, horizontal separators, `surface-muted` hover, `selected` rows, `aria-sort` styling. It scrolls inside its own container at 390 px.
+- **DataList:** used for History and WordPress History (not tabular). Single bordered surface, title first, trailing badges, `Checkbox` selection, named always-visible actions, stacked rows on phones.
+- **Filters:** shared `FilterBar` on History, WordPress History, and Boards. Named group, search, and selects, 2-column grid on phones, no local height overrides.
+- **Pagination:** one shared component behind the three existing wrappers. Named `nav`, `rel` links, filters kept in URLs, disabled ends are `aria-disabled` buttons.
+
+Global validation: `/history`, `/history?page=2`, `/wordpress/history`, `/boards`, `/boards/[id]` (row-action trigger), and `/admin/bypass`, at 1440 / 1024 / 768 / 390 in light and dark. No document-level overflow on these routes. Filtered pagination (`?language=en`, `?status=completed`) keeps the filter on Next and Previous, and works by keyboard. Filter comboboxes expose their name and their selected value separately (`combobox "Project": Crochet Blog EN`). KPI cards, Progress, and Charts are not started.
+
+Audit: `Table` has one consumer, `/admin/bypass` (currently empty). History, WordPress History, and Boards were custom card stacks, each with its own checkbox (sr-only input + hand-drawn SVG, no visible focus), hover-only row actions (invisible on touch and to keyboard users), and 11 px metadata. The three pagination components were copies that differed only by route. `FilterBar` was exported but unused. The filters carried `h-9` / `text-sm` / `placeholder:…/40` overrides: dead at 40 px on desktop, 36 px (below the touch target) on mobile. Projects and Categories are not tabular and were left alone.
+
+- **Table** (`components/ui/table.tsx`, API unchanged): 40 px header, 12 px / 600 muted, `aria-sort` column in foreground, 44 px rows, 12 px padding, `--border` separators, `--surface-muted` hover, `--selected` for `aria-selected` / `data-state=selected`, `--surface-muted` footer. Validated by rendering its exact classes on `/admin/bypass` in both themes: at 390 px it scrolls inside its container and the page does not overflow.
+- **DataList** (new, `components/shared/data-list`): History and WordPress History are now one bordered list with separators. Title first, badges trailing, 59 px rows from 768 px up (WordPress History used to reach 75 px at 1024). The rows use the `Checkbox` primitive (44 / 32 px target, named per row, visible focus), a `--selected` row state, and always-visible ghost `icon-sm` actions named per row ("Actions for …", "Delete article: …"). Metadata is 12 px with hidden separators. Board cards use the same checkbox: always visible below `lg`, and from `lg` shown on hover or keyboard focus.
+- **Filters** (`FilterBar`, `FilterBarSearch`, `filterSelectClass`): adopted by the History, WordPress History, and Boards filters. The component is now a `role="group"` named "Filters", without a box. The search has an accessible name. Selects are named, 160 px, with a 2-column grid below `sm`. Language and Status show their name instead of "all". The dead height overrides are removed.
+- **Pagination** (`components/shared/pagination`): one server component. `HistoryPagination`, `WordPressHistoryPagination`, and `BoardPagination` keep their exports as thin wrappers. It is a named `nav` with `rel` links, and the disabled end is an `aria-disabled` button (previously a link at 40 % opacity with `pointer-events-none`).
+- **Loading:** `TableSkeleton` and the two History `loading.tsx` files follow the new list and filter geometry.
+
+| Width | History row | Filters                          | Pagination | Overflow                                     |
+| ----- | ----------- | -------------------------------- | ---------- | -------------------------------------------- |
+| 1440  | 59 px       | 40 px, search 320 + 4 × 160      | 36 px      | none                                         |
+| 1024  | 59 px       | 40 px, wraps on WordPress        | 36 px      | none                                         |
+| 768   | 59 px       | 40 px                            | 36 px      | none                                         |
+| 390   | 103–131 px  | 44 px, search row + 2 × 175 grid | 44 px      | none (WordPress History was 571 px, now 390) |
+
+- Keyboard: Space toggles a row checkbox, and the selection bar count updates. Enter opens row menus, and Escape returns focus to the row's trigger. Next / Previous navigate with filters kept (`/history?page=2` → Previous goes to `/history`).
+- Dark: separators `#28364a` on `#111a2b` (1.4:1, not glaring), selected `#17375f`, and metadata 5.5:1 on selected rows.
+- Tests: `ui-foundations.spec.ts` 30 passed / 10 skipped. TypeScript, production build, `git diff --check`, and Prettier/ESLint on changed files pass. `content-streams.spec.ts` was not run because it writes to the database.
+
+Out of scope, documented:
+
+- 390 px overflow, not caused by Data UI: `/wordpress/categories` (532 px, the "New Category" / "Import from WordPress" buttons in each project card header do not wrap), `/wordpress/[id]` (515 px, a `<table>` inside the generated article body, from article rendering), `/research` (433 px, a form row).
+- Badge-like local components still inside the rows: `wordpress-usage-badge.tsx` (11 px, interactive) and `wp-send-status-badge.tsx`, already tracked under Badge.
+- Bulk selection bars still use `editorial/selection-action-bar.tsx` (13 px count, `xs` buttons), not the shared `BulkActions`. Tracked under "Bulk actions".
+- No list offers sorting today, so `aria-sort` is only supported by the primitive.
 
 ## Phase 5 — Product States
 

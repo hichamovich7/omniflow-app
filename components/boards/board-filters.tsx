@@ -2,14 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components/ui/select';
+import { FilterBar, FilterBarSearch, filterSelectClass } from '@/components/shared/filter-bar';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 
 interface ProjectOption {
   id: string;
@@ -49,25 +43,22 @@ export function BoardFilters({ projects }: BoardFiltersProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <div className="relative flex-1 sm:max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-        <Input
-          placeholder="Search boards..."
-          className="pl-9 h-9 text-sm placeholder:text-muted-foreground/40"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
+    <FilterBar>
+      <FilterBarSearch
+        label="Search boards"
+        placeholder="Search boards..."
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
 
       <Select
         value={searchParams.get('project') ?? 'all'}
         onValueChange={(v) => v && updateParam('project', v)}
       >
-        <SelectTrigger className="h-9 w-36 text-sm">
+        <SelectTrigger className={filterSelectClass} aria-label="Project">
           <span className="truncate">
             {searchParams.get('project')
-              ? projects.find((p) => p.id === searchParams.get('project'))?.name ?? 'Project'
+              ? (projects.find((p) => p.id === searchParams.get('project'))?.name ?? 'Project')
               : 'All Projects'}
           </span>
         </SelectTrigger>
@@ -80,6 +71,6 @@ export function BoardFilters({ projects }: BoardFiltersProps) {
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </FilterBar>
   );
 }

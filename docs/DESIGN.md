@@ -287,6 +287,18 @@ Badges are soft, never solid fills: a tinted semantic surface, semantic text tha
 
 Use a quiet header, 44–48 px rows, horizontal separators, row hover, selected state, keyboard-reachable actions, and `aria-sort` for sortable columns. Numeric data uses tabular figures. Filters, pagination, empty, loading, and error states should be shared across datasets.
 
+- `Table`: 40 px header in 12 px / 600 `--muted-foreground` (the `aria-sort` column switches to `--foreground`), 44 px body rows, 12 px cell padding, `--border` horizontal separators only, `--surface-muted` hover, `--selected` for `aria-selected` rows. Wide tables scroll inside their own container, never the page.
+- `DataList` (`components/shared/data-list`): for records that read as a title plus a metadata line rather than aligned columns (History, WordPress History). It uses one bordered `--card` surface with separators, not a stack of cards. Rows are about 60 px (title 14 px / 500, metadata 12 px on one truncated line). The title comes first and badges trail it. Below `md`, the title may take 2 lines and the metadata and badges wrap under it. Metadata switches to `--secondary-foreground` on light hover and selected rows to keep 4.5:1.
+- Row selection uses `Checkbox` inside a 44 px (32 px from `lg`) click target, with a row-specific accessible name. Row actions are ghost `icon-sm` buttons (36 px, 44 px below `md`), always visible, with a row-specific name. Hover-only reveal is allowed only from `lg` and must also open on keyboard focus.
+
+### Filters
+
+`FilterBar` has no surrounding box. Below `sm` the search takes its own row and the selects form a 2-column grid. Above that, it is one wrapping row with 8 px gaps: the search grows from 224 px up to 320 px, and each select is 160 px. Controls keep their standard 40 px height (44 px below `md`), with no local height overrides. Every select has an accessible name, and a select set to "all" shows its filter name ("Language"), not the raw value.
+
+### Pagination
+
+`Pagination` (`components/shared/pagination`) is a labelled `nav` with "Page X of Y" in tabular figures, plus outline `sm` Previous / Next (36 px, 44 px below `md`) with `rel="prev"` / `rel="next"`. The unavailable end renders as an `aria-disabled` button, not a dead link. Previous / Next only, so it never overflows at 390 px. Add numbered pages only for long lists, and collapse them below `sm`.
+
 ### Sidebar
 
 - Light surface with a subtle right border.
@@ -345,7 +357,7 @@ Lucide is the sole product icon library. Standard sizes are 14, 16, 18, 20, and 
 | Page layout and headers      | `components/ui/page-container.tsx`, `components/layout/page-header.tsx`, `components/shared/resource-header/resource-header.tsx`                                              |
 | Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                            |
 | Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                   |
-| Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`                                                                         |
+| Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`        |
 | Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx` |
 | Representative feature UI    | `components/dashboard/`, `components/projects/`, `components/boards/`, `components/pinterest/`, `components/wordpress/`, `components/history/`, `components/research/`        |
 
