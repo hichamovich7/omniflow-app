@@ -26,7 +26,7 @@ export function WordPressUsageBadge({ usedPinCount, totalPinCount, articles }: W
     <DropdownMenu>
       <DropdownMenuTrigger
         onClick={(e) => e.stopPropagation()}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors"
+        className="relative inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] hover:bg-muted/70 hover:text-foreground max-md:after:-inset-y-3"
         aria-label={`${usedPinCount} of ${totalPinCount} pins used in WordPress articles`}
       >
         <FileText className="h-3 w-3" />

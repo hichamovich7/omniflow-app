@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -139,9 +140,7 @@ export default function RegisterPage() {
             />
           </div>
           {error && (
-            <div className="rounded-sm bg-destructive-soft px-3 py-2.5" role="alert">
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            </div>
+            <Alert>{error}</Alert>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Creating account...' : 'Create Account'}

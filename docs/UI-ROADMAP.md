@@ -381,11 +381,11 @@ Status: **Complete** (2026-09-25, branch `feature/ui-actions-status-v1`). Covers
 - [x] Error states include clear recovery paths (Product States v1: route error page; inline form errors, see below)
 - [x] Success feedback uses consistent toast/inline treatment (audited in Product States v1: sonner toasts only, already on tokens; unchanged)
 - [x] Disabled and read-only states are distinct (primitives: Input and Button batches; product-level "Soon" tiles: Product States v1)
-- [ ] Loading buttons preserve width and prevent duplicate actions (deferred to the final cleanup)
+- [x] Loading buttons preserve width and prevent duplicate actions (Final UI Polish, Batch 1)
 
 Exit criterion: every representative workflow has defined loading, empty, error, success, and disabled presentations.
 
-Phase 5 status: core states complete (Product States v1). Loading buttons are deferred to the final cleanup, so the phase is not closed.
+Phase 5 status: complete. Core states landed in Product States v1; loading buttons landed in Final UI Polish, Batch 1.
 
 ### Product States v1
 
@@ -440,6 +440,143 @@ Status: **Core states complete** (2026-09-25, branch `feature/ui-product-states-
 - Card debt on the hub tiles (hover translation on the available tile) is unchanged.
 - The known `wordpress-blog-post.spec.ts` "Keyword is required" failure is unchanged.
 - `/wordpress/[id]` has two `h1`s: the page title plus the `h1` inside the generated article HTML. This page is untouched by this batch; fix it with the article rendering.
+
+## Final UI Polish
+
+Status: **Complete** (2026-09-25, branch `feature/ui-final-polish`): Batch 1, Batch 2, and the final global validation. It changes no business logic, API, database, or dependency.
+
+### Batch 1 — shared and cross-component debt
+
+Status: **Complete, pending review** (2026-09-25, branch `feature/ui-final-polish`). No validation rule, condition, request, or API changed.
+
+#### Audit (debt still present on `main`)
+
+| Debt              | Found                                                                                                                                                                                                                                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inline alerts     | 11 hand-drawn boxes, with 5 different recipes (`bg-destructive/5`, `destructive-soft`, left accent border, a warning box, an info box) and `role="alert"` on only some. Where: login, register, `pin-form` ×2, `recompose-pin-dialog` ×3, `research-form`, `article-form`, `pins-source-article-form`, `delete-generations-dialog`. |
+| Loading buttons   | 13 buttons swapped their content for a spinner or a longer label ("Generating... (can take up to a minute)"), so the width changed (up to about 150 px) and some lost their label. None set `aria-busy`.                                                                                                                            |
+| Text < 12 px      | 41 uses: 1 at 9 px, 14 at 10 px, and 26 at 11 px, in Pinterest, WordPress-form, research, and history components.                                                                                                                                                                                                                   |
+| `xs` buttons      | 3 left: the Image Versions "Use this" and delete buttons, and the Pin Detail "Copy". Hook presets and the keyword suggestion reproduced `xs` through `h-7 text-[11px]` overrides.                                                                                                                                                   |
+| Fake badges       | Generation-mode tags on `pin-form`, the "Active" version tag (solid, 9 px, uppercase), and the board chip on pin cards. The diagnostic `Badge`s were forced to 10 px.                                                                                                                                                               |
+| Height overrides  | `h-12` inputs and combobox, `h-11` inputs and selects, `h-9` selects and tag input, and `h-11 px-6 text-sm` submit buttons.                                                                                                                                                                                                         |
+| Hover translation | `hover:-translate-y-0.5` on dashboard quick actions, project cards, project progress cards, and the WordPress hub tile.                                                                                                                                                                                                             |
+
+#### Final pattern
+
+- **`Alert`** (`components/ui/alert.tsx`): `danger` (default, `role="alert"`), `warning`, and `info`. No `success` variant, since success stays a toast. All 11 hand-drawn boxes moved to it; the `data-testid`s and the explicit `role="alert"` on `pin-form` are kept.
+- **`<Button loading>`**: the spinner replaces the leading icon, or overlays hidden content when there is no icon. It sets `aria-busy` and keeps the width and label. It is used by all 13 loading buttons; `disabled` conditions are unchanged.
+  - The two article forms keep their duration hint as a line next to the button ("Generation can take up to a minute.") instead of inside the label.
+  - Login and register keep their "Signing in…" label: those buttons are full width, so the label cannot shift anything.
+- **Small text**: every 9, 10, and 11 px text is now 12 px. Opacity-faded metadata (`/40`, `/50`, `/70`) went back to `--muted-foreground`, and the uppercase tracked summary labels are sentence case.
+- **Sizes and badges**:
+  - Form actions use `size="lg"` (submits) or `sm` (presets and the suggestion); the tag-input add button is an `icon` button with a name.
+  - `xs` stays only for the dense Image Versions grid and the Pin Detail "Copy".
+  - Generation-mode tags, "Active", and the board name are `Badge`s (primary/neutral/outline; the board truncates).
+- **Heights**: the local overrides were removed, so inputs, selects, and the combobox follow the primitives (40 px, 44 px below `md`).
+- **Hover**: cards change border and shadow only (`transition-[border-color,box-shadow] duration-150`).
+
+#### Validation
+
+- **Specimen** (temporary route, deleted, absent from the build): 6 button cases (lg/default/sm/xs, with and without an icon, children in a fragment or direct) × primary/outline × 1440/768/390 × light/dark. Every case holds its width and height exactly when loading, sets `aria-busy`, and shows one spinner inside the button. The three Alert variants measure 6.05 / 5.1 / 9.35:1 (light) and 7.66 / 6.79 / 10.29:1 (dark).
+- **Routes** at 1440/768/390 in light and dark:
+  - pages: `/dashboard`, `/projects`, `/wordpress`, `/pinterest`, `/research`, `/wordpress/blog-post` (Advanced Options open), `/pinterest/[id]`, `/history`, `/wordpress/categories`, `/wordpress?pinIds=…`, `/login`, `/register`;
+  - no horizontal overflow and no visible text under 12 px;
+  - inputs, selects, and the combobox are 40 px (44 px at 390);
+  - every badge is 12 px at ≥ 5.1:1;
+  - link cards have `transform: none` on hover.
+- **Mocked submits**: Playwright intercepts every mutating `/api` call, so nothing reached the server.
+  - Research, Generate Pins, and Generate Article (1440/390, light/dark): the button width changes by 0 px while loading and after the error, the label is unchanged, and `aria-busy="true"` is set. The error renders as `Alert` `role="alert"`.
+  - Login (mocked Supabase 400): the `Alert` shows "Invalid login credentials".
+
+### Batch 2 — page-specific debt
+
+Status: **Complete, pending review** (2026-09-25, same branch). No business logic, request, API, stored content, or dependency changed.
+
+#### Overflows (reproduced at 390 px inside `<main>`)
+
+| Route                   | Before | Cause                                                                                                  | Fix                                                                                  |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `/research`             | 433 px | `grid-cols-[1fr_auto]` with a fixed 176 px Source select beside a Project select that could not shrink | One column below `sm`, `minmax(0,1fr)` from `sm`, both triggers full width on mobile |
+| `/wordpress/categories` | 532 px | "Import from WordPress" and "New Category" did not wrap in each project header                         | The header and its actions wrap; the project name breaks                             |
+| `/wordpress/[id]`       | 515 px | `<table>` inside the generated article                                                                 | Tables scroll inside themselves (`block overflow-x-auto`)                            |
+| `/wordpress/history`    | —      | Already fixed by Data UI v1                                                                            | —                                                                                    |
+
+#### Dialog focus
+
+I audited 20 business dialogs, opened from their real trigger by keyboard and closed with both Escape and Cancel/Close, at 1440 and 390.
+
+- **Working before this batch (14):**
+  - History, Boards, and Projects deletes from a row menu; History bulk delete;
+  - WordPress History row delete; research delete;
+  - content stream Edit and Archive;
+  - Schedule, Batch Review, pin Detail, Generate WordPress confirm;
+  - category Import and Manage.
+- **Broken, now fixed (3):**
+  - Add content stream: the dialog remounted on close (`key` included `formOpen`). The key is now bumped only on open.
+  - New Category (Categories page): `autoFocus` moved focus before the dialog recorded its opener. It now uses `initialFocus={ref}`.
+  - New Category from the blog-post Select: the opener is a Select item that unmounts. The dialog now uses `finalFocus` on the Select trigger.
+- **Not testable with the current data (3):** Image Versions, Change layout, admin bypass Remove. They are built like the working pin dialogs.
+- The pin card (`role="button"`) handled Enter/Space for everything inside it: its checkbox and image actions opened the detail dialog instead of acting. It now reacts only when it is the target itself.
+
+#### Headings and headers
+
+- `/wordpress/[id]`: the article preview shifts its headings one level down (h1 → h2 …) for display only. Styles moved with them, so the article looks the same. The stored article and the exports are unchanged. The page now has a single `h1`.
+- `/pinterest/[id]`, `/wordpress/[id]`, `/boards/[id]`, and `/projects/[id]` hand-built the same header: a 28 px back link, a 20 px title, and 12 px metadata. They now use `ResourceHeader`: a 22 / 28 px title, a 36 px back link (44 px on mobile), metadata, status, and actions. On `/projects/[id]`, the niche chip is a `Badge`.
+- The 4 centred generator headers drifted (a 44/48/56 px tile, a 20/24 px title, different spacing). They now use one `GeneratorHeader` (see DESIGN.md). `CenteredHeaderSkeleton` follows the new title height.
+
+#### Small controls
+
+- **Pin-card image actions:**
+  - Change layout, Regenerate, and Versions are `Button`s (outline `sm` / `icon-sm`: 36 px, 44 px on mobile). Regenerate uses `loading`.
+  - They are always visible below `lg`; from `lg` they appear on hover or keyboard focus.
+- **Today Priorities:**
+  - The per-priority project chip keeps its compact 28 px look with an invisible hit area of 36 px (44 px on mobile). The done toggle and edit pencil get the same.
+  - "Add priority" is an outline `sm` `Button`.
+  - The add form uses `Input`, the default `Select`, a `Button` submit, and an `icon` cancel.
+- **Research history:** Retry and Delete were 26 px and hidden (`opacity-0`) even on touch and keyboard focus. They are now ghost `icon-sm` `Button`s, always visible below `lg`, and revealed on hover or focus from `lg`.
+
+#### Validation
+
+- **Routes** at 1440 / 768 / 390, light and dark:
+  - pages: `/dashboard` (add form open), `/research`, `/wordpress/categories`, `/wordpress`, `/wordpress/blog-post`, `/pinterest`, `/pinterest/[id]`, `/wordpress/[id]`, `/projects/[id]`, `/boards/[id]`, `/wordpress?pinIds=…`;
+  - no overflow in `<main>` or the document, and one `h1` per page;
+  - back links are 36 px (44 px at 390);
+  - no interactive control under 32 px (44 px at 390), apart from the standalone text links listed below.
+- **Dialog focus:** 17 of 17 testable dialogs return focus to their opener after Escape and after Cancel/Close, at 1440 and 390.
+- **Pin card:** Enter on Regenerate regenerates (a mocked request) and does not open the detail. Space on the checkbox checks it. Enter on the card still opens the detail.
+
+### Final validation
+
+The final validation found a few inconsistencies and fixed them:
+
+- the niche chip on `/projects` cards was hand-drawn; it is now a `Badge`, like on `/projects/[id]`;
+- the "Project actions" menu trigger was a native 32 px button; it is now a ghost `icon-sm` `Button`;
+- the History "N of N pins used in WordPress" trigger (20 px) gets an invisible hit area of 36 px (44 px on mobile);
+- four WordPress-form textareas forced `text-sm` (14 px on mobile, against the 15–16 px rule); the primitive size now applies.
+
+After those fixes, 18 routes pass in light and dark at 1440 / 768 / 390 (108 combinations):
+
+- `/dashboard`, `/projects`, `/projects/[id]`, `/research`, `/pinterest`, `/pinterest/[id]`, `/history`, `/boards`, `/boards/[id]`;
+- `/wordpress`, `/wordpress/blog-post`, `/wordpress/history`, `/wordpress/categories`, `/wordpress/[id]`, `/credits`, `/settings`, `/login`, `/register`.
+
+On every route:
+
+- no document-level overflow and exactly one `h1`;
+- no visible text under 12 px;
+- no link-card hover transform;
+- Card, Badge, Input, and Select geometry match on every page: cards have a 16 px radius, badges are 22 px tall with 12 px text, and inputs and selects are 40 px (44 px at 390).
+
+The 17 testable business dialogs return focus to their opener.
+
+### Remaining debt (deliberately out of scope)
+
+- The known `wordpress-blog-post.spec.ts` failure "Keyword is required" (it also fails on `main`).
+- Standalone text links 16–20 px tall: "View all projects" and "View all" on the Dashboard, "View on WordPress" on `/wordpress/[id]`, and "Connect WordPress" on `/projects/[id]`.
+- At 390 px: the mobile top-bar logo link (32 px) and the Boards row links (38 px).
+- On `/wordpress/[id]`, the send status ("Published · View on WordPress") appears in the header and again in the publish panel.
+- Today Priorities edit mode: Save and Cancel are 18 px icon buttons 6 px apart (a mock-data preview).
+- Dialog focus that needs data this account does not have: Image Versions, Change layout, and admin bypass Remove.
+- Analytics and Charts (see "Charts v1 — Deferred").
 
 ## Phase 6 — Page Rollout
 

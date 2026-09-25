@@ -40,7 +40,7 @@ export function ProjectProgressCard({ project }: ProjectProgressCardProps) {
     return (
       <Link
         href={project.href}
-        className="block rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="block rounded-xl border border-border/60 bg-surface p-5 transition-[border-color,box-shadow] duration-150 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         {body}
       </Link>

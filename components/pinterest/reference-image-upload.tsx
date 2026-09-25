@@ -104,7 +104,7 @@ export function ReferenceImageUpload({ value, onChange, disabled }: ReferenceIma
       ) : (
         <>
           {dragOver ? <Upload className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
-          <span className="text-center text-[10px] leading-tight">Upload</span>
+          <span className="text-center text-xs leading-tight">Upload</span>
         </>
       )}
     </div>

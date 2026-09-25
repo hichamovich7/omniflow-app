@@ -55,38 +55,37 @@ export function PinDiagnosticBadges({
 
   return (
     <div className="flex flex-wrap gap-1.5" data-testid="pin-creative-diagnostics">
-      <Badge variant="outline" className="bg-background/70 text-[10px] font-medium">
+      <Badge variant="outline" className="bg-background/70">
         {getPinGenerationModeLabel(pin.visual_format)}
       </Badge>
-      <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
+      <Badge variant="outline" className="bg-background/70">
         {diagnostics.angle ? ANGLE_LABELS[diagnostics.angle] : 'Angle unavailable'}
       </Badge>
       {isLegacy && <>
-        <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
+        <Badge variant="outline" className="bg-background/70">
           {diagnostics.template ? formatCreativeLabel(diagnostics.template) : 'Template unavailable'}
         </Badge>
-        <Badge variant="outline" className="bg-background/70 text-[10px] text-muted-foreground">
+        <Badge variant="outline" className="bg-background/70">
           {diagnostics.position ? formatCreativeLabel(diagnostics.position) : 'Position unavailable'}
         </Badge>
         <Badge
           variant={diagnostics.status ? QUALITY_VARIANTS[diagnostics.status] : 'outline'}
-          className="text-[10px]"
         >
           {diagnostics.status ?? 'Not evaluated'}
         </Badge>
       </>}
       {!isLegacy && (
-        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+        <Badge variant="outline">
           Visual review needed
         </Badge>
       )}
       {isLegacy && showWarnings && warningLabels.map((warning) => (
-        <Badge key={warning} variant="outline" className="text-[10px] text-muted-foreground">
+        <Badge key={warning} variant="outline">
           {warning}
         </Badge>
       ))}
       {isLegacy && showWarnings && diagnostics.warnings.length > warningLabels.length && (
-        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+        <Badge variant="outline">
           +{diagnostics.warnings.length - warningLabels.length}
         </Badge>
       )}

@@ -48,7 +48,7 @@ export function PinBatchReviewDialog({ pins, onClose, onChangeLayout }: PinBatch
               <div key={label} className="rounded-lg border bg-muted/30 p-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="text-[11px] font-medium">{label}</span>
+                  <span className="text-xs font-medium">{label}</span>
                 </div>
                 <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
               </div>

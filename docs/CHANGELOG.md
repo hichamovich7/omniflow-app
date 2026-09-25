@@ -18,6 +18,35 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Final UI Polish — Batch 2
+
+### Changed
+
+* Research, WordPress categories, and articles with wide tables no longer scroll sideways on phones.
+* Closing a dialog returns focus to the button that opened it, including "Add content stream" and "New Category".
+* Pinterest, WordPress, board, and project detail pages share one header style with a larger back button. The generator pages share one centred header.
+* Pin image actions and research history actions are larger and stay visible on touch screens and when reached by keyboard. Enter on a pin's own buttons no longer opens the pin.
+* The article preview keeps a single page title for screen readers.
+* Project cards show their niche as a standard badge, their action menu is easier to tap, and the article text areas use a readable size on phones.
+
+### Not changed
+
+* No request, API, stored article, or database change.
+
+## UI: Final UI Polish — Batch 1
+
+### Changed
+
+* Form and dialog errors use one inline alert style, announced to screen readers. Warnings and hints use the same component.
+* Buttons keep their size and label while working: a spinner replaces the icon, so nothing jumps. The article generators say "Generation can take up to a minute." next to the button.
+* Small 9–11 px texts are now at least 12 px, and faded metadata is easier to read.
+* Tags such as "Recommended", "Legacy", "Active", and board names use the standard badge.
+* Form fields have the standard height, and cards no longer lift on hover.
+
+### Not changed
+
+* No validation rule, request, API, or database change.
+
 ## UI: Product States v1 — empty, error, unavailable, loading
 
 ### Changed

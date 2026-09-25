@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { generateArticleSchema, generateArticleFromUrlSchema, SEO_KEYWORDS_MAX_COUNT } from '@/lib/validations/wordpress';
 import type { ARTICLE_TYPES, ARTICLE_SIZES, TONES_OF_VOICE } from '@/lib/validations/wordpress';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { Button } from '@/components/ui/button';
+import { GeneratorHeader } from '@/components/shared/generator-header';
+import { Alert } from '@/components/ui/alert';
 import { type CategoryOption } from '@/components/wordpress/category-select';
 import { ProjectContextSection, type ProjectOption } from '@/components/wordpress/article-form-project-context';
 import { ArticleSourceSection, type SourceMode, type UrlSourceType } from '@/components/wordpress/article-form-source';
@@ -276,16 +278,12 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
   return (
     <div className="pt-6 sm:pt-10">
       {/* Hero */}
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-          <FileText aria-hidden="true" className="h-5 w-5 text-primary" />
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">WordPress Generator</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          Enter a keyword, or use an external source as research context, and let AI plan and write a full SEO
-          article with a featured image and internal images.
-        </p>
-      </div>
+      <GeneratorHeader
+        icon={FileText}
+        title="WordPress Generator"
+        description="Enter a keyword, or use an external source as research context, and let AI plan and write a full SEO article with a featured image and internal images."
+        className="mb-6"
+      />
 
       {/* Form — each section below is its own card (TASK-FIX-040 visual
           finish); this element only wraps the submit behavior, no styling. */}
@@ -393,28 +391,14 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
         </div>
 
         {error && (
-          <div className="rounded-lg border border-destructive/20 border-l-4 border-l-destructive bg-destructive/5 px-3 py-2.5">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
+          <Alert>{error}</Alert>
         )}
 
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            disabled={submitDisabled}
-            className="h-11 w-full px-6 text-sm font-medium shadow-sm sm:w-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
-                Generating... (can take up to a minute)
-              </>
-            ) : (
-              <>
-                <FileText aria-hidden="true" className="mr-2 h-4 w-4" />
-                Generate Article
-              </>
-            )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+          <p className="text-xs text-muted-foreground">Generation can take up to a minute.</p>
+          <Button type="submit" size="lg" loading={loading} disabled={submitDisabled} className="w-full sm:w-auto">
+            <FileText aria-hidden="true" data-icon="inline-start" />
+            Generate Article
           </Button>
         </div>
       </form>

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Circle, CircleCheck, Plus, Pencil, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { resolvePriorityProjectName } from '@/lib/dashboard/build-command-center';
 import type { PriorityItem, ProjectOption } from '@/types/dashboard';
@@ -104,15 +106,16 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-section-title">Today&apos;s Priorities</h2>
         {!isAdding && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => setIsAdding(true)}
             title={atLimit ? `You already have ${MAX_PRIORITIES} priorities — pick one to replace` : undefined}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border/60 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
-            <Plus className="h-3 w-3" aria-hidden="true" />
+            <Plus data-icon="inline-start" aria-hidden="true" />
             {atLimit ? 'Replace a priority' : 'Add priority'}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -126,7 +129,7 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
                 onClick={() => toggleDone(priority.id)}
                 aria-pressed={priority.done}
                 aria-label={priority.done ? `Mark "${priority.label}" as not done` : `Mark "${priority.label}" as done`}
-                className="mt-0.5 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="relative after:absolute after:-inset-2.5 after:content-[''] max-md:after:-inset-3.5 mt-0.5 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 {priority.done ? (
                   <CircleCheck className="h-4 w-4 text-success" aria-hidden="true" />
@@ -181,10 +184,11 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
                       setProjectFor(priority.id, value === NO_PROJECT_VALUE ? null : value);
                     }}
                   >
+                    {/* Compact metadata chip (28 px); the invisible hit area makes it 36 px (44 px below md). */}
                     <SelectTrigger
                       size="sm"
                       aria-label={`Project for "${priority.label}"`}
-                      className="h-5.5 w-fit gap-1 rounded-full border-none bg-muted px-2 py-0 text-xs font-normal text-muted-foreground hover:bg-muted/70 [&_svg]:size-3"
+                      className="relative h-5.5 w-fit gap-1 rounded-full border-none bg-muted px-2 py-0 text-xs font-normal text-muted-foreground after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] hover:bg-muted/70 max-md:after:-inset-y-2 [&_svg]:size-3"
                     >
                       <span className="max-w-32 truncate">{resolvePriorityProjectName(priority, projects)}</span>
                     </SelectTrigger>
@@ -205,7 +209,7 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
                   type="button"
                   onClick={() => startEdit(priority)}
                   aria-label={`Edit "${priority.label}"`}
-                  className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="relative after:absolute after:-inset-2.5 after:content-[''] max-md:after:-inset-3.5 mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
@@ -229,7 +233,7 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
                 You already have {MAX_PRIORITIES} priorities — choose one to replace
               </label>
               <Select value={replaceTargetId || undefined} onValueChange={(value) => value && setReplaceTargetId(value)}>
-                <SelectTrigger id="replace-target" size="sm" aria-label="Priority to replace" className="mt-1 w-full text-xs">
+                <SelectTrigger id="replace-target" aria-label="Priority to replace" className="mt-1 w-full">
                   <span className="truncate">
                     {items.find((item) => item.id === replaceTargetId)?.label ?? 'Choose a priority to replace…'}
                   </span>
@@ -246,29 +250,28 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
           )}
 
           <div className="flex items-center gap-2">
-            <input
+            <Input
               autoFocus={!atLimit}
               value={addDraftTitle}
               onChange={(event) => setAddDraftTitle(event.target.value)}
               placeholder="New priority…"
               maxLength={80}
-              className="h-8 min-w-0 flex-1 rounded-lg border border-border/60 bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              aria-label="New priority"
+              className="flex-1"
             />
-            <button
-              type="submit"
-              disabled={!addDraftTitle.trim() || (atLimit && !replaceTargetId)}
-              className="shrink-0 rounded text-xs font-medium text-primary hover:underline disabled:opacity-40 disabled:hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-            >
+            <Button type="submit" disabled={!addDraftTitle.trim() || (atLimit && !replaceTargetId)}>
               {atLimit ? 'Replace' : 'Add'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={cancelAdd}
               aria-label={atLimit ? 'Cancel replacing a priority' : 'Cancel adding a priority'}
-              className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="text-muted-foreground"
             >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
+              <X aria-hidden="true" />
+            </Button>
           </div>
 
           <Select
@@ -278,7 +281,7 @@ export function TodayPriorities({ priorities, projects }: TodayPrioritiesProps) 
               setAddDraftProjectId(value === NO_PROJECT_VALUE ? null : value);
             }}
           >
-            <SelectTrigger size="sm" aria-label="Project for new priority" className="h-7 w-fit gap-1.5 text-xs">
+            <SelectTrigger aria-label="Project for new priority" className="w-fit max-w-full">
               <span className="truncate">{resolvePriorityProjectName({ projectId: addDraftProjectId }, projects)}</span>
             </SelectTrigger>
             <SelectContent>

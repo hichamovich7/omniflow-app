@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
@@ -10,6 +9,7 @@ import {
   getMetaTitle,
 } from '@/lib/wordpress/export';
 import { PageContainer } from '@/components/ui/page-container';
+import { ResourceHeader } from '@/components/shared/resource-header';
 import { ArticleContent } from '@/components/wordpress/article-content';
 import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
 import { PublishControl } from '@/components/wordpress/publish-control';
@@ -17,7 +17,7 @@ import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
 import { ArticleCategoryEditor } from '@/components/wordpress/article-category-editor';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
 import { StatusBadge } from '@/components/shared/status';
 
@@ -46,34 +46,26 @@ export default async function WordPressArticlePage({
 
   return (
     <PageContainer>
-      {/* Header */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/wordpress/blog-post"
-            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted transition-colors"
-            aria-label="Back to generator"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Link>
-          <div className="space-y-0.5">
-            <h1 className="text-xl font-semibold tracking-tight">{generation.keyword}</h1>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-              <span>{langLabel}</span>
-              {article && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>{article.word_count} words</span>
-                </>
-              )}
-              <span className="text-border">·</span>
-              <span>{timeAgo(generation.created_at)}</span>
-              <StatusBadge status={generation.status} className="ml-0.5" />
-            </div>
-            {article && <WpSendStatusBadge article={article} siteUrl={wordpressSite?.site_url} />}
-          </div>
-        </div>
-      </div>
+      <ResourceHeader
+        title={generation.keyword}
+        backHref="/wordpress/blog-post"
+        backLabel="Back to generator"
+        status={<StatusBadge status={generation.status} />}
+        metadata={
+          <>
+            <span>{langLabel}</span>
+            {article && (
+              <>
+                <span aria-hidden="true" className="text-border">·</span>
+                <span>{article.word_count} words</span>
+              </>
+            )}
+            <span aria-hidden="true" className="text-border">·</span>
+            <span>{timeAgo(generation.created_at)}</span>
+          </>
+        }
+        description={article && <WpSendStatusBadge article={article} siteUrl={wordpressSite?.site_url} />}
+      />
 
       {/* Article */}
       {article ? (

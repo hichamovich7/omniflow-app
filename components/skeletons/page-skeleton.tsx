@@ -43,7 +43,7 @@ export function CenteredHeaderSkeleton() {
   return (
     <div className="flex flex-col items-center pt-2">
       <Skeleton className="size-11 rounded-xl" />
-      <Skeleton className="mt-4 h-7 w-56 max-w-full" />
+      <Skeleton className="mt-4 h-8.5 w-56 max-w-full" />
       <Skeleton className="mt-2 h-4 w-80 max-w-full" />
     </div>
   );

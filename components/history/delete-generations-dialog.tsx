@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
@@ -95,8 +96,8 @@ export function DeleteGenerationsDialog({
         </DialogHeader>
 
         {affectedArticles.length > 0 && (
-          <div className="flex gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
+          <Alert variant="warning">
+            <AlertTriangle aria-hidden="true" />
             <div className="space-y-1">
               <p>
                 Some of the pins {isBulk ? 'in this selection were' : 'in this generation were'} used to create{' '}
@@ -113,7 +114,7 @@ export function DeleteGenerationsDialog({
               </ul>
               <p>Deleting will remove those pins&apos; images — the article(s) above will keep broken image links.</p>
             </div>
-          </div>
+          </Alert>
         )}
 
         <div className="space-y-1.5">

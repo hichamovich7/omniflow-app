@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import { DeleteProjectDialog } from './delete-project-dialog';
 
 interface ProjectActionsProps {
@@ -45,10 +46,10 @@ export function ProjectActions({ projectId, projectName, isDefault }: ProjectAct
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+          render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" />}
           aria-label="Project actions"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <MoreHorizontal aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => router.push(`/projects/${projectId}/edit`)}>

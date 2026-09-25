@@ -1,5 +1,7 @@
+import * as React from 'react';
 import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
+import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -44,7 +46,7 @@ const buttonVariants = cva(
         // Each size owns its default icon size (a shared base rule would tie with, and beat, the smaller ones).
         default:
           "h-10 gap-2 px-4 has-data-[icon=inline-end]:pr-3.5 has-data-[icon=inline-start]:pl-3.5 [&_svg:not([class*='size-'])]:size-4",
-        // Compact exception (bulk bars, selection toolbars): 28 px, 12 px text, 8 px radius.
+        // Compact exception (dense in-dialog controls only; bulk bars use `sm`): 28 px, 12 px text, 8 px radius.
         xs: "h-7 gap-1 rounded-sm px-2 text-xs in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-9 gap-1.5 px-3 text-[0.8125rem] has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-11 gap-2 px-5 text-[0.9375rem] max-md:h-12 has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4 [&_svg:not([class*='size-'])]:size-4.5",
@@ -62,18 +64,70 @@ const buttonVariants = cva(
   }
 );
 
+// Loading keeps the button's width and label (docs/DESIGN.md, Buttons): a
+// leading `data-icon="inline-start"` icon is swapped for the spinner;
+// without one, the content stays in place (invisible, still the accessible
+// name) under a centred spinner. `disabled` stays the caller's decision.
+function ButtonSpinner({ className, ...props }: React.ComponentProps<typeof Loader2>) {
+  return (
+    <Loader2
+      data-slot="button-spinner"
+      aria-hidden="true"
+      {...props}
+      className={cn('animate-spin motion-reduce:animate-[spin_1.5s_linear_infinite]', className)}
+    />
+  );
+}
+
+// Children with fragments unwrapped, so a leading icon inside `<>…</>` is found.
+function flatChildren(children: React.ReactNode): React.ReactNode[] {
+  return React.Children.toArray(children).flatMap((child) =>
+    React.isValidElement<{ children?: React.ReactNode }>(child) && child.type === React.Fragment
+      ? flatChildren(child.props.children)
+      : [child]
+  );
+}
+
+function loadingContent(children: React.ReactNode) {
+  const items = flatChildren(children);
+  const first = items[0];
+  if (
+    React.isValidElement<{ 'data-icon'?: string }>(first) &&
+    first.props['data-icon'] === 'inline-start'
+  ) {
+    return (
+      <>
+        <ButtonSpinner data-icon="inline-start" />
+        {items.slice(1)}
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="inline-flex items-center gap-[inherit] opacity-0">{children}</span>
+      <ButtonSpinner className="absolute inset-0 m-auto" />
+    </>
+  );
+}
+
 function Button({
   className,
   variant = 'default',
   size = 'default',
+  loading = false,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { loading?: boolean }) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-loading={loading || undefined}
+      aria-busy={loading || undefined}
+      className={cn(buttonVariants({ variant, size, className }), loading && 'relative')}
       {...props}
-    />
+    >
+      {loading ? loadingContent(children) : children}
+    </ButtonPrimitive>
   );
 }
 

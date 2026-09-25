@@ -209,7 +209,7 @@ export default async function DashboardPage() {
           <Link
             key={action.href}
             href={action.href}
-            className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group relative overflow-hidden rounded-xl border border-border/60 bg-surface p-5 transition-[border-color,box-shadow] duration-150 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">

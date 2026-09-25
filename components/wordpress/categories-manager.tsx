@@ -44,9 +44,9 @@ export function CategoriesManager({ projects, categories: initialCategories, wor
             id={`project-${project.id}`}
             className="scroll-mt-6 rounded-xl border border-border/60 bg-card p-4"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-medium">{project.name}</h2>
-              <div className="flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="min-w-0 text-sm font-medium wrap-break-word">{project.name}</h2>
+              <div className="flex flex-wrap items-center gap-2">
                 {site && (
                   <Button type="button" variant="outline" size="sm" onClick={() => setImportForProjectId(project.id)}>
                     <Download className="mr-1.5 h-3.5 w-3.5" />

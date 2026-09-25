@@ -25,7 +25,7 @@ function SummaryItem({ label, value, isSet, wide }: { label: string; value: stri
         wide && 'sm:col-span-2'
       )}
     >
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className={cn('truncate text-sm', isSet ? 'font-medium text-foreground' : 'text-muted-foreground')}>{value}</dd>
     </div>
   );
@@ -67,7 +67,7 @@ export function GenerationSummary({
         <SummaryItem label="Article Settings" value={articleSettingsSummary} isSet={articleSettingsSet} wide />
       </dl>
       {advancedCustomizedCount > 0 && (
-        <p className="border-t border-border pt-3 text-[11px] text-muted-foreground">
+        <p className="border-t border-border pt-3 text-xs text-muted-foreground">
           {advancedCustomizedCount} advanced option{advancedCustomizedCount > 1 ? 's' : ''} customized.
         </p>
       )}

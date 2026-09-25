@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Search, Trash2, Sparkle, RotateCcw } from 'lucide-react';
+import { Search, Trash2, Sparkle, RotateCcw } from 'lucide-react';
 import { createResearchSchema } from '@/lib/validations/research';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -189,13 +190,13 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
         onSubmit={handleSubmit}
         className="space-y-5 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8"
       >
-        <div className="grid grid-cols-[1fr_auto] gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
             <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
               Project
             </Label>
             <Select value={projectId} onValueChange={(v) => v && setProjectId(v)}>
-              <SelectTrigger id="project">
+              <SelectTrigger id="project" className="w-full">
                 <span className="truncate text-sm">
                   {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
                 </span>
@@ -215,7 +216,7 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
               Source
             </Label>
             <Select value={sourceType} onValueChange={(v) => v && setSourceType(v as SourceType)}>
-              <SelectTrigger id="sourceType" className="w-44">
+              <SelectTrigger id="sourceType" className="w-full sm:w-44">
                 <span className="truncate text-sm">{config.label}</span>
               </SelectTrigger>
               <SelectContent>
@@ -241,29 +242,17 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
             maxLength={500}
             required
             disabled={loading}
-            className="h-12 text-sm placeholder:text-muted-foreground/40"
           />
         </div>
 
         {error && (
-          <div className="rounded-lg bg-destructive/5 px-3 py-2">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
+          <Alert>{error}</Alert>
         )}
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={loading || !projectId} className="h-11 px-6 text-sm font-medium">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Researching...
-              </>
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Research
-              </>
-            )}
+          <Button type="submit" size="lg" loading={loading} disabled={loading || !projectId}>
+            <Search data-icon="inline-start" />
+            Research
           </Button>
         </div>
       </form>
@@ -316,21 +305,13 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
           ) : (
             <Button
               onClick={handleAnalyze}
+              loading={analyzing}
               disabled={analyzing}
               variant="outline"
               className="w-full sm:w-auto"
             >
-              {analyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkle className="mr-2 h-4 w-4" />
-                  Analyze
-                </>
-              )}
+              <Sparkle data-icon="inline-start" />
+              Analyze
             </Button>
           )}
 
@@ -364,33 +345,38 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.title ?? r.input}</p>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-muted-foreground">
                     <span className="truncate">{r.input}</span>
                     <span>·</span>
                     <span>{timeAgo(r.created_at)}</span>
                   </div>
                   {r.status === 'failed' && r.error_message && (
-                    <p className="mt-1 text-[11px] text-destructive">{r.error_message}</p>
+                    <p className="mt-1 text-xs text-destructive">{r.error_message}</p>
                   )}
                 </div>
                 {r.status === 'failed' && r.source_type !== 'pinterest' && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label="Retry research"
                     onClick={() => handleRetry(r)}
-                    className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                    className="text-muted-foreground transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </button>
+                    <RotateCcw aria-hidden="true" />
+                  </Button>
                 )}
-                <button
+                {/* Always visible below lg (touch); from lg revealed on row hover or keyboard focus. */}
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label="Delete research result"
                   onClick={() => setDeleteTarget(r)}
-                  className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-destructive group-hover:opacity-100"
+                  className="text-muted-foreground transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 hover:text-destructive"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                  <Trash2 aria-hidden="true" />
+                </Button>
               </div>
             ))}
           </div>

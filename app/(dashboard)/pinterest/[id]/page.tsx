@@ -1,15 +1,15 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getGenerationWithPins } from '@/lib/queries/generations';
 import { getPinsWordPressUsage } from '@/lib/queries/wordpress-usage';
 import { PageContainer } from '@/components/ui/page-container';
+import { ResourceHeader } from '@/components/shared/resource-header';
 import { EditorialWorkspace } from '@/components/editorial/editorial-workspace';
 import { RegenerateGenerationButton } from '@/components/pinterest/regenerate-generation-button';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { ImageStatus } from '@/types/database';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
 import { StatusBadge } from '@/components/shared/status';
 
@@ -36,36 +36,32 @@ export default async function GenerationResultsPage({
 
   return (
     <PageContainer>
-      {/* Header */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/pinterest"
-            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted transition-colors"
-            aria-label="Back to generator"
-          >
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Link>
-          <div className="space-y-0.5">
-            <h1 className="text-xl font-semibold tracking-tight">{generation.keyword}</h1>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-              <span>{langLabel}</span>
-              <span className="text-border">·</span>
-              <span>
-                {isPartial
-                  ? `${pins.length} of ${generation.pins_requested} pins`
-                  : `${pins.length} pins`}
-              </span>
-              <span className="text-border">·</span>
-              <span>{generation.model_used}</span>
-              <span className="text-border">·</span>
-              <span>{timeAgo(generation.created_at)}</span>
-              <StatusBadge status={generation.status} className="ml-0.5" />
-              {isPartial && <StatusBadge status="partial" />}
-            </div>
-          </div>
-        </div>
-      </div>
+      <ResourceHeader
+        title={generation.keyword}
+        backHref="/pinterest"
+        backLabel="Back to generator"
+        status={
+          <>
+            <StatusBadge status={generation.status} />
+            {isPartial && <StatusBadge status="partial" />}
+          </>
+        }
+        metadata={
+          <>
+            <span>{langLabel}</span>
+            <span aria-hidden="true" className="text-border">·</span>
+            <span>
+              {isPartial
+                ? `${pins.length} of ${generation.pins_requested} pins`
+                : `${pins.length} pins`}
+            </span>
+            <span aria-hidden="true" className="text-border">·</span>
+            <span>{generation.model_used}</span>
+            <span aria-hidden="true" className="text-border">·</span>
+            <span>{timeAgo(generation.created_at)}</span>
+          </>
+        }
+      />
 
       {/* Editorial workspace */}
       {pins.length > 0 ? (

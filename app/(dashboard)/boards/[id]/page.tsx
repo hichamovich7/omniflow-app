@@ -1,13 +1,13 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getBoardWithPins } from '@/lib/queries/boards';
 import { PageContainer } from '@/components/ui/page-container';
+import { ResourceHeader } from '@/components/shared/resource-header';
 import { EmptyState } from '@/components/empty-state';
 import { BoardActions } from '@/components/boards/board-actions';
 import { BoardPinGrid } from '@/components/boards/board-pin-grid';
 import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
-import { ArrowLeft, LayoutGrid } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 
 export default async function BoardDetailPage({
   params,
@@ -26,25 +26,26 @@ export default async function BoardDetailPage({
 
   return (
     <PageContainer>
-      <div className="flex items-center gap-2">
-        <Link
-          href="/boards"
-          className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted transition-colors"
-          aria-label="Back to boards"
-        >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </Link>
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <h1 className="text-xl font-semibold tracking-tight truncate">{board.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {projectName ?? 'No project'} · {pins.length} pin{pins.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {pins.length > 0 && <ExportCsvButton pins={pins} keyword={board.name} />}
-          <BoardActions boardId={board.id} boardName={board.name} redirectAfterDelete="/boards" />
-        </div>
-      </div>
+      <ResourceHeader
+        title={board.name}
+        backHref="/boards"
+        backLabel="Back to boards"
+        metadata={
+          <>
+            <span>{projectName ?? 'No project'}</span>
+            <span aria-hidden="true" className="text-border">·</span>
+            <span>
+              {pins.length} pin{pins.length !== 1 ? 's' : ''}
+            </span>
+          </>
+        }
+        actions={
+          <>
+            {pins.length > 0 && <ExportCsvButton pins={pins} keyword={board.name} />}
+            <BoardActions boardId={board.id} boardName={board.name} redirectAfterDelete="/boards" />
+          </>
+        }
+      />
 
       {pins.length === 0 ? (
         <EmptyState

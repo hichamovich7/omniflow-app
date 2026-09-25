@@ -33,14 +33,19 @@ export function ContentStreamsSection({ projectId, streams, categories, boards, 
   const [formOpen, setFormOpen] = useState(false);
   const [editingStream, setEditingStream] = useState<ContentStream | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<ContentStream | null>(null);
+  // Bumped on every open: the form remounts fresh per opening, but not on
+  // close, so the dialog can animate out and return focus to its trigger.
+  const [formSession, setFormSession] = useState(0);
 
   function openCreate() {
     setEditingStream(null);
+    setFormSession((n) => n + 1);
     setFormOpen(true);
   }
 
   function openEdit(stream: ContentStream) {
     setEditingStream(stream);
+    setFormSession((n) => n + 1);
     setFormOpen(true);
   }
 
@@ -102,7 +107,7 @@ export function ContentStreamsSection({ projectId, streams, categories, boards, 
         // Remounts fresh every time the target changes or the dialog opens,
         // so its internal state always starts from `editing` instead of
         // needing an effect + setState to resync (react-hooks/set-state-in-effect).
-        key={`${formOpen ? 'open' : 'closed'}-${editingStream?.id ?? 'create'}`}
+        key={`${formSession}-${editingStream?.id ?? 'create'}`}
         open={formOpen}
         onOpenChange={setFormOpen}
         projectId={projectId}

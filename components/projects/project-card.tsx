@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FolderOpen } from 'lucide-react';
 import { ProjectActions } from '@/components/projects/project-actions';
+import { Badge } from '@/components/ui/badge';
 import { timeAgo } from '@/lib/utils/format-date';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -17,7 +18,7 @@ export function ProjectCard({ project, generationCount }: ProjectCardProps) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="group relative block overflow-hidden rounded-2xl border border-border/60 bg-surface p-6 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="group relative block overflow-hidden rounded-2xl border border-border/60 bg-surface p-6 transition-[border-color,box-shadow] duration-150 hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div
         className="absolute right-4 top-4"
@@ -36,12 +37,12 @@ export function ProjectCard({ project, generationCount }: ProjectCardProps) {
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
           <FolderOpen className="h-5 w-5 text-primary" />
         </div>
-        <div className="min-w-0 flex-1 pr-8">
+        <div className="min-w-0 flex-1 pr-10">
           <p className="truncate text-base font-semibold tracking-tight">{project.name}</p>
           {project.niche && (
-            <span className="mt-1.5 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+            <Badge variant="primary" className="mt-1.5">
               {project.niche}
-            </span>
+            </Badge>
           )}
         </div>
       </div>

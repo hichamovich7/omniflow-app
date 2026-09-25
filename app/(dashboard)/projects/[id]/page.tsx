@@ -7,13 +7,14 @@ import { listContentStreams, listBoardOccupants, findBoardOccupant } from '@/lib
 import { ContentStreamsSection } from '@/components/projects/content-streams-section';
 import { MetricCard, MetricGrid } from '@/components/shared/metric-card';
 import { PageContainer } from '@/components/ui/page-container';
+import { ResourceHeader } from '@/components/shared/resource-header';
 import { Badge } from '@/components/ui/badge';
 import { ExpandableText } from '@/components/ui/expandable-text';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
-import { ArrowLeft, Pencil, Sparkles, FileText, Tag, Globe, Star } from 'lucide-react';
+import { Pencil, Sparkles, FileText, Tag, Globe, Star } from 'lucide-react';
 
 export default async function ProjectDetailPage({
   params,
@@ -77,23 +78,27 @@ export default async function ProjectDetailPage({
 
   return (
     <PageContainer narrow>
-      <div className="flex items-center gap-2">
-        <Link
-          href="/projects"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-muted"
-          aria-label="Back to projects"
-        >
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </Link>
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <h1 className="truncate text-xl font-semibold tracking-tight">{project.name}</h1>
-          {(project.niche || langLabel || project.is_default) && (
-            <div className="flex flex-wrap items-center gap-1.5">
+      <ResourceHeader
+        title={project.name}
+        backHref="/projects"
+        backLabel="Back to projects"
+        actions={
+          <Link
+            href={`/projects/${project.id}/edit`}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+          >
+            <Pencil aria-hidden="true" />
+            Edit Project
+          </Link>
+        }
+        metadata={
+          (project.niche || langLabel || project.is_default) && (
+            <>
               {project.niche && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                  <Tag className="h-3 w-3" />
+                <Badge variant="primary">
+                  <Tag aria-hidden="true" />
                   {project.niche}
-                </span>
+                </Badge>
               )}
               {langLabel && (
                 <Badge variant="outline">
@@ -107,23 +112,16 @@ export default async function ProjectDetailPage({
                       background, separated by a divider so it doesn't read as a
                       third attribute of the same kind. */}
                   {(project.niche || langLabel) && <span aria-hidden="true" className="h-3.5 w-px bg-border" />}
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                    <Star className="h-3 w-3 fill-primary" />
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-hover">
+                    <Star aria-hidden="true" className="h-3 w-3 fill-primary" />
                     Default
                   </span>
                 </>
               )}
-            </div>
-          )}
-        </div>
-        <Link
-          href={`/projects/${project.id}/edit`}
-          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'shrink-0')}
-        >
-          <Pencil className="mr-1.5 h-3.5 w-3.5" />
-          Edit Project
-        </Link>
-      </div>
+            </>
+          )
+        }
+      />
 
       <div className="rounded-2xl border border-border/60 bg-card p-6">
         <h2 className="text-sm font-medium">Brand Profile</h2>
