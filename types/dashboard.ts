@@ -1,23 +1,19 @@
+import type { ContentStreamStatus } from '@/types/content-streams';
+import type { TaskType } from '@/types/tasks';
+
 /**
- * Command Center types. Shapes mirror what will eventually come from Supabase
- * (ids, status enums, numeric progress) so the mock data in
- * lib/dashboard/command-center-mock.ts can later be swapped for real queries
- * without changing these components' props.
+ * Command Center types. Every value is either read from Supabase or
+ * explicitly marked untracked — no mock numbers (TASK-FIX-042).
  */
 
-export interface DaySummary {
-  greetingName: string;
-  date: string;
-  summary: string;
-}
-
-/** 'mock' = no Supabase table backs this yet. 'real' = read from an existing query. */
-export type KpiSource = 'mock' | 'real';
+/** 'real' = read from an existing query. 'untracked' = no Supabase source exists yet; shown as "—", never a fake number. */
+export type KpiSource = 'real' | 'untracked';
 
 export interface CommandCenterKpi {
   id: string;
   label: string;
-  current: number;
+  /** null only when `source === 'untracked'`. */
+  current: number | null;
   target: number | null;
   unit: 'currency' | 'count';
   source: KpiSource;
@@ -39,25 +35,15 @@ export interface ProjectOption {
   name: string;
 }
 
-export type ProjectStatus = 'on-track' | 'at-risk' | 'paused';
-
-export interface ProjectProgress {
-  id: string;
-  name: string;
-  status: ProjectStatus;
-  progressPercent: number;
-  mainKpiLabel: string;
-  mainKpiValue: string;
-  nextAction: string;
-  /** Set only when a real Supabase project matches this mock project's name — never fabricated. */
-  href?: string;
-}
-
 export interface WeeklyProgressMetric {
   label: string;
-  current: number;
-  target: number;
+  /** null = no Supabase source yet ("Not tracked yet"). */
+  current: number | null;
+  /** null = no target defined (e.g. no content stream sets one). */
+  target: number | null;
   unit: 'currency' | 'count';
+  /** Short note on where the number or its target comes from. */
+  hint?: string;
 }
 
 export interface WeeklyProgressStats {
@@ -65,4 +51,117 @@ export interface WeeklyProgressStats {
   pinsCreated: WeeklyProgressMetric;
   productsLaunched: WeeklyProgressMetric;
   revenue: WeeklyProgressMetric;
+}
+
+// ---------------------------------------------------------------------------
+// Content stream coverage (Phase 2d) — computed from real pins.publish_date.
+// ---------------------------------------------------------------------------
+
+export type StreamHealth = 'on-track' | 'needs-content' | 'create-now' | 'warming' | 'paused' | 'needs-setup';
+
+export interface StreamBoardRef {
+  id: string;
+  name: string;
+}
+
+export interface CoverageDay {
+  /** Local YYYY-MM-DD. */
+  date: string;
+  planned: number;
+  /** full = meets target pins/day, partial = some but below target, empty = nothing planned. */
+  level: 'full' | 'partial' | 'empty';
+  /** Inside the stream's target buffer window (today … today + buffer − 1). */
+  inBuffer: boolean;
+}
+
+export interface ContentStreamCoverage {
+  streamId: string;
+  streamName: string;
+  projectId: string;
+  projectName: string;
+  streamStatus: Exclude<ContentStreamStatus, 'archived'>;
+  boards: StreamBoardRef[];
+  targetPinsPerDay: number | null;
+  targetBufferDays: number | null;
+  /** target_pins_per_day × target_buffer_days, null when targets are not set. */
+  requiredBuffer: number | null;
+  /** Pins on the stream's boards with publish_date on or after today (local). */
+  plannedPins: number;
+  /** max(0, requiredBuffer − plannedPins), null when targets are not set. */
+  missingPins: number | null;
+  /** Local day key of the latest planned pin, or null. */
+  lastPlannedDate: string | null;
+  /** Last day of the unbroken run of days (from today) that each have ≥ 1 planned pin. */
+  coveredThrough: string | null;
+  daysCovered: number;
+  /** Pins on the stream's boards that have no publish_date yet. */
+  unscheduledPins: number;
+  /** A board of this stream is also linked to another non-archived stream (§11 §8) — coverage is ambiguous. */
+  sharedBoard: boolean;
+  health: StreamHealth;
+  /** Day-by-day grid for the coverage horizon. */
+  days: CoverageDay[];
+}
+
+// ---------------------------------------------------------------------------
+// Recommended next actions (read-only suggestions — never auto-pinned).
+// ---------------------------------------------------------------------------
+
+export type RecommendationKind = 'create-pins' | 'schedule-pins' | 'review-stream' | 'review-buffer' | 'sunday-review';
+export type RecommendationUrgency = 'high' | 'medium' | 'low';
+
+export interface Recommendation {
+  id: string;
+  kind: RecommendationKind;
+  actionLabel: string;
+  href: string;
+  reason: string;
+  urgency: RecommendationUrgency;
+  quantity: number | null;
+  projectId: string | null;
+  projectName: string | null;
+  streamId: string | null;
+  streamName: string | null;
+  boardId: string | null;
+  boardName: string | null;
+  daysCovered: number | null;
+  /** tasks.type used when the user turns this into a priority. */
+  taskType: TaskType;
+  /** Pre-filled, editable priority title. */
+  taskTitle: string;
+}
+
+// ---------------------------------------------------------------------------
+// Sunday analytics review routine.
+// ---------------------------------------------------------------------------
+
+export type SundayReviewState = 'due-sunday' | 'due-soon' | 'overdue' | 'completed';
+
+export interface SundayReviewStatus {
+  state: SundayReviewState;
+  /** The Sunday (local YYYY-MM-DD) this status refers to. */
+  occurrenceDate: string;
+  /** Calendar days from today to `occurrenceDate` (negative when overdue). */
+  daysUntil: number;
+  /** tasks.id of the routine, null until the user starts it the first time. */
+  routineId: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// This week (Mon → Sun).
+// ---------------------------------------------------------------------------
+
+export interface WeekDayPlan {
+  date: string;
+  isToday: boolean;
+  isPast: boolean;
+  isSunday: boolean;
+  /** Pins with publish_date on this day, any board. */
+  plannedPins: number;
+  /** Gap to the active streams' daily targets that existing unscheduled pins can fill. */
+  pinsToSchedule: number;
+  /** Remaining gap once unscheduled pins are used — new pins to create. */
+  pinsToCreate: number;
+  /** Open tasks whose due_date is this day. */
+  reviewTasks: string[];
 }

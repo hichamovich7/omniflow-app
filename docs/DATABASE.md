@@ -57,6 +57,12 @@ auth.users
         └── content_stream_boards (join table) → boards
 ```
 
+```
+profiles
+  └── tasks (TASK-FIX-042; project_id / content_stream_id / board_id all optional, ON DELETE SET NULL)
+        └── task_occurrences (only for tasks.source = 'recurring', written lazily)
+```
+
 ---
 
 # profiles
@@ -302,7 +308,7 @@ Topic-pillar grouping under a project (TASK-FIX-039 Phase 2a, discovery in `docs
 
 ## Purpose
 
-Groups a project's Pinterest/WordPress activity into named pillars (e.g. "Crochet Cats", "Crochet Sweaters") without duplicating `projects`, `wordpress_categories`, or `boards` — it only stores foreign keys to them. `target_pins_per_day` and `target_buffer_days` together define the required planning buffer (`required_buffer = target_pins_per_day × target_buffer_days`), used to compute a "missing pins" figure from real `pins.publish_date` data. This is Phase 2a only: no `tasks`, no recommendations, no UI reads or writes this table yet.
+Groups a project's Pinterest/WordPress activity into named pillars (e.g. "Crochet Cats", "Crochet Sweaters") without duplicating `projects`, `wordpress_categories`, or `boards` — it only stores foreign keys to them. `target_pins_per_day` and `target_buffer_days` together define the required planning buffer (`required_buffer = target_pins_per_day × target_buffer_days`), used to compute a "missing pins" figure from real `pins.publish_date` data. Written by the project page (Phase 2a.1) and read by the Command Center dashboard (TASK-FIX-042), which computes planned coverage, missing pins and recommendations from it plus real `pins.publish_date` values.
 
 ## RLS
 
@@ -418,6 +424,100 @@ file.
 (content_stream_id, board_id) PRIMARY KEY
 (board_id)
 (user_id)
+```
+
+---
+
+# tasks
+
+Personal work items for the Command Center (TASK-FIX-042 — Command Center Phase 2b, migration `033_add_tasks.sql`; design in `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md` §5.3). Backs Today's Priorities (manual tasks and accepted dashboard recommendations) and the Sunday analytics review routine. No `pinterest_accounts` table: an "account" task points at `board_id` (§1.3a).
+
+## Columns
+
+| Column            | Type                               | Description |
+| ----------------- | ---------------------------------- | ----------- |
+| id                | uuid PK                            | |
+| user_id           | uuid FK → profiles.id              | NOT NULL, ON DELETE CASCADE |
+| project_id        | uuid FK → projects.id              | nullable, ON DELETE **SET NULL** — a task outlives its project (§11 §2) |
+| content_stream_id | uuid FK → content_streams.id       | nullable, ON DELETE SET NULL |
+| board_id          | uuid FK → boards.id                | nullable, ON DELETE SET NULL — also stands in for "Pinterest account" |
+| title             | text                               | NOT NULL (max 200, Zod) |
+| description       | text                               | nullable |
+| source            | text                               | NOT NULL, CHECK IN ('manual','automatic','recurring') |
+| type              | text                               | NOT NULL, Zod-validated only (no CHECK, expected to grow): content_creation, pinterest_publishing, wordpress_article, account_warming, keyword_research, account_analysis, digital_product, niche_research, maintenance, custom, weekly_review |
+| due_date          | date                               | nullable |
+| scheduled_at      | timestamptz                        | nullable (not used by any UI yet) |
+| estimated_minutes | integer                            | nullable, CHECK >= 0 |
+| priority          | text                               | NOT NULL DEFAULT 'medium', Zod-validated (low/medium/high) |
+| status            | text                               | NOT NULL DEFAULT 'pending', Zod-validated: suggested, pending, scheduled, completed, skipped, postponed, cancelled (`cancelled` = soft delete) |
+| recurrence_rule   | text                               | nullable, only for `source = 'recurring'` (weekly review: `FREQ=WEEKLY;BYDAY=SU`) |
+| pinned_to_today   | boolean                            | NOT NULL DEFAULT false |
+| created_by_user   | boolean                            | NOT NULL DEFAULT true |
+| completed_at      | timestamptz                        | nullable |
+| skipped_at        | timestamptz                        | nullable |
+| created_at        | timestamptz                        | |
+| updated_at        | timestamptz                        | trigger `set_tasks_updated_at` |
+
+No `accepted_at` (§11 §3 — "accepted" = `status != 'suggested'`), no `related_*_id` content link (§11 §4).
+
+## Constraints
+
+* `tasks_suggested_not_pinned`: `CHECK (NOT (pinned_to_today AND status = 'suggested'))` — an unaccepted suggestion can never be pinned.
+* `tasks_one_weekly_review_routine`: partial UNIQUE `(user_id) WHERE type = 'weekly_review' AND source = 'recurring' AND status <> 'cancelled'` — one live Sunday routine per user.
+* The **max 3 open pinned priorities** rule is application-layer (`lib/queries/tasks.ts`, 409 `priorities_full`), never an automatic eviction.
+
+## RLS
+
+Same hardened shape as `content_streams` (migration 031): `USING (user_id = auth.uid())`, and `WITH CHECK` additionally requires every non-null `project_id` / `content_stream_id` / `board_id` to reference a row owned by the caller. `lib/queries/tasks.ts` re-checks the same ownership first (defense-in-depth, clearer errors).
+
+## Indexes
+
+```sql
+(user_id)
+(project_id)
+(content_stream_id)
+(board_id)
+(status)
+(due_date)
+(user_id) WHERE pinned_to_today
+(user_id) UNIQUE WHERE type = 'weekly_review' AND source = 'recurring' AND status <> 'cancelled'
+```
+
+---
+
+# task_occurrences
+
+One row per recurring task per day, written **lazily** — only when the user acts on that day's instance (migration `034_add_task_occurrences.sql`, design §5.4/§9). No cron/Inngest. Used today by the Sunday analytics review: completing a Sunday writes that Sunday's row; the routine (`tasks` row) itself is never completed.
+
+## Columns
+
+| Column          | Type                    | Description |
+| --------------- | ----------------------- | ----------- |
+| id              | uuid PK                 | |
+| task_id         | uuid FK → tasks.id      | NOT NULL, ON DELETE CASCADE |
+| user_id         | uuid FK → profiles.id   | NOT NULL, ON DELETE CASCADE |
+| occurrence_date | date                    | NOT NULL — local calendar day of the instance |
+| status          | text                    | NOT NULL DEFAULT 'pending', Zod-validated: pending, scheduled, completed, skipped |
+| scheduled_at    | timestamptz             | nullable |
+| pinned_to_today | boolean                 | NOT NULL DEFAULT false |
+| completed_at    | timestamptz             | nullable |
+| skipped_at      | timestamptz             | nullable |
+| created_at      | timestamptz             | |
+
+## Constraints
+
+`UNIQUE (task_id, occurrence_date)`.
+
+## RLS
+
+`USING (user_id = auth.uid())`; `WITH CHECK` also requires the parent `tasks` row to belong to the caller.
+
+## Indexes
+
+```sql
+(task_id, occurrence_date) UNIQUE
+(user_id)
+(occurrence_date)
 ```
 
 ---

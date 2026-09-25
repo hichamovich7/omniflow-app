@@ -18,6 +18,36 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## TASK-FIX-042: Operational Command Center
+
+### Added
+
+* Today's workspace: one recommended focus for today — the content stream whose planned Pins run out first — with days covered, Pins to create or schedule, and one button. When every buffer is covered it says so and names the first date coverage ends.
+* Content streams table: board, targets, planned Pins, last planned date, days covered and status (On track, Needs content, Create now, Warming, Paused, Needs setup). Cards on mobile.
+* Publishing coverage: Created, Planned, Planned date passed and Unscheduled Pins counted separately, and a 14-day coverage grid per stream with a one-line verdict ("No urgent work for Bathroom Ideas. You are covered through October 5.").
+* Recommended next actions ranked by urgency: Create Pins, Schedule Pins, Review stream, Review buffer, Start Sunday analytics review. "Add to priorities" lets you edit the title first.
+* Sunday analytics review routine with a checklist. It stays Overdue until completed.
+* This week: Monday to Sunday with Pins planned, to schedule, to create, and tasks due.
+* `tasks` and `task_occurrences` tables (migrations 033, 034) and `GET/POST /api/tasks`, `PATCH /api/tasks/[id]`, `POST /api/tasks/weekly-review`.
+
+### Changed
+
+* Today's Priorities are saved (max 3 open; "Replace a priority" asks which one to swap; "Remove from today" keeps the task).
+* Tasks Completed, weekly Articles Published and weekly Pins Created show real numbers. Monthly Revenue, Digital Products, Products Launched and Revenue show "Not tracked yet" instead of sample values.
+* The header shows today's priorities and active projects counts.
+
+### Removed
+
+* Sample (mock) Command Center data and the sample "Active Projects" cards — the Content streams table replaces them.
+
+### Not changed
+
+* Pinterest generation, AI providers, CSV export, generation routes and the renderer. No `pinterest_accounts` table.
+
+### Requires
+
+* Apply `supabase/migrations/033_add_tasks.sql` then `034_add_task_occurrences.sql` in the Supabase SQL Editor.
+
 ## UI: Final UI Polish — Batch 2
 
 ### Changed

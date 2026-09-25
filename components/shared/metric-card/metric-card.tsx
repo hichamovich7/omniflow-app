@@ -165,7 +165,8 @@ interface ProgressMetricProps {
   value: React.ReactNode;
   /** Muted text after the value, e.g. "/ 4". */
   secondaryValue?: React.ReactNode;
-  progress: MetricProgress;
+  /** Omit when there is no target to measure against (the bar is then not rendered). */
+  progress?: MetricProgress;
   className?: string;
 }
 
@@ -188,12 +189,14 @@ function ProgressMetric({
           )}
         </p>
       </div>
-      <Progress
-        value={progress.value}
-        max={progress.max}
-        aria-label={progress.label ?? label}
-        aria-valuetext={progress.valueText}
-      />
+      {progress && (
+        <Progress
+          value={progress.value}
+          max={progress.max}
+          aria-label={progress.label ?? label}
+          aria-valuetext={progress.valueText}
+        />
+      )}
     </div>
   );
 }

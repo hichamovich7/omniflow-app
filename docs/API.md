@@ -1304,6 +1304,151 @@ forbidden
 
 ---
 
+# GET /api/tasks
+
+Lists the caller's tasks (every status except `cancelled`), oldest first — TASK-FIX-042 (Command Center Phase 2b). The dashboard reads tasks server-side directly; this route exists for client refreshes.
+
+## Response
+
+```json
+{
+  "data": { "tasks": [ { "id": "uuid", "title": "Create 20 Crochet Sweaters Pins", "status": "pending", "pinned_to_today": true, "...": "..." } ] },
+  "error": null
+}
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+```
+
+---
+
+# POST /api/tasks
+
+Creates a task. Used by Today's Priorities ("Add priority") and by a dashboard recommendation's "Add to priorities" (the click is the acceptance, so the task lands as `pending`, never `suggested`).
+
+## Request
+
+```json
+{
+  "title": "Create 20 Crochet Sweaters Pins",
+  "source": "manual | automatic",
+  "type": "content_creation",
+  "projectId": "uuid | null",
+  "contentStreamId": "uuid | null",
+  "boardId": "uuid | null",
+  "dueDate": "YYYY-MM-DD | null",
+  "priority": "low | medium | high",
+  "pinnedToToday": true,
+  "replaceTaskId": "uuid (optional)"
+}
+```
+
+Only `title` is required. `source` defaults to `manual`, `type` to `custom` (any of the 11 `tasks.type` values except `weekly_review`, which is created server-side only). `recurring` cannot be sent by a client. Every referenced project / content stream / board is re-read and must belong to the caller.
+
+At most **3 open priorities** (`pinned_to_today` with status `pending`/`scheduled`/`postponed`). At the limit the request fails with `priorities_full` (409) unless `replaceTaskId` names one of the caller's open priorities — that task is then unpinned (it stays a pending task, nothing is deleted) and the new one takes its slot.
+
+## Response (201)
+
+```json
+{ "data": { "task": { "id": "uuid", "status": "pending", "pinned_to_today": true, "...": "..." } }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_json
+invalid_request
+project_forbidden
+content_stream_forbidden
+board_forbidden
+not_found          (replaceTaskId)
+priorities_full    (409)
+server_error
+```
+
+---
+
+# PATCH /api/tasks/[id]
+
+Edits a task, changes its status, or pins/unpins it.
+
+## Request
+
+Any subset (at least one field):
+
+```json
+{
+  "title": "string",
+  "description": "string | null",
+  "projectId": "uuid | null",
+  "dueDate": "YYYY-MM-DD | null",
+  "priority": "low | medium | high",
+  "status": "pending | scheduled | completed | skipped | postponed | cancelled",
+  "pinnedToToday": false
+}
+```
+
+`suggested` can never be set by a client. `status: "completed"` stamps `completed_at`; `skipped` stamps `skipped_at`. **Delete is `status: "cancelled"`** (soft, history kept) — there is no DELETE handler. Pinning (or reopening a pinned task) is refused with `priorities_full` when 3 open priorities already exist.
+
+## Response
+
+```json
+{ "data": { "task": { "...": "..." } }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+project_forbidden
+priorities_full    (409)
+server_error
+```
+
+---
+
+# POST /api/tasks/weekly-review
+
+Sunday analytics review routine (`tasks.type = 'weekly_review'`, `source = 'recurring'`, `recurrence_rule = 'FREQ=WEEKLY;BYDAY=SU'`).
+
+## Request
+
+```json
+{ "action": "start | complete | reopen", "occurrenceDate": "YYYY-MM-DD" }
+```
+
+* `start` — creates the caller's routine if it doesn't exist yet (idempotent; a partial unique index allows at most one live routine per user). `occurrenceDate` ignored.
+* `complete` — upserts that Sunday's `task_occurrences` row with `status = 'completed'`. The routine itself is never completed.
+* `reopen` — sets that Sunday's occurrence back to `pending`.
+
+`occurrenceDate` is required for `complete`/`reopen` and must be a Sunday (local calendar).
+
+## Response
+
+```json
+{ "data": { "routine": { "id": "uuid", "...": "..." }, "occurrence": { "occurrence_date": "2026-09-27", "status": "completed", "...": "..." } }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_json
+invalid_request
+not_found     (reopen before the routine exists)
+server_error
+```
+
+---
+
 # POST /api/research
 
 Research a topic from a keyword, website, or blog using Firecrawl.

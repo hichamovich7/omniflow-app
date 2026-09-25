@@ -14,6 +14,13 @@ server-side (§14c). Everything else in this document (§5.3/§5.4
 2b–2e in §12) remains **discovery/design only**: no migration, no component,
 no API route, no UI for any of it yet.
 
+
+**Update (2026-09-25, TASK-FIX-042):** `tasks` (migration 033) and
+`task_occurrences` (migration 034) now exist, with `/api/tasks` routes, and
+the dashboard reads real coverage / missing-pins numbers and shows a
+read-only recommendation feed. This covers Phase 2b, the minimal part of 2c
+(the Sunday `weekly_review` routine only — no generic "Make recurring" yet),
+Phase 2d, and a read-only Phase 2e. See §15.
 ---
 
 ## 0. Method note — Graphify was unavailable
@@ -1324,3 +1331,117 @@ badges still being rendered read-only inside Project Context, unchanged
 in substance. See `docs/CHANGELOG.md`'s "Visual finish (same task)"
 subsection under the TASK-FIX-040 entry for the full list of style-only
 changes (no field, state, handler, schema, or API touched).
+
+## 15. TASK-FIX-042 — Operational Command Center (Phases 2b, 2c-minimal, 2d, 2e read-only) — 2026-09-25
+
+Founder brief: turn `/dashboard` into an operational Command Center (what to
+work on today, which board is covered and until when, where the buffer is
+short, when the Sunday analytics review is due) while keeping every existing
+metric and action, and using real data only.
+
+### Decisions taken with the founder before coding (2026-09-25)
+
+1. **`tasks` did not exist** (Phases 2b/2c were design-only), but the brief
+   required a Sunday routine that "never disappears until completed" and
+   compatibility with manual tasks. Founder chose **"Add tasks migration"**
+   over a localStorage-only fallback → migrations **033 `tasks`** (§5.3
+   exactly) and **034 `task_occurrences`** (§5.4 exactly).
+2. **Mock KPIs vs "no mock data"**: founder chose **"real where possible"**.
+   Every card and weekly metric is kept; Tasks Completed, weekly Articles
+   Published and weekly Pins Created became real; Monthly Revenue, Digital
+   Products, Products Launched and Revenue render "—" / "Not tracked yet".
+   `lib/dashboard/command-center-mock.ts` was deleted.
+
+### Decisions taken while implementing (flagged, reversible)
+
+* **"Active Projects" removed.** It was 100 % mock (CrochetSal / Home Decor
+  DE, name-matched — the stopgap §4 said to delete once real data existed).
+  The new Content streams table shows the same information from real data.
+  `components/dashboard/project-progress-card.tsx` and
+  `command-center-section.tsx` were deleted with it.
+* **Sixth stream status `Needs setup`**, beside the five requested (On
+  track, Needs content, Create now, Warming, Paused): a stream with no board
+  or no pins/day / buffer targets cannot be judged, and labelling it with
+  one of the five would be a fabricated verdict.
+* **Coverage definitions** (all in `lib/dashboard/build-content-coverage.ts`):
+  *planned* = pins on the stream's boards with `publish_date` on or after
+  **today's local midnight** (so a pin planned at 07:00 still counts for
+  today at 10:00); *covered through* = last day of the unbroken run of days,
+  starting today, that each have ≥ 1 planned pin; *last planned date* is
+  shown separately. `missing_pins = max(0, pins/day × buffer days −
+  planned)` (§11 §1). Health: `missing = 0` → On track; otherwise ≤ 1 day
+  covered → Create now, else Needs content. So a stream covered until
+  October 5 is never urgent while its buffer is met.
+* **Shared board** (§11 §8 b/c implemented): a board linked to two
+  non-archived streams is flagged, its pins are never split, and only a
+  "Review stream" recommendation is produced.
+* **Sunday overdue anchor**: overdue only for a Sunday on/after the day the
+  routine was started ("Start review" creates it) — a routine the user never
+  set up cannot be "missed". Only the most recent past Sunday is checked.
+* **Recommendations → tasks**: "Add to priorities" opens an editable title
+  and creates `source = 'automatic'`, `status = 'pending'` (the click is the
+  acceptance, §8 Accept) with `pinned_to_today = true`. No `suggested` row is
+  ever written; nothing is auto-pinned (§10).
+* **Max 3 open priorities** enforced server-side (409 `priorities_full`);
+  "Replace" explicitly unpins the chosen one (kept as a pending task).
+* **Timezone**: day keys use the runtime's local calendar
+  (`lib/dashboard/local-date.ts`), the same convention
+  `lib/validations/schedule.ts` uses to *write* `publish_date` and
+  `lib/csv/pinterest.ts` uses to *read* it. `toISOString().slice(0, 10)` is
+  never used for a day. No timezone constant was introduced.
+* **`/pinterest` has no prefill parameters**, so "Create Pins" links to
+  `/pinterest` as-is (generation logic untouched); "Schedule Pins" links to
+  the board's page.
+
+### Files
+
+New: `supabase/migrations/033_add_tasks.sql`, `034_add_task_occurrences.sql`,
+`types/tasks.ts`, `lib/validations/tasks.ts`, `lib/queries/tasks.ts`,
+`lib/queries/command-center.ts`, `lib/dashboard/local-date.ts`,
+`build-content-coverage.ts`, `build-recommendations.ts`,
+`build-sunday-review.ts`, `app/api/tasks/route.ts` (GET/POST),
+`app/api/tasks/[id]/route.ts` (PATCH), `app/api/tasks/weekly-review/route.ts`
+(POST), `components/dashboard/{today-workspace, content-streams-overview,
+publishing-coverage, recommended-actions, add-to-priorities-button,
+sunday-review-card, week-view, stream-health-badge}.tsx`,
+`tests/renderer/dashboard-coverage.spec.ts`, `tests/renderer/tasks.spec.ts`,
+`tests/playwright/dashboard.spec.ts`.
+
+Modified: `app/(dashboard)/dashboard/page.tsx`, `lib/dashboard/build-command-center.ts`,
+`types/dashboard.ts`, `components/dashboard/{dashboard-header, kpi-card,
+today-priorities, weekly-progress}.tsx`, `components/shared/metric-card/metric-card.tsx`
+(`ProgressMetric.progress` optional), `tests/renderer/dashboard-command-center.spec.ts`,
+`lib/guide/content.ts`, docs.
+
+Deleted: `lib/dashboard/command-center-mock.ts`,
+`components/dashboard/project-progress-card.tsx`,
+`components/dashboard/command-center-section.tsx`.
+
+Not touched: Pinterest generation, AI providers, CSV export, generation
+routes, renderer, `pins`/`boards`/`content_streams` schema. No
+`pinterest_accounts` table.
+
+### Validation
+
+| Check | Result |
+| --- | --- |
+| `npx tsc --noEmit` | Pass |
+| `npx eslint` (every touched file) | Pass |
+| New/updated offline specs (dashboard-command-center, dashboard-coverage, tasks) | 55/55 pass; coverage specs also pass under `TZ=UTC` and `TZ=Europe/Paris` |
+| Full `npx playwright test` | 276 passed, 84 skipped (auth-gated browser tests, incl. the new `tests/playwright/dashboard.spec.ts` desktop + mobile), 2 failed — both pre-existing and unrelated: `pinterest-text-importance-none` (CRLF in the untouched `pin-form.tsx` vs a `\n` literal), `pinterest-auto-template-selection` diversity (flaky, passes on re-run) |
+| `npx next build` | Pass — `/api/tasks`, `/api/tasks/[id]`, `/api/tasks/weekly-review` added |
+| `git diff --check` | Clean |
+
+### Remaining limitations
+
+* **Migrations 033 and 034 are not applied to the live database** (no
+  Supabase CLI/Docker here, same as §14). Until they are pasted into the SQL
+  Editor, the dashboard still renders (task reads return empty, a server log
+  line says so) but adding a priority or completing the Sunday review
+  returns `server_error`.
+* RLS `WITH CHECK`, the CHECK constraints and the partial unique index were
+  reviewed statically only (same limitation as §14).
+* The desktop/mobile browser spec skips without `PLAYWRIGHT_STORAGE_STATE`.
+* Sunday checklist ticks are not persisted (no column for them; a
+  deliberate minimum).
+* No period filter in the header (the brief marked it optional).

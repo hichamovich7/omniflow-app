@@ -1597,6 +1597,31 @@ Le brief demandait explicitement de chercher (Étape 0) un composant tag/chip ex
 
 ---
 
+## 2026-09-25
+
+### Decision
+
+TASK-FIX-042 — Operational Command Center: how to honour "keep every metric", "no mock data" and "a Sunday routine that never disappears" when no `tasks` table and no revenue/product source existed.
+
+### Context
+
+Phases 2b/2c (`tasks`, `task_occurrences`) were design-only; Monthly Revenue, Tasks Completed, Digital Products, Weekly Progress and Today's Priorities were hardcoded mocks.
+
+### Decision Taken
+
+1. Founder chose to add the `tasks` (033) and `task_occurrences` (034) migrations exactly as designed in TASK-COMMAND-CENTER-PHASE-2.md §5.3/§5.4, rather than a localStorage fallback.
+2. Founder chose "real where possible": every metric card is kept; metrics with no source render "Not tracked yet", never a number. The mock module is deleted.
+3. The mocked "Active Projects" block is removed (the name-matching stopgap §4 said to delete once real data existed); Content streams replaces it.
+4. A sixth stream status, "Needs setup", is used when a stream has no board or no targets — the five requested statuses would each be a fabricated verdict there.
+5. Days are computed in the runtime's local calendar, the same convention already used to write and export `pins.publish_date`; no timezone constant is introduced.
+
+### Consequences
+
+* The dashboard needs migrations 033/034 applied before priorities and the Sunday review can be saved; reads degrade to empty until then.
+* A later revenue/products source can switch those cards from `untracked` to `real` without touching the layout.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

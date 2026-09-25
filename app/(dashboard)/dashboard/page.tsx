@@ -5,10 +5,39 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Progress } from '@/components/ui/progress';
 import { buttonVariants } from '@/components/ui/button';
 import { PageState } from '@/components/shared/page-state';
+import { MetricGrid } from '@/components/shared/metric-card';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
-import { CommandCenterSection } from '@/components/dashboard/command-center-section';
-import { MOCK_DAY_SUMMARY } from '@/lib/dashboard/command-center-mock';
-import { buildCommandCenterKpis, resolveActiveProjects } from '@/lib/dashboard/build-command-center';
+import { KpiCard } from '@/components/dashboard/kpi-card';
+import { TodayPriorities } from '@/components/dashboard/today-priorities';
+import { TodayWorkspace } from '@/components/dashboard/today-workspace';
+import { ContentStreamsOverview } from '@/components/dashboard/content-streams-overview';
+import { PublishingCoverage } from '@/components/dashboard/publishing-coverage';
+import { RecommendedActions, recommendationPinnedKey } from '@/components/dashboard/recommended-actions';
+import { SundayReviewCard } from '@/components/dashboard/sunday-review-card';
+import { WeekView } from '@/components/dashboard/week-view';
+import { WeeklyProgress } from '@/components/dashboard/weekly-progress';
+import {
+  OPEN_TASK_STATUSES,
+  buildCommandCenterKpis,
+  buildDaySummary,
+  buildWeeklyProgress,
+  countActiveProjects,
+  selectTodayPriorities,
+} from '@/lib/dashboard/build-command-center';
+import { buildContentCoverage, buildWeekPlan } from '@/lib/dashboard/build-content-coverage';
+import { buildRecommendations, pickFocusRecommendation } from '@/lib/dashboard/build-recommendations';
+import { buildSundayReviewStatus } from '@/lib/dashboard/build-sunday-review';
+import { startOfLocalWeek } from '@/lib/dashboard/local-date';
+import {
+  countPinLifecycle,
+  countTasksCompletedThisMonth,
+  countUnscheduledPinsByBoard,
+  countWeeklyActivity,
+  listCommandCenterStreams,
+  listDashboardTasks,
+  listPlannedPinsFrom,
+  loadWeeklyReview,
+} from '@/lib/queries/command-center';
 import { cn } from '@/lib/utils';
 import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Wand2, FilePlus2, Sparkles, TriangleAlert } from 'lucide-react';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
@@ -34,6 +63,10 @@ export default async function DashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const userId = user?.id ?? '';
+  // One clock for every day-based computation on this render (runtime-local
+  // calendar — same convention as pins.publish_date, see lib/dashboard/local-date.ts).
+  const now = new Date();
 
   const [
     generationsResult,
@@ -44,13 +77,19 @@ export default async function DashboardPage() {
     recentPinterestResult,
     recentWordPressResult,
     bypassResult,
+    streams,
+    plannedPins,
+    lifecycle,
+    weeklyActivity,
+    dashboardTasks,
+    tasksCompletedThisMonth,
+    weeklyReviewData,
   ] = await Promise.all([
     supabase.from('generations').select('id', { count: 'exact', head: true }),
     supabase.from('pins').select('id', { count: 'exact', head: true }),
     supabase.from('profiles').select('credits_balance, name, total_generations_used').single(),
-    // Fetched as rows (not head-count) so Active Projects can link to a
-    // matching real project by name — see lib/dashboard/build-command-center.ts
-    supabase.from('projects').select('id, name'),
+    // Fetched as rows (not head-count): Today's Priorities' project picker needs id + name.
+    supabase.from('projects').select('id, name').order('name'),
     supabase.from('wordpress_articles').select('id', { count: 'exact', head: true }),
     supabase
       .from('generations')
@@ -66,6 +105,18 @@ export default async function DashboardPage() {
     // rate_limit_bypass table) — keeps this banner's "am I exempt" answer
     // consistent with what actually gets enforced server-side.
     supabase.rpc('is_rate_limit_bypassed'),
+    // Command Center (TASK-FIX-042) — real planning data only.
+    listCommandCenterStreams(supabase),
+    listPlannedPinsFrom(supabase, startOfLocalWeek(now).toISOString()),
+    countPinLifecycle(supabase, now),
+    countWeeklyActivity(supabase, now),
+    listDashboardTasks(supabase, userId, now),
+    countTasksCompletedThisMonth(supabase, userId, now),
+    loadWeeklyReview(supabase, userId, now),
+  ]);
+
+  const unscheduledByBoard = await countUnscheduledPinsByBoard(supabase, [
+    ...new Set(streams.flatMap((stream) => stream.boards.map((board) => board.id))),
   ]);
 
   const totalGenerations = generationsResult.count ?? 0;
@@ -81,8 +132,36 @@ export default async function DashboardPage() {
     articlesGenerated: totalArticles,
     projects: totalProjects,
     generations: totalGenerations,
+    tasksCompletedThisMonth,
   });
-  const activeProjects = resolveActiveProjects(realProjects);
+
+  const coverage = buildContentCoverage({ streams, plannedPins, unscheduledByBoard, now });
+  const sundayReview = buildSundayReviewStatus({ now, ...weeklyReviewData });
+  const recommendations = buildRecommendations(coverage, sundayReview);
+  const focus = pickFocusRecommendation(recommendations);
+  const priorities = selectTodayPriorities(dashboardTasks, now);
+  const openPriorities = priorities.filter((item) => !item.done).length;
+  const activeProjectCount = countActiveProjects(streams);
+  const pinnedKeys = dashboardTasks
+    .filter((task) => task.pinned_to_today && OPEN_TASK_STATUSES.includes(task.status))
+    .map((task) => recommendationPinnedKey({ streamId: task.content_stream_id, taskType: task.type }));
+  const weekPlan = buildWeekPlan({
+    coverage,
+    plannedPins,
+    dueTasks: dashboardTasks
+      .filter((task) => task.due_date && OPEN_TASK_STATUSES.includes(task.status))
+      .map((task) => ({ title: task.title, dueDate: task.due_date as string })),
+    now,
+  });
+  const weeklyProgress = buildWeeklyProgress({
+    articlesPublished: weeklyActivity.articlesPublished,
+    pinsCreated: weeklyActivity.pinsCreated,
+    streams: streams.map((stream) => ({
+      status: stream.status,
+      targetPinsPerDay: stream.targetPinsPerDay,
+      targetArticlesPerWeek: stream.targetArticlesPerWeek,
+    })),
+  });
 
   const isTrialExempt = user?.email === process.env.ADMIN_EMAIL || bypassResult.data === true;
   const trialLimit = getTrialGenerationLimit();
@@ -128,13 +207,13 @@ export default async function DashboardPage() {
     .slice(0, 5);
 
   const greeting = (() => {
-    const hour = new Date().getHours();
+    const hour = now.getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
   })();
 
-  const today = new Date().toLocaleDateString('en-US', {
+  const today = now.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -154,8 +233,10 @@ export default async function DashboardPage() {
         greeting={greeting}
         userName={userName}
         date={today}
-        summary={MOCK_DAY_SUMMARY}
+        summary={buildDaySummary(openPriorities, activeProjectCount)}
         credits={credits}
+        prioritiesToday={openPriorities}
+        activeProjects={activeProjectCount}
       />
 
       {/* Trial usage banner — lightweight lifetime cap distinct from the future
@@ -191,17 +272,46 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Command Center — KPIs, Today's Priorities, Active Projects, Weekly
-          Progress (TASK-FIX-038). KPIs and Active Projects mix real Supabase
-          data with mock goals; Today's Priorities and Weekly Progress stay
-          fully mocked. See docs/tasks/TASK-COMMAND-CENTER-MVP.md. */}
+      {/* Command Center (TASK-FIX-042) — every value is read from Supabase or
+          marked "Not tracked yet"; no mock data. See
+          docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md §15. */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <TodayWorkspace focus={focus} coverage={coverage} />
+        </div>
+        <div className="lg:col-span-1">
+          <TodayPriorities priorities={priorities} projects={realProjects} />
+        </div>
+      </div>
+
       <div className="space-y-3">
         <div>
           <p className="text-label">Overview</p>
           <h2 className="text-section-title mt-1">Command Center</h2>
         </div>
-        <CommandCenterSection kpis={commandCenterKpis} activeProjects={activeProjects} projects={realProjects} />
+        <MetricGrid>
+          {commandCenterKpis.map((kpi) => (
+            <KpiCard key={kpi.id} kpi={kpi} />
+          ))}
+        </MetricGrid>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RecommendedActions recommendations={recommendations} pinnedKeys={pinnedKeys} />
+        </div>
+        <div className="lg:col-span-1 lg:pt-13">
+          <SundayReviewCard review={sundayReview} />
+        </div>
+      </div>
+
+      <ContentStreamsOverview coverage={coverage} />
+
+      <PublishingCoverage coverage={coverage} lifecycle={lifecycle} />
+
+      <WeekView days={weekPlan} review={sundayReview} />
+
+      <WeeklyProgress stats={weeklyProgress} />
 
       {/* Quick Actions */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

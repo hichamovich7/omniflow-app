@@ -236,6 +236,22 @@ Cada generación conservará:
 
 ---
 
+# Command Center (Dashboard)
+
+`/dashboard` es el centro operativo diario (TASK-FIX-042):
+
+* Foco recomendado del día: el Content Stream cuyo buffer de Pins planificados se agota primero
+* Content Streams con board, objetivos (Pins/día, días de buffer), Pins planificados, fecha de cobertura y estado
+* Cobertura de publicación a 14 días, calculada con `pins.publish_date` (fechas planificadas en OmniFlow, nunca confirmación de publicación en Pinterest)
+* Acciones recomendadas (Create Pins, Schedule Pins, Review stream, Review buffer, revisión del domingo) — solo sugerencias; se convierten en prioridad únicamente con un clic del usuario, con título editable
+* Today's Priorities persistentes (tabla `tasks`, máximo 3 abiertas)
+* Rutina semanal "Sunday analytics review" (`tasks` + `task_occurrences`), que queda "Overdue" hasta completarse
+* Vista semanal (Pins planificados / por planificar / por crear, tareas con fecha)
+
+Las métricas sin fuente de datos (Monthly Revenue, Digital Products, Products Launched, Revenue semanal) se muestran como "Not tracked yet", nunca con valores ficticios.
+
+---
+
 # User Roles
 
 OmniFlow utiliza un sistema de roles.
