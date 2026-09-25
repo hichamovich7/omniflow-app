@@ -1,0 +1,142 @@
+[
+  {
+    "name": "dashboard__light__1440",
+    "extra": 792,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "dashboard__dark__1440",
+    "extra": 792,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "dashboard__light__390",
+    "extra": 2055,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "dashboard__dark__390",
+    "extra": 2055,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "form-wordpress-blog-post__light__1440",
+    "extra": 1007,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "form-wordpress-blog-post__dark__1440",
+    "extra": 1007,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "form-wordpress-blog-post__light__390",
+    "extra": 1540,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "form-wordpress-blog-post__dark__390",
+    "extra": 1540,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "table-projects__light__1440",
+    "extra": 2,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "table-projects__dark__1440",
+    "extra": 2,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "table-projects__light__390",
+    "extra": 154,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "table-projects__dark__390",
+    "extra": 154,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "detail-project__light__1440",
+    "extra": 168,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "detail-project__dark__1440",
+    "extra": 168,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "detail-project__light__390",
+    "extra": 510,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "detail-project__dark__390",
+    "extra": 510,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "dialog-add-content-stream__light__1440",
+    "extra": 168,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "dialog-add-content-stream__dark__1440",
+    "extra": 168,
+    "hScrollers": [],
+    "docScrollW": 1440,
+    "vw": 1440
+  },
+  {
+    "name": "dialog-add-content-stream__light__390",
+    "extra": 510,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  },
+  {
+    "name": "dialog-add-content-stream__dark__390",
+    "extra": 510,
+    "hScrollers": [],
+    "docScrollW": 390,
+    "vw": 390
+  }
+]

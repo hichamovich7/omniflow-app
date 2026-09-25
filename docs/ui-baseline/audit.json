@@ -1,0 +1,1603 @@
+{
+  "projectPath": "/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+  "results": [
+    {
+      "name": "dashboard__light__1440",
+      "url": "http://localhost:3000/dashboard",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 127
+      },
+      "fontSizes": {
+        "12px/400": 36,
+        "13px/400": 14,
+        "14px/500": 14,
+        "13px/500": 10,
+        "12px/500": 9,
+        "18px/600": 9,
+        "10px/500": 8,
+        "14px/400": 8,
+        "10px/600": 5,
+        "22px/600": 5,
+        "16px/600": 4,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 43,
+        "3.35544e+07px": 28,
+        "14px": 8,
+        "10px": 3,
+        "4px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 2
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 19,
+        "rgb(241, 245, 250)": 14,
+        "rgb(21, 112, 239)": 8,
+        "rgb(247, 249, 252)": 5,
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.4)": 4,
+        "rgb(22, 138, 69)": 4,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 2,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.06)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.557015 -0.124625 0.0691698 / 0.1)": 1,
+        "oklab(0.539429 0.114245 0.106502 / 0.1)": 1,
+        "rgb(217, 45, 32)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 19,
+        "rgba(0, 0, 0, 0)": 2,
+        "rgb(232, 237, 244)": 1
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 58,
+        "rgb(23, 32, 51)": 40,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.55)": 6,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.45)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.35)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.7)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.6)": 3,
+        "rgb(255, 255, 255)": 1,
+        "rgb(21, 112, 239)": 1,
+        "oklab(0.244858 -0.00380383 -0.0385778 / 0.8)": 1,
+        "rgb(22, 138, 69)": 1,
+        "rgb(181, 71, 8)": 1
+      },
+      "h1": [
+        "H1 28px/700 \"Good evening\"",
+        "H2 22px/600 \"Command Center\"",
+        "H2 22px/600 \"Today's Priorities\"",
+        "H2 22px/600 \"Active Projects\"",
+        "H2 22px/600 \"Weekly Progress\"",
+        "H2 22px/600 \"Recent activity\""
+      ]
+    },
+    {
+      "name": "dashboard__dark__1440",
+      "url": "http://localhost:3000/dashboard",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 127
+      },
+      "fontSizes": {
+        "12px/400": 36,
+        "13px/400": 14,
+        "14px/500": 14,
+        "13px/500": 10,
+        "12px/500": 9,
+        "18px/600": 9,
+        "10px/500": 8,
+        "14px/400": 8,
+        "10px/600": 5,
+        "22px/600": 5,
+        "16px/600": 4,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 43,
+        "3.35544e+07px": 28,
+        "14px": 8,
+        "10px": 3,
+        "4px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 2
+      },
+      "bgs": {
+        "rgb(17, 26, 43)": 18,
+        "rgb(24, 34, 53)": 11,
+        "rgb(76, 155, 255)": 8,
+        "rgb(11, 18, 32)": 5,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.4)": 4,
+        "rgb(86, 201, 133)": 4,
+        "oklab(0.38648 -0.0104334 -0.0454015 / 0.3)": 3,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 2,
+        "rgb(15, 24, 40)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.06)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.752185 -0.130342 0.0615616 / 0.2)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 19,
+        "rgba(0, 0, 0, 0)": 2,
+        "rgb(40, 54, 74)": 1
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 58,
+        "rgb(245, 247, 250)": 40,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.55)": 6,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.45)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.35)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.7)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.6)": 3,
+        "rgb(8, 17, 31)": 1,
+        "rgb(76, 155, 255)": 1,
+        "oklab(0.975462 -0.00087294 -0.00442082 / 0.8)": 1,
+        "rgb(86, 201, 133)": 1,
+        "rgb(245, 165, 36)": 1
+      },
+      "h1": [
+        "H1 28px/700 \"Good evening\"",
+        "H2 22px/600 \"Command Center\"",
+        "H2 22px/600 \"Today's Priorities\"",
+        "H2 22px/600 \"Active Projects\"",
+        "H2 22px/600 \"Weekly Progress\"",
+        "H2 22px/600 \"Recent activity\""
+      ]
+    },
+    {
+      "name": "dashboard__light__390",
+      "url": "http://localhost:3000/dashboard",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 99
+      },
+      "fontSizes": {
+        "12px/400": 36,
+        "14px/500": 15,
+        "13px/500": 9,
+        "18px/600": 9,
+        "12px/500": 8,
+        "14px/400": 8,
+        "22px/600": 5,
+        "16px/600": 4,
+        "10px/500": 3,
+        "11px/500": 1,
+        "28px/700": 1
+      },
+      "smallText": [
+        "11px \"H\"",
+        "10px \"Preview\"",
+        "10px \"Preview\"",
+        "10px \"Preview\""
+      ],
+      "radii": {
+        "3.35544e+07px": 27,
+        "16px": 27,
+        "14px": 5,
+        "10px": 4,
+        "4px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 1
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 18,
+        "rgb(241, 245, 250)": 13,
+        "rgb(21, 112, 239)": 8,
+        "rgb(247, 249, 252)": 5,
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.4)": 4,
+        "rgb(22, 138, 69)": 4,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 2,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.557015 -0.124625 0.0691698 / 0.1)": 1,
+        "oklab(0.539429 0.114245 0.106502 / 0.1)": 1,
+        "rgb(217, 45, 32)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 19,
+        "rgba(0, 0, 0, 0)": 3,
+        "rgb(232, 237, 244)": 1
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 48,
+        "rgb(23, 32, 51)": 39,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.7)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.6)": 3,
+        "rgb(21, 112, 239)": 1,
+        "oklab(0.244858 -0.00380383 -0.0385778 / 0.8)": 1,
+        "rgb(22, 138, 69)": 1,
+        "rgb(181, 71, 8)": 1
+      },
+      "h1": [
+        "H1 28px/700 \"Good evening\"",
+        "H2 22px/600 \"Command Center\"",
+        "H2 22px/600 \"Today's Priorities\"",
+        "H2 22px/600 \"Active Projects\"",
+        "H2 22px/600 \"Weekly Progress\"",
+        "H2 22px/600 \"Recent activity\""
+      ]
+    },
+    {
+      "name": "dashboard__dark__390",
+      "url": "http://localhost:3000/dashboard",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 99
+      },
+      "fontSizes": {
+        "12px/400": 36,
+        "14px/500": 15,
+        "13px/500": 9,
+        "18px/600": 9,
+        "12px/500": 8,
+        "14px/400": 8,
+        "22px/600": 5,
+        "16px/600": 4,
+        "10px/500": 3,
+        "11px/500": 1,
+        "28px/700": 1
+      },
+      "smallText": [
+        "11px \"H\"",
+        "10px \"Preview\"",
+        "10px \"Preview\"",
+        "10px \"Preview\""
+      ],
+      "radii": {
+        "3.35544e+07px": 27,
+        "16px": 27,
+        "14px": 5,
+        "10px": 4,
+        "4px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 1
+      },
+      "bgs": {
+        "rgb(17, 26, 43)": 18,
+        "rgb(24, 34, 53)": 10,
+        "rgb(76, 155, 255)": 8,
+        "rgb(11, 18, 32)": 5,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.4)": 4,
+        "rgb(86, 201, 133)": 4,
+        "oklab(0.38648 -0.0104334 -0.0454015 / 0.3)": 3,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 2,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.752185 -0.130342 0.0615616 / 0.2)": 1,
+        "oklab(0.781885 0.0481399 0.150984 / 0.2)": 1,
+        "rgb(255, 116, 107)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 19,
+        "rgba(0, 0, 0, 0)": 3,
+        "rgb(40, 54, 74)": 1
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 48,
+        "rgb(245, 247, 250)": 39,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.7)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.6)": 3,
+        "rgb(76, 155, 255)": 1,
+        "oklab(0.975462 -0.00087294 -0.00442082 / 0.8)": 1,
+        "rgb(86, 201, 133)": 1,
+        "rgb(245, 165, 36)": 1
+      },
+      "h1": [
+        "H1 28px/700 \"Good evening\"",
+        "H2 22px/600 \"Command Center\"",
+        "H2 22px/600 \"Today's Priorities\"",
+        "H2 22px/600 \"Active Projects\"",
+        "H2 22px/600 \"Weekly Progress\"",
+        "H2 22px/600 \"Recent activity\""
+      ]
+    },
+    {
+      "name": "form-wordpress-blog-post__light__1440",
+      "url": "http://localhost:3000/wordpress/blog-post",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 79,
+        "\"Geist Mono\"": 5
+      },
+      "fontSizes": {
+        "14px/400": 18,
+        "13px/400": 14,
+        "12px/500": 12,
+        "14px/600": 6,
+        "11px/500": 6,
+        "12px/400": 6,
+        "10px/600": 5,
+        "10px/500": 5,
+        "11px/400": 5,
+        "14px/500": 3,
+        "12px/700": 1,
+        "9px/400": 1,
+        "13px/500": 1,
+        "24px/600": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 29,
+        "14px": 16,
+        "10px": 3,
+        "3.35544e+07px": 2,
+        "8px": 1
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 9
+      },
+      "bgs": {
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.7)": 15,
+        "rgb(255, 255, 255)": 6,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.05)": 5,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.15)": 5,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 2,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.06)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "rgb(241, 245, 250)": 1,
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.6)": 1,
+        "oklab(0.557015 -0.124625 0.0691698 / 0.1)": 1,
+        "rgb(21, 112, 239)": 1
+      },
+      "borders": {
+        "rgb(217, 226, 236)": 9,
+        "rgb(232, 237, 244)": 8,
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.7)": 6,
+        "rgba(0, 0, 0, 0)": 3,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.3)": 2
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 47,
+        "rgb(23, 32, 51)": 17,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.55)": 6,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.45)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.35)": 5,
+        "rgb(255, 255, 255)": 2,
+        "rgb(21, 112, 239)": 1,
+        "rgb(22, 138, 69)": 1
+      },
+      "h1": [
+        "H1 24px/600 \"WordPress Generator\"",
+        "H2 14px/600 \"Project Context\"",
+        "H2 14px/600 \"Article Source\"",
+        "H2 14px/600 \"Article Settings\"",
+        "H2 14px/600 \"Advanced Options\"",
+        "H2 14px/600 \"Generation Summary\""
+      ]
+    },
+    {
+      "name": "form-wordpress-blog-post__dark__1440",
+      "url": "http://localhost:3000/wordpress/blog-post",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 79,
+        "\"Geist Mono\"": 5
+      },
+      "fontSizes": {
+        "14px/400": 18,
+        "13px/400": 14,
+        "12px/500": 12,
+        "14px/600": 6,
+        "11px/500": 6,
+        "12px/400": 6,
+        "10px/600": 5,
+        "10px/500": 5,
+        "11px/400": 5,
+        "14px/500": 3,
+        "12px/700": 1,
+        "9px/400": 1,
+        "13px/500": 1,
+        "24px/600": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 29,
+        "14px": 16,
+        "10px": 3,
+        "3.35544e+07px": 2,
+        "8px": 1
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 9
+      },
+      "bgs": {
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.4)": 14,
+        "rgb(17, 26, 43)": 5,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.05)": 5,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.15)": 5,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 2,
+        "rgb(11, 18, 32)": 1,
+        "rgb(15, 24, 40)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.06)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "rgb(24, 34, 53)": 1,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.6)": 1,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.7)": 1
+      },
+      "borders": {
+        "rgb(52, 69, 93)": 9,
+        "rgb(40, 54, 74)": 8,
+        "oklab(0.329655 -0.00885125 -0.0393082 / 0.7)": 6,
+        "rgba(0, 0, 0, 0)": 3,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.3)": 2
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 47,
+        "rgb(245, 247, 250)": 17,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.55)": 6,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.45)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.35)": 5,
+        "rgb(8, 17, 31)": 2,
+        "rgb(76, 155, 255)": 1,
+        "rgb(86, 201, 133)": 1
+      },
+      "h1": [
+        "H1 24px/600 \"WordPress Generator\"",
+        "H2 14px/600 \"Project Context\"",
+        "H2 14px/600 \"Article Source\"",
+        "H2 14px/600 \"Article Settings\"",
+        "H2 14px/600 \"Advanced Options\"",
+        "H2 14px/600 \"Generation Summary\""
+      ]
+    },
+    {
+      "name": "form-wordpress-blog-post__light__390",
+      "url": "http://localhost:3000/wordpress/blog-post",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 51,
+        "\"Geist Mono\"": 5
+      },
+      "fontSizes": {
+        "14px/400": 18,
+        "12px/500": 11,
+        "11px/500": 6,
+        "12px/400": 6,
+        "11px/400": 5,
+        "14px/600": 5,
+        "14px/500": 4,
+        "24px/600": 1
+      },
+      "smallText": [
+        "11px \"H\"",
+        "11px \"01\"",
+        "11px \"02\"",
+        "11px \"03\"",
+        "11px \"04\"",
+        "11px \"05\""
+      ],
+      "radii": {
+        "16px": 13,
+        "14px": 13,
+        "10px": 4,
+        "3.35544e+07px": 1,
+        "8px": 1
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 8
+      },
+      "bgs": {
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.7)": 15,
+        "rgb(255, 255, 255)": 5,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.05)": 5,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.15)": 5,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 2,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.6)": 1,
+        "oklab(0.557015 -0.124625 0.0691698 / 0.1)": 1,
+        "rgb(21, 112, 239)": 1
+      },
+      "borders": {
+        "rgb(217, 226, 236)": 9,
+        "rgb(232, 237, 244)": 8,
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.7)": 6,
+        "rgba(0, 0, 0, 0)": 4,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.3)": 2
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 37,
+        "rgb(23, 32, 51)": 16,
+        "rgb(21, 112, 239)": 1,
+        "rgb(22, 138, 69)": 1,
+        "rgb(255, 255, 255)": 1
+      },
+      "h1": [
+        "H1 24px/600 \"WordPress Generator\"",
+        "H2 14px/600 \"Project Context\"",
+        "H2 14px/600 \"Article Source\"",
+        "H2 14px/600 \"Article Settings\"",
+        "H2 14px/600 \"Advanced Options\"",
+        "H2 14px/600 \"Generation Summary\""
+      ]
+    },
+    {
+      "name": "form-wordpress-blog-post__dark__390",
+      "url": "http://localhost:3000/wordpress/blog-post",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 51,
+        "\"Geist Mono\"": 5
+      },
+      "fontSizes": {
+        "14px/400": 18,
+        "12px/500": 11,
+        "11px/500": 6,
+        "12px/400": 6,
+        "11px/400": 5,
+        "14px/600": 5,
+        "14px/500": 4,
+        "24px/600": 1
+      },
+      "smallText": [
+        "11px \"H\"",
+        "11px \"01\"",
+        "11px \"02\"",
+        "11px \"03\"",
+        "11px \"04\"",
+        "11px \"05\""
+      ],
+      "radii": {
+        "16px": 13,
+        "14px": 13,
+        "10px": 4,
+        "3.35544e+07px": 1,
+        "8px": 1
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 8
+      },
+      "bgs": {
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.4)": 14,
+        "rgb(17, 26, 43)": 5,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.05)": 5,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.15)": 5,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 2,
+        "rgb(11, 18, 32)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.6)": 1,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.7)": 1,
+        "oklab(0.752185 -0.130342 0.0615616 / 0.2)": 1,
+        "rgb(76, 155, 255)": 1
+      },
+      "borders": {
+        "rgb(52, 69, 93)": 9,
+        "rgb(40, 54, 74)": 8,
+        "oklab(0.329655 -0.00885125 -0.0393082 / 0.7)": 6,
+        "rgba(0, 0, 0, 0)": 4,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.3)": 2
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 37,
+        "rgb(245, 247, 250)": 16,
+        "rgb(76, 155, 255)": 1,
+        "rgb(86, 201, 133)": 1,
+        "rgb(8, 17, 31)": 1
+      },
+      "h1": [
+        "H1 24px/600 \"WordPress Generator\"",
+        "H2 14px/600 \"Project Context\"",
+        "H2 14px/600 \"Article Source\"",
+        "H2 14px/600 \"Article Settings\"",
+        "H2 14px/600 \"Advanced Options\"",
+        "H2 14px/600 \"Generation Summary\""
+      ]
+    },
+    {
+      "name": "table-projects__light__1440",
+      "url": "http://localhost:3000/projects",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 57
+      },
+      "fontSizes": {
+        "12px/400": 15,
+        "13px/400": 14,
+        "10px/600": 5,
+        "10px/500": 5,
+        "12px/500": 4,
+        "16px/600": 3,
+        "13px/500": 2,
+        "14px/400": 2,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1,
+        "11px/500": 1,
+        "28px/700": 1,
+        "15px/500": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 23,
+        "3.35544e+07px": 4,
+        "10px": 4,
+        "14px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 3
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 6,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 6,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.06)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "rgb(241, 245, 250)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 7,
+        "rgb(232, 237, 244)": 1
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 22,
+        "rgb(23, 32, 51)": 8,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.55)": 6,
+        "rgb(232, 237, 244)": 6,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.45)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.35)": 5,
+        "rgb(21, 112, 239)": 4,
+        "rgb(255, 255, 255)": 1
+      },
+      "h1": [
+        "H1 28px/700 \"Projects\"",
+        "H2 22px/600 \"Your content projects\""
+      ]
+    },
+    {
+      "name": "table-projects__dark__1440",
+      "url": "http://localhost:3000/projects",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 57
+      },
+      "fontSizes": {
+        "12px/400": 15,
+        "13px/400": 14,
+        "10px/600": 5,
+        "10px/500": 5,
+        "12px/500": 4,
+        "16px/600": 3,
+        "13px/500": 2,
+        "14px/400": 2,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1,
+        "11px/500": 1,
+        "28px/700": 1,
+        "15px/500": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 23,
+        "3.35544e+07px": 4,
+        "10px": 4,
+        "14px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 3
+      },
+      "bgs": {
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 6,
+        "rgb(17, 26, 43)": 5,
+        "rgb(11, 18, 32)": 1,
+        "rgb(15, 24, 40)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.06)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "rgb(24, 34, 53)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 7,
+        "rgb(40, 54, 74)": 1
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 22,
+        "rgb(245, 247, 250)": 8,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.55)": 6,
+        "rgb(40, 54, 74)": 6,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.45)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.35)": 5,
+        "rgb(76, 155, 255)": 4,
+        "rgb(8, 17, 31)": 1
+      },
+      "h1": [
+        "H1 28px/700 \"Projects\"",
+        "H2 22px/600 \"Your content projects\""
+      ]
+    },
+    {
+      "name": "table-projects__light__390",
+      "url": "http://localhost:3000/projects",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 29
+      },
+      "fontSizes": {
+        "12px/400": 15,
+        "16px/600": 3,
+        "12px/500": 3,
+        "14px/400": 2,
+        "14px/500": 1,
+        "11px/500": 1,
+        "28px/700": 1,
+        "15px/500": 1,
+        "13px/500": 1,
+        "22px/600": 1
+      },
+      "smallText": [
+        "11px \"H\""
+      ],
+      "radii": {
+        "16px": 7,
+        "10px": 5,
+        "3.35544e+07px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 2
+      },
+      "bgs": {
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 6,
+        "rgb(255, 255, 255)": 5,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 7,
+        "rgba(0, 0, 0, 0)": 1,
+        "rgb(232, 237, 244)": 1
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 12,
+        "rgb(23, 32, 51)": 7,
+        "rgb(232, 237, 244)": 6,
+        "rgb(21, 112, 239)": 4
+      },
+      "h1": [
+        "H1 28px/700 \"Projects\"",
+        "H2 22px/600 \"Your content projects\""
+      ]
+    },
+    {
+      "name": "table-projects__dark__390",
+      "url": "http://localhost:3000/projects",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 29
+      },
+      "fontSizes": {
+        "12px/400": 15,
+        "16px/600": 3,
+        "12px/500": 3,
+        "14px/400": 2,
+        "14px/500": 1,
+        "11px/500": 1,
+        "28px/700": 1,
+        "15px/500": 1,
+        "13px/500": 1,
+        "22px/600": 1
+      },
+      "smallText": [
+        "11px \"H\""
+      ],
+      "radii": {
+        "16px": 7,
+        "10px": 5,
+        "3.35544e+07px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 2
+      },
+      "bgs": {
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 6,
+        "rgb(17, 26, 43)": 5,
+        "rgb(11, 18, 32)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 7,
+        "rgba(0, 0, 0, 0)": 1,
+        "rgb(40, 54, 74)": 1
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 12,
+        "rgb(245, 247, 250)": 7,
+        "rgb(40, 54, 74)": 6,
+        "rgb(76, 155, 255)": 4
+      },
+      "h1": [
+        "H1 28px/700 \"Projects\"",
+        "H2 22px/600 \"Your content projects\""
+      ]
+    },
+    {
+      "name": "detail-project__light__1440",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 48
+      },
+      "fontSizes": {
+        "13px/400": 14,
+        "12px/500": 7,
+        "10px/600": 5,
+        "10px/500": 5,
+        "14px/500": 5,
+        "14px/400": 2,
+        "24px/600": 2,
+        "12px/400": 2,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1,
+        "13px/500": 1,
+        "11px/500": 1,
+        "20px/600": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 24,
+        "14px": 6,
+        "8px": 5,
+        "3.35544e+07px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 6
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 11,
+        "rgb(241, 245, 250)": 4,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.06)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 1,
+        "rgb(238, 243, 248)": 1,
+        "rgb(21, 112, 239)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 7,
+        "rgb(232, 237, 244)": 4,
+        "rgba(0, 0, 0, 0)": 2
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 14,
+        "rgb(23, 32, 51)": 13,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.55)": 6,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.45)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.35)": 5,
+        "rgb(255, 255, 255)": 2,
+        "rgb(21, 112, 239)": 2,
+        "rgb(52, 64, 84)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\""
+      ]
+    },
+    {
+      "name": "detail-project__dark__1440",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 48
+      },
+      "fontSizes": {
+        "13px/400": 14,
+        "12px/500": 7,
+        "10px/600": 5,
+        "10px/500": 5,
+        "14px/500": 5,
+        "14px/400": 2,
+        "24px/600": 2,
+        "12px/400": 2,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1,
+        "13px/500": 1,
+        "11px/500": 1,
+        "20px/600": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 24,
+        "14px": 6,
+        "8px": 5,
+        "3.35544e+07px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 6
+      },
+      "bgs": {
+        "rgb(17, 26, 43)": 10,
+        "rgb(24, 34, 53)": 4,
+        "rgb(11, 18, 32)": 1,
+        "rgb(15, 24, 40)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.06)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 1,
+        "rgb(27, 38, 56)": 1,
+        "rgb(76, 155, 255)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 7,
+        "rgb(40, 54, 74)": 4,
+        "rgba(0, 0, 0, 0)": 2
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 14,
+        "rgb(245, 247, 250)": 13,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.55)": 6,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.45)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.35)": 5,
+        "rgb(8, 17, 31)": 2,
+        "rgb(76, 155, 255)": 2,
+        "rgb(232, 238, 246)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\""
+      ]
+    },
+    {
+      "name": "detail-project__light__390",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 20
+      },
+      "fontSizes": {
+        "14px/500": 6,
+        "12px/500": 6,
+        "14px/400": 2,
+        "24px/600": 2,
+        "12px/400": 2,
+        "11px/500": 1,
+        "20px/600": 1
+      },
+      "smallText": [
+        "11px \"H\""
+      ],
+      "radii": {
+        "16px": 8,
+        "8px": 5,
+        "14px": 3,
+        "3.35544e+07px": 2,
+        "10px": 1
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 5
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 10,
+        "rgb(241, 245, 250)": 3,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 1,
+        "rgb(238, 243, 248)": 1,
+        "rgb(21, 112, 239)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 7,
+        "rgb(232, 237, 244)": 4,
+        "rgba(0, 0, 0, 0)": 3
+      },
+      "textColors": {
+        "rgb(23, 32, 51)": 12,
+        "rgb(104, 115, 134)": 4,
+        "rgb(21, 112, 239)": 2,
+        "rgb(52, 64, 84)": 1,
+        "rgb(255, 255, 255)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\""
+      ]
+    },
+    {
+      "name": "detail-project__dark__390",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": "",
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 20
+      },
+      "fontSizes": {
+        "14px/500": 6,
+        "12px/500": 6,
+        "14px/400": 2,
+        "24px/600": 2,
+        "12px/400": 2,
+        "11px/500": 1,
+        "20px/600": 1
+      },
+      "smallText": [
+        "11px \"H\""
+      ],
+      "radii": {
+        "16px": 8,
+        "8px": 5,
+        "14px": 3,
+        "3.35544e+07px": 2,
+        "10px": 1
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 5
+      },
+      "bgs": {
+        "rgb(17, 26, 43)": 10,
+        "rgb(24, 34, 53)": 3,
+        "rgb(11, 18, 32)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 1,
+        "rgb(27, 38, 56)": 1,
+        "rgb(76, 155, 255)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 7,
+        "rgb(40, 54, 74)": 4,
+        "rgba(0, 0, 0, 0)": 3
+      },
+      "textColors": {
+        "rgb(245, 247, 250)": 12,
+        "rgb(166, 176, 192)": 4,
+        "rgb(76, 155, 255)": 2,
+        "rgb(232, 238, 246)": 1,
+        "rgb(8, 17, 31)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\""
+      ]
+    },
+    {
+      "name": "dialog-add-content-stream__light__1440",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": {
+        "x": 528,
+        "w": 384,
+        "h": 463,
+        "top": 218.5,
+        "vh": 900,
+        "radius": "16px",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0",
+        "bg": "rgb(255, 255, 255)",
+        "scrollH": 463,
+        "overflowY": "visible"
+      },
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 66
+      },
+      "fontSizes": {
+        "13px/400": 14,
+        "14px/400": 9,
+        "13px/500": 8,
+        "14px/500": 8,
+        "12px/500": 7,
+        "10px/600": 5,
+        "10px/500": 5,
+        "24px/600": 2,
+        "12px/400": 2,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1,
+        "11px/500": 1,
+        "20px/600": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 25,
+        "14px": 9,
+        "8px": 6,
+        "10px": 6,
+        "3.35544e+07px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 13
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 17,
+        "rgb(241, 245, 250)": 4,
+        "rgb(21, 112, 239)": 2,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.06)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 1,
+        "rgb(238, 243, 248)": 1,
+        "oklab(0 0 0 / 0.1)": 1,
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.5)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 7,
+        "rgb(232, 237, 244)": 6,
+        "rgb(217, 226, 236)": 6,
+        "rgba(0, 0, 0, 0)": 4,
+        "rgb(37, 131, 255)": 1
+      },
+      "textColors": {
+        "rgb(104, 115, 134)": 25,
+        "rgb(23, 32, 51)": 19,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.55)": 6,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.45)": 5,
+        "oklab(0.553171 -0.00483209 -0.0320814 / 0.35)": 5,
+        "rgb(255, 255, 255)": 3,
+        "rgb(21, 112, 239)": 2,
+        "rgb(52, 64, 84)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\"",
+        "H2 16px/500 \"Add Content Stream\""
+      ]
+    },
+    {
+      "name": "dialog-add-content-stream__dark__1440",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": {
+        "x": 528,
+        "w": 384,
+        "h": 463,
+        "top": 218.5,
+        "vh": 900,
+        "radius": "16px",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0",
+        "bg": "rgb(22, 32, 51)",
+        "scrollH": 463,
+        "overflowY": "visible"
+      },
+      "errors": [],
+      "scrollW": 1440,
+      "vw": 1440,
+      "pageH": 900,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 66
+      },
+      "fontSizes": {
+        "13px/400": 14,
+        "14px/400": 9,
+        "13px/500": 8,
+        "14px/500": 8,
+        "12px/500": 7,
+        "10px/600": 5,
+        "10px/500": 5,
+        "24px/600": 2,
+        "12px/400": 2,
+        "12px/700": 1,
+        "14px/600": 1,
+        "9px/400": 1,
+        "11px/500": 1,
+        "20px/600": 1
+      },
+      "smallText": [
+        "9px \"AI CONTENT OS\"",
+        "10px \"Workspace\"",
+        "10px \"Pinterest\"",
+        "10px \"WordPress\"",
+        "10px \"Platforms\"",
+        "10px \"Soon\""
+      ],
+      "radii": {
+        "16px": 25,
+        "14px": 9,
+        "8px": 6,
+        "10px": 6,
+        "3.35544e+07px": 3
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 13
+      },
+      "bgs": {
+        "rgb(17, 26, 43)": 15,
+        "rgb(24, 34, 53)": 4,
+        "oklab(0.38648 -0.0104334 -0.0454015 / 0.3)": 3,
+        "rgb(76, 155, 255)": 2,
+        "rgb(11, 18, 32)": 1,
+        "rgb(15, 24, 40)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.06)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 1,
+        "rgb(27, 38, 56)": 1,
+        "oklab(0 0 0 / 0.1)": 1,
+        "rgb(22, 32, 51)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 7,
+        "rgb(40, 54, 74)": 6,
+        "rgb(52, 69, 93)": 6,
+        "rgba(0, 0, 0, 0)": 4,
+        "rgb(91, 167, 255)": 1
+      },
+      "textColors": {
+        "rgb(166, 176, 192)": 25,
+        "rgb(245, 247, 250)": 19,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.55)": 6,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.45)": 5,
+        "oklab(0.754412 -0.0044857 -0.0251532 / 0.35)": 5,
+        "rgb(8, 17, 31)": 3,
+        "rgb(76, 155, 255)": 2,
+        "rgb(232, 238, 246)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\"",
+        "H2 16px/500 \"Add Content Stream\""
+      ]
+    },
+    {
+      "name": "dialog-add-content-stream__light__390",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": {
+        "x": 0,
+        "w": 390,
+        "h": 527,
+        "top": 158.5,
+        "vh": 844,
+        "radius": "16px",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0",
+        "bg": "rgb(255, 255, 255)",
+        "scrollH": 527,
+        "overflowY": "visible"
+      },
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable light",
+      "bodyBg": "rgb(247, 249, 252)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 38
+      },
+      "fontSizes": {
+        "14px/500": 9,
+        "14px/400": 9,
+        "13px/500": 7,
+        "12px/500": 6,
+        "24px/600": 2,
+        "12px/400": 2,
+        "11px/500": 1,
+        "20px/600": 1,
+        "16px/500": 1
+      },
+      "smallText": [
+        "11px \"H\""
+      ],
+      "radii": {
+        "16px": 9,
+        "10px": 7,
+        "14px": 6,
+        "8px": 6,
+        "3.35544e+07px": 2
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 12
+      },
+      "bgs": {
+        "rgb(255, 255, 255)": 16,
+        "rgb(241, 245, 250)": 3,
+        "rgb(21, 112, 239)": 2,
+        "rgb(247, 249, 252)": 1,
+        "oklab(0.981442 -0.000871629 -0.0044139 / 0.8)": 1,
+        "oklab(0.571995 -0.0398672 -0.203765 / 0.1)": 1,
+        "rgb(238, 243, 248)": 1,
+        "oklab(0 0 0 / 0.1)": 1,
+        "oklab(0.968542 -0.00216419 -0.00760746 / 0.5)": 1
+      },
+      "borders": {
+        "oklab(0.944321 -0.00245497 -0.0105452 / 0.6)": 7,
+        "rgb(232, 237, 244)": 6,
+        "rgb(217, 226, 236)": 6,
+        "rgba(0, 0, 0, 0)": 5,
+        "rgb(37, 131, 255)": 1
+      },
+      "textColors": {
+        "rgb(23, 32, 51)": 18,
+        "rgb(104, 115, 134)": 15,
+        "rgb(21, 112, 239)": 2,
+        "rgb(255, 255, 255)": 2,
+        "rgb(52, 64, 84)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\"",
+        "H2 16px/500 \"Add Content Stream\""
+      ]
+    },
+    {
+      "name": "dialog-add-content-stream__dark__390",
+      "url": "http://localhost:3000/projects/69dbe22f-f860-42c5-823c-43f816ba2a66",
+      "dialog": {
+        "x": 0,
+        "w": 390,
+        "h": 527,
+        "top": 158.5,
+        "vh": 844,
+        "radius": "16px",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0",
+        "bg": "rgb(22, 32, 51)",
+        "scrollH": 527,
+        "overflowY": "visible"
+      },
+      "errors": [],
+      "scrollW": 390,
+      "vw": 390,
+      "pageH": 844,
+      "htmlClass": "inter_7b064e0d-module__MOT0tq__variable geist_mono_1bf8cbf6-module__FlyLvG__variable dark",
+      "bodyBg": "rgb(11, 18, 32)",
+      "overflow": [],
+      "fontFamilies": {
+        "Inter": 38
+      },
+      "fontSizes": {
+        "14px/500": 9,
+        "14px/400": 9,
+        "13px/500": 7,
+        "12px/500": 6,
+        "24px/600": 2,
+        "12px/400": 2,
+        "11px/500": 1,
+        "20px/600": 1,
+        "16px/500": 1
+      },
+      "smallText": [
+        "11px \"H\""
+      ],
+      "radii": {
+        "16px": 9,
+        "10px": 7,
+        "14px": 6,
+        "8px": 6,
+        "3.35544e+07px": 2
+      },
+      "shadows": {
+        "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0": 12
+      },
+      "bgs": {
+        "rgb(17, 26, 43)": 15,
+        "rgb(24, 34, 53)": 3,
+        "oklab(0.38648 -0.0104334 -0.0454015 / 0.3)": 3,
+        "rgb(76, 155, 255)": 2,
+        "rgb(11, 18, 32)": 1,
+        "oklab(0.18311 -0.0035518 -0.0306818 / 0.8)": 1,
+        "oklab(0.687186 -0.0415281 -0.16178 / 0.1)": 1,
+        "rgb(27, 38, 56)": 1,
+        "oklab(0 0 0 / 0.1)": 1,
+        "rgb(22, 32, 51)": 1,
+        "oklab(0.25234 -0.00498408 -0.0386548 / 0.5)": 1
+      },
+      "borders": {
+        "oklab(0.329655 -0.00885124 -0.0393082 / 0.6)": 7,
+        "rgb(40, 54, 74)": 6,
+        "rgb(52, 69, 93)": 6,
+        "rgba(0, 0, 0, 0)": 5,
+        "rgb(91, 167, 255)": 1
+      },
+      "textColors": {
+        "rgb(245, 247, 250)": 18,
+        "rgb(166, 176, 192)": 15,
+        "rgb(76, 155, 255)": 2,
+        "rgb(8, 17, 31)": 2,
+        "rgb(232, 238, 246)": 1
+      },
+      "h1": [
+        "H1 20px/600 \"Home Decor CTA Test\"",
+        "H2 14px/500 \"Brand Profile\"",
+        "H2 14px/500 \"WordPress Connection\"",
+        "H2 14px/500 \"Content Streams\"",
+        "H2 14px/500 \"Quick Links\"",
+        "H2 16px/500 \"Add Content Stream\""
+      ]
+    }
+  ]
+}

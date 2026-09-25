@@ -46,19 +46,20 @@ export function ProjectCard({ project, generationCount }: ProjectCardProps) {
         </div>
       </div>
       {project.description && (
-        <p className="mt-3 text-secondary line-clamp-2">
-          {project.description}
-        </p>
+        <p className="text-body-secondary mt-3 line-clamp-2">{project.description}</p>
       )}
       <div className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-border/60 pt-4 text-metadata">
-        <span>{generationCount} generation{generationCount !== 1 ? 's' : ''}</span>
+        <span>
+          {generationCount} generation{generationCount !== 1 ? 's' : ''}
+        </span>
         <span className="text-border">·</span>
         <span>{timeAgo(project.created_at)}</span>
         {project.default_language && (
           <>
             <span className="text-border">·</span>
             <span>
-              {LANGUAGE_LABELS[project.default_language as SupportedLanguage] ?? project.default_language}
+              {LANGUAGE_LABELS[project.default_language as SupportedLanguage] ??
+                project.default_language}
             </span>
           </>
         )}

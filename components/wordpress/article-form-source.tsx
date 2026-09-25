@@ -96,7 +96,7 @@ export function ArticleSourceSection({
                 maxLength={200}
                 required
                 disabled={loading}
-                className={`h-12 text-sm placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
+                className={`placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
               />
             </div>
 
@@ -146,7 +146,7 @@ export function ArticleSourceSection({
                   maxLength={2000}
                   required
                   disabled={loading}
-                  className={`h-12 text-sm placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
+                  className={`placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
                 />
               </div>
             ) : (

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -50,56 +51,60 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-sm">
-      <div className="mb-8 text-center">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-md bg-primary shadow-xs">
           <span className="text-sm font-bold text-primary-foreground">O</span>
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">Welcome back</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Sign in to OmniFlow</p>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={loading}
-            className="h-10"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={loading}
-            className="h-10"
-          />
-        </div>
-        {error && (
-          <div className="rounded-lg bg-destructive/5 px-3 py-2">
-            <p className="text-sm text-destructive">{error}</p>
+        <h1 className="text-card-title">Welcome back</h1>
+        <p className="text-body-secondary">Sign in to OmniFlow</p>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="email" className="text-label">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={loading}
+            />
           </div>
-        )}
-        <Button type="submit" className="h-10 w-full" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign In'}
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-[13px] text-muted-foreground">
-        Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium text-foreground hover:underline">
-          Create account
-        </Link>
-      </p>
-    </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password" className="text-label">
+              Password
+            </Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+          {error && (
+            <div className="rounded-sm bg-destructive-soft px-3 py-2.5" role="alert">
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            </div>
+          )}
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign In'}
+          </Button>
+        </form>
+        <p className="text-label mt-6 text-center">
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="font-semibold text-primary hover:underline">
+            Create account
+          </Link>
+        </p>
+      </CardContent>
+    </Card>
   );
 }

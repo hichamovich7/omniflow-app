@@ -5,7 +5,7 @@ type SendStatusArticle = Pick<WordPressArticle, 'wp_post_id' | 'publish_status' 
 
 function getSendStatus(article: SendStatusArticle): {
   label: string;
-  variant: 'secondary' | 'success' | 'destructive';
+  variant: 'secondary' | 'primary' | 'success' | 'destructive';
 } {
   if (!article.wp_post_id) {
     if (article.publish_status === 'failed') {
@@ -22,7 +22,8 @@ function getSendStatus(article: SendStatusArticle): {
         label: article.scheduled_at
           ? `Scheduled for ${new Date(article.scheduled_at).toLocaleString()}`
           : 'Scheduled',
-        variant: 'success',
+        // Planned, not yet live: primary like every other "scheduled" badge.
+        variant: 'primary',
       };
     case 'failed':
       // wp_post_id already exists — a prior send succeeded, only the most

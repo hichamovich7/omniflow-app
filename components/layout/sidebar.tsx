@@ -297,6 +297,11 @@ export function SidebarContent() {
           </div>
         </div>
       </nav>
+      {process.env.NEXT_PUBLIC_APP_VERSION && (
+        <div className="shrink-0 border-t border-sidebar-border/70 px-5 py-3">
+          <p className="font-mono text-xs text-muted-foreground">v{process.env.NEXT_PUBLIC_APP_VERSION}</p>
+        </div>
+      )}
     </>
   );
 }

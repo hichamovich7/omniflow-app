@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Add: App version in the sidebar footer
+
+### Added
+
+* The sidebar (desktop and mobile menu) now ends with the running app version (`v0.1.0`), read from `package.json` `version` via `NEXT_PUBLIC_APP_VERSION` in `next.config.ts`.
+
+### Not changed
+
+* No navigation item, route, API, or database change.
+
 ## Add: `None` importance for AI Integrated Headline, Subtitle and CTA
 
 ### Added
