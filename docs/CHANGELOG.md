@@ -18,6 +18,20 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Application Shell v1 (sidebar, topbar, page container, mobile navigation)
+
+### Changed
+
+* Sidebar 240 px, 40 px items, 12 px section labels, `--selected` active state with `aria-current="page"`, "Soon" as `Badge`.
+* Only the most specific nav link is active (on `/wordpress/history`, "History" only, no longer "Generate" too).
+* Topbar 56/64 px on the sidebar surface (no blur), page-aligned gutters, and the brand next to the menu button on small screens.
+* The desktop sidebar now shows from 1024 px; below that, navigation uses the mobile sheet (288 px, with a close button, and it closes only when a link is chosen).
+* `PageContainer` tablet gutter is 24 px.
+
+### Not changed
+
+* No navigation item, route, API, database, or page content change.
+
 ## Add: App version in the sidebar footer
 
 ### Added

@@ -196,8 +196,8 @@ Defaults:
 ### Breakpoints and behavior
 
 - 390 px: single-column layout, 16 px gutter, 44 px minimum touch controls, no unintended horizontal overflow.
-- 768 px: mobile navigation may transition to sidebar; two-column cards only when content remains readable.
-- 1024 px: desktop application shell and dense tables become primary.
+- 768 px: navigation stays in the mobile sheet so content keeps the full width (24 px gutters); two-column cards only when content remains readable.
+- 1024 px (`lg`): the desktop sidebar appears; desktop application shell and dense tables become primary.
 - 1280 px: standard maximum-width layout.
 - 1440 px: preserve content width; do not stretch cards or form fields merely to fill space.
 
@@ -290,15 +290,15 @@ Use a quiet header, 44–48 px rows, horizontal separators, row hover, selected 
 ### Sidebar
 
 - Light surface with a subtle right border.
-- Desktop width target: 240 px; collapse only if the existing information architecture can remain legible.
-- Items: 40 px visual height, 16–18 px Lucide icons, 12 px section labels.
-- Active: `--selected` background plus blue icon/text. Do not also add a decorative indicator unless later testing shows the fill alone is insufficient.
+- Desktop width: 240 px, shown from `lg` (1024 px); below that the same content opens in a 288 px left sheet. Collapse only if the existing information architecture can remain legible.
+- Items: 40 px visual height (44 px inside the mobile sheet), 16–18 px Lucide icons, 12 px section labels.
+- Active: `--selected` background, `--primary` icon, and `--primary-hover` label (`--primary` text is under 4.5:1 on `--selected`), plus `aria-current="page"`. Only the most specific matching destination is active. Do not also add a decorative indicator unless later testing shows the fill alone is insufficient.
 - Hover: `--surface-muted`; inactive text: `--muted-foreground`.
-- Disabled destinations remain identifiable and explain availability rather than disappearing.
+- Disabled destinations remain identifiable and explain availability rather than disappearing (outline `Badge` "Soon").
 
 ### Top navigation
 
-Target height: 64 px desktop and 56 px mobile. Use the same surface, border, focus, radius, and typography language as the sidebar. Keep global actions sparse. Page title and page-specific actions remain in `PageHeader`.
+Target height: 64 px desktop and 56 px mobile. Use the same opaque `--sidebar` surface (no translucency or blur), `--sidebar-border`, focus, radius, and typography language as the sidebar, and the same horizontal gutter as the page container. Below `lg` it carries the menu trigger and the brand. Keep global actions sparse. Page title and page-specific actions remain in `PageHeader`.
 
 ### Dropdowns and popovers
 

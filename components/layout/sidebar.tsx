@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from '@/components/ui/collapsible';
 
 interface NavItem {
@@ -167,15 +168,43 @@ function isGroupActive(pathname: string, group: CollapsibleNavGroup) {
   return group.items.some((item) => isItemActive(pathname, item.href));
 }
 
+const allNavHrefs = [
+  ...workspaceGroup.items,
+  researchItem,
+  ...collapsibleGroups.flatMap((group) => group.items),
+  ...platformsGroup.items,
+  ...accountGroup.items,
+].map((item) => item.href);
+
+// Only the most specific match is the current page: on /wordpress/history,
+// "History" is active, not also "Generate" (/wordpress).
+function getActiveHref(pathname: string) {
+  return allNavHrefs
+    .filter((href) => isItemActive(pathname, href))
+    .reduce<
+      string | null
+    >((best, href) => (!best || href.length > best.length ? href : best), null);
+}
+
+// Shared item geometry (docs/DESIGN.md, Sidebar): 40 px rows, 44 px below
+// `lg` where this content renders inside the mobile navigation sheet.
+const navItemClass =
+  'flex h-10 items-center gap-3 rounded-md px-3 text-sm max-lg:h-11 [&_svg]:size-4 [&_svg]:shrink-0';
+const navFocusClass = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const sectionLabelClass = 'text-xs font-semibold uppercase tracking-wider text-muted-foreground';
+
 function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
-  const isActive = isItemActive(pathname, item.href);
+  const isActive = item.href === getActiveHref(pathname);
 
   if (item.disabled) {
     return (
-      <span aria-disabled="true" className="flex min-h-9 items-center gap-3 rounded-xl px-3 text-[13px] text-muted-foreground/45 cursor-not-allowed">
-        <item.icon className="h-[15px] w-[15px]" />
+      <span
+        aria-disabled="true"
+        className={cn(navItemClass, 'cursor-not-allowed text-muted-foreground/60')}
+      >
+        <item.icon />
         <span className="flex-1">{item.label}</span>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/35">Soon</span>
+        <Badge variant="outline">Soon</Badge>
       </span>
     );
   }
@@ -183,15 +212,39 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <Link
       href={item.href}
+      aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'relative flex min-h-9 items-center gap-3 rounded-xl px-3 text-[13px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        navItemClass,
+        navFocusClass,
+        'transition-colors duration-150',
         isActive
-          ? 'bg-primary/6 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary'
-          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+          ? // `primary-hover` text keeps >= 4.5:1 on `selected` in both themes, like Badge.
+            'bg-selected font-medium text-primary-hover [&_svg]:text-primary'
+          : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground'
       )}
     >
-      <item.icon className="h-[15px] w-[15px]" />
+      <item.icon />
       {item.label}
+    </Link>
+  );
+}
+
+export function BrandLink({ className }: { className?: string }) {
+  return (
+    <Link
+      href="/dashboard"
+      className={cn('flex items-center gap-3 rounded-md', navFocusClass, className)}
+    >
+      <div
+        aria-hidden="true"
+        className="flex size-8 items-center justify-center rounded-sm bg-primary"
+      >
+        <span className="text-xs font-bold text-primary-foreground">O</span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-sm font-semibold leading-none tracking-tight">OmniFlow</span>
+        <span className="mt-1 text-xs leading-none text-muted-foreground">AI Content OS</span>
+      </div>
     </Link>
   );
 }
@@ -221,30 +274,20 @@ export function SidebarContent() {
 
   return (
     <>
-      <div className="flex h-18 shrink-0 items-center border-b border-sidebar-border/70 px-5">
-        <Link href="/dashboard" className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br from-primary to-brand-accent shadow-sm">
-            <span className="text-xs font-bold text-primary-foreground">O</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold leading-none tracking-tight">OmniFlow</span>
-            <span className="mt-1 text-[9px] leading-none tracking-[0.16em] text-muted-foreground/55">AI CONTENT OS</span>
-          </div>
-        </Link>
+      <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-5 lg:h-16">
+        <BrandLink />
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-4">
         <div>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
-            {workspaceGroup.label}
-          </p>
-          <div className="space-y-px">
+          <p className={cn('mb-2 px-3', sectionLabelClass)}>{workspaceGroup.label}</p>
+          <div className="space-y-0.5">
             {workspaceGroup.items.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}
           </div>
         </div>
 
-        <div className="mt-5 space-y-px">
+        <div className="mt-5 space-y-0.5">
           <NavLink item={researchItem} pathname={pathname} />
         </div>
 
@@ -258,14 +301,23 @@ export function SidebarContent() {
               onOpenChange={(open) => toggleGroup(group.id, open)}
               className="mt-5"
             >
-              <CollapsibleTrigger className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55 transition-colors hover:bg-muted/60 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+              <CollapsibleTrigger
+                className={cn(
+                  'flex h-8 w-full items-center justify-between rounded-md px-3 transition-colors hover:bg-surface-muted hover:text-foreground max-lg:h-11',
+                  sectionLabelClass,
+                  navFocusClass
+                )}
+              >
                 {group.label}
                 <ChevronRight
-                  className={cn('h-3 w-3 shrink-0 transition-transform duration-150', isOpen && 'rotate-90')}
+                  className={cn(
+                    'size-3.5 shrink-0 transition-transform duration-150',
+                    isOpen && 'rotate-90'
+                  )}
                 />
               </CollapsibleTrigger>
               <CollapsiblePanel>
-                <div className="space-y-0.5 pt-1.5">
+                <div className="space-y-0.5 pt-1">
                   {group.items.map((item) => (
                     <NavLink key={item.href} item={item} pathname={pathname} />
                   ))}
@@ -276,10 +328,8 @@ export function SidebarContent() {
         })}
 
         <div className="mt-5">
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
-            {platformsGroup.label}
-          </p>
-          <div className="space-y-px">
+          <p className={cn('mb-2 px-3', sectionLabelClass)}>{platformsGroup.label}</p>
+          <div className="space-y-0.5">
             {platformsGroup.items.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}
@@ -287,10 +337,8 @@ export function SidebarContent() {
         </div>
 
         <div className="mt-5">
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
-            {accountGroup.label}
-          </p>
-          <div className="space-y-px">
+          <p className={cn('mb-2 px-3', sectionLabelClass)}>{accountGroup.label}</p>
+          <div className="space-y-0.5">
             {accountGroup.items.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}
@@ -298,8 +346,10 @@ export function SidebarContent() {
         </div>
       </nav>
       {process.env.NEXT_PUBLIC_APP_VERSION && (
-        <div className="shrink-0 border-t border-sidebar-border/70 px-5 py-3">
-          <p className="font-mono text-xs text-muted-foreground">v{process.env.NEXT_PUBLIC_APP_VERSION}</p>
+        <div className="shrink-0 border-t border-sidebar-border px-5 py-3">
+          <p className="font-mono text-xs text-muted-foreground">
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </p>
         </div>
       )}
     </>
@@ -308,7 +358,7 @@ export function SidebarContent() {
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
       <SidebarContent />
     </aside>
   );

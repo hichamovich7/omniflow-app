@@ -78,6 +78,8 @@ Account
 
 The sidebar ends with a small footer showing the running app version (`v0.1.0`, Geist Mono, `text-xs`, muted). The value comes from `package.json` `version`, exposed as `NEXT_PUBLIC_APP_VERSION` in `next.config.ts` and inlined at build time. Because the mobile navigation sheet reuses `SidebarContent`, the version also shows at the bottom of the mobile menu. To change the displayed version, bump `version` in `package.json`.
 
+The desktop sidebar (240 px) shows from 1024 px (`lg`). Below that, the top bar shows an "Open menu" button and the brand, and the same navigation opens in a left sheet that closes when a link is chosen. Visual rules: `docs/DESIGN.md` (Sidebar, Top navigation).
+
 ---
 
 ## Top Bar
@@ -96,7 +98,7 @@ User Menu
 
 ## Scroll Containment
 
-The dashboard shell (`app/(dashboard)/layout.tsx`) is a fixed `h-screen` frame — it never scrolls itself. Only the main content pane (`<main className="flex-1 overflow-y-auto">`) scrolls; the sidebar and top bar stay put regardless of how long the page content is.
+The dashboard shell (`app/(dashboard)/layout.tsx`) is a fixed `h-dvh` frame — it never scrolls itself. Only the main content pane (`<main className="flex-1 overflow-y-auto">`) scrolls; the sidebar and top bar stay put regardless of how long the page content is.
 
 A nested `overflow-hidden` alone isn't enough to guarantee this: per the CSS overflow-propagation rule, the browser viewport's scrollability is governed by `<body>`'s own `overflow` value, not a descendant div's. A wheel event starting outside `<main>` (e.g. over the sidebar or top bar) would otherwise bubble up and scroll the whole document, taking the sidebar with it. `components/layout/scroll-lock.tsx` (`<ScrollLock />`, mounted in the dashboard layout) sets `overflow: hidden` on `html`/`body` for as long as the dashboard is mounted, and restores the previous value on unmount — so routes outside `(dashboard)` (e.g. `/login`) keep normal document scroll.
 

@@ -1,4 +1,6 @@
+import { Badge } from '@/components/ui/badge';
 import { MobileNav } from '@/components/layout/mobile-nav';
+import { BrandLink } from '@/components/layout/sidebar';
 import { UserMenu } from '@/components/layout/user-menu';
 
 interface TopbarProps {
@@ -6,17 +8,20 @@ interface TopbarProps {
   creditsBalance?: number;
 }
 
+// Same surface and border as the sidebar, and the same horizontal gutter as
+// PageContainer (docs/DESIGN.md, Top navigation): 56 px below `lg`, 64 px above.
 export function Topbar({ email, creditsBalance }: TopbarProps) {
   return (
-    <header className="flex h-18 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-sm md:px-8">
-      <div className="flex items-center">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-sidebar-border bg-sidebar px-4 md:px-6 lg:h-16 lg:px-8">
+      <div className="flex items-center gap-2 lg:hidden">
         <MobileNav />
+        <BrandLink />
       </div>
-      <div className="flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-3">
         {creditsBalance !== undefined && (
-          <span className="hidden rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
+          <Badge variant="neutral" className="hidden tabular-nums sm:inline-flex">
             {creditsBalance} credits
-          </span>
+          </Badge>
         )}
         <UserMenu email={email} creditsBalance={creditsBalance} />
       </div>
