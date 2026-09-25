@@ -1,9 +1,9 @@
-import { PageContainer } from '@/components/ui/page-container';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ResultsLoading() {
   return (
-    <PageContainer>
+    <PageSkeleton label="Loading generation">
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Skeleton className="h-7 w-7 rounded-lg" />
@@ -35,6 +35,6 @@ export default function ResultsLoading() {
           ))}
         </div>
       </div>
-    </PageContainer>
+    </PageSkeleton>
   );
 }

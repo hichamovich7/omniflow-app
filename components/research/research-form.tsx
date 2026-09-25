@@ -347,6 +347,7 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
             title="No research yet"
             description="Results for this project will appear here."
             icon={Search}
+            headingLevel={3}
           />
         ) : (
           <div className="space-y-2">

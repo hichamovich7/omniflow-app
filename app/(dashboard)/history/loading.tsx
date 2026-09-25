@@ -1,10 +1,10 @@
-import { PageContainer } from '@/components/ui/page-container';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 
 export default function HistoryLoading() {
   return (
-    <PageContainer>
+    <PageSkeleton label="Loading history">
       <div className="space-y-1">
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-4 w-56" />
@@ -20,6 +20,6 @@ export default function HistoryLoading() {
       </div>
 
       <TableSkeleton rows={6} />
-    </PageContainer>
+    </PageSkeleton>
   );
 }

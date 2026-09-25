@@ -18,6 +18,19 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Product States v1 — empty, error, unavailable, loading
+
+### Changed
+
+* One page-state pattern (`PageState`) for empty, no-results, error, and "Coming soon" states: compact, 18 px title, 14 px description, and only the actions that already existed. `EmptyState` is now a wrapper around it.
+* `/credits` and `/settings` show a calm "Coming soon" state. The error page shows a readable title and its "Try again" button.
+* Loading screens are marked busy and announce one short message ("Loading projects"). The skeletons of the Dashboard, Projects, Pinterest, and article generator now match their pages. Skeletons stop pulsing when reduced motion is requested.
+* Upcoming WordPress generators show a readable "Soon" badge instead of faded, low-contrast tiles.
+
+### Not changed
+
+* No filter, empty-state condition, action, toast, API, or database change.
+
 ## UI: Actions & Status v1 — Bulk actions and Workflow statuses
 
 ### Changed

@@ -1,24 +1,26 @@
-import { PageContainer } from '@/components/ui/page-container';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  CenteredHeaderSkeleton,
+  PageSkeleton,
+  SkeletonCard,
+} from '@/components/skeletons/page-skeleton';
 
+/** Mirrors /pinterest: narrow container, centred generator header, form card with section cards. */
 export default function PinterestLoading() {
   return (
-    <PageContainer>
-      <div className="flex flex-col items-center pt-8 sm:pt-16">
-        <Skeleton className="h-14 w-14 rounded-2xl" />
-        <Skeleton className="mt-5 h-7 w-48" />
-        <Skeleton className="mt-2 h-4 w-64" />
-      </div>
+    <PageSkeleton label="Loading Pinterest generator" narrow>
+      <CenteredHeaderSkeleton />
 
-      <div className="mx-auto w-full max-w-xl space-y-4 mt-10">
-        <Skeleton className="h-10 w-full" />
-        <div className="grid grid-cols-3 gap-3">
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-        </div>
-        <Skeleton className="h-12 w-full" />
-      </div>
-    </PageContainer>
+      <SkeletonCard className="space-y-4 rounded-2xl p-5 sm:p-8">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-3 rounded-xl border border-border p-4">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-4 w-64 max-w-full" />
+            <Skeleton className="h-11 w-full rounded-md md:h-10" />
+          </div>
+        ))}
+        <Skeleton className="h-11 w-full rounded-md" />
+      </SkeletonCard>
+    </PageSkeleton>
   );
 }

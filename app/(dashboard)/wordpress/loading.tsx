@@ -1,9 +1,9 @@
-import { PageContainer } from '@/components/ui/page-container';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function WordPressLoading() {
   return (
-    <PageContainer>
+    <PageSkeleton label="Loading WordPress generator">
       <div className="flex flex-col items-center pt-8 sm:pt-16">
         <Skeleton className="h-14 w-14 rounded-2xl" />
         <Skeleton className="mt-5 h-7 w-56" />
@@ -16,6 +16,6 @@ export default function WordPressLoading() {
         <Skeleton className="h-28 rounded-2xl" />
         <Skeleton className="h-28 rounded-2xl" />
       </div>
-    </PageContainer>
+    </PageSkeleton>
   );
 }

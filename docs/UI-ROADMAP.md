@@ -376,14 +376,70 @@ Status: **Complete** (2026-09-25, branch `feature/ui-actions-status-v1`). Covers
 
 ## Phase 5 — Product States
 
-- [ ] Skeletons match final card, table, and form geometry
-- [ ] Empty states use the canonical PageState pattern
-- [ ] Error states include clear recovery paths
-- [ ] Success feedback uses consistent toast/inline treatment
-- [ ] Disabled and read-only states are distinct
-- [ ] Loading buttons preserve width and prevent duplicate actions
+- [x] Skeletons match final card, table, and form geometry (Product States v1)
+- [x] Empty states use the canonical PageState pattern (Product States v1)
+- [x] Error states include clear recovery paths (Product States v1: route error page; inline form errors, see below)
+- [x] Success feedback uses consistent toast/inline treatment (audited in Product States v1: sonner toasts only, already on tokens; unchanged)
+- [x] Disabled and read-only states are distinct (primitives: Input and Button batches; product-level "Soon" tiles: Product States v1)
+- [ ] Loading buttons preserve width and prevent duplicate actions (deferred to the final cleanup)
 
 Exit criterion: every representative workflow has defined loading, empty, error, success, and disabled presentations.
+
+Phase 5 status: core states complete (Product States v1). Loading buttons are deferred to the final cleanup, so the phase is not closed.
+
+### Product States v1
+
+Status: **Core states complete** (2026-09-25, branch `feature/ui-product-states-v1`): `PageState`, `EmptyState` wrapper, `PageSkeleton`, loading routes, error page, and unavailable states. Loading buttons are deferred to the final cleanup. No condition that decides whether a state shows, no filter, and no action changed.
+
+#### Audit
+
+| Class            | Where                                                                                                                                                                           | Before                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A. Page-level    | `/credits`, `/settings` ("Coming soon"); `app/(dashboard)/error.tsx`; `/pinterest`, `/research`, `/wordpress/blog-post`, `/wordpress/categories`, `/boards` ("No projects yet") | Two primitives: `PageState` (2 consumers) and the older `EmptyState` (13 consumers). They differed in padding (`py-12` vs `py-20`), title (18 px vs 14 px / 500 `h3`), and description (14 px vs 13 px). The error page was hand-built, with no `h1`. "Coming soon" used `EmptyState`.                                                                                                                                   |
+| B. Section-level | History, WordPress History, Boards (no data vs no results via `hasFilters`); Boards detail; research history; admin bypass list; dashboard Recent activity                      | No data and no results were already told apart by title, icon, and action ("Clear filters"). Only the rendering varied. Research history used an `h3` under its section's `h2`.                                                                                                                                                                                                                                          |
+| C. Inline        | Submit or generation errors in `pin-form`, `pins-source-article-form`, `article-form`, `research-form`; `recompose-pin-dialog` errors; login / register errors                  | Each form hand-draws a `bg-destructive/5` box (sometimes `role="alert"`, a border, or a left accent). There is no shared Alert component.                                                                                                                                                                                                                                                                                |
+| D. Loading       | 9 `loading.tsx` files, `DashboardSkeleton`, `TableSkeleton`, and `Skeleton` (`animate-pulse`, `bg-muted`)                                                                       | No `aria-busy` and no status message. The Dashboard skeleton showed 4 KPIs, 2 cards, and a small header, while the real page has a header card, an "Overview / Command Center" heading, 7 KPIs, and 5 quick actions. The Projects skeleton had a plain header and 36 px icons (real: a header card and 44 px icons). The Pinterest and blog-post skeletons used a wide container where the real page is narrow (672 px). |
+| Unavailable      | WordPress hub "Soon" tiles; sidebar "Soon"                                                                                                                                      | The tiles stacked opacity (`opacity-60` + `/50` + `/40` text) and showed a 10 px uppercase "Soon". The sidebar already used `Badge outline`.                                                                                                                                                                                                                                                                             |
+| Success          | 37 `toast.success`, 51 `toast.error`, 2 `toast.warning` (sonner)                                                                                                                | A single toaster on `--popover` / `--border` with lucide icons, so text and icon carry the meaning. No inline success panel exists.                                                                                                                                                                                                                                                                                      |
+
+#### Final pattern
+
+- **`PageState`** is the canonical page- and section-level state:
+  - a compact block with a dashed `--border` outline, no fill, and `py-10`;
+  - a 40 px tile holding a 20 px icon; the tile carries the tone: muted, `destructive-soft`, or `warning-soft`;
+  - an 18 / 600 title with a `headingLevel` of 1, 2, or 3; a 14 px muted description; at most one existing action.
+  - Variants: `empty`, `error`, `unavailable` (new, for "Coming soon"), `permission-denied`, `loading`.
+- **`EmptyState`** keeps its API (`children` becomes the action) as a thin wrapper around an `empty` `PageState`. Its 13 callers are unchanged, apart from research history now using `headingLevel={3}`.
+- **Page states**: `/credits` and `/settings` use `unavailable`. The route error page uses `PageState` `error` as its `h1`, with the existing "Try again" (`reset`) and no error details.
+- **Loading**:
+  - A new `PageSkeleton` wraps every `loading.tsx` in the page's own container (wide or narrow) with `aria-busy="true"` and one `role="status"` message ("Loading projects"). `Skeleton` is `aria-hidden` and stops pulsing with reduced motion.
+  - The Dashboard, Projects, Pinterest, and blog-post skeletons were redrawn to match their pages. The History / WordPress History (Data UI v1), `/pinterest/[id]`, `/wordpress/[id]`, and hub skeletons keep their shapes.
+- **Unavailable tiles**: dashed outline on the card surface, muted text at full token strength (no opacity), and "Soon" as `Badge variant="outline"`, like the sidebar.
+
+#### Validation
+
+- Skeletons: each `loading.tsx` was rendered through a temporary route, deleted afterwards and absent from the build, at 1440 / 1024 / 768 / 390 in light and dark (72 combinations). The skeleton container width equals the real page's at every width. Every skeleton has its status message, every skeleton block is `aria-hidden`, and nothing overflows. The Dashboard skeleton was compared side by side with the page, and the missing "Command Center" heading was added.
+- States (64 combinations): `/credits`, `/settings`, no results on `/history?q=…`, `/wordpress/history?q=…`, and `/boards?search=…` (URL filters only), the `/wordpress` "Soon" tiles, and a temporary specimen for the error page, empty with an action, `permission-denied`, and `loading`.
+  - All titles are 18 / 600; descriptions are 14 px, at 4.54:1 (light) and 8.55:1 (dark).
+  - Actions are 36 px, and 44 px at 390.
+  - No overflow.
+  - Each page keeps exactly one `h1`, and the error page's `h1` is its title.
+  - The "Soon" tiles went from 4.37:1 to 4.79:1 in light (7.27:1 in dark), at full opacity.
+- Tests (chromium + mobile-chrome):
+  - `ui-foundations.spec.ts`: 30 passed / 10 skipped.
+  - `pinterest-previews.spec.ts`: 2 passed / 2 skipped.
+  - `wordpress-blog-post.spec.ts`: 14 passed / 4 skipped / 2 failed. Only the known pre-existing "Keyword is required" test fails (see Actions & Status v1).
+  - TypeScript, production build (43 pages), `git diff --check`, and ESLint on the changed files pass. Prettier passes on the new and rewritten files.
+  - `content-streams.spec.ts` was not run, because it writes to the database.
+
+#### Out of scope, documented
+
+- Inline form errors (`pin-form`, `pins-source-article-form`, `article-form`, `research-form`, `recompose-pin-dialog`) still hand-draw their `bg-destructive/5` boxes. There is no shared Alert primitive to standardize them on; add one with the form rollout.
+- Loading buttons (width preservation, duplicate submits) are not audited here, so the checklist item stays open.
+- The `/pinterest/[id]` and `/wordpress/[id]` skeletons keep their approximate shapes, since the real pages are very long (up to 27,000 px).
+- Card debt on the hub tiles (hover translation on the available tile) is unchanged.
+- The known `wordpress-blog-post.spec.ts` "Keyword is required" failure is unchanged.
+- `/wordpress/[id]` has two `h1`s: the page title plus the `h1` inside the generated article HTML. This page is untouched by this batch; fix it with the article rendering.
 
 ## Phase 6 — Page Rollout
 
