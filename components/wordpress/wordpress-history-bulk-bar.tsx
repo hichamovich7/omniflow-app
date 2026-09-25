@@ -19,8 +19,8 @@ export function WordPressHistoryBulkBar({ articles }: WordPressHistoryBulkBarPro
   return (
     <>
       <SelectionActionBar>
-        <Button variant="destructive" size="xs" onClick={() => setDeleteOpen(true)}>
-          <Trash2 className="mr-1 h-3 w-3" />
+        <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+          <Trash2 aria-hidden="true" />
           Delete ({selected.length})
         </Button>
       </SelectionActionBar>

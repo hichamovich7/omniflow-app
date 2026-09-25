@@ -14,7 +14,7 @@ import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Wand2, FilePlus2, Spark
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
-import { statusToVariant } from '@/lib/utils/status';
+import { getStatusPresentation, statusToVariant } from '@/lib/utils/status';
 import { getTrialGenerationLimit } from '@/lib/rate-limit';
 
 interface ActivityItem {
@@ -252,6 +252,7 @@ export default async function DashboardPage() {
                   className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 first:rounded-t-xl last:rounded-b-xl focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
                 >
                   <StatusDot variant={statusToVariant(item.status)} />
+                  <span className="sr-only">{getStatusPresentation(item.status).label}:</span>
                   <PlatformIcon
                     className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
                     aria-label={item.platform === 'pinterest' ? 'Pinterest' : 'WordPress'}

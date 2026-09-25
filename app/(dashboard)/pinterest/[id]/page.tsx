@@ -6,13 +6,12 @@ import { getPinsWordPressUsage } from '@/lib/queries/wordpress-usage';
 import { PageContainer } from '@/components/ui/page-container';
 import { EditorialWorkspace } from '@/components/editorial/editorial-workspace';
 import { RegenerateGenerationButton } from '@/components/pinterest/regenerate-generation-button';
-import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { ImageStatus } from '@/types/database';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
-import { statusToBadgeVariant } from '@/lib/utils/status';
+import { StatusBadge } from '@/components/shared/status';
 
 export default async function GenerationResultsPage({
   params,
@@ -61,10 +60,8 @@ export default async function GenerationResultsPage({
               <span>{generation.model_used}</span>
               <span className="text-border">·</span>
               <span>{timeAgo(generation.created_at)}</span>
-              <Badge variant={statusToBadgeVariant(generation.status)} className="ml-0.5">
-                {generation.status}
-              </Badge>
-              {isPartial && <Badge variant="warning">partial</Badge>}
+              <StatusBadge status={generation.status} className="ml-0.5" />
+              {isPartial && <StatusBadge status="partial" />}
             </div>
           </div>
         </div>

@@ -201,9 +201,9 @@ New debt found (out of scope, not fixed):
 - [x] Filters and search bars (Data UI v1, batch 1)
 - [x] Data tables and row actions (Data UI v1, batch 1)
 - [x] Pagination (Data UI v1, batch 1)
-- [ ] Bulk actions
+- [x] Bulk actions (Actions & Status v1)
 - [x] Progress indicators (Data Metrics v1)
-- [ ] Workflow statuses
+- [x] Workflow statuses (Actions & Status v1)
 - [ ] Chart palette, grid, axes, legend, tooltip, loading, empty, and error states
 - [ ] Accessible chart summaries and data alternatives
 
@@ -245,7 +245,7 @@ Out of scope, documented:
 
 - 390 px overflow, not caused by Data UI: `/wordpress/categories` (532 px, the "New Category" / "Import from WordPress" buttons in each project card header do not wrap), `/wordpress/[id]` (515 px, a `<table>` inside the generated article body, from article rendering), `/research` (433 px, a form row).
 - Badge-like local components still inside the rows: `wordpress-usage-badge.tsx` (11 px, interactive) and `wp-send-status-badge.tsx`, already tracked under Badge.
-- Bulk selection bars still use `editorial/selection-action-bar.tsx` (13 px count, `xs` buttons), not the shared `BulkActions`. Tracked under "Bulk actions".
+- ~~Bulk selection bars still use `editorial/selection-action-bar.tsx` (13 px count, `xs` buttons), not the shared `BulkActions`.~~ Resolved in Actions & Status v1.
 - No list offers sorting today, so `aria-sort` is only supported by the primitive.
 
 ### Data Metrics v1 (KPI Cards, Progress)
@@ -299,6 +299,80 @@ Status: **Deferred / Not implemented** (audit 2026-09-25, branch `feature/ui-cha
 - The Analytics Dashboard is outside the current MVP (`docs/PROJECT.md`, `docs/TASKS.md`).
 - Only the `--chart-1` … `--chart-5` tokens exist, unused. Their contrast was checked and recorded under "Chart palette" in `docs/DESIGN.md`, including the green / orange rule.
 - Implementation is deferred until a real product need exists. No library, wrapper, demo page, or placeholder chart was added. When it starts, the axes, grid, tooltip, legend, heights, responsive behavior, and accessible summaries will be validated on real charts.
+
+### Actions & Status v1 (Bulk actions, Workflow statuses)
+
+Status: **Complete** (2026-09-25, branch `feature/ui-actions-status-v1`). Covers Bulk actions and Workflow statuses. No selection, deletion, confirmation, status value, query, or API logic changed.
+
+#### Audit
+
+- Bulk actions:
+  - `components/shared/bulk-actions` existed but had no consumer.
+  - The 4 bars used `editorial/selection-action-bar.tsx`: History, WordPress History, and Boards (Delete only), plus the Pinterest generation page `/pinterest/[id]` (Regenerate / Schedule / Export / Generate WordPress Article).
+  - The bars had no accessible name, and the count read "1 Selected" in 13 px primary text.
+  - Delete and Clear were `xs` (28 px on desktop).
+  - The Select All / Select None / Invert toolbar was also `xs`.
+  - After "Clear", keyboard focus fell back to `<body>`.
+- Statuses: the real values come from `types/`:
+  - generation / article: `pending`, `processing`, `completed`, `failed`;
+  - WordPress publishing: `draft`, `scheduled`, `published`, `failed`;
+  - content streams: `active`, `warming`, `paused`, `archived`;
+  - dashboard mock projects: `on-track`, `at-risk`, `paused`;
+  - generation "partial" (derived);
+  - research: `failed`;
+  - `StatusBadge` also knew `queued`, `generating`, `ready`, and `reviewing`.
+- Before this batch there were 4 mapping helpers in `lib/utils/status.ts` plus a local map in `project-progress-card.tsx`. `StatusBadge` had no consumer. History, WordPress History, the Pinterest and WordPress detail pages, and `publish-control` rendered raw lowercase values. `content-stream-card` used `capitalize`. Research used a page-local `destructive` badge.
+- Color-only statuses:
+  - Dashboard Recent activity showed a colored dot with no text;
+  - the WordPress form tinted content-stream name badges by status with no status text.
+
+#### Final pattern
+
+- **`BulkActions`**: named region, `--selected` surface, 14 px radius. "N selected" in 14 px / 500 tabular, then the `sm` actions, then a ghost "Clear" with its name. Includes an always-mounted status region and focus handling after Clear. `SelectionActionBar` is now a thin wrapper, so the 4 consumers keep their API. The Delete buttons and the Select All / None / Invert toolbar moved from `xs` to `sm`.
+- **Statuses**:
+  - `lib/utils/status.ts` is the single value → label / tone mapping, with a readable neutral fallback. `statusToVariant` (dots) derives from it.
+  - `StatusBadge` now takes any stored value.
+  - Migrated: History, WordPress History, `/pinterest/[id]` (including "Partial"), `/wordpress/[id]`, `publish-control`, `content-stream-card`, `project-progress-card` (local maps removed), and research "Failed".
+  - `WpSendStatusBadge` stays specialized (it combines `wp_post_id`, `publish_status`, and the date). It uses the shared tones, and its labels are sentence case.
+  - The 3 unused helpers (`statusToBadgeVariant`, `publishStatusToBadgeVariant`, `contentStreamStatusToBadgeVariant`) were removed.
+- **Color-only fixes**:
+  - Recent activity links now include the status as `sr-only` text ("Completed: …");
+  - WordPress form stream badges read "Name · Status".
+- The in-app Guide quotes the new "Sent as draft" label.
+
+#### Validation
+
+| Width | History / WP History / Boards bar | Pinterest bar (4 actions)       | Buttons | Overflow |
+| ----- | --------------------------------- | ------------------------------- | ------- | -------- |
+| 1440  | 1 row, 54 px                      | 1 row                           | 36 px   | none     |
+| 1024  | 1 row                             | count / actions / Clear, 126 px | 36 px   | none     |
+| 768   | 1 row                             | count / actions / Clear, 126 px | 36 px   | none     |
+| 390   | 1 row, 62 px                      | count / wrapped actions / Clear | 44 px   | none     |
+
+- Routes: `/history`, `/wordpress/history`, `/boards`, `/pinterest/[id]` (bar after selecting a row, client-side only), `/wordpress/[id]`, `/projects/[id]`, and `/dashboard`, in light and dark at all four widths. No document overflow.
+- Status badge text contrast:
+  - light: 5.10:1 ("At risk") to 9.56:1;
+  - dark: 6.71:1 to 13.64:1.
+- Keyboard:
+  - Space on a row selects it, and the status region announces "1 selected";
+  - Tab order inside the bar is Delete → Clear, with the focus ring visible;
+  - Delete opens the existing confirmation dialog (closed with Escape; nothing was deleted);
+  - Clear hides the bar and moves focus, with a visible ring, to the first row's checkbox.
+- The status mapping was checked directly: all known values, plus `ON_HOLD` → "On hold", `needs-review` → "Needs review", empty / `null` → "Unknown", and prototype keys (`toString`, `__proto__`) all fall back safely.
+- Tests (chromium + mobile-chrome):
+  - `ui-foundations.spec.ts`: 30 passed / 10 skipped.
+  - `pinterest-previews.spec.ts`: 2 passed / 2 skipped.
+  - `wordpress-blog-post.spec.ts`: 14 passed / 4 skipped / 2 failed. Both failures are the same test, "Keyword mode still validates and submits an empty keyword client-side" ("Keyword is required" never appears).
+- Known pre-existing failure: I ran the test again with all of this batch's changes temporarily removed (the code of `main` at `514b77d`), and it still fails. So it is not a regression from Actions & Status. It was not fixed here, and no form behavior was changed; it needs to be investigated separately. TypeScript, production build (43 pages), `git diff --check`, and ESLint on the changed files pass. Prettier passes on the new and rewritten files. `content-streams.spec.ts` was not run, because it writes to the database.
+
+#### Out of scope, documented
+
+- The pin quality-gate badge (`PASS` / `WARN` / `RECOMPOSE` / `FAIL`, uppercase, 10 px) lives inside `pin-diagnostic-badges.tsx`, a group of 10 px metadata chips (mode, angle, template). Migrate the whole group with the Pinterest page rollout.
+- `WordPressUsageBadge` shows usage data and opens a menu (11 px interactive chip). It is not a status.
+- The status filters (`history-filters`, `wordpress-history-filters`) and the content-stream form select still show raw values with `capitalize`. These belong to the Filters and forms work.
+- Dashboard Recent activity shows the status to sighted users as a colored dot only. The text is `sr-only`, and a visible label is a dashboard-layout change.
+- `xs` buttons remain in `image-versions-dialog.tsx` and `pin-detail-dialog.tsx` (dense in-dialog controls).
+- `wordpress-blog-post.spec.ts` "Keyword is required": a pre-existing failure, to investigate separately.
 
 ## Phase 5 — Product States
 

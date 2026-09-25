@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Search, Trash2, Sparkle, CircleAlert, RotateCcw } from 'lucide-react';
+import { Loader2, Search, Trash2, Sparkle, RotateCcw } from 'lucide-react';
 import { createResearchSchema } from '@/lib/validations/research';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/status';
 import {
   Select,
   SelectContent,
@@ -357,10 +358,7 @@ export function ResearchForm({ projects, researchResults }: ResearchFormProps) {
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Badge variant="outline">{SOURCE_TYPE_CONFIG[r.source_type].label}</Badge>
                   {r.status === 'failed' && (
-                    <Badge variant="destructive" className="gap-1">
-                      <CircleAlert className="h-3 w-3" />
-                      Failed
-                    </Badge>
+                    <StatusBadge status="failed" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">

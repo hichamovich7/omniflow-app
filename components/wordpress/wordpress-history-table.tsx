@@ -16,7 +16,7 @@ import { useSelection } from '@/components/editorial/selection-provider';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
-import { statusToBadgeVariant } from '@/lib/utils/status';
+import { StatusBadge } from '@/components/shared/status';
 import type { WordPressPublishStatus } from '@/types/wordpress';
 
 interface ArticleSummary {
@@ -103,7 +103,7 @@ export function WordPressHistoryTable({ generations }: WordPressHistoryTableProp
                 </p>
               </Link>
               <div className="flex flex-wrap items-center gap-1.5 md:shrink-0">
-                <Badge variant={statusToBadgeVariant(gen.status)}>{gen.status}</Badge>
+                <StatusBadge status={gen.status} />
                 <Badge variant="outline">{categoryName ?? 'Uncategorized'}</Badge>
                 {article && <WpSendStatusBadge article={article} compact />}
               </div>

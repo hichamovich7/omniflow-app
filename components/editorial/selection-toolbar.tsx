@@ -13,7 +13,7 @@ export function SelectionToolbar({ allIds }: SelectionToolbarProps) {
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-[13px] font-medium text-muted-foreground">
+      <p className="text-[0.8125rem] font-medium text-muted-foreground tabular-nums">
         {selectedCount > 0
           ? `${selectedCount} selected of ${total} ${total === 1 ? 'pin' : 'pins'}`
           : `${total} generated ${total === 1 ? 'pin' : 'pins'}`}
@@ -21,7 +21,7 @@ export function SelectionToolbar({ allIds }: SelectionToolbarProps) {
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
-          size="xs"
+          size="sm"
           onClick={() => selectAll(allIds)}
           disabled={selectedCount === total}
         >
@@ -29,7 +29,7 @@ export function SelectionToolbar({ allIds }: SelectionToolbarProps) {
         </Button>
         <Button
           variant="ghost"
-          size="xs"
+          size="sm"
           onClick={selectNone}
           disabled={selectedCount === 0}
         >
@@ -37,7 +37,7 @@ export function SelectionToolbar({ allIds }: SelectionToolbarProps) {
         </Button>
         <Button
           variant="ghost"
-          size="xs"
+          size="sm"
           onClick={() => invertSelection(allIds)}
         >
           Invert

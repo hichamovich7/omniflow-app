@@ -259,7 +259,7 @@ Primary uses blue with white text and a darker hover. Destructive uses a solid o
 
 Button focus-visible uses a solid 2 px `--ring` (or `--destructive` for destructive buttons) with a 2 px `--background` offset. A translucent halo is not enough on solid blue fills, especially in dark mode. Inputs keep the border-to-`--ring` treatment described under Borders.
 
-Button heights are `sm` 36 px, `default` 40 px, and `lg` 44 px, with a 44 px minimum touch target below `md` (48 px for `lg`). Buttons use a 10 px radius, 500 weight, 13–15 px labels, and icons sized to the button (14 / 16 / 18 px). A compact `xs` size (28 px, 12 px text) is reserved for dense bulk and selection bars. Disabled buttons are not faded copies of their variant: they keep full opacity on a muted surface with muted text and a not-allowed cursor, so the label stays readable while clearly inert.
+Button heights are `sm` 36 px, `default` 40 px, and `lg` 44 px, with a 44 px minimum touch target below `md` (48 px for `lg`). Buttons use a 10 px radius, 500 weight, 13–15 px labels, and icons sized to the button (14 / 16 / 18 px). A compact `xs` size (28 px, 12 px text) exists for dense in-dialog controls only; bulk and selection bars use `sm`. Disabled buttons are not faded copies of their variant: they keep full opacity on a muted surface with muted text and a not-allowed cursor, so the label stays readable while clearly inert.
 
 ### Inputs and forms
 
@@ -287,6 +287,35 @@ Headers are typographic blocks, not cards: no surface, border, shadow, gradient,
 Variants: neutral, primary, success, warning, danger, and purple. Badges are compact; reserve pills for short statuses. Every status includes text and may add a dot/icon—color is never the only signal. `StatusBadge` is the canonical workflow-status component.
 
 Badges are soft, never solid fills: a tinted semantic surface, semantic text that meets 4.5:1 at 12 px, and a subtle same-hue border. They are 22 px tall with 12 px / 500 text, 8 px horizontal padding, and a 6 px radius (`radius-xs`). Text is never smaller than 12 px. Blue marks in-progress or planned states (processing, scheduled), and amber is reserved for states that need attention (at risk, warming).
+
+Workflow statuses have one source, `lib/utils/status.ts`. It maps a stored value to a label and a tone; the stored values never change.
+
+- Pass the raw value: `<StatusBadge status={gen.status} />`. Do not pick a `Badge` variant or write a label per page.
+- Labels are sentence case ("Completed", "On track", "Sent as draft"). Never render the raw lowercase value, and never use `capitalize`.
+- Tones:
+  - primary: generating, processing, scheduled;
+  - neutral: pending, queued, reviewing, draft, paused;
+  - success: ready, completed, published, active, on-track;
+  - warning: partial, warming, at-risk;
+  - danger: failed;
+  - outline: archived.
+- Unknown or missing value: a readable sentence-case label derived from the value ("on_hold" → "On hold", empty → "Unknown"), neutral tone. It never crashes or hides the status.
+- `StatusDot` takes its color from the same tone (`statusToVariant`). A dot on its own must come with the status as text, visible or `sr-only`.
+- Components that derive a status from several fields (for example `WpSendStatusBadge`: sent or not + publish status + date) keep their own labels but take their tones from the same mapping.
+
+### Bulk actions
+
+`BulkActions` (`components/shared/bulk-actions`) is the only bulk-selection bar. `SelectionActionBar` is a thin wrapper that binds it to the editorial selection context.
+
+- Surface: a region named "Bulk actions" on `--selected`, with a `primary/20` border, a 14 px radius (`radius-lg`, like other toolbars), and 8 px padding. No shadow, unless it is the fixed `mobileSticky` bar.
+- Content, in this order:
+  1. The count, "N selected": 14 px / 500, foreground color, tabular figures.
+  2. The caller's actions.
+  3. A ghost "Clear" button with an × icon, named "Clear selection".
+- Actions are `sm` `Button`s (36 px, 44 px below `md`). Neutral actions are outline (or the primary variant for the main action). Destructive actions use the `destructive` variant, and their existing confirmation dialog stays as it is.
+- Layout: the actions move to their own line when they don't fit beside the count, and "Clear" stays last, aligned right. Keyboard order always matches the visual order.
+- Announcements: a `role="status"` region stays mounted and announces the count, including the first selection.
+- Focus: after "Clear", focus moves to the next focusable element after the bar (normally the first row) instead of falling back to `<body>`.
 
 ### Tables
 
@@ -389,7 +418,7 @@ Lucide is the sole product icon library. Standard sizes are 14, 16, 18, 20, and 
 | Core controls                | `components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `select.tsx`, `combobox.tsx`, `checkbox.tsx`, `label.tsx`                                                                                                                     |
 | Surfaces and overlays        | `components/ui/card.tsx`, `dialog.tsx`, `sheet.tsx`, `dropdown-menu.tsx`, `collapsible.tsx`                                                                                                                                            |
 | Data display                 | `components/ui/table.tsx`, `badge.tsx`, `status-dot.tsx`, `components/shared/status/status-badge.tsx`, `components/shared/data-list/`, `components/shared/pagination/`, `components/ui/progress.tsx`, `components/shared/metric-card/` |
-| Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx`                                                          |
+| Shared states and workflows  | `components/shared/page-state/page-state.tsx`, `components/empty-state.tsx`, `components/shared/filter-bar/filter-bar.tsx`, `components/shared/bulk-actions/bulk-actions.tsx`, `lib/utils/status.ts`                                   |
 | Representative feature UI    | `components/dashboard/`, `components/projects/`, `components/boards/`, `components/pinterest/`, `components/wordpress/`, `components/history/`, `components/research/`                                                                 |
 
 ## Governance

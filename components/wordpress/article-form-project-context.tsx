@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CategorySelect, type CategoryOption } from '@/components/wordpress/category-select';
 import { ArticleFormSectionCard, SELECT_SURFACE_CLASS } from '@/components/wordpress/article-form-section-card';
-import { contentStreamStatusToBadgeVariant } from '@/lib/utils/status';
+import { getStatusPresentation } from '@/lib/utils/status';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { ProjectContentStreamInfo, ProjectSiteInfo } from '@/lib/wordpress/project-context';
@@ -141,8 +141,8 @@ export function ProjectContextSection({
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <span>Content stream{matchingStreams.length > 1 ? 's' : ''} for this category:</span>
           {matchingStreams.map((stream) => (
-            <Badge key={stream.id} variant={contentStreamStatusToBadgeVariant(stream.status)}>
-              {stream.name}
+            <Badge key={stream.id} variant={getStatusPresentation(stream.status).tone}>
+              {stream.name} · {getStatusPresentation(stream.status).label}
             </Badge>
           ))}
         </div>
