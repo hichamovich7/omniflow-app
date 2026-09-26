@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Feature: Publishing coverage — expected external activity on future days (TASK-FIX-053, 2026-09-26)
+
+* Every cell of the 14-day Publishing coverage grid is now clickable. A future cell opens "Expected publishing" (Pins expected, Scheduled with, Note, Save as expected): the entry is `expected` — hollow dashed marker, "Expected externally: N (not confirmed)" — and is never shown or counted as published.
+* Once the day has come, today's cell opens "Confirm external publishing": Confirm as published, Keep as expected, or Delete. Every existing entry can be edited or deleted from its cell. Today / past entries keep the "Published externally" behavior.
+* Counters kept apart: "Confirmed externally" (today) and "Expected externally" (next 14 days, not confirmed). Expected Pins improve their own day's forecast (level, days covered, This week to-create, buffer credit capped at the day's gap) but never change the Created / Planned counts, `plannedPins` or any Pin.
+* Migration `038_add_publishing_activity_status.sql`: `status text NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'expected'))`. Existing rows stay `published`; RLS, grants and `UNIQUE (user_id, content_stream_id, activity_date)` unchanged. Apply by hand in the Supabase SQL Editor.
+* API: `PUT /api/content-streams/[id]/publishing-activity` takes an optional `status` (omitted → future = expected, today or earlier = published; `published` on a future day → `400 future_date`). New `DELETE /api/content-streams/[id]/publishing-activity?activityDate=YYYY-MM-DD` (auth, UUID, date, ownership, 404 when nothing to delete).
+* Tests: new offline `tests/renderer/publishing-coverage-expected.spec.ts` (26 cases), `stream-planned-and-activity.spec.ts` updated to the new future-day rule, a gated browser case for the future cell in `tests/playwright/dashboard.spec.ts`; `wordpress-quality-report.spec.ts` no longer requires 037 to be the last migration.
+
 ## Feature: WordPress export — internal links in Copy Markdown / Copy HTML (TASK-FIX-052, 2026-09-26)
 
 * New "Include internal links" option (on by default, available when the project has a WordPress site) under Copy Markdown / Copy HTML / Download .md on `/wordpress/[id]`. The copy buttons are now shown even when a WordPress site is connected, next to the Publish control.

@@ -1541,7 +1541,7 @@ server_error
 
 # PUT /api/content-streams/[id]/publishing-activity
 
-Records — or updates — how many Pins were published outside OmniFlow for this content stream on one day (TASK-FIX-043, table `content_stream_publishing_activity`). Upsert on `(user_id, content_stream_id, activity_date)`: saving the same day again updates the row. Never writes to `pins`.
+Records — or updates — how many Pins were published outside OmniFlow for this content stream on one day, or how many are expected from another tool on a future day (TASK-FIX-043, `status` TASK-FIX-053; table `content_stream_publishing_activity`). Upsert on `(user_id, content_stream_id, activity_date)`: saving the same day again updates the row — this is also how an expected entry is edited, or confirmed as published once its day has come. Never writes to `pins`.
 
 ## Request
 
@@ -1550,21 +1550,23 @@ Records — or updates — how many Pins were published outside OmniFlow for thi
   "activityDate": "2026-09-25",
   "publishedCount": 5,
   "note": "Created and published with another tool",
-  "source": "external"
+  "source": "external",
+  "status": "published"
 }
 ```
 
-* `activityDate` — local `YYYY-MM-DD`, a real date, today or earlier (future days are covered by OmniFlow's planned Pins only).
+* `activityDate` — local `YYYY-MM-DD`, a real date (past, today or future).
 * `publishedCount` — integer 0–1000.
 * `note` — optional, trimmed, max 500 chars; empty becomes `null`.
 * `source` — `manual` (default) or `external`.
+* `status` — optional, `published` or `expected`. Omitted → derived from the date: future = `expected`, today or earlier = `published`. `published` on a future day is refused (`future_date`). `expected` stays allowed on today / past days (an unconfirmed entry edited without being confirmed).
 
-Checks, in order: session (`401`), UUID (`400`), Zod body (`400`), stream exists (`404`) and belongs to the caller (`403`), date not in the future (`400`). RLS `WITH CHECK` enforces the same ownership in the database.
+Checks, in order: session (`401`), UUID (`400`), Zod body (`400`), stream exists (`404`) and belongs to the caller (`403`), `published` not on a future day (`400`). RLS `WITH CHECK` enforces the same ownership in the database.
 
 ## Response
 
 ```json
-{ "data": { "activity": { "id": "uuid", "content_stream_id": "uuid", "activity_date": "2026-09-25", "published_count": 5, "note": "…", "source": "external", "...": "..." } }, "error": null }
+{ "data": { "activity": { "id": "uuid", "content_stream_id": "uuid", "activity_date": "2026-09-25", "published_count": 5, "note": "…", "source": "external", "status": "published", "...": "..." } }, "error": null }
 ```
 
 ## Possible Errors
@@ -1577,6 +1579,29 @@ invalid_request
 not_found
 forbidden
 future_date
+server_error
+```
+
+# DELETE /api/content-streams/[id]/publishing-activity?activityDate=YYYY-MM-DD
+
+Removes the entry (confirmed or expected) of this content stream for one local day (TASK-FIX-053). Never writes to `pins`.
+
+Checks, in order: session (`401`), UUID (`400`), `activityDate` a real `YYYY-MM-DD` (`400 invalid_request`), stream exists (`404`) and belongs to the caller (`403`), an entry exists for that day (`404 not_found`). The delete is scoped to the session user explicitly and by RLS.
+
+## Response
+
+```json
+{ "data": { "deleted": true }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_request
+not_found
+forbidden
 server_error
 ```
 

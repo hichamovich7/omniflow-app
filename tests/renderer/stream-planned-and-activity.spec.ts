@@ -151,7 +151,7 @@ function pinsFor(boardId: string, startOffset: number, days: number, perDay: num
 }
 
 function external(streamId: string, activityDate: string, publishedCount: number, note: string | null = null): ExternalActivityInput {
-  return { streamId, activityDate, publishedCount, note, source: 'external' };
+  return { streamId, activityDate, publishedCount, note, source: 'external', status: 'published' };
 }
 
 const noReview = buildSundayReviewStatus({ now: NOW, routine: null, occurrences: [] });
@@ -321,12 +321,13 @@ test.describe('Publishing activity — save, update, ownership', () => {
     expect(tables.content_stream_publishing_activity).toHaveLength(0);
   });
 
-  test('future days are refused: they stay measured on planned Pins', async () => {
+  // TASK-FIX-053: a future day can be saved as `expected`, never confirmed as published.
+  test('future days cannot be confirmed as published', async () => {
     expect(isRecordableActivityDate(TODAY, NOW)).toBe(true);
     expect(isRecordableActivityDate(toLocalDayKey(addLocalDays(NOW, -3)), NOW)).toBe(true);
     expect(isRecordableActivityDate(toLocalDayKey(addLocalDays(NOW, 1)), NOW)).toBe(false);
     const { client, tables } = setup();
-    const input = upsertPublishingActivitySchema.parse({ activityDate: toLocalDayKey(addLocalDays(NOW, 1)), publishedCount: 2 });
+    const input = upsertPublishingActivitySchema.parse({ activityDate: toLocalDayKey(addLocalDays(NOW, 1)), publishedCount: 2, status: 'published' });
     const err = await upsertPublishingActivity(client, USER_A, STREAM_ID, input, NOW).catch((e) => e);
     expect(err.code).toBe('future_date');
     expect(tables.content_stream_publishing_activity).toHaveLength(0);
@@ -421,7 +422,7 @@ test.describe('Publishing activity — coverage maths', () => {
     expect(computeExternalBufferCredit(null, 0, 50)).toBe(0);
   });
 
-  test('future planned Pins are computed normally; a future external entry is ignored', () => {
+  test('future planned Pins are computed normally; a future *published* entry is ignored', () => {
     const planned = pinsFor('board-cat', 1, 2, 5);
     const [coverage] = buildContentCoverage({
       streams: [cat],

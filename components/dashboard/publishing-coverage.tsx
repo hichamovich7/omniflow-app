@@ -1,8 +1,8 @@
 import { Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PublishingActivityCell } from '@/components/dashboard/publishing-activity-dialog';
+import { PublishingActivityCell, type PublishingActivityCellProps } from '@/components/dashboard/publishing-activity-dialog';
 import { formatDayKeyLong, formatDayKeyShort, formatDayKeyWeekday } from '@/lib/dashboard/local-date';
-import { coverageDayDescription, externalActivityLabel } from '@/lib/dashboard/publishing-activity';
+import { coverageDayDescription, expectedActivityLabel, externalActivityLabel } from '@/lib/dashboard/publishing-activity';
 import { cn } from '@/lib/utils';
 import type { PinLifecycleCounts } from '@/lib/queries/command-center';
 import type { ContentStreamCoverage, CoverageDay } from '@/types/dashboard';
@@ -35,6 +35,9 @@ export function coverageMessage(stream: ContentStreamCoverage): string {
   }
 }
 
+/** Hollow dashed dot: expected, never the filled "published" dot. */
+const EXPECTED_MARKER_CLASS = 'size-2 rounded-full border border-dashed border-foreground/70 bg-surface';
+
 const LEVEL_CLASS: Record<CoverageDay['level'], string> = {
   full: 'bg-primary',
   partial: 'bg-primary/40',
@@ -43,6 +46,42 @@ const LEVEL_CLASS: Record<CoverageDay['level'], string> = {
 
 function dayTitle(day: CoverageDay, target: number | null): string {
   return coverageDayDescription(day, formatDayKeyShort(day.date), target);
+}
+
+/**
+ * Dashboard counters for manual activity, never mixed: confirmed = published
+ * externally today; expected = planned in another tool, today or later, not
+ * confirmed yet (a forecast, never counted as published).
+ */
+export function externalActivityTotals(streams: ContentStreamCoverage[]): { confirmed: number; expected: number } {
+  return streams.reduce(
+    (totals, stream) => ({ confirmed: totals.confirmed + stream.externalToday, expected: totals.expected + stream.expectedExternal }),
+    { confirmed: 0, expected: 0 }
+  );
+}
+
+/**
+ * Props of the clickable cell for one day: every day opens the modal, today
+ * (and earlier) records published Pins, a later day only expected ones.
+ */
+export function coverageCellProps(
+  stream: ContentStreamCoverage,
+  day: CoverageDay,
+  todayKey: string
+): Omit<PublishingActivityCellProps, 'className' | 'children'> {
+  return {
+    streamId: stream.streamId,
+    streamName: stream.streamName,
+    date: day.date,
+    isFuture: day.date > todayKey,
+    targetPinsPerDay: stream.targetPinsPerDay,
+    external: day.external,
+    expected: day.expected,
+    status: day.externalStatus,
+    note: day.externalNote,
+    source: day.externalSource,
+    description: dayTitle(day, stream.targetPinsPerDay),
+  };
 }
 
 /** Paused and planned streams expect no publishing, so they get no row. */
@@ -56,15 +95,18 @@ export function selectCoverageRows(coverage: ContentStreamCoverage[]): ContentSt
  * planned, empty when none are. Days inside the buffer window that are not
  * full are outlined as "needs new Pins".
  *
- * Today's cell opens the "Publishing activity" modal: Pins published outside
- * OmniFlow count toward today's target (dot marker + "Published externally")
- * but never change the Created / Planned counters or any Pin. Future days
- * stay measured on OmniFlow's planned Pins only.
+ * Every cell opens the "Publishing activity" modal. Today: Pins published
+ * outside OmniFlow count toward today's target (filled dot + "Published
+ * externally"). A future day: Pins expected from another tool (hollow dashed
+ * dot + "Expected externally") improve that day's forecast but are never
+ * shown or counted as published. Neither changes the Created / Planned
+ * counters or any Pin.
  */
 export function PublishingCoverage({ coverage, lifecycle }: PublishingCoverageProps) {
   const streams = selectCoverageRows(coverage);
   const firstDays = streams[0]?.days ?? [];
-  const externalToday = streams.reduce((sum, stream) => sum + stream.externalToday, 0);
+  const totals = externalActivityTotals(streams);
+  const todayKey = firstDays[0]?.date ?? '';
 
   return (
     <Card size="sm">
@@ -72,17 +114,19 @@ export function PublishingCoverage({ coverage, lifecycle }: PublishingCoveragePr
         <CardTitle>Publishing coverage</CardTitle>
         <CardDescription>
           Planned dates set in OmniFlow (the CSV &ldquo;Publish date&rdquo;). OmniFlow does not connect to Pinterest, so a past date
-          is not confirmation that a Pin went live. Click today&apos;s cell to record Pins published with another tool.
+          is not confirmation that a Pin went live. Click today&apos;s cell to record Pins published with another tool, or a future
+          cell to note Pins expected from another tool.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
             { label: 'Created', value: lifecycle.created, hint: 'All Pins generated' },
             { label: 'Planned', value: lifecycle.planned, hint: 'Planned date still ahead' },
             { label: 'Planned date passed', value: lifecycle.pastPlannedDate, hint: 'Not verified on Pinterest' },
             { label: 'Unscheduled', value: lifecycle.unscheduled, hint: 'No planned date yet' },
-            { label: 'Published externally', value: externalToday, hint: 'Today · entered manually' },
+            { label: 'Confirmed externally', value: totals.confirmed, hint: 'Today · entered manually' },
+            { label: 'Expected externally', value: totals.expected, hint: 'Next 14 days · not confirmed' },
           ].map((item) => (
             <div key={item.label} className="rounded-lg border border-border/60 bg-surface-muted/60 px-3 py-2">
               <dt className="text-xs text-muted-foreground">{item.label}</dt>
@@ -102,6 +146,7 @@ export function PublishingCoverage({ coverage, lifecycle }: PublishingCoveragePr
               <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-muted" /> No Pins</span>
               <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm ring-2 ring-warning ring-inset" /> Needs new Pins</span>
               <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-success" /> Published externally</span>
+              <span className="inline-flex items-center gap-1.5"><span className={EXPECTED_MARKER_CLASS} /> Expected externally</span>
             </div>
 
             {firstDays.length > 0 && (
@@ -123,40 +168,30 @@ export function PublishingCoverage({ coverage, lifecycle }: PublishingCoveragePr
                       <p className="truncate text-xs text-muted-foreground">{stream.boards[0]?.name ?? 'No board linked'}</p>
                     </div>
                     <ol className="flex flex-1 gap-1" aria-label={`${stream.streamName} coverage, next 14 days`}>
-                      {stream.days.map((day, index) => {
-                        const title = dayTitle(day, stream.targetPinsPerDay);
+                      {stream.days.map((day) => {
                         const cellClass = cn(
                           'relative h-6 flex-1 rounded-sm',
                           LEVEL_CLASS[day.level],
                           day.inBuffer && day.level !== 'full' && 'ring-2 ring-warning ring-inset'
                         );
-                        const marker = day.external > 0 && (
-                          <span
-                            className="absolute right-0.5 top-0.5 size-2 rounded-full bg-success ring-1 ring-surface"
-                            aria-hidden="true"
-                          />
-                        );
-                        // Only today is recordable: future days stay measured on planned Pins.
-                        return index === 0 ? (
+                        const marker =
+                          day.external > 0 ? (
+                            <span
+                              className="absolute right-0.5 top-0.5 size-2 rounded-full bg-success ring-1 ring-surface"
+                              aria-hidden="true"
+                            />
+                          ) : day.expected > 0 ? (
+                            <span className={cn('absolute right-0.5 top-0.5', EXPECTED_MARKER_CLASS)} aria-hidden="true" />
+                          ) : null;
+                        // Every day is recordable: today as published, a future day as expected only.
+                        return (
                           <li key={day.date} className={cellClass}>
                             <PublishingActivityCell
-                              streamId={stream.streamId}
-                              streamName={stream.streamName}
-                              date={day.date}
-                              targetPinsPerDay={stream.targetPinsPerDay}
-                              external={day.external}
-                              note={day.externalNote}
-                              source={day.externalSource}
-                              description={title}
+                              {...coverageCellProps(stream, day, todayKey)}
                               className="hover:ring-2 hover:ring-primary/60 hover:ring-inset"
                             >
                               {marker}
                             </PublishingActivityCell>
-                          </li>
-                        ) : (
-                          <li key={day.date} title={title} className={cellClass}>
-                            {marker}
-                            <span className="sr-only">{title}</span>
                           </li>
                         );
                       })}
@@ -177,6 +212,13 @@ export function PublishingCoverage({ coverage, lifecycle }: PublishingCoveragePr
                           <Info className="size-3.5" aria-hidden="true" />
                         </span>
                       )}
+                    </p>
+                  )}
+                  {stream.expectedExternal > 0 && (
+                    <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground sm:pl-44">
+                      <span className={EXPECTED_MARKER_CLASS} aria-hidden="true" />
+                      {expectedActivityLabel(stream.expectedExternal)}
+                      <span>· planned in another tool, not confirmed yet</span>
                     </p>
                   )}
                   <p

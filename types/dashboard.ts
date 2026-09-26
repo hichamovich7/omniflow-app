@@ -1,4 +1,4 @@
-import type { ContentStreamStatus, PublishingActivitySource } from '@/types/content-streams';
+import type { ContentStreamStatus, PublishingActivitySource, PublishingActivityStatus } from '@/types/content-streams';
 import type { TaskType } from '@/types/tasks';
 
 /**
@@ -70,16 +70,23 @@ export interface CoverageDay {
   /** Pins planned in OmniFlow (pins.publish_date) — never includes external activity. */
   planned: number;
   /**
-   * Pins the user recorded as published manually / with another tool
-   * (content_stream_publishing_activity). Only counted up to today: future
-   * days always use OmniFlow's planned Pins, so this is 0 after today.
+   * Pins the user confirmed as published manually / with another tool
+   * (content_stream_publishing_activity, status `published`). Only counted
+   * for today, so this is 0 after today.
    */
   external: number;
+  /**
+   * Pins the user expects another tool to publish that day (status
+   * `expected`, migration 038). Forecast only — never counted as published.
+   */
+  expected: number;
+  /** Status of the day's manual entry; null when there is none. */
+  externalStatus: PublishingActivityStatus | null;
   /** Note saved with the external activity, if any. */
   externalNote: string | null;
   /** How the external count was reported; null when there is none. */
   externalSource: PublishingActivitySource | null;
-  /** planned + external — what the level below is measured on. */
+  /** planned + external + expected — what the level below is measured on. */
   effective: number;
   /** full = meets target pins/day, partial = some but below target, empty = nothing. Measured on `effective`. */
   level: 'full' | 'partial' | 'empty';
@@ -109,6 +116,8 @@ export interface ContentStreamCoverage {
   daysCovered: number;
   /** Pins recorded as published outside OmniFlow today (manual / external), never part of plannedPins. */
   externalToday: number;
+  /** Pins expected from another tool today or later (not confirmed), never part of plannedPins or externalToday. */
+  expectedExternal: number;
   /** Pins on the stream's boards that have no publish_date yet. */
   unscheduledPins: number;
   /** A board of this stream is also linked to another non-archived stream (§11 §8) — coverage is ambiguous. */

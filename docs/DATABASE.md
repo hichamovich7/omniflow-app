@@ -55,7 +55,7 @@ auth.users
         │  wordpress_category_id references wordpress_categories, nullable
         │
         ├── content_stream_boards (join table) → boards
-        └── content_stream_publishing_activity (TASK-FIX-043, one row per stream + local day)
+        └── content_stream_publishing_activity (TASK-FIX-043, one row per stream + local day; status published/expected — TASK-FIX-053)
 ```
 
 ```
@@ -452,10 +452,11 @@ Pins published **outside OmniFlow** (by hand or with another tool) for one conte
 | id                | uuid PK                       | |
 | user_id           | uuid FK → profiles.id         | NOT NULL, ON DELETE CASCADE — always the session user |
 | content_stream_id | uuid FK → content_streams.id  | NOT NULL, ON DELETE CASCADE |
-| activity_date     | date                          | NOT NULL — local calendar day; the API refuses future days |
+| activity_date     | date                          | NOT NULL — local calendar day (past, today or future) |
 | published_count   | integer                       | NOT NULL, CHECK >= 0 (Zod also caps it at 1000) |
 | note              | text                          | nullable, CHECK length <= 500 |
 | source            | text                          | NOT NULL DEFAULT 'manual', CHECK IN ('manual','external') |
+| status            | text                          | NOT NULL DEFAULT 'published', CHECK IN ('published','expected') — migration 038 (TASK-FIX-053). `published` = confirmed live outside OmniFlow; `expected` = planned in another tool, not confirmed. The API only allows `published` for today or earlier |
 | created_at        | timestamptz                   | |
 | updated_at        | timestamptz                   | trigger `update_updated_at_column()` |
 
@@ -463,7 +464,9 @@ Pins published **outside OmniFlow** (by hand or with another tool) for one conte
 
 ## Purpose
 
-Lets today's cell of the dashboard "Publishing coverage" grid count Pins published elsewhere: `effective = Pins planned in OmniFlow for today + published_count`. It never touches `pins` — no `publish_date` change, no pin row — so the Created / Planned counters and any real Pinterest statistic stay untouched. Future days are always measured on OmniFlow's planned Pins only. In the buffer maths, external activity only fills today's gap to `target_pins_per_day` (never future days).
+Lets the dashboard "Publishing coverage" grid count Pins published — or expected — elsewhere: `effective = Pins planned in OmniFlow for the day + confirmed count (today only) + expected count (today or later)`. It never touches `pins` — no `publish_date` change, no pin row — so the Created / Planned counters and any real Pinterest statistic stay untouched. Confirmed (`published`) and expected rows are always counted apart: an `expected` row improves the coverage forecast of its own day but is never counted or shown as published. In the buffer maths, each entry only fills its own day's gap to `target_pins_per_day`, never more.
+
+Migration `038_add_publishing_activity_status.sql` (TASK-FIX-053) only adds the `status` column; every existing row became `published` (035 only accepted today or earlier). The rule "a future day can only be `expected`" depends on the user's local calendar, which Postgres does not know, so it is enforced in `lib/queries/stream-publishing-activity.ts` (`resolveActivityStatus`), not by a CHECK. RLS, grants and the unique key are unchanged.
 
 ## RLS
 

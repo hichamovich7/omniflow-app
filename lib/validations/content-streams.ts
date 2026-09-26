@@ -29,6 +29,7 @@ export const linkContentStreamBoardSchema = z.object({
 });
 
 export const publishingActivitySourceSchema = z.enum(['manual', 'external']);
+export const publishingActivityStatusSchema = z.enum(['published', 'expected']);
 
 /** Local calendar day, YYYY-MM-DD, that actually exists (rejects 2026-02-30). */
 const dayKeySchema = z
@@ -54,9 +55,16 @@ export const upsertPublishingActivitySchema = z.object({
     .optional()
     .transform((value) => (value ? value : null)),
   source: publishingActivitySourceSchema.default('manual'),
+  // Omitted → derived from the date (future = expected, today or earlier = published).
+  status: publishingActivityStatusSchema.optional(),
+});
+
+export const deletePublishingActivitySchema = z.object({
+  activityDate: dayKeySchema,
 });
 
 export type CreateContentStreamInput = z.infer<typeof createContentStreamSchema>;
 export type UpdateContentStreamInput = z.infer<typeof updateContentStreamSchema>;
 export type LinkContentStreamBoardInput = z.infer<typeof linkContentStreamBoardSchema>;
 export type UpsertPublishingActivityInput = z.infer<typeof upsertPublishingActivitySchema>;
+export type DeletePublishingActivityInput = z.infer<typeof deletePublishingActivitySchema>;

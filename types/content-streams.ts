@@ -44,6 +44,13 @@ export type ContentStreamBoardInsert = Omit<ContentStreamBoard, 'created_at'>;
 export type PublishingActivitySource = 'manual' | 'external';
 
 /**
+ * published = confirmed as live outside OmniFlow (today or earlier);
+ * expected  = planned in another tool for that day, not confirmed yet
+ * (migration 038). Only `published` rows are ever counted as published.
+ */
+export type PublishingActivityStatus = 'published' | 'expected';
+
+/**
  * Pins published outside OmniFlow for one stream on one local day
  * (migration 035). Never linked to `pins` rows and never a Pinterest stat.
  */
@@ -56,6 +63,7 @@ export interface StreamPublishingActivity {
   published_count: number;
   note: string | null;
   source: PublishingActivitySource;
+  status: PublishingActivityStatus;
   created_at: string;
   updated_at: string;
 }

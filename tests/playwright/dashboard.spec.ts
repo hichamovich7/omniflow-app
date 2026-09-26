@@ -75,4 +75,17 @@ test.describe('Command Center dashboard', () => {
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('heading', { name: 'Publishing activity' })).not.toBeVisible();
   });
+
+  // TASK-FIX-053 — a future cell opens the Expected publishing modal (no write).
+  test('a future coverage cell opens the Expected publishing modal, and Cancel saves nothing', async ({ page }) => {
+    const cell = page.getByRole('button', { name: /Plan external publishing/ }).first();
+    test.skip(!(await cell.isVisible().catch(() => false)), 'No active content stream with a coverage row.');
+    await cell.click();
+    await expect(page.getByRole('heading', { name: 'Expected publishing' })).toBeVisible();
+    await expect(page.getByLabel('Pins expected')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Save as expected|Saving/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Confirm as published' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('heading', { name: 'Expected publishing' })).not.toBeVisible();
+  });
 });

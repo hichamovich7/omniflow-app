@@ -48,7 +48,8 @@ const PASSED_REPORT: ArticleQualityReport = {
 
 test('migration 037 adds a nullable jsonb quality_report on wordpress_generations only', () => {
   const files = readdirSync(join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
-  expect(files[files.length - 1]).toBe('037_add_wordpress_quality_report.sql');
+  // Later migrations (038+) may follow; 037 itself must exist exactly once.
+  expect(files).toContain('037_add_wordpress_quality_report.sql');
   expect(files.filter((f) => f.startsWith('037_'))).toHaveLength(1);
 
   const sql = read('supabase/migrations/037_add_wordpress_quality_report.sql')

@@ -819,6 +819,20 @@ Live RLS enforcement (a user B session cannot read or write user A's rows) needs
 
 ---
 
+# TASK-FIX-053 — Expected (future) external publishing activity
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/publishing-coverage-expected.spec.ts tests/renderer/stream-planned-and-activity.spec.ts tests/renderer/dashboard-coverage.spec.ts --project=renderer --reporter=list
+```
+
+Offline (`publishing-coverage-expected.spec.ts`, 26 cases): status per date (past / today = published, future = expected, `published` on a future day refused), creation for a past day, today and a future day, edit of a future entry on the same row, confirmation of today's expected entry as published, delete (one stream + day only, 404 when nothing, bad date refused), permissions (another user's stream refused for create and delete, nothing written or removed), confirmed / expected counters kept apart, a past expected and a future published entry ignored, no double counting with OmniFlow planned dates (planned count unchanged, credit capped at the day's gap), forecast improvement (coverage run, This week), static checks of migration 038 (status column + CHECK, no RLS / grant / unique / pins change, 035 untouched) and the DELETE route, and the grid cell props (all 14 cells clickable, future cells labelled "Plan external publishing", confirm flow on today's expected entry).
+
+Live RLS enforcement still needs a real Postgres after applying 038. Gated browser case (skips without `PLAYWRIGHT_STORAGE_STATE`): a future coverage cell opens the Expected publishing modal and Cancel saves nothing (`tests/playwright/dashboard.spec.ts`).
+
+---
+
 # WordPress outline model (`AI_OUTLINE_MODEL`, 2026-09-26)
 
 Focused command:
