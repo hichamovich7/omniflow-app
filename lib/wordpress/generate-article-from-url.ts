@@ -14,6 +14,8 @@ import {
 import type { SourceContextSummary } from '@/lib/validations/wordpress';
 import {
   TEXT_ROLE,
+  OUTLINE_ROLE,
+  logWordPressTextModel,
   WORDPRESS_IMAGE_CONFIG,
   OUTLINE_MAX_TOKENS,
   ARTICLE_MAX_TOKENS,
@@ -153,8 +155,9 @@ export async function generateArticleFromUrl(
     language,
   });
 
+  logWordPressTextModel('wordpress-from-url', 'outline', OUTLINE_ROLE);
   const outlineRaw = await generateText({
-    role: TEXT_ROLE,
+    role: OUTLINE_ROLE,
     messages: [
       { role: 'system', content: outlineSystem },
       { role: 'user', content: outlineUser },
@@ -183,6 +186,7 @@ export async function generateArticleFromUrl(
   // Step 3: full article — EXACT same prompt/schema as Option 1, unchanged.
   const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({ outline, language });
 
+  logWordPressTextModel('wordpress-from-url', 'article', TEXT_ROLE);
   const articleRaw = await generateText({
     role: TEXT_ROLE,
     messages: [

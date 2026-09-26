@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { generateText, generateImage } from '@/lib/ai/engine';
+import { generateText, generateImage, resolveTextModel } from '@/lib/ai/engine';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
@@ -30,6 +30,24 @@ import type { SupportedLanguage } from '@/types/pinterest';
 // nothing else needs to change. Exported: Option 3 (generate-article-from-url.ts)
 // reuses the exact same outline/article prompts and must stay on the same role.
 export const TEXT_ROLE: 'FAST' | 'SMART' = 'FAST';
+
+// Outline step only (Options 1, 3 and 4): AI_OUTLINE_MODEL, falling back to
+// the FAST config when unset — see getOutlineConfig() (lib/ai/config.ts). The
+// full article keeps TEXT_ROLE.
+export const OUTLINE_ROLE = 'OUTLINE' as const;
+
+/**
+ * Technical log of the model a WordPress text step runs on — provider and
+ * model id only, never a key. Exported for Option 3 (generate-article-from-url.ts).
+ */
+export function logWordPressTextModel(
+  logTag: string,
+  step: 'outline' | 'article',
+  role: typeof OUTLINE_ROLE | typeof TEXT_ROLE
+): void {
+  const { provider, model } = resolveTextModel(role);
+  console.info(`[${logTag}] ${step} model: ${provider}/${model} (role ${role})`);
+}
 
 // Exported for reuse by Option 3 (generate-article-from-url.ts) — same image
 // pipeline, same config.
@@ -238,8 +256,9 @@ export async function generateWordPressArticle(
     includeFaq: includeFaq ?? undefined,
   });
 
+  logWordPressTextModel('wordpress', 'outline', OUTLINE_ROLE);
   const outlineRaw = await generateText({
-    role: TEXT_ROLE,
+    role: OUTLINE_ROLE,
     messages: [
       { role: 'system', content: outlineSystem },
       { role: 'user', content: outlineUser },
@@ -287,6 +306,7 @@ export async function generateWordPressArticle(
     manualExternalUrls: manualExternalUrls && manualExternalUrls.length > 0 ? manualExternalUrls : undefined,
   });
 
+  logWordPressTextModel('wordpress', 'article', TEXT_ROLE);
   const articleRaw = await generateText({
     role: TEXT_ROLE,
     messages: [
@@ -426,9 +446,10 @@ export async function generateArticleFromPins(
     imageCount,
   });
 
+  logWordPressTextModel('wordpress-from-pins', 'outline', OUTLINE_ROLE);
   let stepStart = Date.now();
   const outlineRaw = await generateText({
-    role: TEXT_ROLE,
+    role: OUTLINE_ROLE,
     messages: [
       { role: 'system', content: outlineSystem },
       { role: 'user', content: outlineUser },
@@ -458,6 +479,7 @@ export async function generateArticleFromPins(
     language,
   });
 
+  logWordPressTextModel('wordpress-from-pins', 'article', TEXT_ROLE);
   stepStart = Date.now();
   const articleRaw = await generateText({
     role: TEXT_ROLE,

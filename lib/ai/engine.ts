@@ -1,3 +1,3 @@
-export { generateText } from './services/text';
+export { generateText, resolveTextModel } from './services/text';
 export { analyzeImage } from './services/vision';
 export { generateImage, resolveImageModel } from './services/image';

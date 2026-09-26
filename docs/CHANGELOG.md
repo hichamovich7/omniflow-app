@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Add: optional `AI_OUTLINE_MODEL` for the WordPress outline (2026-09-26)
+
+* New optional `AI_OUTLINE_PROVIDER` / `AI_OUTLINE_MODEL` (`lib/ai/config.ts` `getOutlineConfig()`, text role `OUTLINE` in `lib/ai/services/text.ts`), used only by the outline step of the three WordPress generators (keyword, pins, URL).
+* Unset or empty `AI_OUTLINE_MODEL` → the whole FAST config, exactly the previous behavior. The full article, external link, source summary, keyword suggestions and Pinterest stay on `AI_FAST_MODEL`.
+* Server logs now record the provider/model of the outline and article steps (`[wordpress] outline model: …`), never a key.
+* Same prompts, JSON format, token budgets and Zod validations. Image pipeline, Pinterest and migrations unchanged. `.env.example` documents both variables.
+* Tests: `tests/renderer/wordpress-outline-model.spec.ts` (10 offline cases).
+
 ---
 
 # [3.0.0] - 2026-09-26

@@ -21,3 +21,17 @@ export function getRoleConfig(role: AIRole): AIRoleConfig {
 
   return { provider, model };
 }
+
+// WordPress outline step only (the article, external link, summaries and
+// Pinterest all stay on their own roles). Not an AIRole: it has no default of
+// its own — when AI_OUTLINE_MODEL is unset or blank the whole FAST config is
+// used (AI_OUTLINE_PROVIDER alone is ignored), so existing deployments keep
+// exactly the pre-existing behavior.
+export function getOutlineConfig(): AIRoleConfig {
+  const fast = getRoleConfig('FAST');
+  const model = process.env.AI_OUTLINE_MODEL?.trim();
+  if (!model) return fast;
+
+  const provider = (process.env.AI_OUTLINE_PROVIDER?.trim() || fast.provider) as AIProvider;
+  return { provider, model };
+}

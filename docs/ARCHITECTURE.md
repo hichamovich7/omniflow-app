@@ -140,6 +140,8 @@ El AI Engine expone cuatro roles. Un rol representa una capacidad de negocio, nu
 
 Cada rol se configura de forma independiente vía variables de entorno (`AI_<ROLE>_PROVIDER`, `AI_<ROLE>_MODEL`), con valores por defecto en `lib/ai/config.ts`. Cambiar de proveedor o modelo es un cambio de configuración, no de código.
 
+**Outline WordPress (`AI_OUTLINE_MODEL`, 2026-09-26)**: el paso outline de los tres generadores WordPress (keyword, pins, URL) usa el rol de texto `OUTLINE` (`lib/ai/services/text.ts`), resuelto por `getOutlineConfig()` (`lib/ai/config.ts`) desde `AI_OUTLINE_PROVIDER` / `AI_OUTLINE_MODEL`. No es un quinto `AIRole`: sin `AI_OUTLINE_MODEL` (o vacío) se usa la configuración FAST completa, idéntica al comportamiento anterior. Mismo `reasoning.effort = minimal` que FAST. El artículo completo, el enlace externo, el resumen de fuente, las sugerencias de keywords y Pinterest siguen en FAST. Cada generación registra en los logs del servidor el provider/modelo del outline y del artículo (`logWordPressTextModel()`), nunca una clave.
+
 **Excepción IMAGE (TASK-034)**: cuando un pin tiene `visual_format = 'text-overlay'`, `lib/ai/services/image.ts` ignora `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL` y fuerza el provider `openrouter` con el modelo `AI_IMAGE_MODEL_TEXT` (por defecto `google/gemini-3.1-flash-image`), reutilizando `OPENROUTER_IMAGE_API_KEY` — gpt-image-1 (OpenAI) no es fiable para texto legible en la imagen. Sigue siendo la única puerta de entrada IA (Rule #10): la decisión de routing vive dentro de `lib/ai/services/image.ts`, ninguna ruta ni componente la conoce.
 
 ### Provider Abstraction

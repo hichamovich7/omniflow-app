@@ -816,3 +816,15 @@ npx playwright test tests/renderer/stream-planned-and-activity.spec.ts --project
 Offline (29 cases): `planned` validation, create and Planned → Warming / Active through `createContentStream` / `updateContentStream` (in-memory Supabase stub), no urgency / focus / active-project / weekly-target / coverage row for Planned streams, the Planned badge, the activity Zod schema, add / update (upsert, no duplicate) / note, ownership (403 / 404, nothing written), future dates refused, "Mark target met" = `target_pins_per_day`, external activity reaching Target met, Created / Planned counters unchanged, future planned Pins computed normally, and static checks of migrations 035 (unique key, `published_count >= 0`, source CHECK, RLS `WITH CHECK` on stream ownership) and 036.
 
 Live RLS enforcement (a user B session cannot read or write user A's rows) needs a real Postgres and stays a manual check after applying 035/036. Gated browser cases (skip without `PLAYWRIGHT_STORAGE_STATE`): create a Planned stream and move it to Active (`tests/playwright/content-streams.spec.ts`), open / cancel the Publishing activity modal (`tests/playwright/dashboard.spec.ts`).
+
+---
+
+# WordPress outline model (`AI_OUTLINE_MODEL`, 2026-09-26)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/wordpress-outline-model.spec.ts --project=renderer --reporter=list
+```
+
+Offline (10 cases, `fetch` stubbed — no network, no paid call, Supabase Storage stubbed): `getOutlineConfig()` with `AI_OUTLINE_MODEL` / `AI_OUTLINE_PROVIDER`, provider fallback to FAST, full fallback to the FAST config when `AI_OUTLINE_MODEL` is unset / empty / whitespace, FAST unaffected; a keyword generation (`generateWordPressArticle`) and a pins generation (`generateArticleFromPins`) send the outline to `AI_OUTLINE_MODEL` and the article + external link to `AI_FAST_MODEL`, log both models without the API key, keep the same output contract (outline fields, resolved image markers); an invalid outline from the outline model is still rejected by the unchanged Zod schema before any article call. Without `AI_OUTLINE_MODEL`, both steps use `AI_FAST_MODEL` (no regression).
