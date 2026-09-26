@@ -7,7 +7,7 @@ import { buildWordPressFromPinsPrompt, resolvePinsPrimaryKeyword } from '@/lib/a
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import { addExternalLink } from '@/lib/ai/services/external-link';
 import { collectPinLinkUrls, collectPinsAuthorizedUrls, keepFirstLinkOnly } from '@/lib/wordpress/pins-context';
-import { insertFaqSection } from '@/lib/wordpress/faq-section';
+import { applyFaqSection, type FaqItem } from '@/lib/wordpress/faq-section';
 import { runArticleQualityCheck, logArticleQuality, type ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import {
   wordpressArticleResponseSchema,
@@ -192,6 +192,8 @@ export interface GenerateArticleResult {
   slug: string;
   metaDescription: string;
   content: string;
+  /** FAQ items rendered into `content` (saved to wordpress_articles.faq) — [] when none. */
+  faq: FaqItem[];
   wordCount: number;
   featuredImagePrompt: string;
   featuredImageUrl: string | null;
@@ -340,10 +342,11 @@ export async function generateWordPressArticle(
   }
   // The structured FAQ becomes one visible section of the article (empty
   // when includeFaq is "Non" — faqRange already forces [] then).
-  let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, {
+  const faqApplied = applyFaqSection(articleValidated.data.content, articleValidated.data.faq, {
     language,
     useH3: includeH3 !== false,
   });
+  let content = faqApplied.content;
 
   // Step 2b: best-effort single external link (real, web-search-verified source).
   // Runs before image marker resolution so it never has to reason about
@@ -435,6 +438,7 @@ export async function generateWordPressArticle(
     slug: outline.slug,
     metaDescription: outline.metaDescription,
     content,
+    faq: faqApplied.faq,
     wordCount,
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl: urlByMarker.get('FEATURED') ?? null,
@@ -584,7 +588,8 @@ export async function generateArticleFromPins(
     );
     throw new Error('AI returned an invalid article format. Try again.');
   }
-  let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
+  const faqApplied = applyFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
+  let content = faqApplied.content;
   // An authorized URL (Pin link_url or the user's External URL) is linked at most once.
   for (const url of authorizedUrls) content = keepFirstLinkOnly(content, url);
 
@@ -676,6 +681,7 @@ export async function generateArticleFromPins(
     slug: outline.slug,
     metaDescription: outline.metaDescription,
     content,
+    faq: faqApplied.faq,
     wordCount,
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl,

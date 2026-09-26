@@ -1665,6 +1665,31 @@ The 2026-09-25 decision (point 5) derived every day key from the runtime's local
 
 ---
 
+## 2026-09-26 (ter)
+
+### Decision
+
+TASK-FIX-055 — Structured FAQ persisted on `wordpress_articles.faq`; one FAQPage JSON-LD added by OmniFlow on publish.
+
+### Context
+
+The FAQ was rendered into `content` from the structured response and then discarded. Rank Math (the only SEO plugin integrated, `lib/wordpress/seo/rank-math.ts`) generates a FAQPage schema only from its own "FAQ by Rank Math" block or a FAQ schema added in its editor; OmniFlow sends plain HTML (H2/H3 + paragraphs) and writes only title, description and focus keyword, so published posts had no FAQPage.
+
+### Decision Taken
+
+1. Rendering stays at generation time (user choice): the same validated array is rendered into `content` and saved in `faq`, in one step; `content` is never edited, so both cannot diverge. Display, exports, Quality Gate and internal links are unchanged. Best-effort write after the insert (like `quality_report`), so an unapplied migration only loses the column.
+2. OmniFlow adds exactly one FAQPage `<script type="application/ld+json">` after the body, built server-side from the saved Q/A only, as escaped plain text — and none when FAQ is disabled / empty / invalid, when the HTML already carries a Rank Math/Yoast FAQ block or FAQPage, or when the saved Q/A are not visible in the content.
+3. Kses safety: the post's saved `content.raw` must contain the exact script; otherwise the post is re-sent without it (never visible JSON), with a warning.
+4. Rank Math's `updateSchemas` route and FAQ block are not used: unverified payload format, and the block would change the visible FAQ markup.
+5. Old articles: `faq` stays NULL (no backfill); the schema falls back to a read-only parse of an H3 FAQ section.
+
+### Consequences
+
+* A FAQ schema added by hand in Rank Math's editor on a post OmniFlow later updates cannot be detected through the REST API — both would be output.
+* Copy Markdown / Copy HTML never include the JSON-LD.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

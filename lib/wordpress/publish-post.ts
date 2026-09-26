@@ -45,7 +45,15 @@ export interface SendArticleInput {
    * (TASK-FIX-051). Off by default; the publish route turns it on.
    */
   insertInternalLinks?: boolean;
+  /**
+   * FAQPage JSON-LD <script> (faq-schema.ts, TASK-FIX-055) appended after
+   * the body — never part of the visible text. Omitted = no schema.
+   */
+  faqSchema?: string | null;
 }
+
+/** added = kept by WordPress; removed = WordPress filtered it, post re-sent without it. */
+export type FaqSchemaStatus = 'added' | 'not_added' | 'removed';
 
 export interface SendArticleResult {
   post: WordPressPostResult;
@@ -53,9 +61,12 @@ export interface SendArticleResult {
   focusKeyword: ResolvedFocusKeyword;
   rankMath: RankMathResult;
   internalLinks: InternalLinksReport;
+  faqSchema: FaqSchemaStatus;
   warnings: string[];
 }
 
+export const FAQ_SCHEMA_REMOVED_WARNING =
+  'The FAQ schema was filtered out by WordPress — the post was sent without it.';
 export const NO_TAGS_WARNING = 'No reliable tags found — the post was sent without tags.';
 export const TAGS_NOT_CREATED_WARNING = 'Tags could not be found or created on WordPress — the post was sent without tags.';
 export const NO_FOCUS_KEYWORD_WARNING = 'No reliable focus keyword found — the Rank Math focus keyword was left empty.';
@@ -140,7 +151,11 @@ export async function sendArticleToWordPress(
     internalLinks = linked.report;
   }
 
-  const postInput = buildPostInput({ ...input, html }, tagIds);
+  // Appended after internal linking, so the link tokenizer never sees it.
+  const faqSchema = input.faqSchema?.trim() || null;
+  const postInput = buildPostInput({ ...input, html: faqSchema ? `${html.trimEnd()}
+${faqSchema}
+` : html }, tagIds);
 
   let post: WordPressPostResult;
   try {
@@ -152,6 +167,23 @@ export async function sendArticleToWordPress(
       post = await upsertPost(site, null, postInput);
     } else {
       throw err;
+    }
+  }
+
+  // A user without unfiltered_html gets <script> stripped by kses, which
+  // would leave the JSON as visible text: unless the saved content still
+  // holds the exact script, the same post is re-sent without it.
+  let faqSchemaStatus: FaqSchemaStatus = 'not_added';
+  if (faqSchema) {
+    if (post.contentRaw?.includes(faqSchema)) {
+      faqSchemaStatus = 'added';
+    } else {
+      console.warn(
+        `[wordpress publish] step=faq_schema article=${input.article.id} post=${post.id} ` +
+          `result=${post.contentRaw === undefined ? 'unverifiable' : 'filtered'} — re-sending without schema`
+      );
+      post = await upsertPost(site, post.id, buildPostInput({ ...input, html }, tagIds));
+      faqSchemaStatus = 'removed';
     }
   }
 
@@ -177,6 +209,7 @@ export async function sendArticleToWordPress(
   }
 
   warnings.push(...internalLinks.warnings);
+  if (faqSchemaStatus === 'removed') warnings.push(FAQ_SCHEMA_REMOVED_WARNING);
 
-  return { post, tagIds, focusKeyword, rankMath, internalLinks, warnings };
+  return { post, tagIds, focusKeyword, rankMath, internalLinks, faqSchema: faqSchemaStatus, warnings };
 }

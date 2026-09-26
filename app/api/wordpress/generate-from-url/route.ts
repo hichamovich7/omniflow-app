@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import { saveQualityReport } from '@/lib/wordpress/quality-report';
+import { saveArticleFaq } from '@/lib/wordpress/faq-data';
 
 // Same budget as /api/wordpress/generate and /api/wordpress/generate-from-pins
 // (outline + full-article generation, up to ARTICLE_GENERATION_TIMEOUT_MS =
@@ -258,6 +259,7 @@ export async function POST(request: Request) {
       .update({ status: 'completed', keyword: result.resolvedKeyword })
       .eq('id', generation.id);
     await saveQualityReport(supabase, generation.id, result.quality, 'wordpress-from-url');
+    await saveArticleFaq(supabase, article.id, result.faq, 'wordpress-from-url');
 
     return NextResponse.json<ApiResponse<{ generationId: string; status: string; quality: ArticleQualityReport }>>(
       { data: { generationId: generation.id, status: 'completed', quality: result.quality }, error: null },

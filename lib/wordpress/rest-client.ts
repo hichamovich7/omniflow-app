@@ -36,6 +36,8 @@ export interface WordPressPostResult {
   id: number;
   link: string;
   status: string;
+  /** The content as WordPress saved it (edit-context response), when returned. */
+  contentRaw?: string;
 }
 
 const KNOWN_MIME_BY_EXTENSION: Record<string, string> = {
@@ -314,8 +316,9 @@ export async function upsertPost(
     throw new WordPressApiError(await parseErrorBody(res), res.status);
   }
 
-  const data = (await res.json()) as { id: number; link: string; status: string };
-  return { id: data.id, link: data.link, status: data.status };
+  const data = (await res.json()) as { id: number; link: string; status: string; content?: { raw?: unknown } };
+  const contentRaw = typeof data.content?.raw === 'string' ? data.content.raw : undefined;
+  return { id: data.id, link: data.link, status: data.status, ...(contentRaw !== undefined ? { contentRaw } : {}) };
 }
 
 /** Only the fields internal linking needs — never the post content. */

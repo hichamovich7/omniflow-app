@@ -66,6 +66,25 @@ export function insertFaqSection(content: string, faq: FaqItem[], opts: InsertFa
   return tidy(replaced);
 }
 
+/**
+ * insertFaqSection() plus the FAQ items it actually rendered (TASK-FIX-055)
+ * — the exact array saved to wordpress_articles.faq, so the stored FAQ and
+ * the visible section always come from the same validated data. [] when
+ * nothing was rendered from it (FAQ disabled/empty, or the model already
+ * wrote its own FAQ section, which is kept instead).
+ */
+export function applyFaqSection(
+  content: string,
+  faq: FaqItem[],
+  opts: InsertFaqOptions
+): { content: string; faq: FaqItem[] } {
+  const rendered = faq.length > 0 && !EXISTING_FAQ_HEADING_PATTERN.test(content);
+  return {
+    content: insertFaqSection(content, faq, opts),
+    faq: rendered ? faq.map((item) => ({ question: item.question.trim(), answer: item.answer.trim() })) : [],
+  };
+}
+
 function tidy(content: string): string {
   return content.replace(/\n{3,}/g, '\n\n');
 }

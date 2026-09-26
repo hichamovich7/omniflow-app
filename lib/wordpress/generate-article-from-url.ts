@@ -5,7 +5,7 @@ import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
 import { buildSourceContextSummaryPrompt } from '@/lib/ai/prompts/source-context-summary';
 import { addExternalLink } from '@/lib/ai/services/external-link';
-import { insertFaqSection } from '@/lib/wordpress/faq-section';
+import { applyFaqSection } from '@/lib/wordpress/faq-section';
 import { runArticleQualityCheck, logArticleQuality } from '@/lib/wordpress/quality-check';
 import { scrapeUrl, CONTENT_CHAR_CAP } from '@/lib/research/providers/firecrawl';
 import {
@@ -213,7 +213,8 @@ export async function generateArticleFromUrl(
   if (!articleValidated.success) {
     throw new Error('AI returned an invalid article format. Try again.');
   }
-  let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
+  const faqApplied = applyFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
+  let content = faqApplied.content;
 
   // Step 3b: best-effort single external link — same as Option 1/4.
   const externalLink = await addExternalLink(content, outline.title, language);
@@ -298,6 +299,7 @@ export async function generateArticleFromUrl(
     slug: outline.slug,
     metaDescription: outline.metaDescription,
     content,
+    faq: faqApplied.faq,
     wordCount,
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl: urlByMarker.get('FEATURED') ?? null,

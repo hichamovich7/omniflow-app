@@ -5,7 +5,8 @@ import { getPinsSeoSource, getWordPressArticleByGenerationId } from '@/lib/queri
 import { getWordPressSiteWithSecretByProjectId } from '@/lib/queries/wordpress-sites';
 import { exportToHtmlForWordPress } from '@/lib/wordpress/export';
 import { decryptSecret } from '@/lib/wordpress/crypto';
-import { sendArticleToWordPress } from '@/lib/wordpress/publish-post';
+import { decideFaqSchema } from '@/lib/wordpress/faq-schema';
+import { sendArticleToWordPress, type FaqSchemaStatus } from '@/lib/wordpress/publish-post';
 import type { InternalLinksReport } from '@/lib/wordpress/internal-links';
 import {
   uploadMedia,
@@ -187,13 +188,21 @@ export async function POST(
   const pins =
     generation.source_type === 'pins' ? await getPinsSeoSource(supabase, generation.source_pin_ids ?? []) : null;
 
+  // One FAQPage JSON-LD at most, from the saved FAQ only (TASK-FIX-055).
+  const html = exportToHtmlForWordPress({ content });
+  const faqDecision = decideFaqSchema({ article, includeFaq: generation.include_faq, html });
+  if (faqDecision.status === 'skipped' && faqDecision.reason === 'not_visible') {
+    console.warn(`[wordpress publish] step=faq_schema article=${article.id} result=skipped reason=not_visible`);
+  }
+
   let sent;
   try {
     sent = await sendArticleToWordPress(credentials, {
       article,
       generation,
       pins,
-      html: exportToHtmlForWordPress({ content }),
+      html,
+      faqSchema: faqDecision.status === 'add' ? faqDecision.script : null,
       status: wpStatus,
       date,
       categoryIds,
@@ -239,6 +248,7 @@ export async function POST(
       viewUrl: string;
       rankMath: 'saved' | 'not_detected' | 'failed';
       internalLinks: InternalLinksReport;
+      faqSchema: FaqSchemaStatus;
       warnings: string[];
     }>
   >({
@@ -249,6 +259,7 @@ export async function POST(
       viewUrl: postResult.link,
       rankMath: sent.rankMath.status,
       internalLinks: sent.internalLinks,
+      faqSchema: sent.faqSchema,
       warnings: sent.warnings,
     },
     error: null,

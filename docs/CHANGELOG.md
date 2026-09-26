@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Feature: WordPress — structured FAQ and FAQPage schema (TASK-FIX-055, 2026-09-26)
+
+* Migration `039_add_wordpress_article_faq.sql`: nullable `wordpress_articles.faq jsonb` (`[{ question, answer }]`). No backfill, no RLS change. Apply by hand in the Supabase SQL Editor.
+* `applyFaqSection()` (`lib/wordpress/faq-section.ts`) renders the FAQ as before and returns the items it rendered; the three generate routes save them with `saveArticleFaq()` (`lib/wordpress/faq-data.ts`, Zod-validated, best-effort after the insert). Older articles keep NULL and fall back to a read-only parse of their H3 FAQ section.
+* Publish: new `lib/wordpress/faq-schema.ts` decides and builds one FAQPage JSON-LD (saved Q/A only, plain text, `<` `>` `&` escaped, no URL but `@context`), appended after the body once internal links are inserted. Skipped when FAQ is disabled / empty / invalid / not visible, or when the HTML already carries a Rank Math / Yoast FAQ block or FAQPage. `sendArticleToWordPress()` checks the saved `content.raw` and re-sends the post without the script if WordPress filtered it (warning + log with no content). The response gains `faqSchema`: `added` / `not_added` / `removed`.
+* Rank Math strategy: Rank Math only outputs FAQPage for its own FAQ block or a hand-added schema, which OmniFlow never sends — so OmniFlow provides the only FAQPage. Rank Math meta, tags, focus keyword, slug and internal links unchanged; a Rank Math failure still never blocks the publish.
+* Visible FAQ, Copy Markdown / Copy HTML (no JSON-LD), Quality Gate and generation prompts unchanged; no AI call.
+* Tests: new offline `tests/renderer/wordpress-faq-schema.spec.ts` (23 cases).
+
 ## Fix: Publishing coverage — manual external activity blocked (TASK-FIX-054, 2026-09-26)
 
 * Root cause: migration 038 (`content_stream_publishing_activity.status`) was not applied; every save (today included) failed with a generic 500 and the dashboard read no manual activity. Apply `038_add_publishing_activity_status.sql` in the Supabase SQL Editor.

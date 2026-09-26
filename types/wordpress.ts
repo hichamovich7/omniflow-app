@@ -109,6 +109,10 @@ export interface WordPressArticle {
   published_at: string | null;
   scheduled_at: string | null;
   publish_error: string | null;
+  // Structured FAQ (TASK-FIX-055, migration 039). Raw jsonb as stored — read
+  // it through parseStoredFaq()/resolveArticleFaq() (lib/wordpress/faq-data.ts).
+  // Null before 039; [] when the article was generated without a FAQ.
+  faq?: unknown;
 }
 
 export type WordPressArticleInsert = Omit<WordPressArticle, 'id' | 'created_at' | 'word_count' | 'status' | 'meta_title' | 'featured_image_prompt' | 'featured_image_url' | 'category_id' | 'wp_post_id' | 'publish_status' | 'published_at' | 'scheduled_at' | 'publish_error'> & {

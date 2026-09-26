@@ -933,6 +933,16 @@ Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42
 
 ---
 
+# WordPress — structured FAQ and FAQPage schema (TASK-FIX-055, 2026-09-26)
+
+```bash
+npx playwright test tests/renderer/wordpress-faq-schema.spec.ts --project=renderer --reporter=list
+```
+
+Offline (23 cases, Supabase stubbed in memory, WordPress a stubbed global `fetch` — no database, no network, no AI call): migration 039 (single nullable `faq jsonb` column, nothing else); Zod structure (missing / blank / wrong-type fields, non-array, max 20); `parseStoredFaq()` (null = legacy, invalid → [], trimmed); `applyFaqSection()` renders one section and returns exactly the rendered items, [] when disabled or when the model wrote its own FAQ; `saveArticleFaq()` write, missing column / network error / invalid data never thrown and logged without content; jsonb round trip through `getWordPressArticleByGenerationId()`; the three generate routes save after the insert; legacy fallback (H3 section only, no plain-paragraph or unanswered question); `resolveArticleFaq()` precedence; JSON-LD content (plain text, links as anchors, no URL but `@context`), `</script>` / `&` / U+2028 escaping that still parses back; existing Rank Math / Yoast FAQ block or FAQPage detection; absent / empty / invalid / disabled / existing / not-visible → no schema; one FAQPage for stored and legacy articles, and after an external link lands in an answer; HTML and Markdown exports unchanged with no JSON-LD; publish with one script after the body and Rank Math saved, republish never stacks a second schema, kses-filtered or unverifiable script → post re-sent without it + warning, no schema when none decided, Rank Math failure never blocks; route wiring.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 23/23, WordPress suites (pipeline quality, quality check, quality report, pins coherence, internal links, export internal links, publish SEO) 195/195, full renderer 577/578 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK. Not checked on the real WordPress site (script kept after save, Google Rich Results test) — manual check after applying 039.
+
 # WordPress export — internal links in Copy Markdown / Copy HTML (TASK-FIX-052, 2026-09-26)
 
 ```bash

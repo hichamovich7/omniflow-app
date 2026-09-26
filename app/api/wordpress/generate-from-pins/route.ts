@@ -7,6 +7,7 @@ import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import { saveQualityReport } from '@/lib/wordpress/quality-report';
+import { saveArticleFaq } from '@/lib/wordpress/faq-data';
 import type { Pin } from '@/types/database';
 import { buildPinSummaries } from '@/lib/wordpress/pins-context';
 import { listBoardOccupants } from '@/lib/queries/content-streams';
@@ -289,6 +290,7 @@ export async function POST(request: Request) {
 
     await supabase.from('wordpress_generations').update({ status: 'completed' }).eq('id', generation.id);
     await saveQualityReport(supabase, generation.id, result.quality, 'wordpress-from-pins');
+    await saveArticleFaq(supabase, article.id, result.faq, 'wordpress-from-pins');
 
     return NextResponse.json<ApiResponse<{ generationId: string; status: string; quality: ArticleQualityReport }>>(
       { data: { generationId: generation.id, status: 'completed', quality: result.quality }, error: null },
