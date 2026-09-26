@@ -27,7 +27,7 @@ import {
 import { buildContentCoverage, buildWeekPlan } from '@/lib/dashboard/build-content-coverage';
 import { buildRecommendations, pickFocusRecommendation } from '@/lib/dashboard/build-recommendations';
 import { buildSundayReviewStatus } from '@/lib/dashboard/build-sunday-review';
-import { startOfLocalWeek, toLocalDayKey } from '@/lib/dashboard/local-date';
+import { startOfLocalWeek, toDayKeyInTimeZone } from '@/lib/dashboard/local-date';
 import { listPublishingActivityFrom } from '@/lib/queries/stream-publishing-activity';
 import {
   countPinLifecycle,
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
     countTasksCompletedThisMonth(supabase, userId, now),
     loadWeeklyReview(supabase, userId, now),
     // Manual / external publishing activity (migration 035) — only today's counts toward coverage.
-    listPublishingActivityFrom(supabase, toLocalDayKey(now)),
+    listPublishingActivityFrom(supabase, toDayKeyInTimeZone(now)),
   ]);
 
   const unscheduledByBoard = await countUnscheduledPinsByBoard(supabase, [

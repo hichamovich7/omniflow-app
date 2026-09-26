@@ -19,6 +19,20 @@ export function toLocalDayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Project calendar (TASK-FIX-054). "Today" of the Publishing coverage grid
+ * and of the publishing-activity API is the calendar day in this zone,
+ * whatever the server runtime's zone is (UTC on most hosts).
+ */
+export const PROJECT_TIME_ZONE = 'Europe/Madrid';
+
+/** YYYY-MM-DD of `date` in `timeZone` (defaults to the project zone). */
+export function toDayKeyInTimeZone(date: Date, timeZone: string = PROJECT_TIME_ZONE): string {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 /** Local midnight of a YYYY-MM-DD key. */
 export function parseLocalDayKey(key: string): Date {
   const [y, m, d] = key.split('-').map(Number);

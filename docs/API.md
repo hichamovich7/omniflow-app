@@ -1563,6 +1563,8 @@ Records — or updates — how many Pins were published outside OmniFlow for thi
 
 Checks, in order: session (`401`), UUID (`400`), Zod body (`400`), stream exists (`404`) and belongs to the caller (`403`), `published` not on a future day (`400`). RLS `WITH CHECK` enforces the same ownership in the database.
 
+"Future" = after today's **Europe/Madrid** calendar day (TASK-FIX-054, `PROJECT_TIME_ZONE`), whatever the server runtime zone; `activityDate` is a calendar date compared as `YYYY-MM-DD`, never shifted through UTC. When the database lacks the `status` column (migration 038 not applied), the route answers `503 schema_outdated` with a message naming the migration instead of a generic `500`.
+
 ## Response
 
 ```json
@@ -1579,6 +1581,7 @@ invalid_request
 not_found
 forbidden
 future_date
+schema_outdated
 server_error
 ```
 

@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: Publishing coverage — manual external activity blocked (TASK-FIX-054, 2026-09-26)
+
+* Root cause: migration 038 (`content_stream_publishing_activity.status`) was not applied; every save (today included) failed with a generic 500 and the dashboard read no manual activity. Apply `038_add_publishing_activity_status.sql` in the Supabase SQL Editor.
+* The API now answers `503 schema_outdated` with an actionable message when that column is missing; the modal shows the API's message (and network errors) instead of failing silently.
+* "Today" of Publishing coverage, This week and the activity API is the Europe/Madrid calendar day, whatever the server zone; dates are compared as `YYYY-MM-DD`, never via UTC `toISOString()`. Past / today = Published externally, future = Expected externally.
+* Tests: new offline `tests/renderer/publishing-activity-madrid.spec.ts` (17 cases).
+
 ## Feature: Publishing coverage — expected external activity on future days (TASK-FIX-053, 2026-09-26)
 
 * Every cell of the 14-day Publishing coverage grid is now clickable. A future cell opens "Expected publishing" (Pins expected, Scheduled with, Note, Save as expected): the entry is `expected` — hollow dashed marker, "Expected externally: N (not confirmed)" — and is never shown or counted as published.

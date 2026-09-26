@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PublishingActivitySource, PublishingActivityStatus, StreamPublishingActivity } from '@/types/content-streams';
 import type { DeletePublishingActivityInput, UpsertPublishingActivityInput } from '@/lib/validations/content-streams';
 import type { ExternalActivityInput } from '@/lib/dashboard/build-content-coverage';
-import { toLocalDayKey } from '@/lib/dashboard/local-date';
+import { toDayKeyInTimeZone } from '@/lib/dashboard/local-date';
 
 /**
  * Manual / external publishing activity per content stream and local day
@@ -12,7 +12,7 @@ import { toLocalDayKey } from '@/lib/dashboard/local-date';
  * Created / Planned counters and Pinterest statistics stay untouched.
  */
 
-export type PublishingActivityErrorCode = 'not_found' | 'forbidden' | 'future_date';
+export type PublishingActivityErrorCode = 'not_found' | 'forbidden' | 'future_date' | 'schema_outdated';
 
 export class PublishingActivityError extends Error {
   constructor(
@@ -29,19 +29,35 @@ export function publishingActivityErrorStatus(err: PublishingActivityError): num
       return 404;
     case 'forbidden':
       return 403;
+    case 'schema_outdated':
+      return 503;
     default:
       return 400;
   }
 }
 
 /**
- * A publication can only be *confirmed* for today or a past day
- * (runtime-local calendar, same convention as the coverage grid). A future
- * day can only hold an `expected` entry.
+ * A publication can only be *confirmed* for today or a past day. "Today" is
+ * the Europe/Madrid calendar day (PROJECT_TIME_ZONE, same as the coverage
+ * grid) compared as YYYY-MM-DD strings — never against a UTC
+ * `toISOString()` day. A future day can only hold an `expected` entry.
  */
 export function isRecordableActivityDate(activityDate: string, now: Date): boolean {
-  return activityDate <= toLocalDayKey(now);
+  return activityDate <= toDayKeyInTimeZone(now);
 }
+
+/**
+ * The write fails this way when migration 038 (`status` column) is not
+ * applied: PostgREST PGRST204 (unknown column in the schema cache) or
+ * Postgres 42703 (undefined column).
+ */
+export function isMissingStatusColumnError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return (error.code === 'PGRST204' || error.code === '42703') && /status/.test(error.message ?? '');
+}
+
+export const SCHEMA_OUTDATED_MESSAGE =
+  'Publishing activity cannot be saved: database migration 038 (status column) is not applied. Apply supabase/migrations/038_add_publishing_activity_status.sql, then retry.';
 
 /**
  * Status saved for an entry. Omitted → derived from the date (future =
@@ -108,6 +124,7 @@ export async function upsertPublishingActivity(
     .select()
     .single();
 
+  if (isMissingStatusColumnError(error)) throw new PublishingActivityError('schema_outdated', SCHEMA_OUTDATED_MESSAGE);
   if (error) throw error;
   return data as StreamPublishingActivity;
 }
@@ -145,6 +162,7 @@ export async function listPublishingActivityFrom(supabase: SupabaseClient, fromD
     .gte('activity_date', fromDayKey);
 
   if (error) console.error('Command Center — publishing activity read failed (are migrations 035 and 038 applied?):', error);
+  if (isMissingStatusColumnError(error)) console.error(SCHEMA_OUTDATED_MESSAGE);
 
   return (data ?? []).map((row) => ({
     streamId: row.content_stream_id as string,

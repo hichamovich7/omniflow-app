@@ -819,6 +819,20 @@ Live RLS enforcement (a user B session cannot read or write user A's rows) needs
 
 ---
 
+# TASK-FIX-054 — Manual external activity on any date, Europe/Madrid
+
+Focused command (run it also with `TZ=UTC`):
+
+```bash
+npx playwright test tests/renderer/publishing-activity-madrid.spec.ts tests/renderer/publishing-coverage-expected.spec.ts tests/renderer/stream-planned-and-activity.spec.ts --project=renderer --reporter=list
+```
+
+Offline (`publishing-activity-madrid.spec.ts`, 17 cases): creation for yesterday / today (published) / tomorrow (expected, `published` refused), Madrid day keys vs UTC (summer and winter), 23:59:59 / 00:00 Madrid boundary for the API rule, grid first cell = Madrid today and recordable, week plan aligned, edit + delete for each of the three dates, confirm of today's expected entry, API validation (format, real date, count, status), ownership 403 / 404 on every date, `user_id` from the session, missing migration 038 → `503 schema_outdated` (PGRST204 and 42703), separate Published / Expected counters with unchanged OmniFlow planned counts, future published and stale expected entries ignored.
+
+Manual: after applying 038, click today's, a future and (via API) a past cell; check the saved `activity_date` / `status` in `content_stream_publishing_activity`.
+
+---
+
 # TASK-FIX-053 — Expected (future) external publishing activity
 
 Focused command:

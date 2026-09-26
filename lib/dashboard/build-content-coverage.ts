@@ -1,6 +1,6 @@
 import type { ContentStreamStatus, PublishingActivitySource, PublishingActivityStatus } from '@/types/content-streams';
 import type { ContentStreamCoverage, CoverageDay, StreamBoardRef, StreamHealth, WeekDayPlan } from '@/types/dashboard';
-import { addDaysToKey, addLocalDays, daysBetweenKeys, startOfLocalWeek, toLocalDayKey } from '@/lib/dashboard/local-date';
+import { addDaysToKey, addLocalDays, daysBetweenKeys, parseLocalDayKey, startOfLocalWeek, toDayKeyInTimeZone, toLocalDayKey } from '@/lib/dashboard/local-date';
 
 /**
  * Planned coverage per content stream (Command Center Phase 2d,
@@ -145,7 +145,8 @@ export function buildContentCoverage({
   externalActivity = [],
   now,
 }: CoverageInput): ContentStreamCoverage[] {
-  const todayKey = toLocalDayKey(now);
+  // "Today" = Europe/Madrid calendar day (TASK-FIX-054), same as the activity API.
+  const todayKey = toDayKeyInTimeZone(now);
   const liveStreams = streams.filter((stream) => stream.status !== 'archived');
 
   // §11 §8: a board linked to more than one non-archived stream makes its
@@ -263,8 +264,9 @@ export interface WeekPlanInput {
  * "to create". Past days only report what was planned.
  */
 export function buildWeekPlan({ coverage, plannedPins, dueTasks, now }: WeekPlanInput): WeekDayPlan[] {
-  const todayKey = toLocalDayKey(now);
-  const monday = startOfLocalWeek(now);
+  // Same "today" as buildContentCoverage, so coverage.days offsets line up.
+  const todayKey = toDayKeyInTimeZone(now);
+  const monday = startOfLocalWeek(parseLocalDayKey(todayKey));
   const weekKeys = Array.from({ length: 7 }, (_, i) => toLocalDayKey(addLocalDays(monday, i)));
   const plannedByDay = countPinsByDay(plannedPins.map((pin) => pin.publishDate));
 

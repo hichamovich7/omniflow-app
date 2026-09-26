@@ -37,8 +37,9 @@ const dayKeySchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
   .refine((value) => {
     const [y, m, d] = value.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+    // UTC calendar arithmetic: a pure date check, independent of any zone / DST.
+    const date = new Date(Date.UTC(y, m - 1, d));
+    return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
   }, 'Invalid date');
 
 export const MAX_PUBLISHING_ACTIVITY_NOTE = 500;

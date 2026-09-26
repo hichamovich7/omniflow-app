@@ -134,12 +134,22 @@ function PublishingActivityDialog({
 
   async function send(url: string, init: RequestInit, success: string) {
     setLoading(true);
-    const res = await fetch(url, init);
-    const json = await res.json().catch(() => ({ error: { message: 'Something went wrong' } }));
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      setLoading(false);
+      const message = 'Network error — publishing activity was not saved. Check your connection and retry.';
+      setError(message);
+      toast.error(message);
+      return;
+    }
+    const json = await res.json().catch(() => null);
     setLoading(false);
 
-    if (!res.ok || json.error) {
-      const message = json.error?.message ?? 'Something went wrong';
+    if (!res.ok || !json || json.error) {
+      // Show the API's reason (validation, ownership, missing migration…), never a silent failure.
+      const message = json?.error?.message ?? `Request failed (HTTP ${res.status})`;
       setError(message);
       toast.error(message);
       return;

@@ -1643,6 +1643,28 @@ The 2026-07-15 decision kept the FAQ only in the structured `faq` field ("jamais
 
 ---
 
+## 2026-09-26 (bis)
+
+### Decision
+
+TASK-FIX-054 — Publishing coverage "today" and the publishing-activity API use the project zone **Europe/Madrid**.
+
+### Context
+
+The 2026-09-25 decision (point 5) derived every day key from the runtime's local calendar. On a UTC host, between 00:00 and 02:00 Madrid (01:00 in winter) "today" was still the previous day for the grid and for the API's future-day rule. The user asked explicitly for Europe/Madrid.
+
+### Decision Taken
+
+1. `PROJECT_TIME_ZONE = 'Europe/Madrid'` and `toDayKeyInTimeZone()` (`Intl`, no dependency) in `lib/dashboard/local-date.ts`.
+2. Used for "today" in `buildContentCoverage`, `buildWeekPlan` (its Monday is derived from that key), the dashboard's activity read cutoff and `isRecordableActivityDate`.
+3. `activityDate` is a calendar date `YYYY-MM-DD`, compared as a string; validation uses UTC calendar arithmetic only.
+
+### Consequences
+
+* Supersedes point 5 of the 2026-09-25 decision for these call sites only. `pins.publish_date` is still written and bucketed in the runtime's local calendar (unchanged, out of scope).
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.
