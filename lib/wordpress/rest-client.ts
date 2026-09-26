@@ -25,7 +25,10 @@ export interface CreatePostInput {
   content: string;
   status: 'draft' | 'publish' | 'future';
   date?: string;
+  excerpt?: string;
+  slug?: string;
   categoryIds?: number[];
+  tagIds?: number[];
   featuredMediaId?: number;
 }
 
@@ -130,6 +133,58 @@ export async function fetchCategories(
 }
 
 /**
+ * Resolves a tag name to its WordPress term id: reuses an existing tag whose
+ * name matches case-insensitively, otherwise creates it. Returns null (never
+ * throws) when the tag can't be found nor created — e.g. the account lacks
+ * the manage_categories capability — so one bad tag never blocks a publish.
+ * `search` is a fuzzy match on WP's side, hence the exact-name filter here.
+ */
+export async function findOrCreateTag(site: WordPressSiteCredentials, name: string): Promise<number | null> {
+  const base = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/tags`;
+  const headers = { Authorization: authHeader(site.username, site.password) };
+  const wanted = name.trim().toLowerCase();
+
+  try {
+    const res = await fetch(`${base}?search=${encodeURIComponent(name)}&per_page=100`, { headers });
+    if (res.ok) {
+      const found = (await res.json()) as { id: number; name: string }[];
+      const match = found.find((t) => decodeHtmlEntities(t.name).trim().toLowerCase() === wanted);
+      if (match) return match.id;
+    }
+  } catch {
+    return null;
+  }
+
+  try {
+    const res = await fetch(base, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = (await res.json().catch(() => null)) as
+      | { id?: number; code?: string; data?: { term_id?: number } }
+      | null;
+    if (res.ok && typeof data?.id === 'number') return data.id;
+    // Race or a name WP normalizes differently: WP answers 400 term_exists
+    // with the existing term's id.
+    if (data?.code === 'term_exists' && typeof data.data?.term_id === 'number') return data.data.term_id;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// WP returns term names HTML-escaped ("Bad &amp; Boujee").
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+/**
  * Downloads an image from its current (public) URL and uploads it to the
  * WordPress media library. WP's media endpoint expects the raw file bytes as
  * the request body (NOT multipart/form-data) with Content-Type set to the
@@ -208,7 +263,10 @@ export async function upsertPost(
     status: input.status,
   };
   if (input.date) body.date = input.date;
+  if (input.excerpt) body.excerpt = input.excerpt;
+  if (input.slug) body.slug = input.slug;
   if (input.categoryIds && input.categoryIds.length > 0) body.categories = input.categoryIds;
+  if (input.tagIds && input.tagIds.length > 0) body.tags = input.tagIds;
   if (input.featuredMediaId) body.featured_media = input.featuredMediaId;
 
   let res: Response;

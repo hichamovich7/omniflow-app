@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { publishArticleSchema } from '@/lib/validations/wordpress-publish';
-import { getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
+import { getPinsSeoSource, getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
 import { getWordPressSiteWithSecretByProjectId } from '@/lib/queries/wordpress-sites';
-import { exportToHtmlForWordPress, getMetaTitle } from '@/lib/wordpress/export';
+import { exportToHtmlForWordPress } from '@/lib/wordpress/export';
 import { decryptSecret } from '@/lib/wordpress/crypto';
+import { sendArticleToWordPress } from '@/lib/wordpress/publish-post';
 import {
   uploadMedia,
-  upsertPost,
   toWordPressLocalDateString,
   WordPressApiError,
   type WordPressSiteCredentials,
@@ -181,46 +181,32 @@ export async function POST(
     date = toWordPressLocalDateString(scheduledAt);
   }
 
-  let postResult;
+  // Pins method: tags and focus keyword come from the selected Pins and their
+  // Pinterest generation, not from the synthesized pin-title label.
+  const pins =
+    generation.source_type === 'pins' ? await getPinsSeoSource(supabase, generation.source_pin_ids ?? []) : null;
+
+  let sent;
   try {
-    postResult = await upsertPost(credentials, article.wp_post_id, {
-      title: getMetaTitle(article),
-      content: exportToHtmlForWordPress({ content }),
+    sent = await sendArticleToWordPress(credentials, {
+      article,
+      generation,
+      pins,
+      html: exportToHtmlForWordPress({ content }),
       status: wpStatus,
       date,
       categoryIds,
       featuredMediaId,
     });
   } catch (err) {
-    if (err instanceof WordPressApiError && err.status === 404 && article.wp_post_id) {
-      // The previously-published post no longer exists on WordPress —
-      // fall back to creating a fresh one.
-      try {
-        postResult = await upsertPost(credentials, null, {
-          title: getMetaTitle(article),
-          content: exportToHtmlForWordPress({ content }),
-          status: wpStatus,
-          date,
-          categoryIds,
-          featuredMediaId,
-        });
-      } catch (retryErr) {
-        const message = isAuthError(retryErr)
-          ? 'WordPress rejected the connection credentials — reconnect in Project settings.'
-          : retryErr instanceof Error
-            ? retryErr.message
-            : 'Failed to publish the post to WordPress.';
-        return fail(message);
-      }
-    } else {
-      const message = isAuthError(err)
-        ? 'WordPress rejected the connection credentials — reconnect in Project settings.'
-        : err instanceof Error
-          ? err.message
-          : 'Failed to publish the post to WordPress.';
-      return fail(message);
-    }
+    const message = isAuthError(err)
+      ? 'WordPress rejected the connection credentials — reconnect in Project settings.'
+      : err instanceof Error
+        ? err.message
+        : 'Failed to publish the post to WordPress.';
+    return fail(message);
   }
+  const postResult = sent.post;
 
   const publishStatus = mode === 'draft' ? 'draft' : mode === 'now' ? 'published' : 'scheduled';
   const publishedAt = mode === 'now' ? new Date().toISOString() : null;
@@ -244,13 +230,22 @@ export async function POST(
   }
 
   return NextResponse.json<
-    ApiResponse<{ wpPostId: number; publishStatus: string; publishedAt: string | null; viewUrl: string }>
+    ApiResponse<{
+      wpPostId: number;
+      publishStatus: string;
+      publishedAt: string | null;
+      viewUrl: string;
+      rankMath: 'saved' | 'not_detected' | 'failed';
+      warnings: string[];
+    }>
   >({
     data: {
       wpPostId: postResult.id,
       publishStatus,
       publishedAt,
       viewUrl: postResult.link,
+      rankMath: sent.rankMath.status,
+      warnings: sent.warnings,
     },
     error: null,
   });

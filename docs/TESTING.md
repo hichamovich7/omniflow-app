@@ -902,3 +902,15 @@ Quality report (4 new cases, plus the updated card/page checks): default open st
 External URL (8 new cases): schema (optional, blank → none, http/https only, clear error); form → route → generator wiring and storage in `manual_external_urls`; prompt wording (relevant only, at most once, exact copy) and Quality Gate acceptance; never linked twice even when the model or the verified-source pass repeat it; a URL equal to a Pin `link_url` listed once; no External URL keeps the automatic verified source; `keepFirstLinkOnly()`; method B keeps its Manual URLs field and schema.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42/42, full Playwright 404 passed / 88 browser cases skipped (no `PLAYWRIGHT_STORAGE_STATE`) / 1 failed (same pre-existing `pinterest-text-importance-none.spec.ts`), production build OK, `git diff --check` OK.
+
+---
+
+# WordPress publish — slug, excerpt, tags, Rank Math (TASK-FIX-049 / TASK-FIX-050, 2026-09-26)
+
+```bash
+npx playwright test tests/renderer/wordpress-publish-seo.spec.ts --project=renderer --reporter=list
+```
+
+Offline (36 cases, the WordPress site is a stubbed global `fetch`, Supabase stubbed — no network, no paid call): post payload (H1 `title`, `excerpt` = meta description, explicit `slug`, categories, featured image, draft / publish / future + date), update of the existing post and 404 fallback; tags from `seo_keywords` → Pin keywords → focus keyword, existing tag reused, missing tag created, refused creation skipped, no minimum, max 8, duplicates / empty / over-long / placeholder / pin-title label dropped, post sent without tags + warning; focus keyword per method (Keyword user keyword, URL resolved keyword only when completed, Pins source Pinterest keyword, never the pin-title concatenation, empty + warning when unreliable); `getPinsSeoSource()` order and shared keyword; Rank Math `updateMeta` payload, absent / route missing / HTTP error never blocking; retry with no duplicate post or tag; no credentials or content in logs; route wiring.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 36/36, full renderer 440/441 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. La validation d'écriture réelle sur Rank Math et la vérification finale des tags sur le site WordPress n'ont pas été exécutées, afin d'éviter une consommation supplémentaire d'API payante. Les tests offline et les mocks couvrent le comportement attendu. À vérifier ultérieurement si un problème Rank Math ou tags est signalé.

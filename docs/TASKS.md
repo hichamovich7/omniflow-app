@@ -6,6 +6,10 @@
 
 # ACTIVE TASK
 
+TASK-FIX-050 (WordPress publish fix after the live test — Rank Math focus keyword resolved per method: user keyword, URL-method resolved keyword, or for Pins the source Pinterest generation keyword instead of the pin-title label; tags from `seo_keywords` + selected Pins' keywords + focus keyword; warnings when no focus keyword or no tag) is implemented locally, not committed. No migration, prompt, model, image, Quality Gate, Pinterest or Social Content Studio change. TypeScript, ESLint (touched files), the SEO spec (36/36) and the production build pass; full renderer 440/441 with the same pre-existing, unrelated Pinterest failure. Validated by the offline tests and the founder's manual test. La validation d'écriture réelle sur Rank Math et la vérification finale des tags sur le site WordPress n'ont pas été exécutées, afin d'éviter une consommation supplémentaire d'API payante. Les tests offline et les mocks couvrent le comportement attendu. À vérifier ultérieurement si un problème Rank Math ou tags est signalé. See CHANGELOG.md "TASK-FIX-050".
+
+TASK-FIX-049 (WordPress publish: H1 as post title, explicit `slug`, `meta_description` as `excerpt`, up to 8 tags from `keyword` + `seo_keywords` looked up or created on WordPress, and a non-blocking Rank Math adapter writing meta title / description / focus keyword through the verified `POST /wp-json/rankmath/v1/updateMeta`) is committed together with TASK-FIX-050, which it is the base of. No migration, prompt, model, image, Quality Gate, Pinterest or Social Content Studio change. TypeScript, ESLint (touched files), the new offline spec (22/22) and the production build pass; full renderer 426/427 with the same pre-existing, unrelated Pinterest failure. See the TASK-FIX-050 note on the live Rank Math check. See CHANGELOG.md "TASK-FIX-049".
+
 TASK-FIX-048 (collapsible Quality report on `/wordpress/[id]` — open for warnings/issues/no report, collapsed when all checks passed, state remembered per generation — and an optional single External URL for method A, stored in the existing `manual_external_urls`, linked at most once and only if relevant, allowed by the Quality Gate) is implemented locally, not committed. Method B, migrations, models, Quality Gate rules, CSV and Pinterest unchanged. TypeScript, ESLint (touched files), the two specs (42/42) and the production build pass; full Playwright 404 passed / 88 skipped (browser, no storage state) / 1 pre-existing Pinterest failure. Manual check of the card toggle recommended. See CHANGELOG.md "TASK-FIX-048". Do not commit automatically.
 
 TASK-FIX-047 (WordPress method A — Pins → article coherence: full Pin context — `overlay_text`, `image_analysis` style summary, board, board section, Content Stream, `link_url` — delimited as data in the outline and article prompts, required outline `promise` passed to the article with coherence rules, Pin `link_url` as the only Pin URL) is implemented locally, not committed. Method B (`/wordpress`), models, migrations, Quality Gate rules, CSV, Social Content Studio and Pinterest images are unchanged. TypeScript, ESLint (touched files), the new offline spec (18/18), WordPress specs (95/95) and the production build pass; full renderer 392/393 with the same pre-existing, unrelated Pinterest failure. Awaiting a real Pins generation to validate output quality. See CHANGELOG.md "TASK-FIX-047". Do not commit automatically.
@@ -483,6 +487,26 @@ Stripe Working                  ⬚ TASK-012
 ---
 
 # COMPLETED TASKS
+
+## [TASK-FIX-050] WordPress publish — focus keyword and tags per method — 2026-09-26
+
+Status: implemented and committed; validated by the offline tests and the founder's manual test.
+
+* Note: La validation d'écriture réelle sur Rank Math et la vérification finale des tags sur le site WordPress n'ont pas été exécutées, afin d'éviter une consommation supplémentaire d'API payante. Les tests offline et les mocks couvrent le comportement attendu. À vérifier ultérieurement si un problème Rank Math ou tags est signalé.
+
+* Goal: correct Rank Math focus keyword and non-empty tags for every generation method, from stored data only.
+* Files: `lib/wordpress/tags.ts`, `lib/wordpress/publish-post.ts`, `lib/queries/wordpress.ts` (`getPinsSeoSource()`), `app/api/wordpress/[id]/publish/route.ts`, `tests/renderer/wordpress-publish-seo.spec.ts`, docs (API, CHANGELOG, TASKS), `lib/guide/content.ts`.
+* Decisions: tag source order seo_keywords → Pin keywords → focus keyword (spec order); Pins focus keyword only when all selected Pins share one Pinterest keyword; URL keyword trusted only on a completed generation.
+* Remaining: with max 8 tags, the first Pin's keywords can fill most slots; the URL method has no seo_keywords, so it usually gets a single tag.
+
+## [TASK-FIX-049] WordPress publish — slug, excerpt, tags, Rank Math — 2026-09-26
+
+Status: implemented and committed with TASK-FIX-050 (see its note on the live Rank Math check).
+
+* Goal: send a complete WordPress post (H1 title, slug, excerpt, categories, tags, featured image, status/date) and Rank Math SEO meta without ever blocking the publish on Rank Math.
+* Files: `lib/wordpress/rest-client.ts` (excerpt/slug/tags fields, `findOrCreateTag()`), new `lib/wordpress/tags.ts`, new `lib/wordpress/seo/rank-math.ts`, new `lib/wordpress/publish-post.ts`, `app/api/wordpress/[id]/publish/route.ts`, `components/wordpress/publish-control.tsx` (warning toasts), new `tests/renderer/wordpress-publish-seo.spec.ts`, docs (API, CHANGELOG, TASKS), `lib/guide/content.ts`.
+* Decisions: meta_title goes to Rank Math only; excerpt = meta_description (no separate field); no tag minimum; Pins-method `keyword` (pin-title label) not used as tag/focus keyword; canonical URL supported by the adapter but never derived.
+* Remaining: live Rank Math write check; outline keywords are not persisted, so Pins/URL articles often get few tags; internal links and Yoast out of scope.
 
 ## [TASK-FIX-046] WordPress Quality Report V1 on the review page — 2026-09-26
 

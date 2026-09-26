@@ -18,6 +18,21 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: WordPress publish — focus keyword and tags per generation method (TASK-FIX-050, 2026-09-26)
+
+* Focus keyword resolved per method (`resolveFocusKeyword()` in `lib/wordpress/tags.ts`): Keyword → the user keyword; URL → the AI-resolved keyword only once the generation is completed (never a URL or the `Pasted content` placeholder); Pins → the keyword of the source Pinterest generation (`pins.generation_id` → `generations.keyword`, new `getPinsSeoSource()` in `lib/queries/wordpress.ts`), never the "Pin title + Pin title" label. No reliable value → Rank Math focus keyword left empty + warning.
+* Tags now come from `seo_keywords`, then the selected Pins' keywords, then the resolved focus keyword (max 8, deduplicated, placeholders and the pin-title label excluded). No tag → post sent without tags + warning; tags that WordPress can't find or create → warning.
+* `sendArticleToWordPress()` takes the Pins source and returns `focusKeyword` (value + source). No migration, prompt, model, image, Quality Gate, Pinterest or Social Content Studio change.
+* Tests: `tests/renderer/wordpress-publish-seo.spec.ts` updated and extended (36 cases).
+
+## Feature: WordPress publish — slug, excerpt, tags and Rank Math SEO meta (TASK-FIX-049, 2026-09-26)
+
+* Post payload: `title` is now the H1 (`article.title`) instead of `meta_title`; `slug` (OmniFlow's validated slug) and `excerpt` (`meta_description`) are sent explicitly. Content, images, categories, featured image, status/date and the update-or-create (404 fallback) behavior are unchanged.
+* Tags: new `lib/wordpress/tags.ts` builds up to 8 tags from `wordpress_generations.keyword` + `seo_keywords` (no AI call, no minimum, deduplicated, empty/over-long values dropped; the Pins method's synthesized pin-title label is skipped). `findOrCreateTag()` in `rest-client.ts` reuses an existing WP tag or creates it; refused creations are skipped.
+* Rank Math: new adapter `lib/wordpress/seo/rank-math.ts` — detects `POST /wp-json/rankmath/v1/updateMeta` from the namespace index, then writes `rank_math_title` (meta title), `rank_math_description`, `rank_math_focus_keyword` (`generation.keyword`, never the title) on the created post. Route and args verified on the connected site (Rank Math 1.0.279 + PRO). Never blocking: absent → "Rank Math was not detected.", failure → "Rank Math metadata could not be saved." (warning toasts, `warnings` + `rankMath` in the response); logs carry only step, ids, HTTP code and message.
+* New `lib/wordpress/publish-post.ts` orchestrates tags → post → Rank Math; the publish route delegates to it. No migration, prompt, model, image, Quality Gate, Pinterest or Social Content Studio change.
+* Tests: new offline `tests/renderer/wordpress-publish-seo.spec.ts` (22 cases, stubbed WordPress site).
+
 ## Improve: collapsible Quality report + External URL for WordPress method A (TASK-FIX-048, 2026-09-26)
 
 * `/wordpress/[id]` Quality report card is collapsible (`components/wordpress/quality-report-disclosure.tsx`): toggle button with `aria-expanded`, open by default for warnings / issues / no report, collapsed when every check passed, choice remembered per generation in localStorage. Report content, export, copy, category save and publish unchanged and always available.

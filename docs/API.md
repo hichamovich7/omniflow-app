@@ -70,7 +70,7 @@ Applied to AI-cost-incurring endpoints via `lib/rate-limit.ts` (`checkRateLimit(
 | POST /api/wordpress/[id]/publish      | 15 / hour  |
 | POST /api/wordpress/suggest-keywords  | 30 / hour  |
 
-Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider. `wordpress/sites/test` and `wordpress/publish` are the exception among non-AI endpoints: both make real external HTTP requests to a third-party WordPress host OmniFlow doesn't control, with real side effects (a live post appearing/updating on the user's site), so they're rate-limited like the AI endpoints — `publish` deliberately below `wordpress/generate`'s 20/hour since a single publish can fan out into up to ~5 sequential WordPress requests (image uploads + post create/update).
+Not applied to CRUD endpoints (projects, boards, schedule, pin-images) — these don't call an external AI/scraping provider. `wordpress/sites/test` and `wordpress/publish` are the exception among non-AI endpoints: both make real external HTTP requests to a third-party WordPress host OmniFlow doesn't control, with real side effects (a live post appearing/updating on the user's site), so they're rate-limited like the AI endpoints — `publish` deliberately below `wordpress/generate`'s 20/hour since a single publish can fan out into up to ~5 sequential WordPress requests (image uploads + post create/update), plus since TASK-FIX-049 up to 8 tag lookups/creations and 2 Rank Math calls.
 
 ## Trial Usage Cap
 
@@ -904,7 +904,11 @@ Publish an article to its project's connected WordPress site via the REST API (T
 2. Uploads internal/body images to the WP media library, rewriting their URLs in the post content on success — a failure on any individual internal image is non-fatal, the original (already public) Supabase Storage URL is kept in the content instead.
 3. Resolves the article's mapped WordPress category (`wp_category_id`); an unmapped category is omitted from the payload (WordPress defaults to "Uncategorized"), non-fatal.
 4. Computes `status`/`date` from `mode` and calls `POST /wp-json/wp/v2/posts` (or `POST /wp-json/wp/v2/posts/{id}` to update, if `wp_post_id` is already set — falling back to create on a 404). The post body is `exportToHtmlForWordPress()` (TASK-FIX-008), not the plain `exportToHtml()` used for OmniFlow's own reading view — it strips the leading `# {title}` line from `content` first, since the post's `title` field (rendered as an H1 by the WP theme) already carries it; sending both stacked two H1s on the published page.
-5. Persists `wp_post_id` / `publish_status` / `published_at` / `scheduled_at` (migration 020, TASK-FIX-007 — the WP-side target datetime, only set for `mode: "schedule"`, cleared otherwise), or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
+   Payload (TASK-FIX-049, `lib/wordpress/publish-post.ts`): `title` = the H1 `article.title` (no longer `meta_title`, which is reserved for Rank Math), `content`, `excerpt` = `meta_description`, `slug` = `wordpress_articles.slug` sent explicitly (WordPress never re-derives it from the title), `categories`, `tags`, `featured_media`, `status`, `date`.
+   Focus keyword (`resolveFocusKeyword()`, TASK-FIX-050): Keyword method → `wordpress_generations.keyword`; URL method → the same column only once the generation is `completed` (the AI-resolved keyword), never a URL or the `Pasted content` placeholder; Pins method → never `wordpress_generations.keyword` (a synthesized "Pin title + Pin title" label) but the source Pinterest `generations.keyword`, read via `pins.generation_id` by `getPinsSeoSource()` (`lib/queries/wordpress.ts`) — only when every selected Pin shares one keyword. Empty, URL-like or > 200-character values are rejected; no reliable value → no focus keyword and a warning.
+   Tags (`lib/wordpress/tags.ts`): built only from stored data, in this order — `seo_keywords`, the selected Pins' `pins.keywords` (Pins method), the resolved focus keyword (articles store no tags) — no AI call, no minimum, max 8, deduplicated case/space/hyphen-insensitively, empty, placeholder and > 60-character values dropped, original casing kept, the pin-title label never used. No tag at all → the post is sent without `tags` and a warning is returned. Each name is looked up with `GET /wp-json/wp/v2/tags?search=` (exact case-insensitive name match) and reused, else created with `POST /wp-json/wp/v2/tags`; a tag WordPress refuses to create is skipped, never blocking.
+5. Rank Math (`lib/wordpress/seo/rank-math.ts`), after the post exists: `GET /wp-json/rankmath/v1` checks that `/rankmath/v1/updateMeta` is exposed for `POST`, then `POST /wp-json/rankmath/v1/updateMeta` with `{ "objectType": "post", "objectID": <wp post id>, "meta": { "rank_math_title": getMetaTitle(article), "rank_math_description": meta_description, "rank_math_focus_keyword": keyword } }` (`rank_math_canonical_url` only when explicitly provided — never today). Empty values are omitted, never sent (Rank Math deletes a meta sent empty); `permalink` is never sent. Route and args (`objectType` string, `objectID` integer, `meta`) verified on the connected site's public namespace index — Rank Math 1.0.279 + PRO, 2026-09-26. Never blocking: namespace absent → warning "Rank Math was not detected."; route missing, HTTP error or `false` answer → warning "Rank Math metadata could not be saved." and a log line with only step, article/post ids, HTTP code and message. The post, slug, content and tags stay as sent; a retry updates the same post and overwrites the same meta keys.
+6. Persists `wp_post_id` / `publish_status` / `published_at` / `scheduled_at` (migration 020, TASK-FIX-007 — the WP-side target datetime, only set for `mode: "schedule"`, cleared otherwise), or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
 
 ## Request
 
@@ -926,11 +930,15 @@ Publish an article to its project's connected WordPress site via the REST API (T
     "wpPostId": 42,
     "publishStatus": "scheduled",
     "publishedAt": null,
-    "viewUrl": "https://example.com/?p=42"
+    "viewUrl": "https://example.com/?p=42",
+    "rankMath": "saved",
+    "warnings": []
   },
   "error": null
 }
 ```
+
+`rankMath` is `"saved"`, `"not_detected"` or `"failed"`; `warnings` holds the non-blocking messages shown as warning toasts by the Publish control — Rank Math not detected / not saved, "No reliable tags found — the post was sent without tags.", "Tags could not be found or created on WordPress — the post was sent without tags." and "No reliable focus keyword found — the Rank Math focus keyword was left empty.". A Rank Math problem never turns a publish into `publish_failed`.
 
 ## Credits
 

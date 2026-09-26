@@ -98,6 +98,10 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
           ? 'Published to WordPress'
           : 'Scheduled on WordPress'
     );
+    // Non-blocking SEO issues (e.g. Rank Math) — the post itself was sent.
+    for (const warning of (json.data?.warnings ?? []) as string[]) {
+      toast.warning(warning);
+    }
     router.refresh();
   }
 
