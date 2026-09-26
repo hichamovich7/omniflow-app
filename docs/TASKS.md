@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-044 phase 1 (Social Content Studio — Pinterest from a WordPress article) is implemented locally, not committed. On `/wordpress/[id]` (completed articles only) a "Social Content Studio" section lists six platforms from the central config `lib/social/platforms.ts`: **Pinterest `available`** — "Generate Pinterest content" calls the new `POST /api/wordpress/[id]/social` (`{ platform: "pinterest" }`), which checks auth, UUID, article + project ownership and completion, then rate limit `wordpress/social` + trial cap, and runs the existing Pinterest generator unchanged (`buildPinterestPinsPrompt` pinterest-pins-v10, 5 Pins, photo-only, plan parser + strategy safeguards with the article as evidence) with the article (H1, content excerpt, resolved keyword, meta title/description, SEO keywords, language, featured image, Brand Profile) in its `analysisContext`; result shown with loading / error states and per-Pin Copy. **Facebook `coming_soon`; Instagram, Reels, TikTok, Medium `planned`** — disabled, no handler, accessible message; no API/AI call, no DB write. Content only: no persistence, no Pinterest publication, article never modified; no migration, no credits, no history, no other platform generator. TypeScript, ESLint (touched files), the new offline spec (23/23), the full renderer suite 600/601 (same pre-existing, unrelated `pinterest-text-importance-none.spec.ts` failure) and the production build pass; the gated browser spec needs `PLAYWRIGHT_STORAGE_STATE` + `PLAYWRIGHT_WP_ARTICLE_ID`. No real AI call made. See CHANGELOG.md "TASK-044". Do not commit automatically.
+
 TASK-FIX-055 (WordPress — structured FAQ + FAQPage schema: the FAQ items rendered into `content` at generation time are also saved on the new `wordpress_articles.faq` jsonb column — same validated array, same step, best-effort write after the insert; `[]` when no FAQ was rendered, NULL for older articles, which fall back to a read-only parse of their H3 FAQ section, never written back. On publish, OmniFlow adds exactly one FAQPage `<script type="application/ld+json">` after the body (after internal links), built server-side from the saved Q/A only, as escaped plain text with no URL but `@context`; none when `include_faq` is false, the FAQ is empty/invalid/absent, the HTML already has a Rank Math/Yoast FAQ block or FAQPage, or the Q/A are not visible in the content. Rank Math only outputs FAQPage for its own FAQ block / hand-added schema, which OmniFlow never sends. If WordPress strips the script (kses) the post is re-sent without it + warning, so the JSON never becomes visible text. New `faqSchema` field in the publish response. Visible FAQ, Copy Markdown / Copy HTML, Quality Gate, internal links, tags, focus keyword and slug unchanged; no prompt, model or generation change; no AI call) is implemented and committed. Migration **039** (`039_add_wordpress_article_faq.sql`) must be applied by hand in the Supabase SQL Editor — until then only the column write is lost (logged), generation and publish keep working. TypeScript, ESLint (touched files), the new offline spec (23/23), the WordPress suites (195/195) and the production build pass; full renderer 577/578 with the same pre-existing, unrelated Pinterest failure. Not yet checked on the real WordPress site (script kept by kses, Rich Results test). See CHANGELOG.md "TASK-FIX-055".
 
 TASK-FIX-054 (Publishing coverage — manual external activity blocked, even on today's cell). **Root cause:** migration 038 was not applied to the Supabase database (`column content_stream_publishing_activity.status does not exist`, checked read-only on 2026-09-26). Every `PUT` writes `status`, so every save — today included — failed with a generic `500 server_error` ("Failed to save publishing activity"), and the dashboard read of manual activity failed silently (empty grid markers). **Fix:** apply `supabase/migrations/038_add_publishing_activity_status.sql` by hand in the Supabase SQL Editor (not done by the agent: no DDL access). Code: the missing column now returns `503 schema_outdated` with an actionable message shown in the modal (network errors too, no stuck "Saving..."); "today" of the coverage grid, the This week plan, the activity read cutoff and the API's future-day rule are the **Europe/Madrid** calendar day (`PROJECT_TIME_ZONE`, `toDayKeyInTimeZone`), compared as `YYYY-MM-DD` strings, never against a UTC `toISOString()` day; date validation is zone-independent. Any real date is accepted (past / today = `published`, future = `expected` only); ownership, RLS, stream and date checks unchanged; edit / delete on every date. Pins bucketing (`pins.publish_date`) is unchanged. New offline spec `tests/renderer/publishing-activity-madrid.spec.ts` (17 cases, also under `TZ=UTC`); TypeScript and ESLint (touched files) pass; full renderer 554/555 with one pre-existing unrelated failure (`pinterest-text-importance-none.spec.ts`, `pin-form.tsx` untouched). Not committed. Live check after applying 038 still to do.
@@ -446,7 +448,20 @@ A user can open an existing Pin's detail, add or edit its Board section, and sav
 
 ## [TASK-044] Social Content Studio from WordPress Article
 
-### Status: PLANNED (documented 2026-09-26 — not started, not the active task)
+### Status: PHASE 1 IMPLEMENTED (2026-09-27 — Pinterest only, not committed); later phases PLANNED
+
+Phase 1 platforms (`lib/social/platforms.ts`):
+
+```txt
+pinterest   available     text Pins generated from the article (no persistence, no publish)
+facebook    coming_soon   displayed, disabled
+instagram   planned       displayed, disabled
+reels       planned       displayed, disabled
+tiktok      planned       displayed, disabled
+medium      planned       displayed, disabled
+```
+
+Phase 1 resolves D1 (section on `/wordpress/[id]`, no sub-page yet), D3/D4 (text only, featured image reused for display, no `pins` rows), D6 (rate limit + trial cap, no credits), D10 (article language) for Pinterest. Still open for later phases: storage/history (D5, migration), editing (D7), export formats (D8), article URL as Pin destination link (D11), variants (D2), the other platforms' generators.
 
 ### Goal
 

@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 
-Status: PLANNED — documentation only. Nothing here is implemented, and this is not the active task. Every file, route, table and contract below is a proposal to confirm against the code at implementation time and the open decisions (section 7).
+Status: PHASE 1 IMPLEMENTED (2026-09-27) — Pinterest only, from `POST /api/wordpress/[id]/social` (`lib/social/pinterest-from-article.ts`, platforms in `lib/social/platforms.ts`); Facebook is shown as Coming soon, Instagram / Reels / TikTok / Medium as Planned. No persistence, history, credits or migration in phase 1 — see docs/TASKS.md TASK-044 and docs/API.md. Everything else below remains a proposal for the later phases, to confirm against the code and the open decisions.
 
 Related audit: `docs/tasks/AUDIT-WORDPRESS-PIPELINE-AND-MODELS-2026-09-26.md`.
 

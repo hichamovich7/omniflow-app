@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
   UploadCloud,
+  Share2,
 } from 'lucide-react';
 
 export interface GuideSection {
@@ -210,6 +211,20 @@ export const guideSections: GuideSection[] = [
       'If a publish attempt fails (e.g. revoked credentials, unreachable site), the exact reason is always shown on the article page — never a silent failure. Republishing after fixing the issue updates the same WordPress post rather than creating a duplicate.',
       'A status badge at the top of every article page — and a compact version on each WordPress History row — always shows whether it has been sent yet: "Not sent to WordPress", "Sent as draft", "Published" (with a direct link to the live post), or "Scheduled for [date]". If you click Publish/Save as Draft/Schedule on an article that was already sent, a confirmation step reminds you when and warns that it will update the existing WordPress post rather than create a duplicate — informational, not a hard block.',
       'Changing an article\'s category from its own page never re-publishes it automatically — if it was already sent to WordPress, the new category only takes effect the next time you publish or update it there.',
+    ],
+  },
+  {
+    id: 'social-content-studio',
+    title: 'Social Content Studio',
+    icon: Share2,
+    summary: 'Turn a finished WordPress article into social media content, right from the article page.',
+    points: [
+      'Open a completed article and scroll to "Social Content Studio". It lists Pinterest, Facebook, Instagram, Reels, TikTok and Medium.',
+      'Pinterest is available today: click "Generate Pinterest content" to get 5 Pin ideas (title, description, keywords and a suggested board), each written from a different angle, in the article\'s language, using its title, meta title and description, main keyword, SEO keywords, featured image and your Brand Profile.',
+      'The Pins stay faithful to the article: a number or claim the article does not contain is refused, and you are asked to try again.',
+      'Nothing is published, scheduled or saved: no Pin is created in your Pinterest generations, and the article itself is never changed. Use Copy on each Pin to take what you need; reloading the page clears the result.',
+      'Facebook is coming soon; Instagram, Reels, TikTok and Medium are planned. Their buttons are disabled for now and clicking them does nothing.',
+      'Each Pinterest generation counts toward your hourly limit and your free-trial generations, like the other generators.',
     ],
   },
 ];

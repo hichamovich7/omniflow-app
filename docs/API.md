@@ -958,6 +958,77 @@ A WordPress problem is never an error: the original export is returned. On any r
 
 ---
 
+# POST /api/wordpress/[id]/social
+
+Social Content Studio, phase 1 (TASK-044). Generates platform content from an owned, completed WordPress article. `[id]` is the `wordpress_generations.id`. Content only: nothing is persisted (no history table, no `generations` / `pins` / `boards` row), nothing is published, and `wordpress_articles` / `wordpress_article_images` / storage are only read.
+
+Platforms come from `lib/social/platforms.ts`:
+
+```txt
+pinterest   available     → accepted
+facebook    coming_soon   → rejected (400)
+instagram   planned       → rejected (400)
+reels       planned       → rejected (400)
+tiktok      planned       → rejected (400)
+medium      planned       → rejected (400)
+```
+
+## Description
+
+1. Auth (`supabase.auth.getUser()`), UUID check, Zod body (`generateSocialContentSchema`, `lib/validations/social.ts` — only `available` platforms, strict object).
+2. `loadArticlePinterestSource()` (`lib/social/pinterest-from-article.ts`), selects only: article + generation (`getWordPressArticleByGenerationId()`), `generation.user_id` = caller (else 403), generation and article `completed` (else 409), project owned by the caller (niche + Brand Profile description), and for the Pins method the source Pinterest keyword (`getPinsSeoSource()`).
+3. Rate limit `wordpress/social` (20/hour) with the trial cap — checked after ownership so a rejected request never consumes trial budget. No credits (TASK-011 not shipped).
+4. `generatePinterestFromArticle()` reuses the existing Pinterest generator unchanged: `buildPinterestPinsPrompt()` (`pinterest-pins-v10`) with 5 Pins (one per angle), `photo-only` mode and no text overlay; keyword = `resolveFocusKeyword()` (same per-method resolution as publishing) or the H1 when none is reliable; language = the article's; Brand Profile and niche from the project. The article — H1, meta title, meta description, primary keyword, SEO keywords, featured image (and its stored prompt) and a content excerpt (≤ 6 000 chars, images and link URLs removed) — is passed through the prompt's `analysisContext`, delimited as data. `generateText` role `FAST` (no model change). The response goes through `parsePinterestGenerationPlan()` and `validatePinterestStrategyBatch()` with the article as evidence (a number the article states is allowed, an invented one is refused).
+
+## Request
+
+```json
+{ "platform": "pinterest" }
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "platform": "pinterest",
+    "keyword": "small bathroom storage",
+    "language": "en",
+    "articleTitle": "Small Bathroom Storage That Actually Works",
+    "featuredImageUrl": "https://…/featured.png",
+    "pins": [
+      { "angle": "curiosity", "title": "…", "description": "…", "keywords": "a, b, c", "board": "Bathroom Ideas" }
+    ]
+  },
+  "error": null
+}
+```
+
+No image prompt, image or destination link is returned; the featured image URL is echoed for display only.
+
+## Credits
+
+Not charged (rate limit + trial cap only, as the other generation routes until TASK-011).
+
+## Possible Errors
+
+```txt
+unauthorized            401
+invalid_id              400
+invalid_json            400
+invalid_request         400  (unknown or not-yet-available platform)
+not_found               404
+forbidden               403  (article or project of another user)
+article_not_completed   409
+rate_limited / trial_limit_reached
+invalid_pin_plan        422  (incomplete / invalid JSON, never repaired)
+invalid_strategy_plan   422  (strategy safeguards, e.g. invented number)
+generation_failed       500  (AI provider error)
+server_error            500
+```
+
+---
+
 # POST /api/wordpress/[id]/publish
 
 Publish an article to its project's connected WordPress site via the REST API (TASK-035). `[id]` is the `wordpress_generations.id`, matching the existing `DELETE /api/wordpress/[id]`.

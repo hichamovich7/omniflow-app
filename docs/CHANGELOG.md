@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Feature: Social Content Studio — phase 1, Pinterest from a WordPress article (TASK-044, 2026-09-27)
+
+* `/wordpress/[id]` shows a "Social Content Studio" section for completed articles, with one card per platform from the new central config `lib/social/platforms.ts`: **Pinterest available**; **Facebook coming soon**; **Instagram, Reels, TikTok, Medium planned** (disabled buttons, no handler, accessible explanation — no API/AI call, no database write).
+* New `POST /api/wordpress/[id]/social` (`{ platform: "pinterest" }` — other platforms rejected by Zod): auth, UUID, ownership of the article and its project, article completed (409 otherwise), then rate limit `wordpress/social` + trial cap. `lib/social/pinterest-from-article.ts` reuses the existing Pinterest generator unchanged (`buildPinterestPinsPrompt` pinterest-pins-v10, 5 Pins, photo-only, `parsePinterestGenerationPlan`, `validatePinterestStrategyBatch` with the article as evidence); the article (H1, meta title/description, resolved keyword, SEO keywords, language, featured image, content excerpt) goes through the prompt's existing `analysisContext`; Brand Profile and niche from the project. Role `FAST`, no model change.
+* Content only: no history, no `generations` / `pins` / board row, no Pinterest publication, article tables and storage only read. No migration, no credits, no other platform generator or integration.
+* Tests: new offline `tests/renderer/social-content-studio.spec.ts` (23 cases, stubbed AI + in-memory Supabase recording every operation) and gated browser `tests/playwright/wordpress-social-content.spec.ts` (needs `PLAYWRIGHT_STORAGE_STATE` + `PLAYWRIGHT_WP_ARTICLE_ID`, AI route mocked).
+
 ## Feature: WordPress — structured FAQ and FAQPage schema (TASK-FIX-055, 2026-09-26)
 
 * Migration `039_add_wordpress_article_faq.sql`: nullable `wordpress_articles.faq jsonb` (`[{ question, answer }]`). No backfill, no RLS change. Apply by hand in the Supabase SQL Editor.

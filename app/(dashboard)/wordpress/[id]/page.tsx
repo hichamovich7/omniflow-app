@@ -16,6 +16,7 @@ import { PublishControl } from '@/components/wordpress/publish-control';
 import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
 import { ArticleCategoryEditor } from '@/components/wordpress/article-category-editor';
 import { ArticleQualityReportCard } from '@/components/wordpress/article-quality-report';
+import { SocialContentStudio } from '@/components/wordpress/social-content-studio';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { FileText } from 'lucide-react';
@@ -85,6 +86,10 @@ export default async function WordPressArticlePage({
           />
 
           <ArticleQualityReportCard report={qualityReport} generationId={id} />
+
+          {generation.status === 'completed' && article.status === 'completed' && (
+            <SocialContentStudio generationId={id} />
+          )}
 
           <ArticleCategoryEditor
             generationId={id}
