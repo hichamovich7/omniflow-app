@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { WordPressArticle, WordPressArticleImage, WordPressGeneration } from '@/types/wordpress';
+import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
+import { parseQualityReport } from '@/lib/wordpress/quality-report';
 
 export async function getWordPressArticleByGenerationId(supabase: SupabaseClient, generationId: string) {
   const { data: generation } = await supabase
@@ -13,8 +15,12 @@ export async function getWordPressArticleByGenerationId(supabase: SupabaseClient
       generation: null as WordPressGeneration | null,
       article: null as WordPressArticle | null,
       images: [] as WordPressArticleImage[],
+      qualityReport: null as ArticleQualityReport | null,
     };
   }
+
+  // Validated here so every reader gets a typed report or null, never raw jsonb.
+  const qualityReport = parseQualityReport((generation as WordPressGeneration).quality_report);
 
   const { data: article } = await supabase
     .from('wordpress_articles')
@@ -23,7 +29,7 @@ export async function getWordPressArticleByGenerationId(supabase: SupabaseClient
     .single();
 
   if (!article) {
-    return { generation: generation as WordPressGeneration, article: null, images: [] as WordPressArticleImage[] };
+    return { generation: generation as WordPressGeneration, article: null, images: [] as WordPressArticleImage[], qualityReport };
   }
 
   const { data: images } = await supabase
@@ -36,5 +42,6 @@ export async function getWordPressArticleByGenerationId(supabase: SupabaseClient
     generation: generation as WordPressGeneration,
     article: article as WordPressArticle,
     images: (images ?? []) as WordPressArticleImage[],
+    qualityReport,
   };
 }

@@ -15,6 +15,7 @@ import { CopyExportButtons } from '@/components/wordpress/copy-export-buttons';
 import { PublishControl } from '@/components/wordpress/publish-control';
 import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
 import { ArticleCategoryEditor } from '@/components/wordpress/article-category-editor';
+import { ArticleQualityReportCard } from '@/components/wordpress/article-quality-report';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { FileText } from 'lucide-react';
@@ -28,7 +29,7 @@ export default async function WordPressArticlePage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { generation, article, images } = await getWordPressArticleByGenerationId(supabase, id);
+  const { generation, article, images, qualityReport } = await getWordPressArticleByGenerationId(supabase, id);
 
   if (!generation) {
     redirect('/wordpress/blog-post');
@@ -79,6 +80,8 @@ export default async function WordPressArticlePage({
               filename={`${article.slug}.md`}
             />
           )}
+
+          <ArticleQualityReportCard report={qualityReport} />
 
           <ArticleCategoryEditor
             generationId={id}

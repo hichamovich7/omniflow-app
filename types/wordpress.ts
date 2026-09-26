@@ -57,6 +57,11 @@ export interface WordPressGeneration {
   // Comma-separated, same convention as seo_keywords. Purely additive to the
   // existing, unconditional addExternalLink() mechanism — see DATABASE.md.
   manual_external_urls: string | null;
+  // Quality Gate V1 report (TASK-FIX-046, migration 037). Raw jsonb as
+  // stored — read it through parseQualityReport() (lib/wordpress/quality-report.ts),
+  // which getWordPressArticleByGenerationId() already does. Null before 037
+  // or for generations created before the Quality Gate.
+  quality_report?: unknown;
 }
 
 export type WordPressGenerationInsert = Omit<WordPressGeneration, 'id' | 'created_at' | 'status' | 'source_type' | 'research_notes' | 'source_pin_ids' | 'source_url' | 'article_type' | 'article_size' | 'tone_of_voice' | 'point_of_view' | 'target_country' | 'hook_brief' | 'include_conclusion' | 'include_tables' | 'include_h3' | 'include_lists' | 'include_italics' | 'include_quotes' | 'include_key_takeaways' | 'include_faq' | 'include_bold' | 'seo_keywords' | 'manual_external_urls'> & {

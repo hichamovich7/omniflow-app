@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Add: WordPress Quality Report V1 on the review page (TASK-FIX-046, 2026-09-26)
+
+* Migration `037_add_wordpress_quality_report.sql`: nullable `wordpress_generations.quality_report jsonb` (additive, no backfill, no RLS change). **Apply by hand in the Supabase SQL Editor.**
+* The three generation routes save the Quality Gate V1 report best-effort after marking the generation completed (`saveQualityReport()`, `lib/wordpress/quality-report.ts`) — a missing column or failed write is logged, never fails the generation.
+* `getWordPressArticleByGenerationId()` returns `qualityReport`, validated with Zod (`articleQualityReportSchema`), `null` for older or malformed rows.
+* `/wordpress/[id]` shows a read-only Quality report card (status badge, summary, issues, warnings, collapsible list of all checks); older articles show "No quality report for this article". Informational only — export and publishing unchanged.
+* Quality Gate checks and thresholds, prompts, models, Pinterest, CSV and Social Content Studio unchanged.
+* Tests: `tests/renderer/wordpress-quality-report.spec.ts` (12 offline cases).
+
 ## Add: WordPress Article Quality Gate V1 (TASK-FIX-045, 2026-09-26)
 
 * New `lib/wordpress/quality-check.ts` (`runArticleQualityCheck()`): 17 deterministic checks run after every WordPress generation (keyword, pins, URL) — word count vs chosen size, single H1 title, planned H2 sections, H3 only with `includeH3 = true`, FAQ presence/absence (one section), no unreplaced `{{…}}` marker, first sentence ≠ title, no unauthorized URL, meta title / meta description length, slug validity, truncation (`finish_reason = "length"`), obvious generic phrasing, verbatim repetition, placed image markers, disabled blocks absent, language consistency.

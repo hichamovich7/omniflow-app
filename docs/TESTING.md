@@ -856,3 +856,19 @@ npx playwright test tests/renderer/wordpress-quality-check.spec.ts --project=ren
 Offline (21 cases): a clean fixture passes all 17 checks in a fixed order; aggregate status (failed > warning > passed) and `qualityIssues` / `warnings`; one or more failing/warning variants per check (word count for small/medium/large/default with tolerance, H1, H2, H3 toggles, FAQ toggle and duplicates, `{{FAQ}}`/`{{IMAGE_N}}` leftovers, first sentence, unauthorized links and bare URLs, meta title/description lengths, slug, `finish_reason` length/missing, generic phrasing, repetition, image markers, disabled Key Takeaways/Conclusion/table/blockquote, language); an end-to-end keyword generation (`fetch` + Storage stubbed) where a `finish_reason: "length"` article call yields `truncation = failed` while the article is still returned; static check that the three routes return `quality`.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 21/21, full renderer 362/363 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK.
+
+---
+
+# WordPress Quality Report V1 display (TASK-FIX-046, 2026-09-26)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/wordpress-quality-report.spec.ts --project=renderer --reporter=list
+```
+
+Offline (12 cases): migration 037 is the latest and only adds `quality_report jsonb` (nullable) to `wordpress_generations`; no tracked migration modified (`git diff`); `parseQualityReport()` round trip and rejection of null / malformed values; `saveQualityReport()` payload and never-throw behavior (missing column, network error); the three routes save after `status = completed` and never inside that update; `getWordPressArticleByGenerationId()` returns the validated report or `null` (in-memory Supabase stub); the card's display model (status label/tone, summary and plurals, labels, unknown keys); static checks that the card uses the model, has no button/form/link, is not a client component, and that the review page renders it while the publish route ignores it.
+
+Playwright's runner rewrites JSX in imported `.tsx` files, so the card is not server-rendered in this suite; its labels and counts live in `lib/wordpress/quality-report-view.ts`. Manual check after applying 037: generate an article, open `/wordpress/[id]`, expand "All checks".
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 12/12, full renderer 374/375 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK.

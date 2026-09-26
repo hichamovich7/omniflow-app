@@ -6,6 +6,7 @@ import { getActivePinImageUrls } from '@/lib/queries/pin-images';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
+import { saveQualityReport } from '@/lib/wordpress/quality-report';
 import type { Pin } from '@/types/database';
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -277,6 +278,7 @@ export async function POST(request: Request) {
     }
 
     await supabase.from('wordpress_generations').update({ status: 'completed' }).eq('id', generation.id);
+    await saveQualityReport(supabase, generation.id, result.quality, 'wordpress-from-pins');
 
     return NextResponse.json<ApiResponse<{ generationId: string; status: string; quality: ArticleQualityReport }>>(
       { data: { generationId: generation.id, status: 'completed', quality: result.quality }, error: null },

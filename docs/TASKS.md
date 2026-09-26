@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-046 (WordPress Quality Report V1 on the review page — migration **037** adds nullable `wordpress_generations.quality_report jsonb`, saved best-effort by the three generation routes, read and Zod-validated by `getWordPressArticleByGenerationId()`, shown read-only on `/wordpress/[id]`) is implemented and committed. **Migration 037 must be applied by hand in the Supabase SQL Editor**; until then generations still complete and the page shows "No quality report". No Quality Gate check/threshold, prompt, model, Pinterest, CSV or Social Content Studio change. TypeScript, ESLint (touched files), the new offline spec (12/12) and the production build pass; full renderer 374/375 with the same pre-existing, unrelated Pinterest failure. See CHANGELOG.md "TASK-FIX-046".
+
 TASK-FIX-045 (WordPress Article Quality Gate V1 — 17 deterministic post-generation checks in `lib/wordpress/quality-check.ts`, report logged and returned as `data.quality` by the three generation routes, not persisted, never blocking) is implemented and committed. No prompt, model, Pinterest, CSV, migration or Social Content Studio change. TypeScript, ESLint (touched files), the new offline spec (21/21) and the production build pass; full renderer 362/363 with the same pre-existing, unrelated Pinterest failure as TASK-FIX-044. See CHANGELOG.md "TASK-FIX-045".
 
 TASK-FIX-044 (WordPress pipeline P0 quality fixes — real keyword/Brand Profile/research context in the article prompt, `generations.keyword` first for Pins, no web-search or invented URL instruction, size- and toggle-aware rules, anti-fabrication and editorial rules, visible FAQ) is implemented locally, not committed. No model, `.env`, Pinterest image/generator, credit, migration, CSV or Social Content Studio change. TypeScript, ESLint (touched files), WordPress renderer specs (44/44) and the production build pass; full renderer 341/342 with one pre-existing, unrelated Pinterest failure (`pinterest-text-importance-none.spec.ts`, also failing without this change). Awaiting a real generation to validate output quality. See CHANGELOG.md "TASK-FIX-044". Do not commit automatically.
@@ -478,6 +480,15 @@ Status: implemented locally, awaiting migration 033/034 apply + manual validatio
 * Provider images are saved unchanged under Git-ignored `.benchmark-output/`; Sharp only records technical metadata and never composes text.
 * Added nullable human evaluation fields and PASS/NEEDS_REVIEW/FAIL calculation. A generated image starts at NEEDS_REVIEW; technical ratio inspection alone can never mark it PASS.
 * Added offline coverage for CLI parsing, fixtures, configured-model deduplication, dry-run network isolation and evaluation calculation.
+## [TASK-FIX-046] WordPress Quality Report V1 on the review page — 2026-09-26
+
+Status: implemented and committed, awaiting migration 037 apply + manual validation.
+
+* Goal: persist the Quality Gate V1 report with the generation, return it from the detail read, show it on `/wordpress/[id]`, informational only.
+* Files: new `supabase/migrations/037_add_wordpress_quality_report.sql`, new `lib/wordpress/quality-report.ts` (Zod schema, parse, best-effort save), new `lib/wordpress/quality-report-view.ts` (display model), new `components/wordpress/article-quality-report.tsx`, `app/(dashboard)/wordpress/[id]/page.tsx`, `lib/queries/wordpress.ts`, `types/wordpress.ts`, the three `app/api/wordpress/generate*/route.ts`, new `tests/renderer/wordpress-quality-report.spec.ts`.
+* Decision: stored on `wordpress_generations` (the generation row already carries every generation option and its RLS covers the row); no `GET` endpoint added — the review page is a Server Component reading through `getWordPressArticleByGenerationId()`, which is the detail read path.
+* Remaining: live check after applying 037 (RLS write + real render); the card is not shown in WordPress History.
+
 ## [TASK-FIX-045] WordPress Article Quality Gate V1 — 2026-09-26
 
 Status: implemented and committed; thresholds to tune after real generations.
