@@ -426,6 +426,41 @@ A user can open an existing Pin's detail, add or edit its Board section, and sav
 
 ---
 
+## [TASK-044] Social Content Studio from WordPress Article
+
+### Status: PLANNED (documented 2026-09-26 — not started, not the active task)
+
+### Goal
+
+Add a **Generate Social Content** button on the detail page of a generated WordPress article (`/wordpress/[id]`) that turns the article into platform-adapted content — Pinterest, Facebook, Instagram, Instagram Reel, TikTok, Medium, optionally LinkedIn — for review, editing, copy and export. Content only: never automatic publishing, never a modification of the original article.
+
+### Scope
+
+```txt
+Entry point: an existing, completed article owned by the caller — nowhere else
+Platform multi-select + bounded number of variants
+Article title, content, keywords, images and URL pulled server-side
+Per-platform format/tone/length; article language
+Reel/TikTok v1: hook, short script, scenes, on-screen text, voice-over, caption, hashtags, CTA — no video generation
+Review, edit, copy, export; history persisted (new table(s) + RLS, migration 038 proposed — 037 is already used by the WordPress Quality Report)
+Reuses lib/ai (generateText), rate limit/trial cap, Pinterest content rules and CSV contract
+Read-only access to wordpress_articles / wordpress_article_images / wordpress-images
+```
+
+### Depends On
+
+TASK-028 (WordPress Generator). Credit consumption depends on TASK-011 (Credits System, PLANNED). AI model choice follows the 2026-09-26 audit (`docs/tasks/AUDIT-WORDPRESS-PIPELINE-AND-MODELS-2026-09-26.md`) — no model change in this task.
+
+### Open Decisions
+
+17 decisions (UI surface, grouped vs per-platform calls, variants, image reuse vs new images, Pinterest image from the article, storage, credits, editing, export formats, later publishing, language, article URL, model per platform, limits/cost, Medium duplicate content, RLS, Reel duration) — see `docs/tasks/TASK-044-SOCIAL-CONTENT-STUDIO-FROM-WORDPRESS-ARTICLE.md`.
+
+### Success Criteria
+
+A completed article shows Generate Social Content; selected platforms produce reviewable, editable, copyable, exportable content in the article's language; nothing is published; the original article and its images are unchanged; history is persisted under RLS; unit, API and Playwright tests pass; TypeScript, ESLint and build pass; DATABASE/API/UI_UX/TESTING/DECISIONS/CHANGELOG docs and the in-app Guide are updated. Full detail: `docs/tasks/TASK-044-SOCIAL-CONTENT-STUDIO-FROM-WORDPRESS-ARTICLE.md`.
+
+---
+
 # MVP RELEASE CHECKLIST
 
 ```txt
