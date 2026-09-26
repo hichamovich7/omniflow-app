@@ -4,6 +4,7 @@ import { generateArticleFromUrlSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromUrl } from '@/lib/wordpress/generate-article-from-url';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
+import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
 
 // Same budget as /api/wordpress/generate and /api/wordpress/generate-from-pins
 // (outline + full-article generation, up to ARTICLE_GENERATION_TIMEOUT_MS =
@@ -256,8 +257,8 @@ export async function POST(request: Request) {
       .update({ status: 'completed', keyword: result.resolvedKeyword })
       .eq('id', generation.id);
 
-    return NextResponse.json<ApiResponse<{ generationId: string; status: string }>>(
-      { data: { generationId: generation.id, status: 'completed' }, error: null },
+    return NextResponse.json<ApiResponse<{ generationId: string; status: string; quality: ArticleQualityReport }>>(
+      { data: { generationId: generation.id, status: 'completed', quality: result.quality }, error: null },
       { status: 201 }
     );
   } catch (err) {

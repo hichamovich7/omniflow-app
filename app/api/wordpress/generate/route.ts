@@ -4,6 +4,7 @@ import { generateArticleSchema } from '@/lib/validations/wordpress';
 import { generateWordPressArticle } from '@/lib/wordpress/generate-article';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
+import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
 
 // Outline + full-article generation (up to ARTICLE_GENERATION_TIMEOUT_MS =
 // 120s) plus up to 4 image generations can exceed Vercel's default function
@@ -260,8 +261,8 @@ export async function POST(request: Request) {
 
     await supabase.from('wordpress_generations').update({ status: 'completed' }).eq('id', generation.id);
 
-    return NextResponse.json<ApiResponse<{ generationId: string; status: string }>>(
-      { data: { generationId: generation.id, status: 'completed' }, error: null },
+    return NextResponse.json<ApiResponse<{ generationId: string; status: string; quality: ArticleQualityReport }>>(
+      { data: { generationId: generation.id, status: 'completed', quality: result.quality }, error: null },
       { status: 201 }
     );
   } catch (err) {

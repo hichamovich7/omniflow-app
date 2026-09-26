@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-FIX-045 (WordPress Article Quality Gate V1 — 17 deterministic post-generation checks in `lib/wordpress/quality-check.ts`, report logged and returned as `data.quality` by the three generation routes, not persisted, never blocking) is implemented and committed. No prompt, model, Pinterest, CSV, migration or Social Content Studio change. TypeScript, ESLint (touched files), the new offline spec (21/21) and the production build pass; full renderer 362/363 with the same pre-existing, unrelated Pinterest failure as TASK-FIX-044. See CHANGELOG.md "TASK-FIX-045".
+
 TASK-FIX-044 (WordPress pipeline P0 quality fixes — real keyword/Brand Profile/research context in the article prompt, `generations.keyword` first for Pins, no web-search or invented URL instruction, size- and toggle-aware rules, anti-fabrication and editorial rules, visible FAQ) is implemented locally, not committed. No model, `.env`, Pinterest image/generator, credit, migration, CSV or Social Content Studio change. TypeScript, ESLint (touched files), WordPress renderer specs (44/44) and the production build pass; full renderer 341/342 with one pre-existing, unrelated Pinterest failure (`pinterest-text-importance-none.spec.ts`, also failing without this change). Awaiting a real generation to validate output quality. See CHANGELOG.md "TASK-FIX-044". Do not commit automatically.
 
 TASK-FIX-043 (Content Streams piloting — manual publishing activity + `Planned` stream status) is completed and released as **v3.0.0** (2026-09-26). Migrations **035 `content_stream_publishing_activity`** and **036 (`planned` added to the `content_streams.status` CHECK)** were applied by hand in the Supabase SQL Editor, in that order, and validated with real tests by the founder; 033/034 are untouched. (1) In the dashboard "Publishing coverage" grid, today's cell opens a "Publishing activity" modal (count, "Mark target met" = `target_pins_per_day`, source manual/external, note) saved through `PUT /api/content-streams/[id]/publishing-activity` (auth, Zod, ownership, future dates refused; upsert on `user_id + content_stream_id + activity_date`, RLS `WITH CHECK` on stream ownership). Today's level = Pins planned in OmniFlow + external count; external activity only fills today's gap in the buffer, never future days, and never touches `pins`, the Created / Planned counters or any Pinterest statistic. Interpretation note: the spec's "OmniFlow confirmed count" has no source (OmniFlow never confirms a publication), so today's OmniFlow count is the Pins planned for today. (2) `planned` status: prepared for later, not started — never an active project, never urgent, never recommended/focus, no coverage row, no weekly target; listed in a "Planned" section of the dashboard's Content streams; Planned → Warming / Active allowed. No Pinterest/OAuth call, AI generator, CSV or renderer change; no `pinterest_accounts` table. TypeScript, ESLint (touched files), the new offline spec (29 cases) with the related suites (130/130) and the production build pass; two gated browser cases were added (skip without `PLAYWRIGHT_STORAGE_STATE`). See CHANGELOG.md "TASK-FIX-043".
@@ -476,6 +478,15 @@ Status: implemented locally, awaiting migration 033/034 apply + manual validatio
 * Provider images are saved unchanged under Git-ignored `.benchmark-output/`; Sharp only records technical metadata and never composes text.
 * Added nullable human evaluation fields and PASS/NEEDS_REVIEW/FAIL calculation. A generated image starts at NEEDS_REVIEW; technical ratio inspection alone can never mark it PASS.
 * Added offline coverage for CLI parsing, fixtures, configured-model deduplication, dry-run network isolation and evaluation calculation.
+## [TASK-FIX-045] WordPress Article Quality Gate V1 — 2026-09-26
+
+Status: implemented and committed; thresholds to tune after real generations.
+
+* Goal: flag quality problems of a generated WordPress article with deterministic checks before review/export.
+* Files: new `lib/wordpress/quality-check.ts`, `lib/wordpress/generate-article.ts`, `generate-article-from-url.ts`, the three `app/api/wordpress/generate*/route.ts`, `lib/ai/services/text.ts` + `lib/ai/providers/openrouter.ts` (optional `onFinish` for `finish_reason`), new `tests/renderer/wordpress-quality-check.spec.ts`.
+* Success criteria met offline: every requested check implemented with passed / warning / failed, aggregated status, report attached to all three methods and returned by the routes, truncation detected from the real `finish_reason`.
+* Remaining: the report is not persisted nor shown on `/wordpress/[id]` (needs a migration + UI); the language check is a stopword heuristic (EN/DE/ES/FR); generic-phrase list is short and English-first.
+
 ## [TASK-FIX-044] WordPress pipeline P0 quality fixes — 2026-09-26
 
 Status: implemented locally, awaiting a real generation for quality validation. Not committed.

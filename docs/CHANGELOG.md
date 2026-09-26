@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Add: WordPress Article Quality Gate V1 (TASK-FIX-045, 2026-09-26)
+
+* New `lib/wordpress/quality-check.ts` (`runArticleQualityCheck()`): 17 deterministic checks run after every WordPress generation (keyword, pins, URL) — word count vs chosen size, single H1 title, planned H2 sections, H3 only with `includeH3 = true`, FAQ presence/absence (one section), no unreplaced `{{…}}` marker, first sentence ≠ title, no unauthorized URL, meta title / meta description length, slug validity, truncation (`finish_reason = "length"`), obvious generic phrasing, verbatim repetition, placed image markers, disabled blocks absent, language consistency.
+* Result: `{ status: "passed" | "warning" | "failed", qualityIssues, warnings, checks[] }`. Informational only — it never blocks or alters the article. Logged server-side (`[wordpress] quality gate: …`, check keys only) and returned as `data.quality` by `POST /api/wordpress/generate`, `generate-from-pins` and `generate-from-url`. Not persisted (no migration).
+* `generateText()` / `chatCompletion()` accept an optional `onFinish` callback exposing `finish_reason` — no change to requests, models or return values.
+* Prompts, models, Pinterest, CSV, migrations and the Social Content Studio unchanged.
+* Tests: `tests/renderer/wordpress-quality-check.spec.ts` (21 offline cases).
+
 ## Fix: WordPress pipeline P0 quality — context, anti-fabrication, visible FAQ (TASK-FIX-044, 2026-09-26)
 
 * The article prompt (keyword, URL and pins methods) now receives the real primary keyword (no longer the outline title), the Brand Profile, the research notes / source summary, the article type and size, plus the existing tone, POV, country, SEO keywords and validated outline.

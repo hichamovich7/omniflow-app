@@ -842,3 +842,17 @@ npx playwright test tests/renderer/wordpress-pipeline-quality.spec.ts tests/rend
 Offline (25 cases, `fetch` stubbed — no network, no paid call, Supabase Storage stubbed): real keyword and Brand Profile / research notes / type / tone / POV / country / SEO keywords in the article prompt (keyword method), URL method wiring, `generations.keyword` first for Pins with `deriveThemeKeyword()` fallback and the route reading it; no web-search instruction and no invented URL allowed; meta/slug rules only in the outline; anti-fabrication and editorial rules in the three prompts; small / medium / large section and word ranges (and the default); H3 and disabled-block toggles; FAQ rendered once at the marker when enabled, absent when disabled, without H3 when `includeH3 = false`; `insertFaqSection()` edge cases; Pinterest images reused unchanged (one featured image generated/uploaded); keyword-method image regression; `insertLinkAtAnchor()` / `addExternalLink()` never rewriting the article.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, WordPress renderer specs 44/44, full renderer 341/342 (one pre-existing Pinterest failure in `pinterest-text-importance-none.spec.ts`, reproduced without this change), production build OK, `git diff --check` OK.
+
+---
+
+# WordPress Article Quality Gate V1 (TASK-FIX-045, 2026-09-26)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/wordpress-quality-check.spec.ts --project=renderer --reporter=list
+```
+
+Offline (21 cases): a clean fixture passes all 17 checks in a fixed order; aggregate status (failed > warning > passed) and `qualityIssues` / `warnings`; one or more failing/warning variants per check (word count for small/medium/large/default with tolerance, H1, H2, H3 toggles, FAQ toggle and duplicates, `{{FAQ}}`/`{{IMAGE_N}}` leftovers, first sentence, unauthorized links and bare URLs, meta title/description lengths, slug, `finish_reason` length/missing, generic phrasing, repetition, image markers, disabled Key Takeaways/Conclusion/table/blockquote, language); an end-to-end keyword generation (`fetch` + Storage stubbed) where a `finish_reason: "length"` article call yields `truncation = failed` while the article is still returned; static check that the three routes return `quality`.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 21/21, full renderer 362/363 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK.

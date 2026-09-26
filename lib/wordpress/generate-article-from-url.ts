@@ -6,6 +6,7 @@ import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-
 import { buildSourceContextSummaryPrompt } from '@/lib/ai/prompts/source-context-summary';
 import { addExternalLink } from '@/lib/ai/services/external-link';
 import { insertFaqSection } from '@/lib/wordpress/faq-section';
+import { runArticleQualityCheck, logArticleQuality } from '@/lib/wordpress/quality-check';
 import { scrapeUrl, CONTENT_CHAR_CAP } from '@/lib/research/providers/firecrawl';
 import {
   wordpressOutlineSchema,
@@ -156,6 +157,7 @@ export async function generateArticleFromUrl(
     language,
   });
 
+  const finishReasons: (string | null)[] = [];
   logWordPressTextModel('wordpress-from-url', 'outline', OUTLINE_ROLE);
   const outlineRaw = await generateText({
     role: OUTLINE_ROLE,
@@ -164,6 +166,7 @@ export async function generateArticleFromUrl(
       { role: 'user', content: outlineUser },
     ],
     maxTokens: OUTLINE_MAX_TOKENS,
+    onFinish: ({ finishReason }) => finishReasons.push(finishReason),
   });
 
   let outlineJson: unknown;
@@ -203,6 +206,7 @@ export async function generateArticleFromUrl(
     ],
     maxTokens: ARTICLE_MAX_TOKENS,
     timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
+    onFinish: ({ finishReason }) => finishReasons.push(finishReason),
   });
 
   const articleValidated = wordpressArticleResponseSchema.safeParse(JSON.parse(articleRaw));
@@ -214,6 +218,7 @@ export async function generateArticleFromUrl(
   // Step 3b: best-effort single external link — same as Option 1/4.
   const externalLink = await addExternalLink(content, outline.title, language);
   content = externalLink.content;
+  const contentBeforeImages = content;
 
   // Step 4: featured + internal images — freshly generated via generateImage(),
   // same as Option 1. Never reuses any image from the external source.
@@ -271,6 +276,22 @@ export async function generateArticleFromUrl(
     position: i,
   }));
 
+  const quality = runArticleQualityCheck({
+    title: outline.title,
+    metaTitle: outline.metaTitle,
+    metaDescription: outline.metaDescription,
+    slug: outline.slug,
+    content,
+    contentBeforeImages,
+    language,
+    expectedH2Headings: outline.sections.map((section) => section.heading),
+    expectedImageMarkers: outline.images.map((img) => img.placementMarker),
+    faqExpected: outline.faqQuestions.length > 0,
+    allowedUrls: externalLink.source ? [externalLink.source.url] : [],
+    finishReasons,
+  });
+  logArticleQuality('wordpress-from-url', quality);
+
   return {
     title: outline.title,
     metaTitle: outline.metaTitle,
@@ -281,6 +302,7 @@ export async function generateArticleFromUrl(
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl: urlByMarker.get('FEATURED') ?? null,
     internalImages,
+    quality,
     resolvedKeyword,
     sourceSummary,
   };

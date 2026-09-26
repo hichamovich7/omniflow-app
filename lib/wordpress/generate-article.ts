@@ -7,6 +7,7 @@ import { buildWordPressFromPinsPrompt, resolvePinsPrimaryKeyword } from '@/lib/a
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import { addExternalLink } from '@/lib/ai/services/external-link';
 import { insertFaqSection } from '@/lib/wordpress/faq-section';
+import { runArticleQualityCheck, logArticleQuality, type ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import {
   wordpressArticleResponseSchema,
   buildWordpressPinsOutlineSchema,
@@ -194,6 +195,8 @@ export interface GenerateArticleResult {
   featuredImagePrompt: string;
   featuredImageUrl: string | null;
   internalImages: GeneratedArticleImage[];
+  /** Quality Gate V1 report (lib/wordpress/quality-check.ts) — informational, never blocks the article. */
+  quality: ArticleQualityReport;
 }
 
 /**
@@ -259,6 +262,7 @@ export async function generateWordPressArticle(
     includeH3: includeH3 ?? undefined,
   });
 
+  const finishReasons: (string | null)[] = [];
   logWordPressTextModel('wordpress', 'outline', OUTLINE_ROLE);
   const outlineRaw = await generateText({
     role: OUTLINE_ROLE,
@@ -267,6 +271,7 @@ export async function generateWordPressArticle(
       { role: 'user', content: outlineUser },
     ],
     maxTokens: OUTLINE_MAX_TOKENS,
+    onFinish: ({ finishReason }) => finishReasons.push(finishReason),
   });
 
   let outlineJson: unknown;
@@ -321,6 +326,7 @@ export async function generateWordPressArticle(
     ],
     maxTokens: articleSize === 'large' ? ARTICLE_MAX_TOKENS_LARGE : ARTICLE_MAX_TOKENS,
     timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
+    onFinish: ({ finishReason }) => finishReasons.push(finishReason),
   });
 
   // Same keyTakeawaysRange/faqRange as the outline, so the article response's
@@ -344,6 +350,7 @@ export async function generateWordPressArticle(
   // no-link-found / provider-error fallback (article is simply returned as-is).
   const externalLink = await addExternalLink(content, outline.title, language);
   content = externalLink.content;
+  const contentBeforeImages = content;
 
   // Step 3: featured image + internal images, generated in parallel (bounded concurrency)
   const imageTasks = [
@@ -399,6 +406,28 @@ export async function generateWordPressArticle(
     position: i,
   }));
 
+  const quality = runArticleQualityCheck({
+    title: outline.title,
+    metaTitle: outline.metaTitle,
+    metaDescription: outline.metaDescription,
+    slug: outline.slug,
+    content,
+    contentBeforeImages,
+    language,
+    articleSize,
+    expectedH2Headings: outline.sections.map((section) => section.heading),
+    expectedImageMarkers: outline.images.map((img) => img.placementMarker),
+    includeH3,
+    faqExpected: outline.faqQuestions.length > 0,
+    includeKeyTakeaways,
+    includeConclusion,
+    includeTables,
+    includeQuotes,
+    allowedUrls: [...(manualExternalUrls ?? []), ...(externalLink.source ? [externalLink.source.url] : [])],
+    finishReasons,
+  });
+  logArticleQuality('wordpress', quality);
+
   return {
     title: outline.title,
     metaTitle: outline.metaTitle,
@@ -409,6 +438,7 @@ export async function generateWordPressArticle(
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl: urlByMarker.get('FEATURED') ?? null,
     internalImages,
+    quality,
   };
 }
 
@@ -475,6 +505,7 @@ export async function generateArticleFromPins(
     imageCount,
   });
 
+  const finishReasons: (string | null)[] = [];
   logWordPressTextModel('wordpress-from-pins', 'outline', OUTLINE_ROLE);
   let stepStart = Date.now();
   const outlineRaw = await generateText({
@@ -484,6 +515,7 @@ export async function generateArticleFromPins(
       { role: 'user', content: outlineUser },
     ],
     maxTokens: OUTLINE_MAX_TOKENS,
+    onFinish: ({ finishReason }) => finishReasons.push(finishReason),
   });
   console.log(`[wordpress-from-pins] outline generateText took ${Date.now() - stepStart}ms`);
 
@@ -521,6 +553,7 @@ export async function generateArticleFromPins(
     ],
     maxTokens: ARTICLE_MAX_TOKENS,
     timeoutMs: ARTICLE_GENERATION_TIMEOUT_MS,
+    onFinish: ({ finishReason }) => finishReasons.push(finishReason),
   });
   console.log(`[wordpress-from-pins] article generateText took ${Date.now() - stepStart}ms`);
 
@@ -551,6 +584,7 @@ export async function generateArticleFromPins(
   // no-link-found / provider-error fallback (article is simply returned as-is).
   const externalLink = await addExternalLink(content, outline.title, language);
   content = externalLink.content;
+  const contentBeforeImages = content;
 
   // Step 3: featured image only — generated fresh from the unified-theme prompt.
   // Unlike Option 1 (which routes all image generation through promisePool so a
@@ -604,6 +638,22 @@ export async function generateArticleFromPins(
     position: i,
   }));
 
+  const quality = runArticleQualityCheck({
+    title: outline.title,
+    metaTitle: outline.metaTitle,
+    metaDescription: outline.metaDescription,
+    slug: outline.slug,
+    content,
+    contentBeforeImages,
+    language,
+    expectedH2Headings: outline.sections.map((section) => section.heading),
+    expectedImageMarkers: outline.images.map((img) => img.placementMarker),
+    faqExpected: outline.faqQuestions.length > 0,
+    allowedUrls: externalLink.source ? [externalLink.source.url] : [],
+    finishReasons,
+  });
+  logArticleQuality('wordpress-from-pins', quality);
+
   return {
     title: outline.title,
     metaTitle: outline.metaTitle,
@@ -614,5 +664,6 @@ export async function generateArticleFromPins(
     featuredImagePrompt: outline.featuredImage.prompt,
     featuredImageUrl,
     internalImages,
+    quality,
   };
 }

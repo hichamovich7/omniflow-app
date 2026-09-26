@@ -265,6 +265,8 @@ Creates one `wordpress_generations` row and synchronously produces a full articl
 
 The article prompt receives the typed keyword as primary keyword, the project Brand Profile, the research notes and every Core Settings / Structure / SEO keyword / manual URL option; it may only use URLs explicitly provided and must not invent facts (TASK-FIX-044). The structured FAQ (unless `includeFaq` is `false`) is rendered into `content` as one "FAQ" section. `addExternalLink()` only inserts one verified link on an anchor phrase that already exists in the article — it never rewrites the article.
 
+The `201` response also carries `data.quality`, the Quality Gate V1 report (`lib/wordpress/quality-check.ts`, TASK-FIX-045): `{ status: "passed" | "warning" | "failed", qualityIssues: string[], warnings: string[], checks: { key, status, message }[] }`. It is informational — a `failed` status never blocks or changes the saved article — and is not persisted. `POST /api/wordpress/generate-from-pins` and `POST /api/wordpress/generate-from-url` return the same field.
+
 Option 2 (reference image) is not implemented. Option 3 (external source → article) is implemented as a separate route, `POST /api/wordpress/generate-from-url` (see below) — this route only ever accepts `source_type: "keyword"`.
 
 ## Request

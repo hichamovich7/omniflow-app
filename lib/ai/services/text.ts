@@ -14,6 +14,8 @@ interface GenerateTextParams {
   tools?: AITool[];
   /** Overrides the provider's default fetch timeout — for calls known to routinely run long. */
   timeoutMs?: number;
+  /** Receives the provider's finish_reason once the call succeeds (truncation diagnostics). */
+  onFinish?: (info: { finishReason: string | null }) => void;
 }
 
 // Same resolution generateText() uses, exported so callers can log the exact
@@ -29,6 +31,7 @@ export async function generateText({
   temperature,
   tools,
   timeoutMs,
+  onFinish,
 }: GenerateTextParams): Promise<string> {
   const { provider, model } = resolveTextModel(role);
 
@@ -41,7 +44,7 @@ export async function generateText({
 
   switch (provider) {
     case 'openrouter':
-      return chatCompletion({ model, messages, maxTokens, temperature, reasoningEffort, tools, timeoutMs });
+      return chatCompletion({ model, messages, maxTokens, temperature, reasoningEffort, tools, timeoutMs, onFinish });
     default:
       throw new Error(`Unsupported text provider for role ${role}: ${provider}`);
   }

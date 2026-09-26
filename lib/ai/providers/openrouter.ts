@@ -21,6 +21,8 @@ interface ChatCompletionOptions {
   tools?: AITool[];
   /** Overrides the default 60s/90s(with plugins) fetch timeout for calls known to run long. */
   timeoutMs?: number;
+  /** Diagnostic hook: receives the final choice's finish_reason (e.g. "stop", "length"). */
+  onFinish?: (info: { finishReason: string | null }) => void;
 }
 
 // Translates the provider-agnostic AITool shape into OpenRouter's actual wire
@@ -74,6 +76,7 @@ async function chatCompletionOnce({
   reasoningEffort,
   tools,
   timeoutMs,
+  onFinish,
 }: ChatCompletionOptions): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -141,6 +144,7 @@ async function chatCompletionOnce({
       );
     }
 
+    onFinish?.({ finishReason: choice?.finish_reason ?? null });
     return content;
   } finally {
     clearTimeout(timeout);
