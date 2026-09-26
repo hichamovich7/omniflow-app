@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: WordPress pipeline P0 quality — context, anti-fabrication, visible FAQ (TASK-FIX-044, 2026-09-26)
+
+* The article prompt (keyword, URL and pins methods) now receives the real primary keyword (no longer the outline title), the Brand Profile, the research notes / source summary, the article type and size, plus the existing tone, POV, country, SEO keywords and validated outline.
+* Pins method: the primary keyword is the source Pinterest generation's `generations.keyword`; `deriveThemeKeyword()` is only the fallback. Pinterest images are reused exactly as before.
+* `seo-guidelines.ts` is parameterized (outline vs article stage, size, toggles): no more web-searched-link instruction, only provided URLs may be used and none may be invented, length rules follow the chosen size, disabled blocks (FAQ, Key Takeaways, Conclusion, table) are no longer requested, H3 only on `includeH3 = true`, meta title/description/slug rules stay in the outline.
+* New factual-integrity and editorial-quality rules in the keyword outline, pins outline and article prompts (no invented statistics, studies, quotes, prices, dates or results; no generic intro, repetition, empty sentences or long paragraphs). Prompt ids: `wordpress-outline-v3`, `wordpress-from-pins-outline-v2`, `wordpress-article-v3`.
+* The generated FAQ is now visible: the article writes a `{{FAQ}}` line and `lib/wordpress/faq-section.ts` renders the structured `faq` there as one localized section (appended at the end if the marker is missing, never duplicated, questions as H3 unless `includeH3 = false`). `includeFaq = false` still produces no FAQ. No migration; Zod schemas unchanged.
+* `lib/ai/services/external-link.ts`: the model no longer echoes/rewrites the article — it returns an anchor phrase + source; the link is inserted server-side on that exact phrase after the URL check (article unchanged otherwise, or when the phrase is not found). Output budget 9000 → 1500 tokens.
+* Tests: `tests/renderer/wordpress-pipeline-quality.spec.ts` (25 offline cases).
+
 ## Add: optional `AI_OUTLINE_MODEL` for the WordPress outline (2026-09-26)
 
 * New optional `AI_OUTLINE_PROVIDER` / `AI_OUTLINE_MODEL` (`lib/ai/config.ts` `getOutlineConfig()`, text role `OUTLINE` in `lib/ai/services/text.ts`), used only by the outline step of the three WordPress generators (keyword, pins, URL).

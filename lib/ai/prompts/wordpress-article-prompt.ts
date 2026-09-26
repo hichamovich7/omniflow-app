@@ -1,17 +1,38 @@
-import { buildSeoGuidelines } from './seo-guidelines';
+import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRules } from './seo-guidelines';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import {
+  ARTICLE_SIZE_CONFIG,
   DEFAULT_WORDS_RANGE,
   type WordPressOutline,
+  type ARTICLE_TYPES,
+  type ARTICLE_SIZES,
   type TONES_OF_VOICE,
   type POINTS_OF_VIEW,
 } from '@/lib/validations/wordpress';
 
-export const ARTICLE_PROMPT_ID = 'wordpress-article-v2';
+export const ARTICLE_PROMPT_ID = 'wordpress-article-v3';
 
+/**
+ * Placeholder line the article model writes where the FAQ belongs. The FAQ
+ * itself is rendered from the structured "faq" field by insertFaqSection()
+ * (lib/wordpress/faq-section.ts), so the visible FAQ and the structured one
+ * can never diverge and the article always carries a single FAQ section.
+ */
+export const FAQ_PLACEMENT_MARKER = '{{FAQ}}';
+
+type ArticleType = (typeof ARTICLE_TYPES)[number];
+type ArticleSize = (typeof ARTICLE_SIZES)[number];
 type ToneOfVoice = (typeof TONES_OF_VOICE)[number];
 type PointOfView = (typeof POINTS_OF_VIEW)[number];
+
+const ARTICLE_TYPE_WRITING_GUIDANCE: Record<ArticleType, string> = {
+  'how-to': 'a how-to guide — write each section as clear, ordered, actionable instructions the reader can follow',
+  listicle: 'a listicle — keep each numbered item self-contained and independently useful',
+  'product-review': 'a product review — stay balanced, separate observations from opinion, and never invent test results, specifications, or prices',
+  news: 'a news article — lead with the most important provided fact, and never invent dates, figures, or quotes',
+  comparison: 'a comparison — compare the options on the same criteria, fairly, without inventing figures',
+};
 
 const TONE_OF_VOICE_GUIDANCE: Record<ToneOfVoice, string> = {
   friendly: 'warm and approachable, like a knowledgeable friend giving advice',
@@ -34,11 +55,20 @@ const POINT_OF_VIEW_GUIDANCE: Record<PointOfView, string> = {
 interface ArticlePromptContext {
   outline: WordPressOutline;
   language: SupportedLanguage;
+  /**
+   * The real primary keyword (typed keyword, URL-resolved keyword, or the
+   * pins' generation keyword) — never derived from the outline title.
+   */
+  primaryKeyword: string;
+  /** buildBrandProfileContext() output — empty/undefined when the project has none. */
+  brandProfileContext?: string;
+  /** User research notes, or the Option 3 source summary. */
+  researchNotes?: string;
   // Core Settings (TASK-FIX-034, "1-Click Blog Post" / Option 1 only) — all
-  // optional. Leaving every one of them undefined reproduces the exact prompt
-  // text this function produced before TASK-FIX-034 (word target included).
-  minWords?: number;
-  maxWords?: number;
+  // optional. articleSize drives the word target (ARTICLE_SIZE_CONFIG);
+  // undefined keeps DEFAULT_WORDS_RANGE.
+  articleType?: ArticleType;
+  articleSize?: ArticleSize;
   toneOfVoice?: ToneOfVoice;
   pointOfView?: PointOfView;
   targetCountry?: string;
@@ -60,22 +90,20 @@ interface ArticlePromptContext {
   // produced before TASK-FIX-036.
   seoKeywords?: string[];
   // External Linking (TASK-FIX-037, "1-Click Blog Post" / Option 1 only) —
-  // optional, manual URLs only. Purely additive to the existing, unconditional
-  // addExternalLink() post-processing pass (generate-article.ts) — this
-  // function has no awareness of that mechanism, and empty/undefined
-  // reproduces the exact prompt text this function produced before
-  // TASK-FIX-037.
+  // optional, manual URLs only: the only URLs this prompt ever allows. The
+  // separate addExternalLink() pass (generate-article.ts) is not referenced here.
   manualExternalUrls?: string[];
 }
 
 export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const langName = LANGUAGE_LABELS[ctx.language];
   const { outline } = ctx;
-  const guidelines = buildSeoGuidelines(outline.title);
-  const minWords = ctx.minWords ?? DEFAULT_WORDS_RANGE.minWords;
-  const maxWords = ctx.maxWords ?? DEFAULT_WORDS_RANGE.maxWords;
+  const sizeConfig = ctx.articleSize ? ARTICLE_SIZE_CONFIG[ctx.articleSize] : undefined;
+  const minWords = sizeConfig?.minWords ?? DEFAULT_WORDS_RANGE.minWords;
+  const maxWords = sizeConfig?.maxWords ?? DEFAULT_WORDS_RANGE.maxWords;
 
   const voiceNotes: string[] = [];
+  if (ctx.articleType) voiceNotes.push(`Article type: this is ${ARTICLE_TYPE_WRITING_GUIDANCE[ctx.articleType]}.`);
   if (ctx.toneOfVoice) voiceNotes.push(`Tone of voice: write the entire article body in a ${TONE_OF_VOICE_GUIDANCE[ctx.toneOfVoice]} tone. This is a sentence-level voice instruction, distinct from and layered on top of any Brand Profile context given in your system instructions.`);
   if (ctx.pointOfView) voiceNotes.push(`Point of view: narrate in ${POINT_OF_VIEW_GUIDANCE[ctx.pointOfView]}.`);
   if (ctx.targetCountry) voiceNotes.push(`Localize for readers in ${ctx.targetCountry} — prefer examples, references, units, and cultural context relevant to that country wherever the topic naturally allows it.`);
@@ -109,8 +137,12 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   // does not reference or depend on the separate addExternalLink() pass.
   const manualLinksBlock =
     ctx.manualExternalUrls && ctx.manualExternalUrls.length > 0
-      ? `\n\nExternal links to include: insert each of the following URLs as a Markdown link (\`[relevant anchor text](url)\`) naturally into the article body, wherever contextually relevant to the surrounding content — one per URL where a genuine fit exists, never forced into an unrelated sentence, never as a standalone list of links:\n${ctx.manualExternalUrls.map((u) => `- ${u}`).join('\n')}\n`
+      ? `\n\nExternal links to include: insert each of the following URLs as a Markdown link (\`[relevant anchor text](url)\`) naturally into the article body, wherever contextually relevant to the surrounding content — one per URL where a genuine fit exists, never forced into an unrelated sentence, never as a standalone list of links. Copy each URL exactly as written; these are the only URLs allowed in the article:\n${ctx.manualExternalUrls.map((u) => `- ${u}`).join('\n')}\n`
       : '';
+
+  const researchNotesBlock = ctx.researchNotes
+    ? `\n\nResearch notes provided for this article — the only source of specific facts, figures, or named sources you may use (beyond widely established general knowledge):\n${ctx.researchNotes}\n`
+    : '';
 
   const sectionsList = outline.sections
     .map((s, i) => `${i + 1}. H2 "${s.heading}" — ${s.summary}`)
@@ -180,8 +212,8 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   structureSteps.push(`"## Common Mistakes" section — one item per theme above, each a short paragraph with real editorial value, not generic filler.`);
   structureSteps.push(
     hasFaq
-      ? `Do NOT write an FAQ section in the Markdown body at all — skip straight from Common Mistakes to ${includeConclusionResolved ? 'the Conclusion' : 'the Soft CTA'}. The FAQ is returned only in the structured "faq" field below, never as visible article text, so it can back a FAQPage rich result later.`
-      : `This article has no FAQ — skip straight from Common Mistakes to ${includeConclusionResolved ? 'the Conclusion' : 'the Soft CTA'}. Return "faq": [] (empty array).`
+      ? `The line "${FAQ_PLACEMENT_MARKER}" on its own, exactly once — the FAQ is rendered there automatically from the structured "faq" field below. Do NOT write an FAQ heading, questions, or answers in the Markdown body yourself.`
+      : `This article has no FAQ — skip straight from Common Mistakes to ${includeConclusionResolved ? 'the Conclusion' : 'the Soft CTA'}. Do not write any FAQ or questions-and-answers section, and return "faq": [] (empty array).`
   );
   if (includeConclusionResolved) {
     structureSteps.push(`"## Conclusion" section.`);
@@ -194,15 +226,26 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
     ? 'array of the same standalone bullets used in the Key Takeaways section (4-6 strings)'
     : 'empty array — this article has no Key Takeaways section';
   const faqFieldNote = hasFaq
-    ? 'array of { "question": "...", "answer": "..." } objects, one per question listed above (4-6 items), fully answered'
+    ? 'array of { "question": "...", "answer": "..." } objects, one per question listed above (4-6 items), each answer 2-4 sentences, complete and standalone, adding information not already stated in the body'
     : 'empty array — this article has no FAQ';
 
-  const system = `You are an expert SEO copywriter. You write the full body of a WordPress article from an approved outline, following a fixed ${structureSteps.length}-block AEO structure. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown fences around the JSON itself, no explanations, no extra text — but the "content" field value must itself be Markdown.`;
+  const guidelines = buildSeoGuidelines(ctx.primaryKeyword, {
+    stage: 'article',
+    minWords,
+    maxWords,
+    includeH3: ctx.includeH3,
+    includeKeyTakeaways: hasKeyTakeaways,
+    includeFaq: hasFaq,
+    includeConclusion: includeConclusionResolved,
+    includeComparisonTable: resolvedIncludeTable,
+  });
+
+  const system = `You are an expert SEO copywriter. You write the full body of a WordPress article from an approved outline, following a fixed ${structureSteps.length}-block AEO structure. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown fences around the JSON itself, no explanations, no extra text — but the "content" field value must itself be Markdown.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
   const user = `Write the full article for the outline below. Follow the section order and summaries exactly — do not add, remove, or reorder the Main Content H2 sections.
-${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}
+${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}${researchNotesBlock}
+Primary keyword: ${ctx.primaryKeyword}
 Title: ${outline.title}
-Meta description: ${outline.metaDescription}
 Quick Answer angle: ${outline.quickAnswerAngle}${keyTakeawaysContextBlock}
 
 Main Content sections to write:
@@ -213,6 +256,10 @@ ${commonMistakesThemesList}${faqContextBlock}
 
 ${guidelines}
 
+${buildFactualIntegrityRules()}
+
+${buildEditorialQualityRules()}
+
 Structure — write the "content" field as Markdown, in this exact order:
 ${structureList}
 
@@ -222,10 +269,9 @@ ${imageMarkersList}
 - If there are more image markers than Main Content sections, place more than one marker within the same section rather than skipping, merging, or forcing an unrelated match — every marker listed above must appear exactly once somewhere in the body.
 - The "(shows: ...)" text next to each marker above is context for you only, so you place the marker in the right spot — it is not caption text. Never print any alt text, image description, or a "shows:" phrase as visible content anywhere in the article body. Do not add a caption, list, or summary of the images (in any language, under any heading such as "Bildunterschriften", "Image captions", "Alt text", or similar) at the end of the article or anywhere else — alt text exists only in the outline's JSON data, never as visible article text.
 - Do not invent additional image markers and do not omit any of the ones listed above. Do not include the featured image — it is handled separately, outside this content.
-- Do not repeat the meta description verbatim in the body.
 - Target ${minWords}-${maxWords} words across the Markdown "content" (Quick Answer through Soft CTA; FAQ answers are not part of this count since they're not in the Markdown).
 
-Also return the following as separate structured fields, matching what you wrote in the Markdown (Quick Answer, Key Takeaways, Common Mistakes text must match what's in "content"; the FAQ only exists here, not in "content"):
+Also return the following as separate structured fields, matching what you wrote in the Markdown (Quick Answer, Key Takeaways, Common Mistakes text must match what's in "content"; the FAQ is written only here and rendered into the article automatically):
 - quickAnswer: the same 40-60 word answer used in the Quick Answer section
 - keyTakeaways: ${keyTakeawaysFieldNote}
 - comparisonTable: ${resolvedIncludeTable ? 'the same table as an object { "headers": [...], "rows": [[...], [...]] }' : 'null'}
@@ -234,7 +280,7 @@ Also return the following as separate structured fields, matching what you wrote
 
 Respond with this exact JSON structure:
 {
-  "content": "# Title\\n\\nBody markdown with ## sections and {{IMAGE_N}} markers, no FAQ section...",
+  "content": "${hasFaq ? `# Title\\n\\nBody markdown with ## sections, {{IMAGE_N}} markers and the ${FAQ_PLACEMENT_MARKER} line...` : '# Title\\n\\nBody markdown with ## sections and {{IMAGE_N}} markers, no FAQ...'}",
   "quickAnswer": "...",
   "keyTakeaways": ${hasKeyTakeaways ? '["...", "..."]' : '[]'},
   "comparisonTable": ${resolvedIncludeTable ? '{ "headers": ["...", "..."], "rows": [["...", "..."]] }' : 'null'},

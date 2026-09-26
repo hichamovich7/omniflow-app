@@ -828,3 +828,17 @@ npx playwright test tests/renderer/wordpress-outline-model.spec.ts --project=ren
 ```
 
 Offline (10 cases, `fetch` stubbed — no network, no paid call, Supabase Storage stubbed): `getOutlineConfig()` with `AI_OUTLINE_MODEL` / `AI_OUTLINE_PROVIDER`, provider fallback to FAST, full fallback to the FAST config when `AI_OUTLINE_MODEL` is unset / empty / whitespace, FAST unaffected; a keyword generation (`generateWordPressArticle`) and a pins generation (`generateArticleFromPins`) send the outline to `AI_OUTLINE_MODEL` and the article + external link to `AI_FAST_MODEL`, log both models without the API key, keep the same output contract (outline fields, resolved image markers); an invalid outline from the outline model is still rejected by the unchanged Zod schema before any article call. Without `AI_OUTLINE_MODEL`, both steps use `AI_FAST_MODEL` (no regression).
+
+---
+
+# WordPress pipeline P0 quality (TASK-FIX-044, 2026-09-26)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/wordpress-pipeline-quality.spec.ts tests/renderer/wordpress-outline-model.spec.ts --project=renderer --reporter=list
+```
+
+Offline (25 cases, `fetch` stubbed — no network, no paid call, Supabase Storage stubbed): real keyword and Brand Profile / research notes / type / tone / POV / country / SEO keywords in the article prompt (keyword method), URL method wiring, `generations.keyword` first for Pins with `deriveThemeKeyword()` fallback and the route reading it; no web-search instruction and no invented URL allowed; meta/slug rules only in the outline; anti-fabrication and editorial rules in the three prompts; small / medium / large section and word ranges (and the default); H3 and disabled-block toggles; FAQ rendered once at the marker when enabled, absent when disabled, without H3 when `includeH3 = false`; `insertFaqSection()` edge cases; Pinterest images reused unchanged (one featured image generated/uploaded); keyword-method image regression; `insertLinkAtAnchor()` / `addExternalLink()` never rewriting the article.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, WordPress renderer specs 44/44, full renderer 341/342 (one pre-existing Pinterest failure in `pinterest-text-importance-none.spec.ts`, reproduced without this change), production build OK, `git diff --check` OK.

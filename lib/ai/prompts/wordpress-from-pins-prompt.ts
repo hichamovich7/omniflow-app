@@ -1,8 +1,9 @@
-import { buildSeoGuidelines } from './seo-guidelines';
+import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRules } from './seo-guidelines';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
+import { DEFAULT_SECTIONS_RANGE, DEFAULT_WORDS_RANGE } from '@/lib/validations/wordpress';
 
-export const FROM_PINS_OUTLINE_PROMPT_ID = 'wordpress-from-pins-outline-v1';
+export const FROM_PINS_OUTLINE_PROMPT_ID = 'wordpress-from-pins-outline-v2';
 
 export interface PinSummary {
   title: string;
@@ -11,6 +12,12 @@ export interface PinSummary {
 }
 
 interface FromPinsPromptContext {
+  /**
+   * The primary keyword resolved by the caller (resolvePinsPrimaryKeyword:
+   * the Pinterest generation's own keyword first, deriveThemeKeyword only as
+   * a fallback).
+   */
+  primaryKeyword: string;
   pins: PinSummary[];
   brandProfileContext?: string;
   researchNotes?: string;
@@ -20,13 +27,12 @@ interface FromPinsPromptContext {
 
 /**
  * Frequency-based seed phrase for buildSeoGuidelines' single "primary keyword"
- * rule (title/slug/meta/H2/alt-text placement). Option 1 gets this for free
- * from the user's typed keyword; here there isn't one, so the most common
- * token across the selected pins' `keywords` fields stands in for it. This is
- * only an SEO-guideline anchor — the actual unified theme/title/angle is the
- * model's own synthesis, not this heuristic.
+ * rule (title/slug/meta/H2/alt-text placement). Fallback only — the Pinterest
+ * generation's own keyword (generations.keyword) wins whenever it is set, see
+ * resolvePinsPrimaryKeyword. This is only an SEO-guideline anchor — the actual
+ * unified theme/title/angle is the model's own synthesis, not this heuristic.
  */
-function deriveThemeKeyword(pins: PinSummary[]): string {
+export function deriveThemeKeyword(pins: PinSummary[]): string {
   const counts = new Map<string, number>();
   for (const pin of pins) {
     for (const raw of pin.keywords.split(',')) {
@@ -46,10 +52,25 @@ function deriveThemeKeyword(pins: PinSummary[]): string {
   return best;
 }
 
+/**
+ * Primary keyword for the pins → article flow: the source Pinterest
+ * generation's keyword (what the user actually targeted) first, the
+ * pins-derived heuristic only when that keyword is missing or blank.
+ */
+export function resolvePinsPrimaryKeyword(generationKeyword: string | null | undefined, pins: PinSummary[]): string {
+  const trimmed = generationKeyword?.trim();
+  return trimmed ? trimmed : deriveThemeKeyword(pins);
+}
+
 export function buildWordPressFromPinsPrompt(ctx: FromPinsPromptContext) {
   const langName = LANGUAGE_LABELS[ctx.language];
-  const themeKeyword = deriveThemeKeyword(ctx.pins);
-  const guidelines = buildSeoGuidelines(themeKeyword);
+  const guidelines = buildSeoGuidelines(ctx.primaryKeyword, {
+    stage: 'outline',
+    minWords: DEFAULT_WORDS_RANGE.minWords,
+    maxWords: DEFAULT_WORDS_RANGE.maxWords,
+    minSections: DEFAULT_SECTIONS_RANGE.minSections,
+    maxSections: DEFAULT_SECTIONS_RANGE.maxSections,
+  });
 
   const system = `You are an expert SEO content strategist. You plan long-form WordPress articles optimized for search engines, featured snippets, and AI answer engines — before a single word of the article is written. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
@@ -70,11 +91,17 @@ export function buildWordPressFromPinsPrompt(ctx: FromPinsPromptContext) {
 
   const user = `Below are ${ctx.pins.length} Pinterest pins the user selected. Identify the single common theme that unifies them, and plan the outline for ONE cohesive, unified WordPress article on that theme — not a concatenation or summary of the individual pins. Use the pins as source material and inspiration for the angle, sections, and FAQ, but write the outline as if planning original long-form content.
 
+Primary keyword: "${ctx.primaryKeyword}"
+
 Pins:
 ${pinsList}
 ${researchNotesBlock}
 
 ${guidelines}
+
+${buildFactualIntegrityRules()}
+
+${buildEditorialQualityRules()}
 
 The article follows a fixed 10-block structure (H1, Introduction, Quick Answer, Key Takeaways, Main Content, optional Comparison Table, Common Mistakes, FAQ, Conclusion, Soft CTA). At this planning stage, provide:
 
@@ -84,7 +111,7 @@ The article follows a fixed 10-block structure (H1, Introduction, Quick Answer, 
 - metaDescription: 150-160 characters, includes the primary keyword
 - quickAnswerAngle: one sentence describing the direct answer the Quick Answer block will give (the article step will expand this into the final 40-60 word answer)
 - keyTakeawaysThemes: 4 to 6 short theme phrases (not full sentences) — one per planned Key Takeaway bullet
-- sections: an ordered list of 8 to 10 Main Content H2 sections, each with a one-sentence summary of what it will cover. Do not write the section content yet, only plan it. Each section must be scoped broadly enough to support at least 150-200 words of full body text once written — plan enough sub-points (2-3) per section that it can be developed at that length. This is what makes the final article reach the 1800-2500 word target, not just the section count.
+- sections: an ordered list of ${DEFAULT_SECTIONS_RANGE.minSections} to ${DEFAULT_SECTIONS_RANGE.maxSections} Main Content H2 sections, each with a one-sentence summary of what it will cover. Do not write the section content yet, only plan it. Each section must be scoped broadly enough to support at least 150-200 words of full body text once written — plan enough sub-points (2-3) per section that it can be developed at that length. This is what makes the final article reach the ${DEFAULT_WORDS_RANGE.minWords}-${DEFAULT_WORDS_RANGE.maxWords} word target, not just the section count.
 - includeComparisonTable: true only if the topic naturally involves comparing materials, methods, products, or options — false otherwise. Do not force a table onto a topic that doesn't call for one.
 - comparisonTableReason: one short sentence justifying the includeComparisonTable decision either way (why a comparison fits, or why the topic has nothing to meaningfully compare)
 - commonMistakesThemes: 3 to 5 short theme phrases, one per real, specific mistake people make on this topic — not generic filler

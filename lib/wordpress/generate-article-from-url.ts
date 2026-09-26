@@ -5,6 +5,7 @@ import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
 import { buildSourceContextSummaryPrompt } from '@/lib/ai/prompts/source-context-summary';
 import { addExternalLink } from '@/lib/ai/services/external-link';
+import { insertFaqSection } from '@/lib/wordpress/faq-section';
 import { scrapeUrl, CONTENT_CHAR_CAP } from '@/lib/research/providers/firecrawl';
 import {
   wordpressOutlineSchema,
@@ -183,8 +184,15 @@ export async function generateArticleFromUrl(
   }
   const outline = outlineValidated.data;
 
-  // Step 3: full article — EXACT same prompt/schema as Option 1, unchanged.
-  const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({ outline, language });
+  // Step 3: full article — EXACT same prompt/schema as Option 1, with the
+  // same real keyword, Brand Profile and source summary the outline used.
+  const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({
+    outline,
+    language,
+    primaryKeyword: resolvedKeyword,
+    brandProfileContext: brandProfileContext || undefined,
+    researchNotes,
+  });
 
   logWordPressTextModel('wordpress-from-url', 'article', TEXT_ROLE);
   const articleRaw = await generateText({
@@ -201,7 +209,7 @@ export async function generateArticleFromUrl(
   if (!articleValidated.success) {
     throw new Error('AI returned an invalid article format. Try again.');
   }
-  let content = articleValidated.data.content;
+  let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
 
   // Step 3b: best-effort single external link — same as Option 1/4.
   const externalLink = await addExternalLink(content, outline.title, language);

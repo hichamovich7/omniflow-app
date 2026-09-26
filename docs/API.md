@@ -263,6 +263,8 @@ Generate a WordPress SEO article (TASK-028, Option 1: keyword → article).
 
 Creates one `wordpress_generations` row and synchronously produces a full article: an outline is planned first (title, slug, meta description, H2 sections, featured + 2-3 internal image prompts), then the full Markdown body is written from that outline, then all images are generated and their `{{IMAGE_N}}` markers resolved into the Markdown before the `wordpress_articles` row is written. A single request can take up to ~60 seconds (2 text calls + up to 4 image calls, no async job queue — see RULES.md Rule #15, deferred).
 
+The article prompt receives the typed keyword as primary keyword, the project Brand Profile, the research notes and every Core Settings / Structure / SEO keyword / manual URL option; it may only use URLs explicitly provided and must not invent facts (TASK-FIX-044). The structured FAQ (unless `includeFaq` is `false`) is rendered into `content` as one "FAQ" section. `addExternalLink()` only inserts one verified link on an anchor phrase that already exists in the article — it never rewrites the article.
+
 Option 2 (reference image) is not implemented. Option 3 (external source → article) is implemented as a separate route, `POST /api/wordpress/generate-from-url` (see below) — this route only ever accepts `source_type: "keyword"`.
 
 ## Request
@@ -444,7 +446,7 @@ Reached from the Pinterest Results page's selection toolbar ("Generate WordPress
 
 Same outline → full-article pipeline as Option 1 (`lib/ai/prompts/wordpress-article-prompt.ts`, unchanged), but the outline is synthesized from the pins' combined theme (`lib/ai/prompts/wordpress-from-pins-prompt.ts`) into one cohesive article, not a concatenation of the pins.
 
-Images follow a strict split (see `docs/DECISIONS.md` 2026-07-17): the featured image is **always** freshly generated via `generateImage()` (role IMAGE) from a prompt describing the article's unified theme, never a specific pin. Internal images (up to 3) are **always** the already-generated active `pin_images` image of the selected pins, copied by their existing public Supabase Storage URL — no new `generateImage()` call, no re-upload. `addExternalLink()` runs the same as Option 1, after the article is written and before `{{IMAGE_N}}` marker resolution.
+Images follow a strict split (see `docs/DECISIONS.md` 2026-07-17): the featured image is **always** freshly generated via `generateImage()` (role IMAGE) from a prompt describing the article's unified theme, never a specific pin. Internal images (up to 3) are **always** the already-generated active `pin_images` image of the selected pins, copied by their existing public Supabase Storage URL — no new `generateImage()` call, no re-upload. `addExternalLink()` runs the same as Option 1, after the article is written and before `{{IMAGE_N}}` marker resolution. The primary keyword is the source Pinterest generation's `generations.keyword` (fallback: the most frequent pin keyword), passed to both the outline and the article prompts with the Brand Profile and research notes; the FAQ is rendered into `content` as for Option 1 (TASK-FIX-044).
 
 Fewer than 3 pins is allowed (the UI warns "may lack enough source material" before navigating, and the API logs a warning) but is not a hard block.
 

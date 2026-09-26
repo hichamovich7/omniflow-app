@@ -3,9 +3,10 @@ import { generateText, generateImage, resolveTextModel } from '@/lib/ai/engine';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
-import { buildWordPressFromPinsPrompt } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
+import { buildWordPressFromPinsPrompt, resolvePinsPrimaryKeyword } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import { addExternalLink } from '@/lib/ai/services/external-link';
+import { insertFaqSection } from '@/lib/wordpress/faq-section';
 import {
   wordpressArticleResponseSchema,
   buildWordpressPinsOutlineSchema,
@@ -254,6 +255,8 @@ export async function generateWordPressArticle(
     includeConclusion: includeConclusion ?? undefined,
     includeKeyTakeaways: includeKeyTakeaways ?? undefined,
     includeFaq: includeFaq ?? undefined,
+    includeTables: includeTables ?? undefined,
+    includeH3: includeH3 ?? undefined,
   });
 
   logWordPressTextModel('wordpress', 'outline', OUTLINE_ROLE);
@@ -289,8 +292,11 @@ export async function generateWordPressArticle(
   const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({
     outline,
     language,
-    minWords: sizeConfig?.minWords,
-    maxWords: sizeConfig?.maxWords,
+    primaryKeyword: keyword,
+    brandProfileContext: brandProfileContext || undefined,
+    researchNotes: researchNotes || undefined,
+    articleType: articleType || undefined,
+    articleSize: articleSize || undefined,
     toneOfVoice: toneOfVoice || undefined,
     pointOfView: pointOfView || undefined,
     targetCountry: targetCountry || undefined,
@@ -325,7 +331,12 @@ export async function generateWordPressArticle(
   if (!articleValidated.success) {
     throw new Error('AI returned an invalid article format. Try again.');
   }
-  let content = articleValidated.data.content;
+  // The structured FAQ becomes one visible section of the article (empty
+  // when includeFaq is "Non" — faqRange already forces [] then).
+  let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, {
+    language,
+    useH3: includeH3 !== false,
+  });
 
   // Step 2b: best-effort single external link (real, web-search-verified source).
   // Runs before image marker resolution so it never has to reason about
@@ -417,6 +428,12 @@ interface GenerateArticleFromPinsParams {
    * with an active image, uncapped (TASK-FIX-009).
    */
   internalImageUrls: string[];
+  /**
+   * The source Pinterest generation's keyword (generations.keyword) — the
+   * article's primary keyword. deriveThemeKeyword() is only the fallback when
+   * it is missing or blank.
+   */
+  generationKeyword?: string | null;
   language: SupportedLanguage;
   brandProfileDescription: string | null;
   researchNotes?: string | null;
@@ -433,12 +450,24 @@ interface GenerateArticleFromPinsParams {
 export async function generateArticleFromPins(
   params: GenerateArticleFromPinsParams
 ): Promise<GenerateArticleResult> {
-  const { supabase, userId, generationId, pins, internalImageUrls, language, brandProfileDescription, researchNotes } = params;
+  const {
+    supabase,
+    userId,
+    generationId,
+    pins,
+    internalImageUrls,
+    generationKeyword,
+    language,
+    brandProfileDescription,
+    researchNotes,
+  } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const imageCount = internalImageUrls.length;
+  const primaryKeyword = resolvePinsPrimaryKeyword(generationKeyword, pins);
 
   // Step 1: outline, synthesized from the pins' theme
   const { system: outlineSystem, user: outlineUser } = buildWordPressFromPinsPrompt({
+    primaryKeyword,
     pins,
     brandProfileContext: brandProfileContext || undefined,
     researchNotes: researchNotes || undefined,
@@ -477,6 +506,9 @@ export async function generateArticleFromPins(
   const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({
     outline,
     language,
+    primaryKeyword,
+    brandProfileContext: brandProfileContext || undefined,
+    researchNotes: researchNotes || undefined,
   });
 
   logWordPressTextModel('wordpress-from-pins', 'article', TEXT_ROLE);
@@ -511,7 +543,7 @@ export async function generateArticleFromPins(
     );
     throw new Error('AI returned an invalid article format. Try again.');
   }
-  let content = articleValidated.data.content;
+  let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
 
   // Step 2b: best-effort single external link (real, web-search-verified source).
   // Runs before image marker resolution so it never has to reason about

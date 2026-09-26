@@ -1,4 +1,4 @@
-import { buildSeoGuidelines } from './seo-guidelines';
+import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRules } from './seo-guidelines';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import {
@@ -11,7 +11,7 @@ import {
   type POINTS_OF_VIEW,
 } from '@/lib/validations/wordpress';
 
-export const OUTLINE_PROMPT_ID = 'wordpress-outline-v2';
+export const OUTLINE_PROMPT_ID = 'wordpress-outline-v3';
 
 type ArticleType = (typeof ARTICLE_TYPES)[number];
 type ArticleSize = (typeof ARTICLE_SIZES)[number];
@@ -40,9 +40,13 @@ interface OutlinePromptContext {
   includeConclusion?: boolean;
   includeKeyTakeaways?: boolean;
   includeFaq?: boolean;
+  // Planning only: the table/H3 toggles are enforced at the writing step,
+  // they only keep the guidelines from requesting a disabled block here.
+  includeTables?: boolean;
+  includeH3?: boolean;
 }
 
-const ARTICLE_TYPE_GUIDANCE: Record<ArticleType, string> = {
+export const ARTICLE_TYPE_GUIDANCE: Record<ArticleType, string> = {
   'how-to':
     'Structure the Main Content sections as a sequential, actionable process — each section one clear step or stage in order, phrased as an instruction (e.g. "Prepare X", "Apply Y"), so the article reads as a step-by-step guide from start to finish.',
   listicle:
@@ -75,10 +79,21 @@ const POINT_OF_VIEW_GUIDANCE: Record<PointOfView, string> = {
 
 export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
   const langName = LANGUAGE_LABELS[ctx.language];
-  const guidelines = buildSeoGuidelines(ctx.keyword);
   const sizeConfig = ctx.articleSize ? ARTICLE_SIZE_CONFIG[ctx.articleSize] : undefined;
   const sections = sizeConfig ?? { minSections: DEFAULT_SECTIONS_RANGE.minSections, maxSections: DEFAULT_SECTIONS_RANGE.maxSections };
   const words = sizeConfig ?? { minWords: DEFAULT_WORDS_RANGE.minWords, maxWords: DEFAULT_WORDS_RANGE.maxWords };
+  const guidelines = buildSeoGuidelines(ctx.keyword, {
+    stage: 'outline',
+    minWords: words.minWords,
+    maxWords: words.maxWords,
+    minSections: sections.minSections,
+    maxSections: sections.maxSections,
+    includeH3: ctx.includeH3,
+    includeKeyTakeaways: ctx.includeKeyTakeaways,
+    includeFaq: ctx.includeFaq,
+    includeConclusion: ctx.includeConclusion,
+    includeComparisonTable: ctx.includeTables,
+  });
 
   const coreSettingsNotes: string[] = [];
   if (ctx.articleType) coreSettingsNotes.push(ARTICLE_TYPE_GUIDANCE[ctx.articleType]);
@@ -107,7 +122,10 @@ export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
   // original 10-block sentence.
   const blockNames = ['H1', 'Introduction', 'Quick Answer'];
   if (ctx.includeKeyTakeaways !== false) blockNames.push('Key Takeaways');
-  blockNames.push('Main Content', 'optional Comparison Table', 'Common Mistakes');
+  blockNames.push('Main Content');
+  if (ctx.includeTables === true) blockNames.push('Comparison Table');
+  else if (ctx.includeTables !== false) blockNames.push('optional Comparison Table');
+  blockNames.push('Common Mistakes');
   if (ctx.includeFaq !== false) blockNames.push('FAQ');
   if (ctx.includeConclusion !== false) blockNames.push('Conclusion');
   blockNames.push('Soft CTA');
@@ -126,6 +144,10 @@ export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
 
 ${guidelines}
 
+${buildFactualIntegrityRules()}
+
+${buildEditorialQualityRules()}
+
 The article follows a fixed ${blockNames.length}-block structure (${blockNames.join(', ')}). At this planning stage, provide:
 
 - title: SEO-optimized H1 title, includes the primary keyword. Aim for around 70 characters — the system will trim anything longer at a word boundary, so write it naturally rather than counting characters defensively.
@@ -135,7 +157,7 @@ The article follows a fixed ${blockNames.length}-block structure (${blockNames.j
 - quickAnswerAngle: one sentence describing the direct answer the Quick Answer block will give (the article step will expand this into the final 40-60 word answer)
 ${keyTakeawaysInstruction}
 - sections: an ordered list of ${sections.minSections} to ${sections.maxSections} Main Content H2 sections, each with a one-sentence summary of what it will cover. Do not write the section content yet, only plan it. Each section must be scoped broadly enough to support at least 150-200 words of full body text once written — plan enough sub-points (2-3) per section that it can be developed at that length. This is what makes the final article reach the ${words.minWords}-${words.maxWords} word target, not just the section count.
-- includeComparisonTable: true only if the topic naturally involves comparing materials, methods, products, or options — false otherwise. Do not force a table onto a topic that doesn't call for one.
+- includeComparisonTable: ${ctx.includeTables === true ? 'true — the user requested a comparison table for this article.' : ctx.includeTables === false ? 'false — the user disabled tables for this article.' : "true only if the topic naturally involves comparing materials, methods, products, or options — false otherwise. Do not force a table onto a topic that doesn't call for one."}
 - comparisonTableReason: one short sentence justifying the includeComparisonTable decision either way (why a comparison fits, or why the topic has nothing to meaningfully compare)
 - commonMistakesThemes: 3 to 5 short theme phrases, one per real, specific mistake people make on this topic — not generic filler
 ${faqInstruction}

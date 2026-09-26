@@ -62,6 +62,7 @@ interface PinGenerationRef {
   id: string;
   project_id: string;
   user_id: string;
+  keyword: string | null;
 }
 
 interface PinWithGeneration extends Pin {
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
 
   const { data: pinsData } = await supabase
     .from('pins')
-    .select('*, generations(id, project_id, user_id)')
+    .select('*, generations(id, project_id, user_id, keyword)')
     .in('id', pinIds)
     .order('created_at', { ascending: true });
 
@@ -224,6 +225,7 @@ export async function POST(request: Request) {
       generationId: generation.id,
       pins: pinSummaries,
       internalImageUrls,
+      generationKeyword: generationRef.keyword,
       language,
       brandProfileDescription: project?.description ?? null,
       researchNotes,
