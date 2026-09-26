@@ -4,6 +4,7 @@ import { generateArticleFromUrlSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromUrl } from '@/lib/wordpress/generate-article-from-url';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
+import { formatArticleValidationError } from '@/lib/wordpress/article-form-validation';
 import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import { saveQualityReport } from '@/lib/wordpress/quality-report';
 import { saveArticleFaq } from '@/lib/wordpress/faq-data';
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: parsed.error.issues[0].message, code: 'invalid_request' } },
+      { data: null, error: { message: formatArticleValidationError(parsed.error.issues), code: 'invalid_request' } },
       { status: 400 }
     );
   }

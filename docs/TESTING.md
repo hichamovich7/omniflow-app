@@ -933,6 +933,18 @@ Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42
 
 ---
 
+# WordPress blog-post form — array payload fix + required fields (TASK-FIX-056, 2026-09-27)
+
+```bash
+npx playwright test tests/renderer/wordpress-article-form-validation.spec.ts --project=renderer --reporter=list
+```
+
+Offline (29 cases, pure Zod + helpers + source assertions — no Supabase, no AI call, no browser): reproduction of "Invalid input: expected string, received array" with the previous string-only `manualExternalUrls` schema (client parse → JSON → server re-parse); the fixed schema survives that round trip with and without URLs; string payload, array payload, empty values, invalid / too many URLs in both shapes, wrong types with a readable message; `seoKeywords` stays an array and `researchNotes` / `hookBrief` stay strings; every required field (Project, Language, Primary keyword; Source URL / Pasted text for the URL method) with its message; first invalid field in page order; optional fields stay optional; a fully valid form; URL and Pins methods round trip (non-regression); raw Zod messages replaced; routes use `formatArticleValidationError()`; `*` markers, `aria-required` and inline error slots wired in the form.
+
+The gated browser spec `tests/playwright/wordpress-blog-post.spec.ts` gets three new cases (inline error + focus + no request on an empty keyword, Advanced Options opened on an invalid manual URL, `*` legend and `aria-required`) and the renamed "Primary keyword is required" message; it needs `PLAYWRIGHT_STORAGE_STATE`.
+
+Validation (2026-09-27): TypeScript OK, ESLint (touched files) OK, spec 29/29, full renderer 629/630 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. The real controlled generation was **not** run by the agent (no authenticated session available; creating one with the service-role key was refused) — to be done by the founder from `/wordpress/blog-post`.
+
 # WordPress — structured FAQ and FAQPage schema (TASK-FIX-055, 2026-09-26)
 
 ```bash

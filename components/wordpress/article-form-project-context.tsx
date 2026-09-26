@@ -6,7 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CategorySelect, type CategoryOption } from '@/components/wordpress/category-select';
-import { ArticleFormSectionCard, SELECT_SURFACE_CLASS } from '@/components/wordpress/article-form-section-card';
+import {
+  ArticleFormSectionCard,
+  FieldError,
+  RequiredMark,
+  SELECT_SURFACE_CLASS,
+  fieldErrorId,
+} from '@/components/wordpress/article-form-section-card';
+import type { ArticleFormFieldErrors } from '@/lib/wordpress/article-form-validation';
 import { getStatusPresentation } from '@/lib/utils/status';
 import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -31,6 +38,7 @@ interface ProjectContextSectionProps {
   onCategoriesChange: (categories: CategoryOption[]) => void;
   site: ProjectSiteInfo | null;
   matchingStreams: ProjectContentStreamInfo[];
+  fieldErrors: ArticleFormFieldErrors;
 }
 
 /**
@@ -55,6 +63,7 @@ export function ProjectContextSection({
   onCategoriesChange,
   site,
   matchingStreams,
+  fieldErrors,
 }: ProjectContextSectionProps) {
   return (
     <ArticleFormSectionCard
@@ -67,9 +76,16 @@ export function ProjectContextSection({
       <div className="min-w-0 space-y-1.5">
         <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
           Project
+          <RequiredMark />
         </Label>
         <Select value={projectId} onValueChange={(v) => v && onProjectChange(v)}>
-          <SelectTrigger id="project" className={`w-full min-w-0 ${SELECT_SURFACE_CLASS}`}>
+          <SelectTrigger
+            id="project"
+            aria-required="true"
+            aria-invalid={fieldErrors.projectId ? true : undefined}
+            aria-describedby={fieldErrors.projectId ? fieldErrorId('project') : undefined}
+            className={`w-full min-w-0 ${SELECT_SURFACE_CLASS}`}
+          >
             <span className="min-w-0 truncate text-sm">
               {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
             </span>
@@ -82,6 +98,7 @@ export function ProjectContextSection({
             ))}
           </SelectContent>
         </Select>
+        <FieldError fieldId="project" message={fieldErrors.projectId} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/70 px-3 py-2.5">
@@ -107,9 +124,16 @@ export function ProjectContextSection({
         <div className="min-w-0 space-y-1.5">
           <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
             Language
+            <RequiredMark />
           </Label>
           <Select value={language} onValueChange={(v) => v && onLanguageChange(v as SupportedLanguage)}>
-            <SelectTrigger id="language" className={`w-full min-w-0 ${SELECT_SURFACE_CLASS}`}>
+            <SelectTrigger
+              id="language"
+              aria-required="true"
+              aria-invalid={fieldErrors.language ? true : undefined}
+              aria-describedby={fieldErrors.language ? fieldErrorId('language') : undefined}
+              className={`w-full min-w-0 ${SELECT_SURFACE_CLASS}`}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -120,6 +144,7 @@ export function ProjectContextSection({
               ))}
             </SelectContent>
           </Select>
+          <FieldError fieldId="language" message={fieldErrors.language} />
         </div>
 
         <div className="min-w-0 space-y-1.5">

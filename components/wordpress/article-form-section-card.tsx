@@ -84,3 +84,33 @@ export function ArticleFormSectionCard({ step, icon, title, description, accente
     </section>
   );
 }
+
+/**
+ * Required-field marker for a Label (TASK-FIX-056): a visible `*` plus a
+ * screen-reader "(required)", so the hint doesn't rely on color or glyph alone.
+ */
+export function RequiredMark() {
+  return (
+    <>
+      <span aria-hidden="true" className="ml-0.5 text-destructive">
+        *
+      </span>
+      <span className="sr-only"> (required)</span>
+    </>
+  );
+}
+
+/** Id of a field's inline error, for the control's aria-describedby. */
+export function fieldErrorId(fieldId: string): string {
+  return `${fieldId}-error`;
+}
+
+/** Inline error shown under a field (TASK-FIX-056); renders nothing without a message. */
+export function FieldError({ fieldId, message }: { fieldId: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={fieldErrorId(fieldId)} className="text-xs font-medium text-destructive">
+      {message}
+    </p>
+  );
+}

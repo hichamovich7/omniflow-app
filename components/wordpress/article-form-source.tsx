@@ -9,8 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArticleFormSectionCard,
   FIELD_SURFACE_CLASS,
+  FieldError,
+  RequiredMark,
   SELECT_SURFACE_CLASS,
+  fieldErrorId,
 } from '@/components/wordpress/article-form-section-card';
+import type { ArticleFormFieldErrors } from '@/lib/wordpress/article-form-validation';
 import { MAX_PASTED_CONTENT_LENGTH } from '@/lib/validations/wordpress';
 
 export type SourceMode = 'keyword' | 'url';
@@ -35,6 +39,14 @@ interface ArticleSourceSectionProps {
   confirmedOriginal: boolean;
   onConfirmedOriginalChange: (value: boolean) => void;
   loading: boolean;
+  fieldErrors: ArticleFormFieldErrors;
+}
+
+function invalidProps(fieldId: string, message: string | undefined) {
+  return {
+    'aria-invalid': message ? true : undefined,
+    'aria-describedby': message ? fieldErrorId(fieldId) : undefined,
+  } as const;
 }
 
 /**
@@ -58,6 +70,7 @@ export function ArticleSourceSection({
   confirmedOriginal,
   onConfirmedOriginalChange,
   loading,
+  fieldErrors,
 }: ArticleSourceSectionProps) {
   return (
     <ArticleFormSectionCard
@@ -86,7 +99,8 @@ export function ArticleSourceSection({
           <>
             <div className="space-y-1.5">
               <Label htmlFor="keyword" className="text-xs font-medium text-muted-foreground">
-                Keyword
+                Primary keyword
+                <RequiredMark />
               </Label>
               <Input
                 id="keyword"
@@ -94,10 +108,12 @@ export function ArticleSourceSection({
                 value={keyword}
                 onChange={(e) => onKeywordChange(e.target.value)}
                 maxLength={200}
-                required
+                aria-required="true"
+                {...invalidProps('keyword', fieldErrors.keyword)}
                 disabled={loading}
                 className={`placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
               />
+              <FieldError fieldId="keyword" message={fieldErrors.keyword} />
             </div>
 
             <div className="space-y-1.5">
@@ -110,9 +126,11 @@ export function ArticleSourceSection({
                 value={researchNotes}
                 onChange={(e) => onResearchNotesChange(e.target.value)}
                 maxLength={2000}
+                {...invalidProps('research-notes', fieldErrors.researchNotes)}
                 disabled={loading}
                 className={`min-h-20 ${FIELD_SURFACE_CLASS}`}
               />
+              <FieldError fieldId="research-notes" message={fieldErrors.researchNotes} />
             </div>
           </>
         ) : (
@@ -136,6 +154,7 @@ export function ArticleSourceSection({
               <div className="space-y-1.5">
                 <Label htmlFor="source-url" className="text-xs font-medium text-muted-foreground">
                   URL
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="source-url"
@@ -144,15 +163,18 @@ export function ArticleSourceSection({
                   value={sourceUrl}
                   onChange={(e) => onSourceUrlChange(e.target.value)}
                   maxLength={2000}
-                  required
+                  aria-required="true"
+                  {...invalidProps('source-url', fieldErrors.sourceUrl)}
                   disabled={loading}
                   className={`placeholder:text-muted-foreground/40 ${FIELD_SURFACE_CLASS}`}
                 />
+                <FieldError fieldId="source-url" message={fieldErrors.sourceUrl} />
               </div>
             ) : (
               <div className="space-y-1.5">
                 <Label htmlFor="pasted-content" className="text-xs font-medium text-muted-foreground">
                   Pasted Text
+                  <RequiredMark />
                 </Label>
                 <Textarea
                   id="pasted-content"
@@ -160,10 +182,12 @@ export function ArticleSourceSection({
                   value={pastedContent}
                   onChange={(e) => onPastedContentChange(e.target.value.slice(0, MAX_PASTED_CONTENT_LENGTH))}
                   maxLength={MAX_PASTED_CONTENT_LENGTH}
-                  required
+                  aria-required="true"
+                  {...invalidProps('pasted-content', fieldErrors.pastedContent)}
                   disabled={loading}
                   className={`min-h-40 ${FIELD_SURFACE_CLASS}`}
                 />
+                <FieldError fieldId="pasted-content" message={fieldErrors.pastedContent} />
                 <p className="text-right text-xs text-muted-foreground">
                   {pastedContent.length} / {MAX_PASTED_CONTENT_LENGTH} characters
                 </p>
@@ -180,9 +204,13 @@ export function ArticleSourceSection({
                 checked={confirmedOriginal}
                 onCheckedChange={(checked) => onConfirmedOriginalChange(checked === true)}
                 disabled={loading}
+                aria-required="true"
                 className="mt-0.5"
               />
-              <span className="text-xs leading-relaxed text-muted-foreground">{CONFIRMATION_LABEL}</span>
+              <span className="text-xs leading-relaxed text-muted-foreground">
+                {CONFIRMATION_LABEL}
+                <RequiredMark />
+              </span>
             </label>
           </>
         )}

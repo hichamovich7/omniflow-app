@@ -279,6 +279,10 @@ Option 2 (reference image) is not implemented. Option 3 (external source → art
 }
 ```
 
+Required: `projectId`, `keyword` (1-200 chars after trim) and `language`. Every other field is optional. `manualExternalUrls` accepts either a comma-separated string (`"https://a, https://b"`) or a `string[]` — both normalize to the same trimmed list (max 10 URLs, 500 chars each, valid URLs). Accepting the array form keeps the schema idempotent: the form validates with `generateArticleSchema` and sends the normalized `parsed.data` (TASK-FIX-056 — the previous string-only field rejected every keyword generation with "Invalid input: expected string, received array"). `seoKeywords` stays a `string[]`; `researchNotes` and `hookBrief` stay strings.
+
+On a validation failure the `400 invalid_request` `error.message` is a readable message for the first invalid field in page order (`formatArticleValidationError()`, `lib/wordpress/article-form-validation.ts`) — e.g. "Select a project", "Select an article language", "Primary keyword is required", "One of the URLs is not a valid URL" — never Zod's raw "Invalid input: …" text. `POST /api/wordpress/generate-from-url` uses the same formatter ("Source URL is required", "Paste the source text to use as research context").
+
 ## Response
 
 ```json

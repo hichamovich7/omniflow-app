@@ -86,7 +86,49 @@ test.describe('WordPress blog-post generator reorg (TASK-FIX-040)', () => {
   test('Keyword mode still validates and submits an empty keyword client-side', async ({ page }) => {
     await expect(page.getByLabel('Keyword')).toBeVisible();
     await page.getByRole('button', { name: 'Generate Article' }).click({ force: true });
-    await expect(page.getByText('Keyword is required')).toBeVisible();
+    await expect(page.getByText('Primary keyword is required')).toBeVisible();
+  });
+
+  test('an empty primary keyword shows an inline error, focuses the field and sends no request (TASK-FIX-056)', async ({ page }) => {
+    let generateCalls = 0;
+    await page.route('**/api/wordpress/generate', (route) => {
+      generateCalls += 1;
+      return route.abort();
+    });
+
+    const keyword = page.locator('#keyword');
+    await page.getByRole('button', { name: 'Generate Article' }).click();
+
+    await expect(page.locator('#keyword-error')).toHaveText('Primary keyword is required');
+    await expect(keyword).toHaveAttribute('aria-invalid', 'true');
+    await expect(keyword).toBeFocused();
+    await expect(page.getByText('Fix the highlighted fields before generating the article.')).toBeVisible();
+    await expect(page.getByText(/Invalid input/)).toHaveCount(0);
+    expect(generateCalls).toBe(0);
+
+    // The error stays until the field is actually fixed, then clears.
+    await keyword.fill('   ');
+    await expect(page.locator('#keyword-error')).toBeVisible();
+    await keyword.fill('kitchen ideas');
+    await expect(page.locator('#keyword-error')).toHaveCount(0);
+  });
+
+  test('an invalid manual URL opens Advanced Options and focuses the field (TASK-FIX-056)', async ({ page }) => {
+    await page.locator('#keyword').fill('kitchen ideas');
+    await page.getByRole('button', { name: /Advanced Options/ }).click();
+    await page.locator('#manual-external-urls').fill('not a url');
+    await page.getByRole('button', { name: /Advanced Options/ }).click();
+
+    await page.getByRole('button', { name: 'Generate Article' }).click();
+    await expect(page.locator('#manual-external-urls-error')).toHaveText('One of the URLs is not a valid URL');
+    await expect(page.locator('#manual-external-urls')).toBeFocused();
+  });
+
+  test('required fields are marked with * and a legend', async ({ page }) => {
+    await expect(page.getByText(/Fields marked\s*\*?\s*(with an asterisk)?\s*are required\./)).toBeVisible();
+    await expect(page.locator('#keyword')).toHaveAttribute('aria-required', 'true');
+    await expect(page.locator('#project')).toHaveAttribute('aria-required', 'true');
+    await expect(page.locator('#language')).toHaveAttribute('aria-required', 'true');
   });
 
   test('External Source mode is still reachable and gates submit on the confirmation checkbox', async ({ page }) => {

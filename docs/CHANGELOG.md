@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: WordPress blog-post — "expected string, received array" + required fields (TASK-FIX-056, 2026-09-27)
+
+* Root cause: `manualExternalUrls` — the form sent the Zod-transformed `string[]`, the route re-validated it as a string, so every keyword generation failed with "Invalid input: expected string, received array" (since TASK-FIX-037, even with the field empty).
+* `manualExternalUrls` now accepts a comma-separated string or a `string[]` (`normalizeManualExternalUrls()`), same limits, same stored value and prompt.
+* `POST /api/wordpress/generate` and `/generate-from-url` return a readable message for the first invalid field (`formatArticleValidationError()`), never the raw Zod text.
+* Form: `*` on required fields (Project, Language, Primary keyword; URL / Pasted Text + confirmation for External Source) with a legend, inline errors under each invalid field, no request on invalid input, focus on the first invalid field (Advanced Options opens when needed), errors kept until fixed. "Keyword" label renamed "Primary keyword".
+* "Let AI complete missing fields" documented as a Backlog item, not implemented.
+* New offline spec `tests/renderer/wordpress-article-form-validation.spec.ts` (29); 3 new gated browser cases. No migration, prompt, model or credit change. Real generation not yet run.
+
 ## Feature: Social Content Studio — phase 1, Pinterest from a WordPress article (TASK-044, 2026-09-27)
 
 * `/wordpress/[id]` shows a "Social Content Studio" section for completed articles, with one card per platform from the new central config `lib/social/platforms.ts`: **Pinterest available**; **Facebook coming soon**; **Instagram, Reels, TikTok, Medium planned** (disabled buttons, no handler, accessible explanation — no API/AI call, no database write).

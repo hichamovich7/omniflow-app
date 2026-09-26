@@ -94,16 +94,26 @@ export const SEO_KEYWORD_MAX_LENGTH = 60;
 export const MANUAL_EXTERNAL_URLS_MAX_COUNT = 10;
 export const MANUAL_EXTERNAL_URL_MAX_LENGTH = 500;
 
-// Accepts a simple comma-separated string from the client (e.g. "https://a, https://b")
-// and transforms it into a validated string[] — same input shape as
-// seoKeywords conceptually, but a plain text field, not a tag input (see
-// DECISIONS.md). Empty/undefined transforms to [], matching the "no
-// instruction" default everywhere else in this file.
+// Accepts either the raw comma-separated string typed in the form
+// (e.g. "https://a, https://b") or an already-normalized string[] — the
+// output of this same schema. The client validates with this schema and then
+// sends `parsed.data`, so the server re-parses a string[]: accepting both
+// keeps the schema idempotent (TASK-FIX-056 — a string-only input rejected
+// every keyword generation with "expected string, received array").
+// Empty/undefined/[] transforms to [], matching the "no instruction" default
+// everywhere else in this file.
+export function normalizeManualExternalUrls(value: string | string[] | undefined): string[] {
+  if (value === undefined) return [];
+  const parts = typeof value === 'string' ? value.split(',') : value;
+  return parts.map((u) => u.trim()).filter(Boolean);
+}
+
 const manualExternalUrlsSchema = z
-  .string()
-  .trim()
+  .union([z.string(), z.array(z.string())], {
+    error: 'Manual URLs must be a comma-separated list of URLs',
+  })
   .optional()
-  .transform((val) => (val ? val.split(',').map((u) => u.trim()).filter(Boolean) : []))
+  .transform(normalizeManualExternalUrls)
   .refine((urls) => urls.length <= MANUAL_EXTERNAL_URLS_MAX_COUNT, {
     message: `Too many URLs (max ${MANUAL_EXTERNAL_URLS_MAX_COUNT})`,
   })
@@ -114,10 +124,27 @@ const manualExternalUrlsSchema = z
     message: 'One of the URLs is not a valid URL',
   });
 
+// User-facing messages for the fields the backend actually requires
+// (TASK-FIX-056). `error` on the base type also covers a missing or
+// wrong-typed value, so the raw Zod "Invalid input: expected ..." text never
+// reaches the form.
+export const ARTICLE_PROJECT_REQUIRED_MESSAGE = 'Select a project';
+export const ARTICLE_KEYWORD_REQUIRED_MESSAGE = 'Primary keyword is required';
+export const ARTICLE_LANGUAGE_REQUIRED_MESSAGE = 'Select an article language';
+
+const articleProjectIdSchema = z
+  .string({ error: ARTICLE_PROJECT_REQUIRED_MESSAGE })
+  .uuid(ARTICLE_PROJECT_REQUIRED_MESSAGE);
+const articleLanguageSchema = z.enum(SUPPORTED_LANGUAGES, { error: ARTICLE_LANGUAGE_REQUIRED_MESSAGE });
+
 export const generateArticleSchema = z.object({
-  projectId: z.string().uuid('Invalid project ID'),
-  keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
-  language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
+  projectId: articleProjectIdSchema,
+  keyword: z
+    .string({ error: ARTICLE_KEYWORD_REQUIRED_MESSAGE })
+    .trim()
+    .min(1, ARTICLE_KEYWORD_REQUIRED_MESSAGE)
+    .max(200, 'Primary keyword is too long (max 200 characters)'),
+  language: articleLanguageSchema,
   researchNotes: z.string().trim().max(2000, 'Research notes are too long').optional(),
   categoryId: z.string().uuid('Invalid category ID').optional(),
   articleType: z.enum(ARTICLE_TYPES, { message: 'Invalid article type' }).optional(),
@@ -198,24 +225,29 @@ export const MAX_PASTED_CONTENT_LENGTH = 12000;
 
 export const generateArticleFromUrlSchema = z
   .object({
-    projectId: z.string().uuid('Invalid project ID'),
-    language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
+    projectId: articleProjectIdSchema,
+    language: articleLanguageSchema,
     categoryId: z.string().uuid('Invalid category ID').optional(),
     sourceType: z.enum(['link', 'pasted'], { message: 'Invalid source type' }),
-    sourceUrl: z.string().trim().url('Invalid URL').max(2000, 'URL is too long').optional(),
+    sourceUrl: z
+      .string()
+      .trim()
+      .url('Enter a valid source URL starting with http:// or https://')
+      .max(2000, 'URL is too long')
+      .optional(),
     pastedContent: z
       .string()
       .trim()
-      .min(1, 'Pasted content is required')
+      .min(1, 'Paste the source text to use as research context')
       .max(MAX_PASTED_CONTENT_LENGTH, 'Pasted content is too long')
       .optional(),
   })
   .refine((data) => data.sourceType !== 'link' || !!data.sourceUrl, {
-    message: 'A URL is required when source type is "link"',
+    message: 'Source URL is required',
     path: ['sourceUrl'],
   })
   .refine((data) => data.sourceType !== 'pasted' || !!data.pastedContent, {
-    message: 'Pasted content is required when source type is "pasted"',
+    message: 'Paste the source text to use as research context',
     path: ['pastedContent'],
   })
   .refine((data) => !(data.sourceType === 'link' && data.pastedContent), {

@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from '@/components/ui/collapsible';
-import { SectionHeading } from '@/components/wordpress/article-form-section-card';
+import { FieldError, SectionHeading, fieldErrorId } from '@/components/wordpress/article-form-section-card';
+import type { ArticleFormFieldErrors } from '@/lib/wordpress/article-form-validation';
 import {
   POINTS_OF_VIEW,
   TARGET_COUNTRIES,
@@ -212,6 +213,10 @@ interface AdvancedOptionsSectionProps {
   manualExternalUrls: string;
   onManualExternalUrlsChange: (value: string) => void;
   loading: boolean;
+  /** Controlled by the form so a submit can reveal an invalid field inside (TASK-FIX-056). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fieldErrors: ArticleFormFieldErrors;
 }
 
 /**
@@ -219,8 +224,9 @@ interface AdvancedOptionsSectionProps {
  * External Linking — every remaining optional block from before
  * TASK-FIX-040, now grouped under one collapsed-by-default
  * disclosure instead of being always visible. Closed by default on every
- * mount (local state, not persisted) — none of this changes what gets
- * validated or sent; only its default visibility changed.
+ * mount (state owned by ArticleForm, not persisted, so a failed submit can
+ * open it on an invalid field — TASK-FIX-056) — none of this changes what
+ * gets validated or sent; only its default visibility changed.
  */
 export function AdvancedOptionsSection({
   pointOfView,
@@ -255,13 +261,14 @@ export function AdvancedOptionsSection({
   manualExternalUrls,
   onManualExternalUrlsChange,
   loading,
+  open,
+  onOpenChange,
+  fieldErrors,
 }: AdvancedOptionsSectionProps) {
-  const [open, setOpen] = useState(false);
-
   return (
     <Collapsible
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
       className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       <CollapsibleTrigger className="flex w-full items-start gap-2 bg-primary/5 px-5 py-4 text-left transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-0 sm:px-6">
@@ -363,9 +370,12 @@ export function AdvancedOptionsSection({
                 value={hookBrief}
                 onChange={(e) => onHookBriefChange(e.target.value.slice(0, HOOK_BRIEF_MAX_LENGTH))}
                 maxLength={HOOK_BRIEF_MAX_LENGTH}
+                aria-invalid={fieldErrors.hookBrief ? true : undefined}
+                aria-describedby={fieldErrors.hookBrief ? fieldErrorId('hook-brief') : undefined}
                 disabled={loading}
                 className="min-h-20"
               />
+              <FieldError fieldId="hook-brief" message={fieldErrors.hookBrief} />
               <p className="text-right text-xs text-muted-foreground">
                 {hookBrief.length} / {HOOK_BRIEF_MAX_LENGTH} characters
               </p>
@@ -417,6 +427,7 @@ export function AdvancedOptionsSection({
                 maxLength={SEO_KEYWORD_MAX_LENGTH}
                 placeholder="Type a keyword and press Enter"
               />
+              <FieldError fieldId="seo-keywords" message={fieldErrors.seoKeywords} />
               <p className="text-xs text-muted-foreground">
                 AI suggestions are a language-model brainstorm of related terms — not real search-volume or SERP data.
               </p>
@@ -441,8 +452,11 @@ export function AdvancedOptionsSection({
                 placeholder="https://example.com/a, https://example.com/b"
                 value={manualExternalUrls}
                 onChange={(e) => onManualExternalUrlsChange(e.target.value)}
+                aria-invalid={fieldErrors.manualExternalUrls ? true : undefined}
+                aria-describedby={fieldErrors.manualExternalUrls ? fieldErrorId('manual-external-urls') : undefined}
                 disabled={loading}
               />
+              <FieldError fieldId="manual-external-urls" message={fieldErrors.manualExternalUrls} />
               <p className="text-xs text-muted-foreground">Comma-separated. Up to 10 URLs.</p>
             </div>
           </div>

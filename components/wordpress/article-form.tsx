@@ -24,6 +24,15 @@ import {
   type ProjectContentStreamInfo,
 } from '@/lib/wordpress/project-context';
 import { ARTICLE_TYPE_LABELS, ARTICLE_SIZE_LABELS, TONE_OF_VOICE_LABELS } from '@/lib/wordpress/article-form-labels';
+import {
+  ADVANCED_ARTICLE_FORM_FIELDS,
+  ARTICLE_FORM_FIELD_IDS,
+  getArticleFormFieldErrors,
+  getFirstInvalidField,
+  type ArticleFormFieldErrors,
+} from '@/lib/wordpress/article-form-validation';
+
+const VALIDATION_SUMMARY_MESSAGE = 'Fix the highlighted fields before generating the article.';
 
 interface ArticleFormProps {
   projects: ProjectOption[];
@@ -69,6 +78,11 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
   const [manualExternalUrls, setManualExternalUrls] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Once a submit has been attempted, field errors are recomputed from the
+  // current values on every render: they stay visible until the field is
+  // actually fixed (TASK-FIX-056).
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const categoryOptions = categories.filter((c) => c.project_id === projectId);
 
@@ -84,6 +98,7 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
   function handleSourceModeChange(next: SourceMode) {
     setSourceMode(next);
     setError(null);
+    setSubmitAttempted(false);
   }
 
   async function handleSuggestKeywords() {
@@ -124,48 +139,77 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+  function validateKeywordForm() {
+    return generateArticleSchema.safeParse({
+      projectId,
+      keyword,
+      language,
+      researchNotes: researchNotes.trim() || undefined,
+      categoryId: categoryId || undefined,
+      articleType: articleType || undefined,
+      articleSize: articleSize || undefined,
+      toneOfVoice: toneOfVoice || undefined,
+      pointOfView: pointOfView || undefined,
+      targetCountry: targetCountry || undefined,
+      hookBrief: hookBrief.trim() || undefined,
+      includeConclusion: includeConclusion ? includeConclusion === 'yes' : undefined,
+      includeTables: includeTables ? includeTables === 'yes' : undefined,
+      includeH3: includeH3 ? includeH3 === 'yes' : undefined,
+      includeLists: includeLists ? includeLists === 'yes' : undefined,
+      includeItalics: includeItalics ? includeItalics === 'yes' : undefined,
+      includeQuotes: includeQuotes ? includeQuotes === 'yes' : undefined,
+      includeKeyTakeaways: includeKeyTakeaways ? includeKeyTakeaways === 'yes' : undefined,
+      includeFaq: includeFaq ? includeFaq === 'yes' : undefined,
+      includeBold: includeBold ? includeBold === 'yes' : undefined,
+      seoKeywords: seoKeywords.length > 0 ? seoKeywords : undefined,
+      manualExternalUrls: manualExternalUrls.trim() || undefined,
+    });
+  }
 
-    if (sourceMode === 'keyword') {
-      const parsed = generateArticleSchema.safeParse({
-        projectId,
-        keyword,
-        language,
-        researchNotes: researchNotes.trim() || undefined,
-        categoryId: categoryId || undefined,
-        articleType: articleType || undefined,
-        articleSize: articleSize || undefined,
-        toneOfVoice: toneOfVoice || undefined,
-        pointOfView: pointOfView || undefined,
-        targetCountry: targetCountry || undefined,
-        hookBrief: hookBrief.trim() || undefined,
-        includeConclusion: includeConclusion ? includeConclusion === 'yes' : undefined,
-        includeTables: includeTables ? includeTables === 'yes' : undefined,
-        includeH3: includeH3 ? includeH3 === 'yes' : undefined,
-        includeLists: includeLists ? includeLists === 'yes' : undefined,
-        includeItalics: includeItalics ? includeItalics === 'yes' : undefined,
-        includeQuotes: includeQuotes ? includeQuotes === 'yes' : undefined,
-        includeKeyTakeaways: includeKeyTakeaways ? includeKeyTakeaways === 'yes' : undefined,
-        includeFaq: includeFaq ? includeFaq === 'yes' : undefined,
-        includeBold: includeBold ? includeBold === 'yes' : undefined,
-        seoKeywords: seoKeywords.length > 0 ? seoKeywords : undefined,
-        manualExternalUrls: manualExternalUrls.trim() || undefined,
-      });
-      if (!parsed.success) {
-        setError(parsed.error.issues[0].message);
-        return;
-      }
+  function validateUrlForm() {
+    return generateArticleFromUrlSchema.safeParse({
+      projectId,
+      language,
+      categoryId: categoryId || undefined,
+      sourceType: urlSourceType,
+      sourceUrl: urlSourceType === 'link' ? sourceUrl.trim() : undefined,
+      pastedContent: urlSourceType === 'pasted' ? pastedContent : undefined,
+    });
+  }
 
-      setLoading(true);
+  function currentFieldErrors(): ArticleFormFieldErrors {
+    const result = sourceMode === 'keyword' ? validateKeywordForm() : validateUrlForm();
+    return result.success ? {} : getArticleFormFieldErrors(result.error.issues);
+  }
 
-      const res = await fetch('/api/wordpress/generate', {
+  function focusField(field: string) {
+    const elementId = ARTICLE_FORM_FIELD_IDS[field];
+    if (!elementId) return;
+    if (ADVANCED_ARTICLE_FORM_FIELDS.has(field)) setAdvancedOpen(true);
+    // Wait for Advanced Options to render its panel before focusing inside it.
+    requestAnimationFrame(() => {
+      const element = document.getElementById(elementId);
+      if (!element) return;
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.focus({ preventScroll: true });
+    });
+  }
+
+  function rejectInvalidForm(errors: ArticleFormFieldErrors) {
+    setSubmitAttempted(true);
+    setError(VALIDATION_SUMMARY_MESSAGE);
+    const first = getFirstInvalidField(errors);
+    if (first) focusField(first);
+  }
+
+  async function postGeneration(endpoint: string, payload: unknown) {
+    setLoading(true);
+    try {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(payload),
       });
-
       const json = await res.json();
 
       if (!res.ok || json.error) {
@@ -178,43 +222,43 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
 
       toast.success('Article generated successfully');
       router.push(`/wordpress/${json.data.generationId}`);
-      return;
-    }
-
-    const parsed = generateArticleFromUrlSchema.safeParse({
-      projectId,
-      language,
-      categoryId: categoryId || undefined,
-      sourceType: urlSourceType,
-      sourceUrl: urlSourceType === 'link' ? sourceUrl.trim() : undefined,
-      pastedContent: urlSourceType === 'pasted' ? pastedContent : undefined,
-    });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0].message);
-      return;
-    }
-
-    setLoading(true);
-
-    const res = await fetch('/api/wordpress/generate-from-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(parsed.data),
-    });
-
-    const json = await res.json();
-
-    if (!res.ok || json.error) {
-      const message = json.error?.message ?? 'Generation failed';
+    } catch {
+      const message = 'Generation failed. Check your connection and try again.';
       setError(message);
       toast.error(message);
       setLoading(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (sourceMode === 'keyword') {
+      const parsed = validateKeywordForm();
+      if (!parsed.success) {
+        rejectInvalidForm(getArticleFormFieldErrors(parsed.error.issues));
+        return;
+      }
+      // parsed.data carries manualExternalUrls already normalized to string[];
+      // the route's schema accepts that shape as well as the raw string.
+      await postGeneration('/api/wordpress/generate', parsed.data);
       return;
     }
 
-    toast.success('Article generated successfully');
-    router.push(`/wordpress/${json.data.generationId}`);
+    const parsed = validateUrlForm();
+    if (!parsed.success) {
+      rejectInvalidForm(getArticleFormFieldErrors(parsed.error.issues));
+      return;
+    }
+    await postGeneration('/api/wordpress/generate-from-url', parsed.data);
   }
+
+  const fieldErrors: ArticleFormFieldErrors = submitAttempted ? currentFieldErrors() : {};
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  // The summary alert only belongs to a client-side rejection; once every
+  // field is fixed it disappears together with the inline errors.
+  const displayedError = error === VALIDATION_SUMMARY_MESSAGE && !hasFieldErrors ? null : error;
 
   const submitDisabled =
     loading || projects.length === 0 || (sourceMode === 'url' && !confirmedOriginal);
@@ -287,13 +331,18 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
 
       {/* Form — each section below is its own card (TASK-FIX-040 visual
           finish); this element only wraps the submit behavior, no styling. */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-6">
         {/* Workspace panel: a recessed, tinted surface (bg-muted, already a
             very slightly violet-hued neutral in this app's token set — see
             app/globals.css) that groups the five steps together and reads
             as a distinct layer between the page background and the white
             cards, without becoming another big white block itself. */}
         <div className="space-y-5 rounded-2xl bg-muted/60 p-4 sm:p-6">
+          <p className="text-xs text-muted-foreground">
+            Fields marked <span aria-hidden="true" className="text-destructive">*</span>
+            <span className="sr-only">with an asterisk</span> are required.
+          </p>
+
           <ProjectContextSection
             projects={projects}
             projectId={projectId}
@@ -308,6 +357,7 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
             }}
             site={selectedSite}
             matchingStreams={matchingStreams}
+            fieldErrors={fieldErrors}
           />
 
           <ArticleSourceSection
@@ -326,6 +376,7 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
             confirmedOriginal={confirmedOriginal}
             onConfirmedOriginalChange={setConfirmedOriginal}
             loading={loading}
+            fieldErrors={fieldErrors}
           />
 
           {sourceMode === 'keyword' && (
@@ -374,6 +425,9 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
               manualExternalUrls={manualExternalUrls}
               onManualExternalUrlsChange={setManualExternalUrls}
               loading={loading}
+              open={advancedOpen}
+              onOpenChange={setAdvancedOpen}
+              fieldErrors={fieldErrors}
             />
           )}
 
@@ -390,8 +444,8 @@ export function ArticleForm({ projects, categories: initialCategories, sites, co
           />
         </div>
 
-        {error && (
-          <Alert>{error}</Alert>
+        {displayedError && (
+          <Alert>{displayedError}</Alert>
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
