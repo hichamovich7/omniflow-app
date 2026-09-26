@@ -71,15 +71,18 @@ export default async function WordPressArticlePage({
       {/* Article */}
       {article ? (
         <div className="space-y-6">
-          {wordpressSite ? (
+          {wordpressSite && (
             <PublishControl generationId={id} article={article} wordpressSite={wordpressSite} />
-          ) : (
-            <CopyExportButtons
-              markdown={exportToMarkdownForWordPress(article)}
-              html={exportToHtmlForWordPress(article)}
-              filename={`${article.slug}.md`}
-            />
           )}
+          {/* Always available. Internal links are computed only when the user
+              copies (POST /api/wordpress/[id]/export), never on render. */}
+          <CopyExportButtons
+            markdown={exportToMarkdownForWordPress(article)}
+            html={exportToHtmlForWordPress(article)}
+            filename={`${article.slug}.md`}
+            generationId={id}
+            internalLinksAvailable={!!wordpressSite}
+          />
 
           <ArticleQualityReportCard report={qualityReport} generationId={id} />
 

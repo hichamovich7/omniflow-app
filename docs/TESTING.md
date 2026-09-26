@@ -905,6 +905,28 @@ Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42
 
 ---
 
+# WordPress export — internal links in Copy Markdown / Copy HTML (TASK-FIX-052, 2026-09-26)
+
+```bash
+npx playwright test tests/renderer/wordpress-export-internal-links.spec.ts --project=renderer --reporter=list
+```
+
+Offline (28 cases, WordPress is a stubbed global `fetch` — no network, no database, no AI call): HTML export with `<a href>` links; Markdown export with `[anchor](url)` links and no HTML, differing from the original only by the inserted links; external links, images, figures, tables, quotes, code (fenced, indented, inline), ATX / setext headings, HTML blocks and FAQ (with and without H3) unchanged, a later H2 eligible again; one link per paragraph, no duplicate URL or post; max 3 (small) / 5 (medium, large); paragraphs with a link, autolink or bare URL skipped; parentheses encoded in Markdown URLs; option off → original export and no WordPress call (both formats); no site → skipped; new blog without posts and no relevant post → original export with the right informative message; WordPress API error → original export + non-blocking warning; success message with the link count; no content or credentials in logs; current article excluded; external post URL ignored; tags looked up, never created, nothing written to WordPress; stored article never modified; Keyword / Pins (source Pinterest keyword) / URL methods; wiring — the review page never computes links on render and always shows the copy buttons, the option is on by default and skips the request when off, the export route validates auth / Zod / ownership and writes nothing.
+
+The existing `wordpress-internal-links.spec.ts` (43) and `wordpress-publish-seo.spec.ts` (36) still pass after the placement engine was shared between HTML and Markdown.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 28/28, WordPress internal-links + publish SEO specs 79/79, full renderer 511/512 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. The authenticated browser tests stay skipped without `PLAYWRIGHT_STORAGE_STATE`; clipboard behavior in a real browser is a manual check.
+
+# WordPress publish — automatic internal links (TASK-FIX-051, 2026-09-26)
+
+```bash
+npx playwright test tests/renderer/wordpress-internal-links.spec.ts --project=renderer --reporter=list
+```
+
+Offline (43 cases, the WordPress site is a stubbed global `fetch` — no network, no database, no AI call): published posts request (`status=publish`, `_fields` without content), published-only filter, rendered-title decoding, pagination (short page stops, full pages followed, later page failure keeps loaded posts), exclusion of the post being updated (id and slug), external / invalid / `javascript:` / relative URLs ignored with a warning, URL policy (www, port, base path, credentials); selection by primary keyword, SEO keywords, H2/H3 words, categories and tags (taxonomy never enough alone); no match → HTML byte-for-byte unchanged; generic anchors refused; max 3 (short) / 5 (medium, long) links; one link per paragraph; no duplicate URL or post, URL already linked skipped; no link in H1/H2/H3, FAQ (with and without H3), images/figures, existing external or internal links; entities, inline markup and attributes preserved; accent/case-insensitive matching keeping the original text; escaped href; API error / unreachable site / no posts non-blocking; no content or credentials in logs; publish flow opt-in, Keyword / Pins (source Pinterest keyword, never the pin-title label) / URL methods, draft / publish / future with date, API failure still publishes, no self-link on update.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 43/43, WordPress publish SEO spec unchanged, full renderer 483/484 (same pre-existing `pinterest-text-importance-none.spec.ts` failure). Not yet checked against a real WordPress site.
+
 # WordPress publish — slug, excerpt, tags, Rank Math (TASK-FIX-049 / TASK-FIX-050, 2026-09-26)
 
 ```bash

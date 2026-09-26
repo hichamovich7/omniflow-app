@@ -174,6 +174,27 @@ export async function findOrCreateTag(site: WordPressSiteCredentials, name: stri
   }
 }
 
+/**
+ * Read-only twin of findOrCreateTag(): the existing tag id whose name matches
+ * case-insensitively, or null. Never creates a tag, never throws — used by
+ * the export path, which must not change anything on WordPress.
+ */
+export async function findExistingTagId(site: WordPressSiteCredentials, name: string): Promise<number | null> {
+  const base = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/tags`;
+  const wanted = name.trim().toLowerCase();
+  try {
+    const res = await fetch(`${base}?search=${encodeURIComponent(name)}&per_page=100`, {
+      headers: { Authorization: authHeader(site.username, site.password) },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const found = (await res.json()) as { id: number; name: string }[];
+    return found.find((t) => decodeHtmlEntities(t.name).trim().toLowerCase() === wanted)?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // WP returns term names HTML-escaped ("Bad &amp; Boujee").
 function decodeHtmlEntities(value: string): string {
   return value
@@ -295,6 +316,86 @@ export async function upsertPost(
 
   const data = (await res.json()) as { id: number; link: string; status: string };
   return { id: data.id, link: data.link, status: data.status };
+}
+
+/** Only the fields internal linking needs — never the post content. */
+export interface WordPressPostSummary {
+  id: number;
+  link: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  categories: number[];
+  tags: number[];
+  status: string;
+}
+
+const POST_SUMMARY_FIELDS = 'id,link,slug,title,excerpt,categories,tags,status';
+
+function renderedField(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && typeof (value as { rendered?: unknown }).rendered === 'string') {
+    return (value as { rendered: string }).rendered;
+  }
+  return '';
+}
+
+function numberList(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((v): v is number => typeof v === 'number') : [];
+}
+
+/**
+ * One page of published posts, restricted to POST_SUMMARY_FIELDS through
+ * `_fields`. `totalPages` comes from WP's X-WP-TotalPages header (1 when
+ * absent). Throws WordPressApiError on network/HTTP failure — the internal
+ * linking caller decides it is non-blocking.
+ */
+export async function fetchPublishedPostsPage(
+  site: WordPressSiteCredentials,
+  page: number,
+  perPage: number,
+  timeoutMs: number
+): Promise<{ posts: WordPressPostSummary[]; totalPages: number }> {
+  const url =
+    `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/posts` +
+    `?status=publish&per_page=${perPage}&page=${page}&_fields=${POST_SUMMARY_FIELDS}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: authHeader(site.username, site.password) },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    throw new WordPressApiError('Could not reach that WordPress site while loading posts.');
+  }
+
+  if (!res.ok) {
+    throw new WordPressApiError(await parseErrorBody(res), res.status);
+  }
+
+  const data = (await res.json().catch(() => null)) as unknown;
+  if (!Array.isArray(data)) {
+    throw new WordPressApiError('WordPress returned an unexpected posts response.', res.status);
+  }
+
+  const posts: WordPressPostSummary[] = [];
+  for (const raw of data as Record<string, unknown>[]) {
+    if (!raw || typeof raw.id !== 'number' || typeof raw.link !== 'string') continue;
+    posts.push({
+      id: raw.id,
+      link: raw.link,
+      slug: typeof raw.slug === 'string' ? raw.slug : '',
+      title: renderedField(raw.title),
+      excerpt: renderedField(raw.excerpt),
+      categories: numberList(raw.categories),
+      tags: numberList(raw.tags),
+      status: typeof raw.status === 'string' ? raw.status : 'publish',
+    });
+  }
+
+  const totalPages = Number(res.headers.get('X-WP-TotalPages'));
+  return { posts, totalPages: Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1 };
 }
 
 /**

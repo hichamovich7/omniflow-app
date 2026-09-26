@@ -894,6 +894,70 @@ server_error
 
 ---
 
+# POST /api/wordpress/[id]/export
+
+Builds the Copy Markdown / Copy HTML export of an article on demand, optionally with automatic internal links (TASK-FIX-052). Called only when the user clicks a Copy button with "Include internal links" on — never while rendering `/wordpress/[id]`. `[id]` is the `wordpress_generations.id`. Read-only: nothing is written to Supabase or WordPress; the stored `wordpress_articles.content` is never modified.
+
+## Description
+
+1. Auth (`supabase.auth.getUser()`), UUID check, Zod body (`exportArticleSchema`, `lib/validations/wordpress-export.ts`), ownership (`generation.user_id`).
+2. Base export from the stored article: `exportToHtmlForWordPress()` (HTML) or `exportToMarkdownForWordPress()` (Markdown), the leading H1 stripped as before.
+3. `includeInternalLinks: false`, or no connected WordPress site → the base export is returned unchanged (`internalLinks.status: "skipped"`), WordPress is not contacted.
+4. `includeInternalLinks: true` with a connected site → rate limit `wordpress/export` (60/hour), then `prepareArticleExport()` (`lib/wordpress/export-with-links.ts`): same context as the publish path (`buildInternalLinkContext()` — resolved focus keyword per method, `buildWordPressTags()` names, H1 title, mapped `wp_category_id`, `article_size`, current `wp_post_id` / slug excluded) and same `linkContent()` fetch / scoring / limits / anchors as described under `POST /api/wordpress/[id]/publish`. One difference: tag ids are only looked up (`findExistingTagId()`, `GET /wp-json/wp/v2/tags?search=`), never created. HTML links are `<a href="URL">anchor</a>`; Markdown links are `[anchor](URL)` (parentheses / spaces encoded) and never HTML. Markdown is scanned by block (fenced / indented code, ATX / setext headings, quotes, tables, HTML blocks, lists, paragraphs) and inline protected spans (code, images, links, autolinks, bare URLs, inline HTML, escapes): only plain text of paragraphs and list items outside the FAQ can receive a link, and a paragraph already holding a link is skipped. Headings and word count for scoring and the 3 / 5 limit come from the rendered HTML, so both formats select the same way.
+5. Never blocking: WordPress unreachable or erroring → the base export with `internalLinks.status: "failed"`; logs `[wordpress export] step=internal_links_fetch http=… message=…` only.
+
+## Request
+
+```json
+{
+  "format": "markdown",
+  "includeInternalLinks": true
+}
+```
+
+## Response
+
+```json
+{
+  "data": {
+    "format": "markdown",
+    "content": "A [cozy living room](https://example.com/cozy-living-room-checklist/) starts with…",
+    "internalLinks": {
+      "status": "inserted",
+      "insertedCount": 1,
+      "links": [
+        { "postId": 118, "url": "https://example.com/cozy-living-room-checklist/", "anchor": "cozy living room" }
+      ],
+      "warnings": []
+    },
+    "availablePosts": 12
+  },
+  "error": null
+}
+```
+
+`internalLinks` has the same shape and statuses as in the publish response. `availablePosts` is the number of published, allowed, non-current posts considered — `0` on a new blog (no published post), a failure or when skipped; the client uses it to tell "no published articles" from "no relevant article".
+
+## Credits
+
+Not applicable (no AI call).
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request
+not_found
+forbidden
+rate_limited
+```
+
+A WordPress problem is never an error: the original export is returned. On any request failure the client copies its own original export.
+
+---
+
 # POST /api/wordpress/[id]/publish
 
 Publish an article to its project's connected WordPress site via the REST API (TASK-035). `[id]` is the `wordpress_generations.id`, matching the existing `DELETE /api/wordpress/[id]`.
@@ -907,6 +971,7 @@ Publish an article to its project's connected WordPress site via the REST API (T
    Payload (TASK-FIX-049, `lib/wordpress/publish-post.ts`): `title` = the H1 `article.title` (no longer `meta_title`, which is reserved for Rank Math), `content`, `excerpt` = `meta_description`, `slug` = `wordpress_articles.slug` sent explicitly (WordPress never re-derives it from the title), `categories`, `tags`, `featured_media`, `status`, `date`.
    Focus keyword (`resolveFocusKeyword()`, TASK-FIX-050): Keyword method → `wordpress_generations.keyword`; URL method → the same column only once the generation is `completed` (the AI-resolved keyword), never a URL or the `Pasted content` placeholder; Pins method → never `wordpress_generations.keyword` (a synthesized "Pin title + Pin title" label) but the source Pinterest `generations.keyword`, read via `pins.generation_id` by `getPinsSeoSource()` (`lib/queries/wordpress.ts`) — only when every selected Pin shares one keyword. Empty, URL-like or > 200-character values are rejected; no reliable value → no focus keyword and a warning.
    Tags (`lib/wordpress/tags.ts`): built only from stored data, in this order — `seo_keywords`, the selected Pins' `pins.keywords` (Pins method), the resolved focus keyword (articles store no tags) — no AI call, no minimum, max 8, deduplicated case/space/hyphen-insensitively, empty, placeholder and > 60-character values dropped, original casing kept, the pin-title label never used. No tag at all → the post is sent without `tags` and a warning is returned. Each name is looked up with `GET /wp-json/wp/v2/tags?search=` (exact case-insensitive name match) and reused, else created with `POST /wp-json/wp/v2/tags`; a tag WordPress refuses to create is skipped, never blocking.
+   Internal links (TASK-FIX-051, `lib/wordpress/internal-links.ts`), after the tags are resolved and before the post is sent: `GET /wp-json/wp/v2/posts?status=publish&per_page=100&page=N&_fields=id,link,slug,title,excerpt,categories,tags,status` (never the post content), following `X-WP-TotalPages`, at most 5 pages (500 most recent posts), 8 s per request and 15 s in total. Kept: `status: publish` only, not the post being updated (`wp_post_id`, or the same slug), and only `link` values on the configured site (same host, `www.` ignored, same port, under the site's base path, http/https, no credentials) — the canonical `link` is used as is, never rebuilt from a slug; other URLs are ignored with a warning. Deterministic scoring, no AI call: primary keyword (the resolved focus keyword) in the post title/slug +6 or excerpt +3; each SEO keyword (the tag names) in title/slug +4 or excerpt +2 (max 8); shared significant words between the article title + H2/H3 and the post title +1 each (max 4); shared category +2; shared tags +2 each (max 4). A post needs a lexical score ≥ 2 and a total ≥ 4. Limit: 3 links for a `small` article (or < 1000 words when no size is stored), 5 for `medium` / `large`. The HTML is tokenized (tags vs text, quoted attributes intact) and only text nodes inside `<p>`/`<li>` are touched: never in headings, existing links, images/figures, code, quotes, tables, or the FAQ section (from an FAQ H2/H3 to the next H2); never in a paragraph that already contains a link; one link per paragraph, per post and per URL (URLs already linked in the article are skipped). The anchor is a phrase present in the text — the matched keyword or the longest 2–6-word phrase of the target title — with its original casing; generic anchors ("click here", "cliquez ici", "read more"…) are refused. No match → HTML unchanged. Never blocking: a WordPress error sends the post without new links (`status: "failed"` + warning); logs carry step, HTTP code and message only.
 5. Rank Math (`lib/wordpress/seo/rank-math.ts`), after the post exists: `GET /wp-json/rankmath/v1` checks that `/rankmath/v1/updateMeta` is exposed for `POST`, then `POST /wp-json/rankmath/v1/updateMeta` with `{ "objectType": "post", "objectID": <wp post id>, "meta": { "rank_math_title": getMetaTitle(article), "rank_math_description": meta_description, "rank_math_focus_keyword": keyword } }` (`rank_math_canonical_url` only when explicitly provided — never today). Empty values are omitted, never sent (Rank Math deletes a meta sent empty); `permalink` is never sent. Route and args (`objectType` string, `objectID` integer, `meta`) verified on the connected site's public namespace index — Rank Math 1.0.279 + PRO, 2026-09-26. Never blocking: namespace absent → warning "Rank Math was not detected."; route missing, HTTP error or `false` answer → warning "Rank Math metadata could not be saved." and a log line with only step, article/post ids, HTTP code and message. The post, slug, content and tags stay as sent; a retry updates the same post and overwrites the same meta keys.
 6. Persists `wp_post_id` / `publish_status` / `published_at` / `scheduled_at` (migration 020, TASK-FIX-007 — the WP-side target datetime, only set for `mode: "schedule"`, cleared otherwise), or `publish_status: 'failed'` + `publish_error` on failure — never a silent failure.
 
@@ -932,6 +997,14 @@ Publish an article to its project's connected WordPress site via the REST API (T
     "publishedAt": null,
     "viewUrl": "https://example.com/?p=42",
     "rankMath": "saved",
+    "internalLinks": {
+      "status": "inserted",
+      "insertedCount": 1,
+      "links": [
+        { "postId": 118, "url": "https://example.com/cozy-living-room-checklist/", "anchor": "cozy living room" }
+      ],
+      "warnings": []
+    },
     "warnings": []
   },
   "error": null
@@ -939,6 +1012,8 @@ Publish an article to its project's connected WordPress site via the REST API (T
 ```
 
 `rankMath` is `"saved"`, `"not_detected"` or `"failed"`; `warnings` holds the non-blocking messages shown as warning toasts by the Publish control — Rank Math not detected / not saved, "No reliable tags found — the post was sent without tags.", "Tags could not be found or created on WordPress — the post was sent without tags." and "No reliable focus keyword found — the Rank Math focus keyword was left empty.". A Rank Math problem never turns a publish into `publish_failed`.
+
+`internalLinks.status` (TASK-FIX-051) is `"inserted"` (at least one link added), `"none"` (no relevant post / no usable anchor — content unchanged), `"skipped"` (not run — empty content) or `"failed"` (posts could not be loaded — content unchanged). Its `warnings` (posts not loaded, some pages not loaded, only the 500 most recent posts considered, N URLs ignored) are also appended to the top-level `warnings`. An internal-links problem never turns a publish into `publish_failed`.
 
 ## Credits
 

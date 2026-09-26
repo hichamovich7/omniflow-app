@@ -18,6 +18,23 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Feature: WordPress export — internal links in Copy Markdown / Copy HTML (TASK-FIX-052, 2026-09-26)
+
+* New "Include internal links" option (on by default, available when the project has a WordPress site) under Copy Markdown / Copy HTML / Download .md on `/wordpress/[id]`. The copy buttons are now shown even when a WordPress site is connected, next to the Publish control.
+* Copying with the option on calls the new read-only `POST /api/wordpress/[id]/export` (`lib/wordpress/export-with-links.ts`), which loads the published posts and inserts links with the same selection as publishing (shared `buildInternalLinkContext()` + `linkContent()`): HTML `<a href>` links or Markdown `[anchor](url)` links (never HTML in Markdown). Tags are only looked up, never created. Links are computed only on click, never while rendering the page, and the stored article is never modified.
+* `lib/wordpress/internal-links.ts`: the placement engine is shared by an HTML analyzer and a new Markdown analyzer (`insertInternalLinksInMarkdown()`); scoring, limits, anchors and URL rules unchanged. New `findExistingTagId()` in `rest-client.ts`.
+* UX: "Preparing export with internal links…" loading state, "HTML copied with 3 internal links." / "Markdown copied without internal links." toasts, informative message when the blog has no (relevant) published article, non-blocking warning "Internal links could not be loaded. The original export was copied." on failure. Download .md unchanged.
+* No migration, prompt, model, Rank Math, tag, image, Quality Gate, Pinterest or Social Content Studio change; no AI call.
+* Tests: new offline `tests/renderer/wordpress-export-internal-links.spec.ts` (28 cases).
+
+## Feature: WordPress publish — automatic internal links (TASK-FIX-051, 2026-09-26)
+
+* New `lib/wordpress/internal-links.ts`: before a Save as Draft / Publish Now / Schedule, loads the site's published posts (`fetchPublishedPostsPage()` in `rest-client.ts` — summary `_fields` only, paginated, max 500 posts, 15 s budget), keeps only allowed same-site canonical `link`s and never the post being updated, scores them deterministically (primary keyword, SEO keywords, title and H2/H3 words, categories, tags — no AI call) and inserts up to 3 (short article) / 5 (medium, long) links into body paragraphs through an HTML tokenizer that only edits text nodes.
+* Never in headings, FAQ, images, existing links, code, quotes or tables; one link per paragraph, per post and per URL; natural anchors taken from the text, generic ones ("click here"…) refused.
+* `sendArticleToWordPress()` gains opt-in `insertInternalLinks` (on in the publish route) and returns `internalLinks`; the route returns `internalLinks: { status, insertedCount, links, warnings }`; the Publish control shows an info toast with the count and warning toasts. Never blocking — a WordPress error publishes without new links.
+* The stored article, reading view and Copy Markdown / Copy HTML exports are unchanged. No migration, prompt, model, Rank Math, tag, image, Quality Gate, Pinterest or Social Content Studio change.
+* Tests: new offline `tests/renderer/wordpress-internal-links.spec.ts` (43 cases).
+
 ## Fix: WordPress publish — focus keyword and tags per generation method (TASK-FIX-050, 2026-09-26)
 
 * Focus keyword resolved per method (`resolveFocusKeyword()` in `lib/wordpress/tags.ts`): Keyword → the user keyword; URL → the AI-resolved keyword only once the generation is completed (never a URL or the `Pasted content` placeholder); Pins → the keyword of the source Pinterest generation (`pins.generation_id` → `generations.keyword`, new `getPinsSeoSource()` in `lib/queries/wordpress.ts`), never the "Pin title + Pin title" label. No reliable value → Rank Math focus keyword left empty + warning.

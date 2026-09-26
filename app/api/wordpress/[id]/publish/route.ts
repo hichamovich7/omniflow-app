@@ -6,6 +6,7 @@ import { getWordPressSiteWithSecretByProjectId } from '@/lib/queries/wordpress-s
 import { exportToHtmlForWordPress } from '@/lib/wordpress/export';
 import { decryptSecret } from '@/lib/wordpress/crypto';
 import { sendArticleToWordPress } from '@/lib/wordpress/publish-post';
+import type { InternalLinksReport } from '@/lib/wordpress/internal-links';
 import {
   uploadMedia,
   toWordPressLocalDateString,
@@ -197,6 +198,7 @@ export async function POST(
       date,
       categoryIds,
       featuredMediaId,
+      insertInternalLinks: true,
     });
   } catch (err) {
     const message = isAuthError(err)
@@ -236,6 +238,7 @@ export async function POST(
       publishedAt: string | null;
       viewUrl: string;
       rankMath: 'saved' | 'not_detected' | 'failed';
+      internalLinks: InternalLinksReport;
       warnings: string[];
     }>
   >({
@@ -245,6 +248,7 @@ export async function POST(
       publishedAt,
       viewUrl: postResult.link,
       rankMath: sent.rankMath.status,
+      internalLinks: sent.internalLinks,
       warnings: sent.warnings,
     },
     error: null,

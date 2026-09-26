@@ -98,7 +98,11 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
           ? 'Published to WordPress'
           : 'Scheduled on WordPress'
     );
-    // Non-blocking SEO issues (e.g. Rank Math) — the post itself was sent.
+    const insertedLinks = (json.data?.internalLinks?.insertedCount ?? 0) as number;
+    if (insertedLinks > 0) {
+      toast.info(`${insertedLinks} internal link${insertedLinks === 1 ? '' : 's'} added to older posts`);
+    }
+    // Non-blocking SEO issues (e.g. Rank Math, internal links) — the post itself was sent.
     for (const warning of (json.data?.warnings ?? []) as string[]) {
       toast.warning(warning);
     }

@@ -1,5 +1,11 @@
 import { getMetaTitle } from '@/lib/wordpress/export';
 import {
+  addInternalLinks,
+  skippedInternalLinks,
+  type InternalLinkContext,
+  type InternalLinksReport,
+} from '@/lib/wordpress/internal-links';
+import {
   findOrCreateTag,
   upsertPost,
   WordPressApiError,
@@ -19,11 +25,13 @@ import {
   type PinsSeoSource,
   type ResolvedFocusKeyword,
 } from '@/lib/wordpress/tags';
-import type { WordPressArticle, WordPressGeneration } from '@/types/wordpress';
+import type { WordPressArticle, WordPressArticleSize, WordPressGeneration } from '@/types/wordpress';
 
 export interface SendArticleInput {
   article: Pick<WordPressArticle, 'id' | 'title' | 'meta_title' | 'slug' | 'meta_description' | 'wp_post_id'>;
-  generation: Pick<WordPressGeneration, 'keyword' | 'source_type' | 'seo_keywords' | 'status'>;
+  generation: Pick<WordPressGeneration, 'keyword' | 'source_type' | 'seo_keywords' | 'status'> & {
+    article_size?: WordPressArticleSize | null;
+  };
   /** Pins method only — the selected Pins' keywords and source keyword. */
   pins?: PinsSeoSource | null;
   /** Final HTML, leading H1 already stripped (the title goes in `title`). */
@@ -32,6 +40,11 @@ export interface SendArticleInput {
   date?: string;
   categoryIds?: number[];
   featuredMediaId?: number;
+  /**
+   * Link a few of the site's published posts from the body before sending
+   * (TASK-FIX-051). Off by default; the publish route turns it on.
+   */
+  insertInternalLinks?: boolean;
 }
 
 export interface SendArticleResult {
@@ -39,6 +52,7 @@ export interface SendArticleResult {
   tagIds: number[];
   focusKeyword: ResolvedFocusKeyword;
   rankMath: RankMathResult;
+  internalLinks: InternalLinksReport;
   warnings: string[];
 }
 
@@ -66,6 +80,29 @@ export function buildPostInput(
   };
 }
 
+/**
+ * The internal-link context of an article — one builder for the publish and
+ * the export paths so both select links exactly the same way.
+ */
+export function buildInternalLinkContext(input: {
+  article: Pick<WordPressArticle, 'title' | 'slug' | 'wp_post_id'>;
+  generation: SendArticleInput['generation'];
+  pins: PinsSeoSource | null;
+  categoryIds: number[];
+  tagIds: number[];
+}): InternalLinkContext {
+  return {
+    primaryKeyword: resolveFocusKeyword(input.generation, input.pins).keyword,
+    seoKeywords: buildWordPressTags(input.generation, input.pins),
+    title: input.article.title,
+    categoryIds: input.categoryIds,
+    tagIds: input.tagIds,
+    articleSize: input.generation.article_size ?? null,
+    excludePostId: input.article.wp_post_id,
+    excludeSlug: input.article.slug || null,
+  };
+}
+
 async function resolveTagIds(site: WordPressSiteCredentials, names: string[]): Promise<number[]> {
   const ids: number[] = [];
   for (const name of names) {
@@ -89,7 +126,21 @@ export async function sendArticleToWordPress(
   const tagNames = buildWordPressTags(input.generation, pins);
   const tagIds = await resolveTagIds(site, tagNames);
   const focusKeyword = resolveFocusKeyword(input.generation, pins);
-  const postInput = buildPostInput(input, tagIds);
+
+  // Never blocking: on any failure the HTML is sent unchanged.
+  let html = input.html;
+  let internalLinks = skippedInternalLinks();
+  if (input.insertInternalLinks) {
+    const linked = await addInternalLinks(
+      site,
+      input.html,
+      buildInternalLinkContext({ ...input, pins, categoryIds: input.categoryIds ?? [], tagIds })
+    );
+    html = linked.html;
+    internalLinks = linked.report;
+  }
+
+  const postInput = buildPostInput({ ...input, html }, tagIds);
 
   let post: WordPressPostResult;
   try {
@@ -125,5 +176,7 @@ export async function sendArticleToWordPress(
     );
   }
 
-  return { post, tagIds, focusKeyword, rankMath, warnings };
+  warnings.push(...internalLinks.warnings);
+
+  return { post, tagIds, focusKeyword, rankMath, internalLinks, warnings };
 }
