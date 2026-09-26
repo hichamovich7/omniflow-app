@@ -6,6 +6,10 @@
 
 # ACTIVE TASK
 
+TASK-FIX-048 (collapsible Quality report on `/wordpress/[id]` — open for warnings/issues/no report, collapsed when all checks passed, state remembered per generation — and an optional single External URL for method A, stored in the existing `manual_external_urls`, linked at most once and only if relevant, allowed by the Quality Gate) is implemented locally, not committed. Method B, migrations, models, Quality Gate rules, CSV and Pinterest unchanged. TypeScript, ESLint (touched files), the two specs (42/42) and the production build pass; full Playwright 404 passed / 88 skipped (browser, no storage state) / 1 pre-existing Pinterest failure. Manual check of the card toggle recommended. See CHANGELOG.md "TASK-FIX-048". Do not commit automatically.
+
+TASK-FIX-047 (WordPress method A — Pins → article coherence: full Pin context — `overlay_text`, `image_analysis` style summary, board, board section, Content Stream, `link_url` — delimited as data in the outline and article prompts, required outline `promise` passed to the article with coherence rules, Pin `link_url` as the only Pin URL) is implemented locally, not committed. Method B (`/wordpress`), models, migrations, Quality Gate rules, CSV, Social Content Studio and Pinterest images are unchanged. TypeScript, ESLint (touched files), the new offline spec (18/18), WordPress specs (95/95) and the production build pass; full renderer 392/393 with the same pre-existing, unrelated Pinterest failure. Awaiting a real Pins generation to validate output quality. See CHANGELOG.md "TASK-FIX-047". Do not commit automatically.
+
 TASK-FIX-046 (WordPress Quality Report V1 on the review page — migration **037** adds nullable `wordpress_generations.quality_report jsonb`, saved best-effort by the three generation routes, read and Zod-validated by `getWordPressArticleByGenerationId()`, shown read-only on `/wordpress/[id]`) is implemented and committed. **Migration 037 must be applied by hand in the Supabase SQL Editor**; until then generations still complete and the page shows "No quality report". No Quality Gate check/threshold, prompt, model, Pinterest, CSV or Social Content Studio change. TypeScript, ESLint (touched files), the new offline spec (12/12) and the production build pass; full renderer 374/375 with the same pre-existing, unrelated Pinterest failure. See CHANGELOG.md "TASK-FIX-046".
 
 TASK-FIX-045 (WordPress Article Quality Gate V1 — 17 deterministic post-generation checks in `lib/wordpress/quality-check.ts`, report logged and returned as `data.quality` by the three generation routes, not persisted, never blocking) is implemented and committed. No prompt, model, Pinterest, CSV, migration or Social Content Studio change. TypeScript, ESLint (touched files), the new offline spec (21/21) and the production build pass; full renderer 362/363 with the same pre-existing, unrelated Pinterest failure as TASK-FIX-044. See CHANGELOG.md "TASK-FIX-045".
@@ -480,6 +484,33 @@ Stripe Working                  ⬚ TASK-012
 
 # COMPLETED TASKS
 
+## [TASK-FIX-046] WordPress Quality Report V1 on the review page — 2026-09-26
+
+Status: implemented and committed, awaiting migration 037 apply + manual validation.
+
+* Goal: persist the Quality Gate V1 report with the generation, return it from the detail read, show it on `/wordpress/[id]`, informational only.
+* Files: new `supabase/migrations/037_add_wordpress_quality_report.sql`, new `lib/wordpress/quality-report.ts` (Zod schema, parse, best-effort save), new `lib/wordpress/quality-report-view.ts` (display model), new `components/wordpress/article-quality-report.tsx`, `app/(dashboard)/wordpress/[id]/page.tsx`, `lib/queries/wordpress.ts`, `types/wordpress.ts`, the three `app/api/wordpress/generate*/route.ts`, new `tests/renderer/wordpress-quality-report.spec.ts`.
+* Decision: stored on `wordpress_generations` (the generation row already carries every generation option and its RLS covers the row); no `GET` endpoint added — the review page is a Server Component reading through `getWordPressArticleByGenerationId()`, which is the detail read path.
+* Remaining: live check after applying 037 (RLS write + real render); the card is not shown in WordPress History.
+
+## [TASK-FIX-045] WordPress Article Quality Gate V1 — 2026-09-26
+
+Status: implemented and committed; thresholds to tune after real generations.
+
+* Goal: flag quality problems of a generated WordPress article with deterministic checks before review/export.
+* Files: new `lib/wordpress/quality-check.ts`, `lib/wordpress/generate-article.ts`, `generate-article-from-url.ts`, the three `app/api/wordpress/generate*/route.ts`, `lib/ai/services/text.ts` + `lib/ai/providers/openrouter.ts` (optional `onFinish` for `finish_reason`), new `tests/renderer/wordpress-quality-check.spec.ts`.
+* Success criteria met offline: every requested check implemented with passed / warning / failed, aggregated status, report attached to all three methods and returned by the routes, truncation detected from the real `finish_reason`.
+* Remaining: the report is not persisted nor shown on `/wordpress/[id]` (needs a migration + UI); the language check is a stopword heuristic (EN/DE/ES/FR); generic-phrase list is short and English-first.
+
+## [TASK-FIX-044] WordPress pipeline P0 quality fixes — 2026-09-26
+
+Status: implemented locally, awaiting a real generation for quality validation. Not committed.
+
+* Goal: fix the P0 quality issues found by `docs/tasks/AUDIT-WORDPRESS-PIPELINE-AND-MODELS-2026-09-26.md` without changing the model, `.env`, Pinterest images/generator, credits, migrations, CSV or the Social Content Studio.
+* Files: `lib/ai/prompts/seo-guidelines.ts`, `wordpress-outline-prompt.ts`, `wordpress-from-pins-prompt.ts`, `wordpress-article-prompt.ts`, `lib/ai/services/external-link.ts`, `lib/wordpress/generate-article.ts`, `generate-article-from-url.ts`, new `lib/wordpress/faq-section.ts`, `app/api/wordpress/generate-from-pins/route.ts` (reads `generations.keyword`), new `tests/renderer/wordpress-pipeline-quality.spec.ts`.
+* Success criteria met offline: real keyword + Brand Profile reach the article prompt; `generations.keyword` wins for Pins with `deriveThemeKeyword()` as fallback; no web-search instruction and no invented URL allowed in any WordPress prompt; anti-fabrication rules present; small/medium/large ranges respected; FAQ/H3 toggles respected; FAQ visible exactly once when enabled, absent when disabled; Pinterest images untouched; no Keyword/Pins regression.
+* Remaining: `wordpress_generations.keyword` for Pins still stores the joined pin titles (display label); the FAQ is not yet persisted as structured data nor emitted as FAQPage schema (needs a migration); anti-fabrication is prompt-level only (no automated fact check).
+
 ## [TASK-FIX-042] Operational Command Center — 2026-09-25
 
 Status: implemented locally, awaiting migration 033/034 apply + manual validation. Not committed.
@@ -515,33 +546,6 @@ Status: implemented locally, awaiting migration 033/034 apply + manual validatio
 * Provider images are saved unchanged under Git-ignored `.benchmark-output/`; Sharp only records technical metadata and never composes text.
 * Added nullable human evaluation fields and PASS/NEEDS_REVIEW/FAIL calculation. A generated image starts at NEEDS_REVIEW; technical ratio inspection alone can never mark it PASS.
 * Added offline coverage for CLI parsing, fixtures, configured-model deduplication, dry-run network isolation and evaluation calculation.
-## [TASK-FIX-046] WordPress Quality Report V1 on the review page — 2026-09-26
-
-Status: implemented and committed, awaiting migration 037 apply + manual validation.
-
-* Goal: persist the Quality Gate V1 report with the generation, return it from the detail read, show it on `/wordpress/[id]`, informational only.
-* Files: new `supabase/migrations/037_add_wordpress_quality_report.sql`, new `lib/wordpress/quality-report.ts` (Zod schema, parse, best-effort save), new `lib/wordpress/quality-report-view.ts` (display model), new `components/wordpress/article-quality-report.tsx`, `app/(dashboard)/wordpress/[id]/page.tsx`, `lib/queries/wordpress.ts`, `types/wordpress.ts`, the three `app/api/wordpress/generate*/route.ts`, new `tests/renderer/wordpress-quality-report.spec.ts`.
-* Decision: stored on `wordpress_generations` (the generation row already carries every generation option and its RLS covers the row); no `GET` endpoint added — the review page is a Server Component reading through `getWordPressArticleByGenerationId()`, which is the detail read path.
-* Remaining: live check after applying 037 (RLS write + real render); the card is not shown in WordPress History.
-
-## [TASK-FIX-045] WordPress Article Quality Gate V1 — 2026-09-26
-
-Status: implemented and committed; thresholds to tune after real generations.
-
-* Goal: flag quality problems of a generated WordPress article with deterministic checks before review/export.
-* Files: new `lib/wordpress/quality-check.ts`, `lib/wordpress/generate-article.ts`, `generate-article-from-url.ts`, the three `app/api/wordpress/generate*/route.ts`, `lib/ai/services/text.ts` + `lib/ai/providers/openrouter.ts` (optional `onFinish` for `finish_reason`), new `tests/renderer/wordpress-quality-check.spec.ts`.
-* Success criteria met offline: every requested check implemented with passed / warning / failed, aggregated status, report attached to all three methods and returned by the routes, truncation detected from the real `finish_reason`.
-* Remaining: the report is not persisted nor shown on `/wordpress/[id]` (needs a migration + UI); the language check is a stopword heuristic (EN/DE/ES/FR); generic-phrase list is short and English-first.
-
-## [TASK-FIX-044] WordPress pipeline P0 quality fixes — 2026-09-26
-
-Status: implemented locally, awaiting a real generation for quality validation. Not committed.
-
-* Goal: fix the P0 quality issues found by `docs/tasks/AUDIT-WORDPRESS-PIPELINE-AND-MODELS-2026-09-26.md` without changing the model, `.env`, Pinterest images/generator, credits, migrations, CSV or the Social Content Studio.
-* Files: `lib/ai/prompts/seo-guidelines.ts`, `wordpress-outline-prompt.ts`, `wordpress-from-pins-prompt.ts`, `wordpress-article-prompt.ts`, `lib/ai/services/external-link.ts`, `lib/wordpress/generate-article.ts`, `generate-article-from-url.ts`, new `lib/wordpress/faq-section.ts`, `app/api/wordpress/generate-from-pins/route.ts` (reads `generations.keyword`), new `tests/renderer/wordpress-pipeline-quality.spec.ts`.
-* Success criteria met offline: real keyword + Brand Profile reach the article prompt; `generations.keyword` wins for Pins with `deriveThemeKeyword()` as fallback; no web-search instruction and no invented URL allowed in any WordPress prompt; anti-fabrication rules present; small/medium/large ranges respected; FAQ/H3 toggles respected; FAQ visible exactly once when enabled, absent when disabled; Pinterest images untouched; no Keyword/Pins regression.
-* Remaining: `wordpress_generations.keyword` for Pins still stores the joined pin titles (display label); the FAQ is not yet persisted as structured data nor emitted as FAQPage schema (needs a migration); anti-fabrication is prompt-level only (no automated fact check).
-
 * No database, migration, credit, UI, production route, prompt-engine or legacy renderer change. No paid execution, commit or push.
 * Phase 1.1 adds a discovery-only `--preflight`, fixture-scoped references, four-model shortlist, endpoint capability validation, per-model parameter resolution and future-cost estimation. All four exact slugs passed the live discovery preflight on 2026-09-20; no image endpoint was called.
 * Phase 1.2 adds explicit fixture filtering, a required hard `--max-calls` ceiling, per-result manual-review criteria, `benchmark-summary.json`, and a local comparison page. The authorized run attempted exactly 8 calls, generated 8 images, recorded 0 failures and returned a total provider cost of $0.5239775. No reference or retry was used.

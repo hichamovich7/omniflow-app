@@ -450,6 +450,8 @@ Same outline → full-article pipeline as Option 1 (`lib/ai/prompts/wordpress-ar
 
 Images follow a strict split (see `docs/DECISIONS.md` 2026-07-17): the featured image is **always** freshly generated via `generateImage()` (role IMAGE) from a prompt describing the article's unified theme, never a specific pin. Internal images (up to 3) are **always** the already-generated active `pin_images` image of the selected pins, copied by their existing public Supabase Storage URL — no new `generateImage()` call, no re-upload. `addExternalLink()` runs the same as Option 1, after the article is written and before `{{IMAGE_N}}` marker resolution. The primary keyword is the source Pinterest generation's `generations.keyword` (fallback: the most frequent pin keyword), passed to both the outline and the article prompts with the Brand Profile and research notes; the FAQ is rendered into `content` as for Option 1 (TASK-FIX-044).
 
+Pins context and editorial promise (TASK-FIX-047): `buildPinSummaries()` (`lib/wordpress/pins-context.ts`) passes each selected Pin's title, description, keywords, `overlay_text`, a style summary of `image_analysis` (mood, lighting, colors, materials, Strategy angle — omitted when absent or malformed), `board`, `board_section`, the name of the non-archived Content Stream linked to its board (`content_stream_boards`, via `listBoardOccupants()`) and a validated http(s) `link_url` to both the outline and the article prompts, inside one `<pins_context>…</pins_context>` data block (fields collapsed to one line, delimiter tags stripped, 600 chars max) that the model is told never to treat as instructions. Board, section and Content Stream only frame the theme and are never to be published as facts. The pins outline (`wordpress-from-pins-outline-v3`) must return a `promise` string (required by `buildWordpressPinsOutlineSchema`); the article prompt receives it through the pins-only `pinsContext` option of `buildWordPressArticlePrompt()` with the rules to deliver on it, develop the Pins' ideas rather than their teaser, invent nothing and keep title/outline/images/content consistent. Pin `link_url` values are the only Pin URLs the article may use (optional, copied exactly, never inserted by code) and are added to the Quality Gate's `allowedUrls`; with no `link_url`, the prompt forbids adding any Pin URL. The keyword and URL methods do not pass `pinsContext`, so their prompts are unchanged.
+
 Fewer than 3 pins is allowed (the UI warns "may lack enough source material" before navigating, and the API logs a warning) but is not a hard block.
 
 ## Request
@@ -458,11 +460,12 @@ Fewer than 3 pins is allowed (the UI warns "may lack enough source material" bef
 {
   "pinIds": ["uuid", "uuid", "uuid"],
   "researchNotes": "Optional free-text guidance",
-  "categoryId": "uuid"
+  "categoryId": "uuid",
+  "externalUrl": "https://example.com/useful-source"
 }
 ```
 
-`pinIds` is required, 1-20 uuids. `researchNotes` is optional (max 2000 chars). `categoryId` is optional and must belong to the same project as the selected pins' generation.
+`pinIds` is required, 1-20 uuids. `researchNotes` is optional (max 2000 chars). `categoryId` is optional and must belong to the same project as the selected pins' generation. `externalUrl` (TASK-FIX-048) is optional: one http(s) URL, max 500 chars, blank = none; anything else is rejected with `invalid_request` "Enter a valid URL starting with http:// or https://". It is stored in `wordpress_generations.manual_external_urls` (the keyword method's existing column), listed in the article prompt as a URL to link only if relevant, at most once, copied exactly, and added to the Quality Gate `allowedUrls`. Any later Markdown link to an authorized URL (Pin `link_url` or `externalUrl`) is turned back into plain text (`keepFirstLinkOnly()`), and the automatic `addExternalLink()` source is discarded when the article already links that URL. With no `externalUrl`, behavior is unchanged: `addExternalLink()` still adds its web-search-verified source when it finds one (best-effort — never an invented URL).
 
 ## Response
 

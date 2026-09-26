@@ -6,6 +6,7 @@ import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-
 import { buildWordPressFromPinsPrompt, resolvePinsPrimaryKeyword } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import { addExternalLink } from '@/lib/ai/services/external-link';
+import { collectPinLinkUrls, collectPinsAuthorizedUrls, keepFirstLinkOnly } from '@/lib/wordpress/pins-context';
 import { insertFaqSection } from '@/lib/wordpress/faq-section';
 import { runArticleQualityCheck, logArticleQuality, type ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import {
@@ -467,6 +468,8 @@ interface GenerateArticleFromPinsParams {
   language: SupportedLanguage;
   brandProfileDescription: string | null;
   researchNotes?: string | null;
+  /** Optional External URL from the pins form (already validated http/https). */
+  manualExternalUrl?: string | null;
 }
 
 /**
@@ -490,10 +493,13 @@ export async function generateArticleFromPins(
     language,
     brandProfileDescription,
     researchNotes,
+    manualExternalUrl,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const imageCount = internalImageUrls.length;
   const primaryKeyword = resolvePinsPrimaryKeyword(generationKeyword, pins);
+  const pinLinkUrls = collectPinLinkUrls(pins);
+  const authorizedUrls = collectPinsAuthorizedUrls(pins, manualExternalUrl);
 
   // Step 1: outline, synthesized from the pins' theme
   const { system: outlineSystem, user: outlineUser } = buildWordPressFromPinsPrompt({
@@ -534,13 +540,15 @@ export async function generateArticleFromPins(
   }
   const outline = outlineValidated.data;
 
-  // Step 2: full article, written from the validated outline — identical to Option 1
+  // Step 2: full article, written from the validated outline — same prompt as
+  // Option 1 plus the pins-only block (editorial promise, Pins context, Pin URLs)
   const { system: articleSystem, user: articleUser } = buildWordPressArticlePrompt({
     outline,
     language,
     primaryKeyword,
     brandProfileContext: brandProfileContext || undefined,
     researchNotes: researchNotes || undefined,
+    pinsContext: { promise: outline.promise, pins, pinLinkUrls, manualExternalUrl: manualExternalUrl || null },
   });
 
   logWordPressTextModel('wordpress-from-pins', 'article', TEXT_ROLE);
@@ -577,12 +585,20 @@ export async function generateArticleFromPins(
     throw new Error('AI returned an invalid article format. Try again.');
   }
   let content = insertFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
+  // An authorized URL (Pin link_url or the user's External URL) is linked at most once.
+  for (const url of authorizedUrls) content = keepFirstLinkOnly(content, url);
 
   // Step 2b: best-effort single external link (real, web-search-verified source).
   // Runs before image marker resolution so it never has to reason about
   // {{IMAGE_N}} markers — see lib/ai/services/external-link.ts for the
   // no-link-found / provider-error fallback (article is simply returned as-is).
-  const externalLink = await addExternalLink(content, outline.title, language);
+  // A source the article already links (e.g. the user's External URL) is not
+  // linked a second time.
+  const externalLinkResult = await addExternalLink(content, outline.title, language);
+  const externalLink =
+    externalLinkResult.source && content.includes(externalLinkResult.source.url)
+      ? { content, source: null }
+      : externalLinkResult;
   content = externalLink.content;
   const contentBeforeImages = content;
 
@@ -649,7 +665,7 @@ export async function generateArticleFromPins(
     expectedH2Headings: outline.sections.map((section) => section.heading),
     expectedImageMarkers: outline.images.map((img) => img.placementMarker),
     faqExpected: outline.faqQuestions.length > 0,
-    allowedUrls: externalLink.source ? [externalLink.source.url] : [],
+    allowedUrls: [...authorizedUrls, ...(externalLink.source ? [externalLink.source.url] : [])],
     finishReasons,
   });
   logArticleQuality('wordpress-from-pins', quality);

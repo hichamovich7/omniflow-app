@@ -8,7 +8,8 @@ import type { ApiResponse } from '@/types/api';
 import type { ArticleQualityReport } from '@/lib/wordpress/quality-check';
 import { saveQualityReport } from '@/lib/wordpress/quality-report';
 import type { Pin } from '@/types/database';
-import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
+import { buildPinSummaries } from '@/lib/wordpress/pins-context';
+import { listBoardOccupants } from '@/lib/queries/content-streams';
 import type { SupportedLanguage } from '@/types/pinterest';
 
 // Only used to keep the synthesized `keyword` label readable — internal
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { pinIds, researchNotes, categoryId } = parsed.data;
+  const { pinIds, researchNotes, categoryId, externalUrl } = parsed.data;
 
   if (pinIds.length < 3) {
     console.warn(`[wordpress-from-pins] Only ${pinIds.length} pin(s) selected — article may lack source material.`);
@@ -185,11 +186,17 @@ export async function POST(request: Request) {
   const orderedPins = [...pinsWithImage, ...pinsWithoutImage];
 
   const internalImageUrls = pinsWithImage.map((p) => imageUrlByPinId.get(p.id)!);
-  const pinSummaries: PinSummary[] = orderedPins.map((p) => ({
-    title: p.title,
-    description: p.description,
-    keywords: p.keywords,
-  }));
+
+  // Content Stream of each Pin's board — editorial theme context only. An
+  // archived stream no longer frames the board, same rule as findBoardOccupant.
+  const boardIds = [...new Set(orderedPins.map((p) => p.board_id).filter((id): id is string => !!id))];
+  const contentStreamNameByBoardId = new Map<string, string>();
+  for (const occupant of await listBoardOccupants(supabase, boardIds)) {
+    if (occupant.status !== 'archived' && occupant.content_stream_name && !contentStreamNameByBoardId.has(occupant.board_id)) {
+      contentStreamNameByBoardId.set(occupant.board_id, occupant.content_stream_name);
+    }
+  }
+  const pinSummaries = buildPinSummaries(orderedPins, contentStreamNameByBoardId);
 
   const keyword = pins
     .slice(0, MAX_KEYWORD_PIN_TITLES)
@@ -207,6 +214,8 @@ export async function POST(request: Request) {
       source_type: 'pins',
       source_pin_ids: pinIds,
       research_notes: researchNotes ?? null,
+      // Same column as the keyword method's Manual URLs (migration 029).
+      manual_external_urls: externalUrl ?? null,
       status: 'processing',
     })
     .select()
@@ -231,6 +240,7 @@ export async function POST(request: Request) {
       language,
       brandProfileDescription: project?.description ?? null,
       researchNotes,
+      manualExternalUrl: externalUrl ?? null,
     });
 
     const { data: article, error: articleError } = await supabase

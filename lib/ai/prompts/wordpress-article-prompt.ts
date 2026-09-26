@@ -1,4 +1,5 @@
 import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRules } from './seo-guidelines';
+import { buildPinsContextRules, formatPinsContextBlock, type PinSummary } from './wordpress-from-pins-prompt';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import {
@@ -93,6 +94,46 @@ interface ArticlePromptContext {
   // optional, manual URLs only: the only URLs this prompt ever allows. The
   // separate addExternalLink() pass (generate-article.ts) is not referenced here.
   manualExternalUrls?: string[];
+  // Pins → article (method A) only. Undefined — the keyword and URL methods —
+  // reproduces the exact prompt text this function produced before it existed.
+  pinsContext?: PinsArticleContext;
+}
+
+export interface PinsArticleContext {
+  /** The outline's editorial promise — what the article must deliver. */
+  promise: string;
+  /** The selected Pins, same data as the outline received. */
+  pins: PinSummary[];
+  /** Distinct real pins.link_url values — the only URLs coming from the Pins. */
+  pinLinkUrls: string[];
+  /** Optional External URL typed by the user on the pins form. */
+  manualExternalUrl?: string | null;
+}
+
+function buildPinsArticleBlock(ctx: PinsArticleContext): string {
+  const urlRule =
+    ctx.pinLinkUrls.length > 0
+      ? `- The only URLs provided by the Pins are listed below. You do not have to link them; if one fits naturally, use it at most once, copied exactly as written — never modified, shortened, or replaced by another URL. Never invent any other URL:\n${ctx.pinLinkUrls.map((u) => `  - ${u}`).join('\n')}`
+      : '- The Pins provide no URL: do not add any URL taken from or attributed to them.';
+  const manualUrlRule =
+    ctx.manualExternalUrl && !ctx.pinLinkUrls.includes(ctx.manualExternalUrl)
+      ? `\n- External URL provided by the user: ${ctx.manualExternalUrl} — link it only if it is genuinely relevant to a sentence of the article, as a Markdown link (\`[relevant anchor text](url)\`), at most once, copied exactly as written. If it does not fit the article, leave it out.`
+      : '';
+
+  return `\n\nEditorial promise of this article (planned from the selected Pins): ${ctx.promise}
+
+Selected Pins (source context for this article):
+${formatPinsContextBlock(ctx.pins)}
+
+${buildPinsContextRules()}
+
+Pins article rules:
+- The article must fully deliver on the editorial promise above — the Quick Answer, the Main Content sections and the Conclusion must each answer it concretely.
+- Develop the ideas the Pins announce (titles, descriptions, overlay text) into real, useful explanations. Do not merely restate a Pin's teaser, hook, or curiosity gap: answer it.
+- Do not invent information that is absent from the provided data (Pins, research notes, Brand Profile) beyond widely established general knowledge.
+- Keep the title, the outline sections, the image placements and the content consistent with each other and with the promise.
+${urlRule}${manualUrlRule}
+`;
 }
 
 export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
@@ -139,6 +180,8 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
     ctx.manualExternalUrls && ctx.manualExternalUrls.length > 0
       ? `\n\nExternal links to include: insert each of the following URLs as a Markdown link (\`[relevant anchor text](url)\`) naturally into the article body, wherever contextually relevant to the surrounding content — one per URL where a genuine fit exists, never forced into an unrelated sentence, never as a standalone list of links. Copy each URL exactly as written; these are the only URLs allowed in the article:\n${ctx.manualExternalUrls.map((u) => `- ${u}`).join('\n')}\n`
       : '';
+
+  const pinsContextBlock = ctx.pinsContext ? buildPinsArticleBlock(ctx.pinsContext) : '';
 
   const researchNotesBlock = ctx.researchNotes
     ? `\n\nResearch notes provided for this article — the only source of specific facts, figures, or named sources you may use (beyond widely established general knowledge):\n${ctx.researchNotes}\n`
@@ -243,7 +286,7 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const system = `You are an expert SEO copywriter. You write the full body of a WordPress article from an approved outline, following a fixed ${structureSteps.length}-block AEO structure. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown fences around the JSON itself, no explanations, no extra text — but the "content" field value must itself be Markdown.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
   const user = `Write the full article for the outline below. Follow the section order and summaries exactly — do not add, remove, or reorder the Main Content H2 sections.
-${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}${researchNotesBlock}
+${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}${pinsContextBlock}${researchNotesBlock}
 Primary keyword: ${ctx.primaryKeyword}
 Title: ${outline.title}
 Quick Answer angle: ${outline.quickAnswerAngle}${keyTakeawaysContextBlock}

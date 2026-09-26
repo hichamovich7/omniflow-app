@@ -1,4 +1,4 @@
-import { ChevronDown, CircleCheck, CircleX, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ChevronDown, CircleCheck, CircleX, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { ArticleQualityReport, QualityStatus } from '@/lib/wordpress/quality-check';
@@ -6,7 +6,9 @@ import {
   buildQualityReportView,
   QUALITY_REPORT_INFORMATIONAL_NOTE,
   QUALITY_REPORT_MISSING_MESSAGE,
+  qualityReportDefaultOpen,
 } from '@/lib/wordpress/quality-report-view';
+import { QualityReportDisclosure } from '@/components/wordpress/quality-report-disclosure';
 
 function StatusIcon({ status, className }: { status: QualityStatus; className?: string }) {
   if (status === 'passed') return <CircleCheck aria-hidden="true" className={cn('text-success', className)} />;
@@ -31,46 +33,48 @@ function MessageList({ title, messages, status }: { title: string; messages: str
   );
 }
 
-function CardTitle() {
-  return (
-    <h2 id="quality-report-title" className="flex items-center gap-2 text-sm font-medium">
-      <ShieldCheck aria-hidden="true" className="size-4 text-muted-foreground" />
-      Quality report
-    </h2>
-  );
-}
-
 interface ArticleQualityReportProps {
   /** Null for articles generated before the Quality Gate (or whose report was not saved). */
   report: ArticleQualityReport | null;
+  /** Key of the remembered open/closed state. */
+  generationId: string;
 }
 
 /**
- * Read-only Quality Report V1 on /wordpress/[id] (TASK-FIX-046). Purely
- * informational: no action here, nothing blocks export or publishing.
+ * Read-only Quality Report V1 on /wordpress/[id] (TASK-FIX-046), collapsible
+ * (TASK-FIX-048): open by default when there are warnings/issues or no
+ * report, collapsed when every check passed; the viewer's choice is kept per
+ * generation. Purely informational: nothing here blocks export or publishing.
  */
-export function ArticleQualityReportCard({ report }: ArticleQualityReportProps) {
+export function ArticleQualityReportCard({ report, generationId }: ArticleQualityReportProps) {
+  const defaultOpen = qualityReportDefaultOpen(report);
+
   if (!report) {
     return (
-      <section aria-labelledby="quality-report-title" className="rounded-2xl border border-dashed border-border/60 px-5 py-4">
-        <CardTitle />
+      <QualityReportDisclosure
+        generationId={generationId}
+        defaultOpen={defaultOpen}
+        className="rounded-2xl border border-dashed border-border/60 px-5 py-4"
+      >
         <p className="mt-1 text-sm text-muted-foreground">{QUALITY_REPORT_MISSING_MESSAGE}</p>
-      </section>
+      </QualityReportDisclosure>
     );
   }
 
   const view = buildQualityReportView(report);
 
   return (
-    <section aria-labelledby="quality-report-title" className="rounded-2xl border border-border/60 bg-card px-5 py-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle />
-        <Badge variant={view.tone}>{view.statusLabel}</Badge>
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {view.summary} {QUALITY_REPORT_INFORMATIONAL_NOTE}
-      </p>
-
+    <QualityReportDisclosure
+      generationId={generationId}
+      defaultOpen={defaultOpen}
+      className="rounded-2xl border border-border/60 bg-card px-5 py-4 shadow-sm"
+      aside={<Badge variant={view.tone}>{view.statusLabel}</Badge>}
+      summary={
+        <p className="mt-1 text-sm text-muted-foreground">
+          {view.summary} {QUALITY_REPORT_INFORMATIONAL_NOTE}
+        </p>
+      }
+    >
       <MessageList title="Issues" messages={view.issues} status="failed" />
       <MessageList title="Warnings" messages={view.warnings} status="warning" />
 
@@ -94,6 +98,6 @@ export function ArticleQualityReportCard({ report }: ArticleQualityReportProps) 
           ))}
         </ul>
       </details>
-    </section>
+    </QualityReportDisclosure>
   );
 }

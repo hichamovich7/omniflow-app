@@ -81,7 +81,7 @@ export default async function WordPressArticlePage({
             />
           )}
 
-          <ArticleQualityReportCard report={qualityReport} />
+          <ArticleQualityReportCard report={qualityReport} generationId={id} />
 
           <ArticleCategoryEditor
             generationId={id}

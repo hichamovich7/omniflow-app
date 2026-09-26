@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { FileText, ImageOff } from 'lucide-react';
-import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
+import { MANUAL_EXTERNAL_URL_MAX_LENGTH, generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { Button } from '@/components/ui/button';
 import { GeneratorHeader } from '@/components/shared/generator-header';
 import { Alert } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { CategorySelect, type CategoryOption } from '@/components/wordpress/category-select';
@@ -28,6 +29,7 @@ interface PinsSourceArticleFormProps {
 export function PinsSourceArticleForm({ pins, projectId, categories: initialCategories }: PinsSourceArticleFormProps) {
   const router = useRouter();
   const [researchNotes, setResearchNotes] = useState('');
+  const [externalUrl, setExternalUrl] = useState('');
   const [categories, setCategories] = useState(initialCategories);
   const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export function PinsSourceArticleForm({ pins, projectId, categories: initialCate
       pinIds: pins.map((p) => p.id),
       researchNotes: researchNotes.trim() || undefined,
       categoryId: categoryId || undefined,
+      externalUrl: externalUrl.trim() || undefined,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
@@ -86,6 +89,7 @@ export function PinsSourceArticleForm({ pins, projectId, categories: initialCate
 
       <form
         onSubmit={handleSubmit}
+        noValidate
         className="space-y-5 rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8"
       >
         <div className="space-y-1.5">
@@ -121,6 +125,27 @@ export function PinsSourceArticleForm({ pins, projectId, categories: initialCate
             disabled={loading}
             className="min-h-20"
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="external-url" className="text-xs font-medium text-muted-foreground">
+            External URL (optional)
+          </Label>
+          <Input
+            id="external-url"
+            type="url"
+            inputMode="url"
+            placeholder="https://example.com/useful-source"
+            value={externalUrl}
+            onChange={(e) => setExternalUrl(e.target.value)}
+            maxLength={MANUAL_EXTERNAL_URL_MAX_LENGTH}
+            disabled={loading}
+            aria-describedby="external-url-help"
+          />
+          <p id="external-url-help" className="text-xs text-muted-foreground">
+            One http(s) URL. It is linked at most once, and only if it is relevant to the article. Leave empty to keep
+            the automatic verified source only.
+          </p>
         </div>
 
         <div className="space-y-1.5">

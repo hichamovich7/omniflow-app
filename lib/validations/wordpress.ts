@@ -162,10 +162,31 @@ export const keywordSuggestionsSchema = z.object({
 
 export type KeywordSuggestions = z.infer<typeof keywordSuggestionsSchema>;
 
+export const PINS_EXTERNAL_URL_ERROR = 'Enter a valid URL starting with http:// or https://';
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export const generateArticleFromPinsSchema = z.object({
   pinIds: z.array(z.string().uuid()).min(1, 'Select at least one pin').max(20, 'Too many pins selected'),
   researchNotes: z.string().trim().max(2000, 'Research notes are too long').optional(),
   categoryId: z.string().uuid('Invalid category ID').optional(),
+  // External URL (TASK-FIX-048, pins method only): one optional http(s) URL
+  // the article may link once if relevant — the pins counterpart of the
+  // keyword method's manualExternalUrls. Blank means no URL, unchanged behavior.
+  externalUrl: z
+    .string()
+    .trim()
+    .max(MANUAL_EXTERNAL_URL_MAX_LENGTH, 'External URL is too long')
+    .refine((value) => value === '' || isHttpUrl(value), { message: PINS_EXTERNAL_URL_ERROR })
+    .optional()
+    .transform((value) => value || undefined),
 });
 
 export type GenerateArticleFromPinsInput = z.infer<typeof generateArticleFromPinsSchema>;
@@ -276,13 +297,18 @@ export type WordPressOutline = z.infer<typeof wordpressOutlineSchema>;
  * however many internal images are actually available to reuse — every
  * selected pin with an active image, uncapped (TASK-FIX-009) — instead of
  * Option 1's fixed 2-3. The pins flow never generates internal images, it
- * only has as many as pins supply.
+ * only has as many as pins supply. Also carries the editorial `promise`
+ * (what the article must deliver, derived from the Pins) that the article
+ * prompt must answer — pins flow only, the keyword/URL outlines are unchanged.
  */
 export function buildWordpressPinsOutlineSchema(imageCount: number) {
   return wordpressOutlineSchema.extend({
+    promise: z.string().trim().min(1),
     images: z.array(outlineImageSchema).length(imageCount),
   });
 }
+
+export type WordPressPinsOutline = z.infer<ReturnType<typeof buildWordpressPinsOutlineSchema>>;
 
 const faqItemSchema = z.object({
   question: z.string().min(1),

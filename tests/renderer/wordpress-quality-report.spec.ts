@@ -10,6 +10,11 @@ import {
   buildQualityReportView,
   QUALITY_REPORT_INFORMATIONAL_NOTE,
   QUALITY_REPORT_MISSING_MESSAGE,
+  QUALITY_REPORT_OPEN_STORAGE_PREFIX,
+  parseStoredQualityReportOpen,
+  qualityReportDefaultOpen,
+  qualityReportStorageKey,
+  serializeQualityReportOpen,
 } from '@/lib/wordpress/quality-report-view';
 
 /**
@@ -194,15 +199,85 @@ test('card source: renders the display model, the missing-report message, and no
   expect(card).toContain('QUALITY_REPORT_MISSING_MESSAGE');
   expect(card).toContain('QUALITY_REPORT_INFORMATIONAL_NOTE');
   expect(card).toContain('All checks ({view.checks.length})');
-  expect(card).not.toMatch(/<(button|Button|form|a|Link|input)/);
+  // The only interactive element is the toggle of the disclosure shell below.
+  expect(card).not.toMatch(/<(button|Button|form|a|Link|input)\b/);
   expect(card).not.toContain("'use client'");
+  expect(card).toContain('<QualityReportDisclosure');
+  const disclosure = read('components/wordpress/quality-report-disclosure.tsx');
+  expect(disclosure).not.toMatch(/<(form|a|Link|input)\b/);
+  expect(disclosure.match(/<button/g)).toHaveLength(1);
   expect(QUALITY_REPORT_MISSING_MESSAGE).toContain('No quality report for this article');
   expect(QUALITY_REPORT_INFORMATIONAL_NOTE).toContain('never blocks export or publishing');
 });
 
 test('the review page renders the card, and publishing ignores the report', () => {
   const page = read('app/(dashboard)/wordpress/[id]/page.tsx');
-  expect(page).toContain('<ArticleQualityReportCard report={qualityReport} />');
+  expect(page).toContain('<ArticleQualityReportCard report={qualityReport} generationId={id} />');
   const publish = read('app/api/wordpress/[id]/publish/route.ts');
   expect(publish).not.toContain('quality');
+});
+
+// ------------------------------------------------------------ collapsible card
+
+const WARNING_REPORT: ArticleQualityReport = {
+  status: 'warning',
+  qualityIssues: [],
+  warnings: ['Meta title is 65 characters (target ≤ 60).'],
+  checks: [{ key: 'meta_title', status: 'warning', message: 'Meta title is 65 characters (target ≤ 60).' }],
+};
+
+test('default state: collapsed when every check passed, open for warnings, issues or no report', () => {
+  expect(qualityReportDefaultOpen(PASSED_REPORT)).toBe(false);
+  expect(qualityReportDefaultOpen(WARNING_REPORT)).toBe(true);
+  expect(qualityReportDefaultOpen(FAILED_REPORT)).toBe(true);
+  expect(qualityReportDefaultOpen(null)).toBe(true);
+});
+
+test('open/closed state is stored per generationId and round-trips', () => {
+  expect(qualityReportStorageKey('gen-a')).toBe(`${QUALITY_REPORT_OPEN_STORAGE_PREFIX}gen-a`);
+  expect(qualityReportStorageKey('gen-a')).not.toBe(qualityReportStorageKey('gen-b'));
+  expect(parseStoredQualityReportOpen(serializeQualityReportOpen(true))).toBe(true);
+  expect(parseStoredQualityReportOpen(serializeQualityReportOpen(false))).toBe(false);
+  // No stored choice (or a corrupted value) falls back to the default state.
+  expect(parseStoredQualityReportOpen(null)).toBeNull();
+  expect(parseStoredQualityReportOpen('yes')).toBeNull();
+});
+
+test('disclosure: toggle button with aria-expanded / aria-controls, panel hidden when closed', () => {
+  const disclosure = read('components/wordpress/quality-report-disclosure.tsx');
+  expect(disclosure).toContain("'use client'");
+  expect(disclosure).toContain('type="button"');
+  expect(disclosure).toContain('aria-expanded={open}');
+  expect(disclosure).toContain('aria-controls={panelId}');
+  expect(disclosure).toContain('<div id={panelId} hidden={!open}>');
+  expect(disclosure).toContain('onClick={() => writeStoredOpen(storageKey, !open)}');
+  expect(disclosure).toContain('const open = stored ?? defaultOpen;');
+  expect(disclosure).toContain('qualityReportStorageKey(generationId)');
+  // Server snapshot = no stored choice → same first render on server and client.
+  expect(disclosure).toContain('() => null');
+  // localStorage access is guarded and a failed write still toggles for this view.
+  expect(disclosure).toContain('memoryOpen.set(key, open);');
+  expect(disclosure.match(/try \{/g)?.length).toBeGreaterThanOrEqual(2);
+
+  const card = read('components/wordpress/article-quality-report.tsx');
+  expect(card).toContain('const defaultOpen = qualityReportDefaultOpen(report);');
+  expect(card.match(/defaultOpen=\{defaultOpen\}/g)).toHaveLength(2);
+  expect(card.match(/generationId=\{generationId\}/g)).toHaveLength(2);
+});
+
+test('export, copy, save and publish stay outside the collapsible card and are always rendered', () => {
+  const page = read('app/(dashboard)/wordpress/[id]/page.tsx');
+  const cardAt = page.indexOf('<ArticleQualityReportCard');
+  const publishAt = page.indexOf('<PublishControl');
+  const copyExportAt = page.indexOf('<CopyExportButtons');
+  const categoryAt = page.indexOf('<ArticleCategoryEditor');
+  expect(publishAt).toBeGreaterThan(-1);
+  expect(copyExportAt).toBeGreaterThan(-1);
+  expect(categoryAt).toBeGreaterThan(cardAt);
+  // Rendered before the card and never as its children: collapsing it hides nothing else.
+  expect(publishAt).toBeLessThan(cardAt);
+  expect(copyExportAt).toBeLessThan(cardAt);
+  expect(page).toMatch(/<ArticleQualityReportCard [^>]*\/>/);
+  const card = read('components/wordpress/article-quality-report.tsx');
+  expect(card).not.toMatch(/PublishControl|CopyExportButtons|ArticleCategoryEditor/);
 });

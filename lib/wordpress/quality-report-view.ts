@@ -72,3 +72,32 @@ export function buildQualityReportView(report: ArticleQualityReport): QualityRep
     })),
   };
 }
+
+// Open/closed state of the Quality report card, remembered per generation in
+// localStorage (a per-viewer convenience only — never needed to render).
+export const QUALITY_REPORT_OPEN_STORAGE_PREFIX = 'omniflow:quality-report-open:';
+
+export function qualityReportStorageKey(generationId: string): string {
+  return `${QUALITY_REPORT_OPEN_STORAGE_PREFIX}${generationId}`;
+}
+
+/**
+ * Initial state before the viewer toggles anything: open when there is
+ * something to look at (warnings, issues, or no report at all), collapsed
+ * when every check passed.
+ */
+export function qualityReportDefaultOpen(report: ArticleQualityReport | null): boolean {
+  if (!report) return true;
+  return report.status !== 'passed';
+}
+
+/** '1' / '0' as written by the card; anything else means "no stored choice". */
+export function parseStoredQualityReportOpen(raw: string | null): boolean | null {
+  if (raw === '1') return true;
+  if (raw === '0') return false;
+  return null;
+}
+
+export function serializeQualityReportOpen(open: boolean): string {
+  return open ? '1' : '0';
+}

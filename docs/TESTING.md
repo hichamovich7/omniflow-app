@@ -872,3 +872,33 @@ Offline (12 cases): migration 037 is the latest and only adds `quality_report js
 Playwright's runner rewrites JSX in imported `.tsx` files, so the card is not server-rendered in this suite; its labels and counts live in `lib/wordpress/quality-report-view.ts`. Manual check after applying 037: generate an article, open `/wordpress/[id]`, expand "All checks".
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 12/12, full renderer 374/375 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK.
+
+---
+
+# WordPress method A — Pins → article coherence (TASK-FIX-047, 2026-09-26)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/wordpress-pins-coherence.spec.ts --project=renderer --reporter=list
+```
+
+Offline (18 cases, fetch stub, no network, no database): `generations.keyword` first and `deriveThemeKeyword()` fallback; title, description, keywords, `overlay_text`, `image_analysis` summary, board, board section, Content Stream, `link_url`, research notes and Brand Profile in the outline and the article prompts; board/section/stream framed as theme only; `link_url` as the only Pin URL (accepted by the Quality Gate, never inserted by code); no URL in the prompts without `link_url` and an invented one flagged; invalid `link_url` dropped; `promise` requested and required by the pins outline schema, passed to the article with the coherence rules; injected instructions kept inside one `<pins_context>` block; Pinterest images reused unchanged (one image call, only `FEATURED.png` uploaded); no style notes when `image_analysis` is absent; one Pin and several Pins in order; method B prompts and sources without Pins context; route source checks. The existing pins fixtures of `wordpress-pipeline-quality.spec.ts` and `wordpress-outline-model.spec.ts` now carry a `promise`.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 18/18, WordPress specs 95/95, full renderer 392/393 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. A real Pins generation is still needed to judge output quality.
+
+---
+
+# Collapsible Quality report + method A External URL (TASK-FIX-048, 2026-09-26)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/wordpress-quality-report.spec.ts tests/renderer/wordpress-pins-coherence.spec.ts --project=renderer --reporter=list
+```
+
+Quality report (4 new cases, plus the updated card/page checks): default open state (Passed collapsed, Warning / Failed / no report open); storage key per `generationId` and value round trip; toggle button with `aria-expanded` / `aria-controls` and a `hidden` panel, `useSyncExternalStore` with a `null` server snapshot, guarded storage and in-memory fallback; export / copy / publish / category rendered outside the card. The old `not.toMatch(/<(button|…)\b/)` assertion carried a literal backspace instead of `\b` and could never fail — fixed. The card is not rendered in this runner (JSX), so the open/close click itself is covered by source checks; a manual check on `/wordpress/[id]` is still recommended.
+
+External URL (8 new cases): schema (optional, blank → none, http/https only, clear error); form → route → generator wiring and storage in `manual_external_urls`; prompt wording (relevant only, at most once, exact copy) and Quality Gate acceptance; never linked twice even when the model or the verified-source pass repeat it; a URL equal to a Pin `link_url` listed once; no External URL keeps the automatic verified source; `keepFirstLinkOnly()`; method B keeps its Manual URLs field and schema.
+
+Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42/42, full Playwright 404 passed / 88 browser cases skipped (no `PLAYWRIGHT_STORAGE_STATE`) / 1 failed (same pre-existing `pinterest-text-importance-none.spec.ts`), production build OK, `git diff --check` OK.

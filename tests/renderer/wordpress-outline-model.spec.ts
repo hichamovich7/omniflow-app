@@ -59,6 +59,7 @@ const OUTLINE_FIXTURE = {
   metaTitle: 'Crochet Cat Toys Guide',
   slug: 'crochet-cat-toys-guide',
   metaDescription: 'Learn how to crochet safe, durable cat toys with simple stitches and the right yarn.',
+  promise: 'Show readers how to crochet safe, durable cat toys.',
   quickAnswerAngle: 'Use tight stitches and cotton yarn.',
   keyTakeawaysThemes: ['yarn choice', 'stitch density', 'safety', 'washing'],
   sections: Array.from({ length: 8 }, (_, i) => ({ heading: `Section ${i + 1}`, summary: `Summary ${i + 1}` })),

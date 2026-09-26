@@ -80,6 +80,7 @@ function outlineFixture(sectionCount = 8, withFaq = true) {
     metaTitle: 'Handmade Guide for Playful Felines',
     slug: 'handmade-guide-playful-felines',
     metaDescription: 'Learn how to crochet safe, durable cat toys with simple stitches and the right yarn.',
+    promise: 'Show readers how to crochet safe, durable cat toys.',
     quickAnswerAngle: 'Use tight stitches and cotton yarn.',
     keyTakeawaysThemes: ['yarn choice', 'stitch density', 'safety', 'washing'],
     sections: Array.from({ length: sectionCount }, (_, i) => ({ heading: `Section ${i + 1}`, summary: `Summary ${i + 1}` })),

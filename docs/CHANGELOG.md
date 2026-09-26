@@ -18,6 +18,22 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Improve: collapsible Quality report + External URL for WordPress method A (TASK-FIX-048, 2026-09-26)
+
+* `/wordpress/[id]` Quality report card is collapsible (`components/wordpress/quality-report-disclosure.tsx`): toggle button with `aria-expanded`, open by default for warnings / issues / no report, collapsed when every check passed, choice remembered per generation in localStorage. Report content, export, copy, category save and publish unchanged and always available.
+* Method A (Pins → article): optional "External URL (optional)" field on `PinsSourceArticleForm` — one http(s) URL, validated client- and server-side (`externalUrl` on `generateArticleFromPinsSchema`), stored in the existing `wordpress_generations.manual_external_urls`, linked only if relevant and at most once, added to the Quality Gate allowed URLs. Duplicate links to an authorized URL are unlinked, and the automatic verified source is skipped when it repeats a URL already linked. Empty field = unchanged behavior (automatic web-search-verified source, best-effort).
+* Method B keeps its own Manual URLs field. No migration, model, Quality Gate rule, CSV or Pinterest change.
+* Tests: 12 new offline cases in `wordpress-quality-report.spec.ts` and `wordpress-pins-coherence.spec.ts`; fixed a pre-existing assertion that contained a backspace character instead of `\b`.
+
+## Improve: WordPress method A — Pins context and editorial promise (TASK-FIX-047, 2026-09-26)
+
+* New `lib/wordpress/pins-context.ts`: `buildPinSummaries()` maps each selected Pin to its title, description, keywords, `overlay_text`, an `image_analysis` style summary (null when absent/malformed), board, board section, Content Stream (non-archived stream linked to its board) and a validated http(s) `link_url`.
+* `generate-from-pins` route: builds that context (Content Stream via `listBoardOccupants()`); `generations.keyword` stays the primary keyword, `deriveThemeKeyword()` the fallback.
+* Pins outline prompt `wordpress-from-pins-outline-v3`: Pins in one delimited `<pins_context>` data block (sanitized, never instructions), board/section/stream as theme only, alt text grounded in the Pin's text and style notes (no claimed analysis when absent), new required `promise` field.
+* Article prompt: optional pins-only `pinsContext` (promise, Pins block, Pin URLs) — deliver on the promise, develop the Pins' ideas beyond their teaser, invent nothing, keep title/outline/images/content consistent; Pin `link_url` is the only Pin URL allowed, never inserted by code, and is added to the Quality Gate `allowedUrls`. Keyword and URL methods (method B) unchanged.
+* No model, migration, Quality Gate rule, CSV, Social Content Studio or Pinterest image change; Pinterest images are still reused by URL.
+* Tests: `tests/renderer/wordpress-pins-coherence.spec.ts` (18 offline cases); `promise` added to the existing pins outline fixtures.
+
 ## Add: WordPress Quality Report V1 on the review page (TASK-FIX-046, 2026-09-26)
 
 * Migration `037_add_wordpress_quality_report.sql`: nullable `wordpress_generations.quality_report jsonb` (additive, no backfill, no RLS change). **Apply by hand in the Supabase SQL Editor.**
@@ -52,6 +68,11 @@ No registrar cambios menores de formato o comentarios.
 * Server logs now record the provider/model of the outline and article steps (`[wordpress] outline model: …`), never a key.
 * Same prompts, JSON format, token budgets and Zod validations. Image pipeline, Pinterest and migrations unchanged. `.env.example` documents both variables.
 * Tests: `tests/renderer/wordpress-outline-model.spec.ts` (10 offline cases).
+
+## Docs: WordPress pipeline & AI model audit, TASK-044 planned (2026-09-26)
+
+* Added `docs/tasks/AUDIT-WORDPRESS-PIPELINE-AND-MODELS-2026-09-26.md`: both WordPress generation methods (keyword, existing Pins), every AI call and its real model, OpenRouter catalog check and a model recommendation awaiting approval. No code, model or `.env` change.
+* Added TASK-044 (PLANNED): Social Content Studio from WordPress Article — `docs/tasks/TASK-044-SOCIAL-CONTENT-STUDIO-FROM-WORDPRESS-ARTICLE.md` and its `docs/TASKS.md` entry.
 
 ---
 
