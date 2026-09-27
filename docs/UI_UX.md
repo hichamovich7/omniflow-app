@@ -909,6 +909,16 @@ Manage WordPress categories as real entities, scoped per project — same purpos
 
 One section per project, each listing that project's categories with inline rename and two-step confirm delete, plus a "New Category" button. Deleting a category never deletes its articles — they fall back to "Uncategorized" (`category_id` is nullable, `ON DELETE SET NULL`).
 
+Compact cards (`components/wordpress/categories-manager.tsx`, `lib/wordpress/category-cards-view.ts`):
+
+* Each project card is **compact by default**: chevron toggle, project name, site domain + "Connected" badge (or "No WordPress site"), category count, and the main actions ("Import from WordPress" when a site is connected, "New Category") — always visible.
+* Expanded, the card shows its existing details unchanged: category list (rename / delete) and "Map to WordPress category". The details stay mounted while hidden, so loading and mapping behave as before.
+* Toggle: a chevron button with `aria-expanded`, `aria-controls` (the details panel) and an accessible label "Show details for {project}" / "Hide details for {project}"; clicking the name / summary area also toggles (mouse shortcut). The action buttons sit outside that area and never toggle the card.
+* "Expand all" / "Collapse all" above the cards (each disabled when already in that state).
+* Open/closed state remembered per project in `localStorage` (`omniflow:wp-category-card-open:<projectId>`, `'1'` / `'0'`); new projects start compact. If storage is unavailable or throws, the toggle keeps working for the page view (in-memory copy).
+* A `#project-<id>` link (Project detail page → Categories) opens that card. Creating or importing a category opens its card so the result is visible.
+* Only the site URL / domain is shown — never a username, password or secret. Mobile: header wraps, no horizontal scroll.
+
 The same category picker (`components/wordpress/category-select.tsx`) is also embedded directly in both generation forms, with its own lightweight "+ New Category" quick-create and a "Manage" shortcut — this page is the fuller standalone view, reachable from the sidebar.
 
 Empty state: no projects yet → prompt to create a project first (a category must belong to a project).

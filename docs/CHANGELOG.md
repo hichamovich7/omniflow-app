@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: WordPress Categories — compact, expandable project cards (2026-09-27)
+
+* `/wordpress/categories`: each project card is compact by default (chevron, name, site domain + "Connected" / "No WordPress site", category count, "Import from WordPress" / "New Category"). Expanded: the existing category list (rename / delete) and WordPress mapping, unchanged and kept mounted while hidden.
+* Chevron toggle with `aria-expanded`, `aria-controls` and "Show / Hide details for {project}"; the name / summary area also toggles; actions sit outside it and never toggle. "Expand all" / "Collapse all" added.
+* State remembered per project in `localStorage` (`omniflow:wp-category-card-open:<id>`), compact for new projects; in-memory fallback when storage is unavailable. `#project-<id>` links open their card; a created / imported category opens its card.
+* New `lib/wordpress/category-cards-view.ts`; `components/wordpress/categories-manager.tsx` updated. Guide (WordPress Publishing) and `docs/UI_UX.md` updated.
+* No database, API or AI change. Tests: new offline spec `tests/renderer/wordpress-categories-cards.spec.ts` (9 cases); new gated browser spec `tests/playwright/wordpress-categories-cards.spec.ts` (needs `PLAYWRIGHT_STORAGE_STATE`).
+
 ## Docs: Guide — Connecting WordPress with an Application Password (2026-09-27)
 
 * `/guide`: new section "Connecting WordPress" (`lib/guide/content.ts`, id `wordpress-connection`, before "WordPress Publishing"): create a dedicated Application Password under Users → Profile → Application Passwords; WP Username = the real WordPress account username (usually the administrator); Application Password field = the generated password, never the normal login password; the Application Password's name (e.g. "MyOmniflow-app") is only a label, not the username; never share it; Site URL = main HTTPS URL without `/wp-admin`.
