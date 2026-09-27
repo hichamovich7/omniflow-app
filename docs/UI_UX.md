@@ -267,6 +267,7 @@ An optional "WordPress Connection" section inside the same form used by `/projec
 * Site URL (text input)
 * WP Username (text input)
 * Application Password (password input) — a note explains it's generated in WordPress under Users → Profile → Application Passwords, is encrypted before storage, and is never shown again after saving
+* The step-by-step (real WordPress username vs. the Application Password's label, HTTPS main URL without `/wp-admin`, never the normal login password) and troubleshooting live in the `/guide` section "Connecting WordPress" (`#wordpress-connection`)
 * "Test Connection" button — disabled until all three fields are filled; must succeed (`POST /api/wordpress/sites/test`) before the connection can be saved with the project
 * "Cancel" — only shown when a connection already exists, discards the in-progress edit and reverts to the connected view
 
@@ -1059,6 +1060,8 @@ Layout:
 * Anchor chip row at the top — one per section, jumps to that section's card
 * One card per section: icon, title, one-line summary, bullet points
 * Static content, no data fetching — Server Component
+
+* "Connecting WordPress" (`#wordpress-connection`, just before "WordPress Publishing") — Application Password setup and troubleshooting ("combination rejected" = wrong username; `curl.exe` instead of `curl` in PowerShell). Never contains a real password or identifier; covered by `tests/renderer/guide-wordpress-connection.spec.ts`
 
 Must be updated whenever a user-facing feature ships (see CLAUDE.md Documentation Discipline).
 

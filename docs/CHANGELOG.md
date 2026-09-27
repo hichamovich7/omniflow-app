@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Docs: Guide — Connecting WordPress with an Application Password (2026-09-27)
+
+* `/guide`: new section "Connecting WordPress" (`lib/guide/content.ts`, id `wordpress-connection`, before "WordPress Publishing"): create a dedicated Application Password under Users → Profile → Application Passwords; WP Username = the real WordPress account username (usually the administrator); Application Password field = the generated password, never the normal login password; the Application Password's name (e.g. "MyOmniflow-app") is only a label, not the username; never share it; Site URL = main HTTPS URL without `/wp-admin`.
+* Troubleshooting: "username/Application Password combination rejected" → check the username is the real one, not the application name; in PowerShell use `curl.exe` instead of `curl` (alias of `Invoke-WebRequest`).
+* "WordPress Publishing" first point now refers to the new section. `docs/UI_UX.md` updated.
+* No code change to the connection flow, no API / migration change. New offline spec `tests/renderer/guide-wordpress-connection.spec.ts` (5 cases).
+
 ## Feature: Pinterest History — source WordPress article badge (TASK-044 follow-up, 2026-09-27)
 
 * `/history`: Pinterest generations created from a WordPress article (`generations.source_wordpress_generation_id`, migration 040) show a "From WordPress · <title>" link badge to `/wordpress/[id]`; "WordPress article unavailable" (no link) when the source is not readable by the user or has no article row. Keyword generations and older rows without relation are unchanged.
