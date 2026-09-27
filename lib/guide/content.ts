@@ -221,11 +221,13 @@ export const guideSections: GuideSection[] = [
     summary: 'Turn a finished WordPress article into social media content, right from the article page.',
     points: [
       'Open a completed article and scroll to "Social Content Studio". It lists Pinterest, Facebook, Instagram, Reels, TikTok and Medium.',
-      'Pinterest is available today: click "Generate Pinterest content" to get 5 Pin ideas (title, description, keywords and a suggested board), each written from a different angle, in the article\'s language, using its title, meta title and description, main keyword, SEO keywords, featured image and your Brand Profile.',
-      'The Pins stay faithful to the article: a number or claim the article does not contain is refused, and you are asked to try again.',
-      'Nothing is published, scheduled or saved: no Pin is created in your Pinterest generations, and the article itself is never changed. Use Copy on each Pin to take what you need; reloading the page clears the result.',
+      'Pinterest is available today: click "Generate Pinterest content" to open the Pinterest generator pre-filled from the article — its title, meta title and description, main keyword, SEO keywords, language, featured image and your Brand Profile. Nothing is generated until you click "Generate Pins".',
+      'Choose the number of Pins (5 by default, one per angle: Curiosity, Problem → Solution, Listicle, Discovery, Article Promise — fewer than 5 always use different angles), the language, the keyword, the generation mode and its options, and a board. Only your project\'s real boards are listed, optionally filtered by Content Stream; if none matches the article, a board name is suggested but never created for you.',
+      'No destination link is ever added: no link field, no article URL sent to the AI, no link in titles, descriptions or keywords. Add your URLs yourself in the CSV, as you usually do.',
+      'The Pins are saved like any other Pinterest generation (you find them in your history, CSV export included). Each generation is new — earlier ones are kept. The Pins stay faithful to the article: a number or claim the article does not contain is refused, and you are asked to try again.',
+      'Each Pin card lets you copy the title, description, keywords or the full Pin, edit the text, regenerate just that Pin (same angle) and generate its image. "Generate all images" asks for confirmation first, because it uses AI image credits and Storage. The article and its featured image are never changed, and nothing is published to Pinterest.',
       'Facebook is coming soon; Instagram, Reels, TikTok and Medium are planned. Their buttons are disabled for now and clicking them does nothing.',
-      'Each Pinterest generation counts toward your hourly limit and your free-trial generations, like the other generators.',
+      'Each Pinterest generation or single-Pin regeneration counts toward your hourly limit and your free-trial generations, like the other generators.',
     ],
   },
 ];

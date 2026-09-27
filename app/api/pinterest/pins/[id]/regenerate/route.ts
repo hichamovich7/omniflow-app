@@ -1,23 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateText } from '@/lib/ai/engine';
-import { generateSocialContentSchema } from '@/lib/validations/social';
-import {
-  generatePinterestFromArticle,
-  loadArticlePinterestSource,
-  SocialGenerationError,
-  type ArticlePinterestResult,
-} from '@/lib/social/pinterest-from-article';
+import { regeneratePinSchema } from '@/lib/validations/pinterest';
+import { prepareArticlePinRegeneration, regenerateAndSavePin } from '@/lib/pinterest/pin-text';
+import { SocialGenerationError } from '@/lib/social/pinterest-from-article';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
+import type { Pin } from '@/types/database';
 
 export const maxDuration = 60;
 
 /**
- * Social Content Studio (TASK-044 phase 1): generates platform content from
- * an owned, completed WordPress article. Only Pinterest is available. The
- * article is only read; nothing is persisted and nothing is published.
+ * Regenerates the text of one saved Pin from its source WordPress article
+ * (TASK-044 phase 2): same prompt, same angle, same article context, no URL.
+ * Only that Pin is updated; the article is only read.
  */
 export async function POST(
   request: Request,
@@ -39,7 +36,7 @@ export async function POST(
 
   if (!isValidUuid(id)) {
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: 'Invalid article ID', code: 'invalid_id' } },
+      { data: null, error: { message: 'Invalid Pin ID', code: 'invalid_id' } },
       { status: 400 }
     );
   }
@@ -54,7 +51,7 @@ export async function POST(
     );
   }
 
-  const parsed = generateSocialContentSchema.safeParse(body);
+  const parsed = regeneratePinSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json<ApiResponse<null>>(
@@ -64,20 +61,19 @@ export async function POST(
   }
 
   try {
-    // Ownership and completion are checked before the rate limit so a
-    // rejected request never consumes trial budget.
-    const source = await loadArticlePinterestSource(supabase, user.id, id);
+    // Ownership, completion and project checks run before the rate limit so
+    // a rejected request never consumes trial budget.
+    const prepared = await prepareArticlePinRegeneration(supabase, user.id, id, parsed.data.wordpressArticleId);
 
-    const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'wordpress/social', 20, 3600, {
+    const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/regenerate-pin', 30, 3600, {
       enforceTrialLimit: true,
     });
     if (!rateLimit.allowed) {
       return rateLimitErrorResponse(rateLimit);
     }
 
-    const result = await generatePinterestFromArticle(source, { generateText });
-
-    return NextResponse.json<ApiResponse<ArticlePinterestResult>>({ data: result, error: null });
+    const pin = await regenerateAndSavePin(supabase, prepared, { generateText });
+    return NextResponse.json<ApiResponse<Pin>>({ data: pin, error: null });
   } catch (err) {
     if (err instanceof SocialGenerationError) {
       return NextResponse.json<ApiResponse<null>>(
@@ -85,9 +81,9 @@ export async function POST(
         { status: err.status }
       );
     }
-    console.error('Social content generation failed:', err);
+    console.error('Pin regeneration failed:', err);
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: 'Social content generation failed. Please try again.', code: 'server_error' } },
+      { data: null, error: { message: 'Pin regeneration failed. Please try again.', code: 'server_error' } },
       { status: 500 }
     );
   }

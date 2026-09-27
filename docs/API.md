@@ -144,6 +144,17 @@ Creates one generation request and produces Pinterest content using AI.
 
 `manualAngle` is required when `strategy = manual` and forbidden otherwise. Exact strings are 1-120 characters and their line count cannot exceed `maximumTextLines` (2-6). For `ai-integrated` the server ignores the submitted `language` and uses the owned project's `default_language` (falling back to the submitted value only when the stored one is unsupported). The FAST role returns the final `integratedText` (`headline` / `subtitle` / `cta`) for `Generate` fields; the server substitutes exact strings verbatim, checks presence and the line budget, and persists the resolved contract under `pins.image_analysis._pinterestAiIntegrated`. `strategy = manual` applies the chosen angle to every pin; balanced angle coverage is enforced only for `balanced` and legacy modes.
 
+`wordpressArticleId` is optional (TASK-044 phase 2, Social Content Studio) — the `wordpress_generations.id` of the article the Pins are written from, sent by `/pinterest/create?source=wordpress`. An internal reference only, never a destination URL. When present:
+
+* The Zod schema rejects `websiteUrl` / `pinterestUrl` (message `Destination URLs are not accepted when generating from an article. Add links manually in your CSV.`) and `analysisId` alongside it — HTTP 400 `invalid_request`.
+* After the project ownership check, `loadArticlePinterestSource()` (`lib/social/pinterest-from-article.ts`, selects only) requires the article and its generation to be the caller's (403 `forbidden`), both `completed` (409 `article_not_completed`), unknown → 404 `not_found`, and the article's project must be `projectId` (400 `project_mismatch`).
+* The article becomes the prompt's existing `analysisContext` slot (`buildArticlePinterestContext(article, keyword)`): H1, meta title, meta description, the submitted keyword as primary keyword, SEO keywords, featured image described (never linked), a content excerpt (≤ 6 000 chars; images, links and every bare URL / domain removed) and the instruction never to write a URL. The permalink, `source_url`, image URLs and any other URL are never sent. Same prompt (`pinterest-pins-v10`), model role, parser, strategy safeguards (the article is the evidence for numbers) and every generation mode / option as the keyword flow.
+* `language` is the submitted one in every mode (the article's by default in the form) — the AI Integrated project-language inheritance does not apply.
+* Below 5 Pins, a balanced batch (legacy / Photo Only / AI Integrated `balanced`) must use distinct angles, else 422 `invalid_strategy_plan`. `pinsRequested` keeps the existing options (max 30).
+* Any URL the model writes anyway is removed from `title`, `description` and `keywords` before saving. `pins.link_url` and `generations.website_url` / `pinterest_url` stay `null`.
+* Boards are only matched, never created (`findOrCreateBoardIds(..., { create: false })`): a board name without a real board stays free text on the Pin with `board_id = null`.
+* After completion, `generations.source_wordpress_generation_id` is set best-effort (migration 040); if the migration is not applied the generation still succeeds and a warning is logged. The article is never modified.
+
 `generations.reference_image_url` exists in the database schema but has no corresponding request field yet — deferred to TASK-013 (Image Analysis).
 
 ## Response
@@ -962,74 +973,9 @@ A WordPress problem is never an error: the original export is returned. On any r
 
 ---
 
-# POST /api/wordpress/[id]/social
+# POST /api/wordpress/[id]/social (removed)
 
-Social Content Studio, phase 1 (TASK-044). Generates platform content from an owned, completed WordPress article. `[id]` is the `wordpress_generations.id`. Content only: nothing is persisted (no history table, no `generations` / `pins` / `boards` row), nothing is published, and `wordpress_articles` / `wordpress_article_images` / storage are only read.
-
-Platforms come from `lib/social/platforms.ts`:
-
-```txt
-pinterest   available     → accepted
-facebook    coming_soon   → rejected (400)
-instagram   planned       → rejected (400)
-reels       planned       → rejected (400)
-tiktok      planned       → rejected (400)
-medium      planned       → rejected (400)
-```
-
-## Description
-
-1. Auth (`supabase.auth.getUser()`), UUID check, Zod body (`generateSocialContentSchema`, `lib/validations/social.ts` — only `available` platforms, strict object).
-2. `loadArticlePinterestSource()` (`lib/social/pinterest-from-article.ts`), selects only: article + generation (`getWordPressArticleByGenerationId()`), `generation.user_id` = caller (else 403), generation and article `completed` (else 409), project owned by the caller (niche + Brand Profile description), and for the Pins method the source Pinterest keyword (`getPinsSeoSource()`).
-3. Rate limit `wordpress/social` (20/hour) with the trial cap — checked after ownership so a rejected request never consumes trial budget. No credits (TASK-011 not shipped).
-4. `generatePinterestFromArticle()` reuses the existing Pinterest generator unchanged: `buildPinterestPinsPrompt()` (`pinterest-pins-v10`) with 5 Pins (one per angle), `photo-only` mode and no text overlay; keyword = `resolveFocusKeyword()` (same per-method resolution as publishing) or the H1 when none is reliable; language = the article's; Brand Profile and niche from the project. The article — H1, meta title, meta description, primary keyword, SEO keywords, featured image (and its stored prompt) and a content excerpt (≤ 6 000 chars, images and link URLs removed) — is passed through the prompt's `analysisContext`, delimited as data. `generateText` role `FAST` (no model change). The response goes through `parsePinterestGenerationPlan()` and `validatePinterestStrategyBatch()` with the article as evidence (a number the article states is allowed, an invented one is refused).
-
-## Request
-
-```json
-{ "platform": "pinterest" }
-```
-
-## Response
-
-```json
-{
-  "data": {
-    "platform": "pinterest",
-    "keyword": "small bathroom storage",
-    "language": "en",
-    "articleTitle": "Small Bathroom Storage That Actually Works",
-    "featuredImageUrl": "https://…/featured.png",
-    "pins": [
-      { "angle": "curiosity", "title": "…", "description": "…", "keywords": "a, b, c", "board": "Bathroom Ideas" }
-    ]
-  },
-  "error": null
-}
-```
-
-No image prompt, image or destination link is returned; the featured image URL is echoed for display only.
-
-## Credits
-
-Not charged (rate limit + trial cap only, as the other generation routes until TASK-011).
-
-## Possible Errors
-
-```txt
-unauthorized            401
-invalid_id              400
-invalid_json            400
-invalid_request         400  (unknown or not-yet-available platform)
-not_found               404
-forbidden               403  (article or project of another user)
-article_not_completed   409
-rate_limited / trial_limit_reached
-invalid_pin_plan        422  (incomplete / invalid JSON, never repaired)
-invalid_strategy_plan   422  (strategy safeguards, e.g. invented number)
-generation_failed       500  (AI provider error)
-server_error            500
-```
+Social Content Studio phase 1 (TASK-044) generated 5 unsaved Pins here. Removed in phase 2: the Pinterest card on `/wordpress/[id]` now opens `/pinterest/create?source=wordpress&articleId=<id>`, which uses `POST /api/pinterest/generate` with `wordpressArticleId` (see that endpoint) so the Pins are saved like any other generation. `lib/validations/social.ts` was removed with it.
 
 ---
 
@@ -1213,6 +1159,76 @@ invalid_id
 not_found
 forbidden
 invalid_request (cannot delete only version)
+```
+
+---
+
+# PATCH /api/pinterest/pins/[id]
+
+Manual edit of a saved Pin's text (TASK-044 phase 2, result cards of `/pinterest/create`). No AI call.
+
+## Description
+
+Auth, UUID, Zod body (`updatePinTextSchema`, strict), then `updatePinText()` (`lib/pinterest/pin-text.ts`): the Pin's generation must belong to the caller (403 otherwise, nothing written). Updates only `title`, `description` and `keywords` (keywords trimmed and re-joined with `, `). `board`, `board_id`, `board_section`, `link_url`, `media_url`, `publish_date` and the image metadata are never touched.
+
+## Request
+
+```json
+{ "title": "max 100 chars", "description": "max 500 chars", "keywords": "a, b, c" }
+```
+
+## Response
+
+The updated `pins` row: `{ "data": { ...pin }, "error": null }`.
+
+## Possible Errors
+
+```txt
+unauthorized      401
+invalid_id        400
+invalid_json      400
+invalid_request   400  (empty / too long field, unknown key)
+not_found         404
+forbidden         403
+generation_failed 500  (update failed)
+```
+
+---
+
+# POST /api/pinterest/pins/[id]/regenerate
+
+Regenerates the text of one saved Pin from its source WordPress article (TASK-044 phase 2). `maxDuration = 60`.
+
+## Description
+
+1. Auth, UUID, Zod body (`regeneratePinSchema`, strict).
+2. `prepareArticlePinRegeneration()` (selects only): the Pin's generation is the caller's (403), the article is the caller's and completed (403 / 404 / 409), and the article's project is the Pin's project (400 `project_mismatch`).
+3. Rate limit `pinterest/regenerate-pin` (30/hour) with the trial cap — after the checks, so a rejected request never consumes budget.
+4. `regenerateArticlePin()` (`lib/social/pinterest-from-article.ts`): same `buildPinterestPinsPrompt()` with `pinsRequested: 1`, the generation's keyword and language, the Pin's mode (from `visual_format`), the article context (no URL) plus "rewrite one Pin with the `<angle>` angle" and the other Pins' titles to differ from. AI Integrated Pins reuse their stored settings with the existing Manual strategy set to the Pin's angle. The result must keep the angle and pass `validatePinterestStrategyBatch()` (grounded claims) and title diversity against the siblings, else 422 `invalid_strategy_plan`; URLs are removed from the text.
+5. One update of that Pin: `title`, `description`, `keywords`, `image_prompt`, `overlay_text` (text-overlay Pins only), `image_analysis` (angle / AI Integrated text). Board, section, link, image and schedule are kept — an existing image is not regenerated.
+
+## Request
+
+```json
+{ "wordpressArticleId": "uuid" }
+```
+
+## Response
+
+The updated `pins` row.
+
+## Possible Errors
+
+```txt
+unauthorized / invalid_id / invalid_json / invalid_request   401 / 400
+not_found              404
+forbidden              403
+article_not_completed  409
+project_mismatch       400
+rate_limited / trial_limit_reached
+invalid_pin_plan       422
+invalid_strategy_plan  422
+generation_failed      500
 ```
 
 ---

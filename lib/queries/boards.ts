@@ -25,12 +25,15 @@ export async function getBoardWithPins(supabase: SupabaseClient, boardId: string
  * Matches AI-suggested board names against existing boards for the project
  * (case-insensitive), creating any that don't exist yet. This is the
  * auto-linking step that turns free-text `pins.board` into real entities.
+ * With `create: false` (article-based generation, TASK-044 phase 2) it only
+ * matches: an unknown name stays free text on the Pin and no board is created.
  */
 export async function findOrCreateBoardIds(
   supabase: SupabaseClient,
   projectId: string,
   userId: string,
-  names: string[]
+  names: string[],
+  options: { create?: boolean } = {}
 ): Promise<Map<string, string>> {
   const trimmed = names.map((n) => n.trim()).filter(Boolean);
   if (trimmed.length === 0) return new Map();
@@ -53,7 +56,7 @@ export async function findOrCreateBoardIds(
     }
   }
 
-  if (missing.size > 0) {
+  if (missing.size > 0 && options.create !== false) {
     const toInsert = Array.from(missing.values()).map((name) => ({
       project_id: projectId,
       user_id: userId,

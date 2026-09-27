@@ -171,6 +171,7 @@ Represents one Pinterest generation request.
 | status              | text                  | pending / processing / completed / failed |
 | image_status        | text                  | none / processing / completed / partial / failed |
 | error_message       | text nullable         | Human-readable reason when status = failed |
+| source_wordpress_generation_id | uuid nullable FK → wordpress_generations.id | Source article when the generation was made from a WordPress article on `/pinterest/create?source=wordpress` (migration 040, TASK-044 phase 2). ON DELETE SET NULL. Traceability only — an internal id, never a destination URL (`pins.link_url` stays empty in that flow; links are added manually in the CSV). Written best-effort after completion, so generating still works before 040 is applied. `NULL` for keyword generations and every row before 040. Partial index where not null |
 | created_at          | timestamptz           |                                           |
 | updated_at          | timestamptz           |                                           |
 
@@ -191,6 +192,7 @@ user_id = auth.uid()
 (project_id)
 (status)
 (created_at DESC)
+(source_wordpress_generation_id) WHERE NOT NULL  -- migration 040
 ```
 
 ---
@@ -270,7 +272,7 @@ Real Pinterest board entities (TASK-025). `pins.board` remains a free-text field
 
 Organizes pins into persistent, manageable Pinterest boards, scoped per project (a project represents one niche/blog, matching how a real Pinterest account organizes boards).
 
-At generation time, each pin's AI-suggested `board` name is matched case-insensitively against existing boards for the project; unmatched names create a new board automatically (see `lib/queries/boards.ts` `findOrCreateBoardIds()`). No pre-existing pins are backfilled — only pins generated after this table's migration get `board_id` set.
+At generation time, each pin's AI-suggested `board` name is matched case-insensitively against existing boards for the project; unmatched names create a new board automatically (see `lib/queries/boards.ts` `findOrCreateBoardIds()`). Exception (TASK-044 phase 2): a generation made from a WordPress article only matches existing boards (`{ create: false }`) — an unmatched name stays free text on the pin with `board_id = null`, no board is created. No pre-existing pins are backfilled — only pins generated after this table's migration get `board_id` set.
 
 ## RLS
 

@@ -1,9 +1,9 @@
 /**
  * Social Content Studio platforms (TASK-044). Single source of truth for
  * which platforms exist on the article review page and which one can
- * actually generate. Only `available` platforms are accepted by
- * POST /api/wordpress/[id]/social — the others are display-only: no API
- * call, no AI call, no database write.
+ * actually generate. Only `available` platforms get an action (Pinterest
+ * opens /pinterest/create?source=wordpress) — the others are display-only:
+ * no API call, no AI call, no database write.
  */
 export const SOCIAL_PLATFORM_IDS = ['pinterest', 'facebook', 'instagram', 'reels', 'tiktok', 'medium'] as const;
 export type SocialPlatformId = (typeof SOCIAL_PLATFORM_IDS)[number];
@@ -22,7 +22,7 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     id: 'pinterest',
     label: 'Pinterest',
     status: 'available',
-    description: 'Pin titles, descriptions, keywords and board ideas from this article.',
+    description: 'Saved Pins (title, description, keywords, board, image prompt) written from this article.',
   },
   { id: 'facebook', label: 'Facebook', status: 'coming_soon', description: 'Post text with a hook and a call to action.' },
   { id: 'instagram', label: 'Instagram', status: 'planned', description: 'Caption, hashtags and alt text.' },

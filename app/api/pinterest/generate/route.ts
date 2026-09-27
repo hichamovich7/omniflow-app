@@ -23,6 +23,14 @@ import {
 } from '@/lib/pinterest/generation-plan';
 import type { PinterestGenerationPlan } from '@/lib/pinterest/generation-plan';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
+import {
+  buildArticlePinterestContext,
+  loadArticlePinterestSource,
+  SocialGenerationError,
+  validateDistinctAngles,
+  withoutUrls,
+  type ArticlePinterestSource,
+} from '@/lib/social/pinterest-from-article';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import {
@@ -130,6 +138,7 @@ export async function POST(request: Request) {
     pinterestUrl,
     analysisId,
     generationMode,
+    wordpressArticleId,
   } = parsed.data;
   // The schema already rejects a reference for the other modes; this is a
   // second guard so the Vision step below can only ever run for Legacy
@@ -164,13 +173,35 @@ export async function POST(request: Request) {
     );
   }
 
-  const language = resolveEffectiveLanguage(
-    generationMode,
-    requestedLanguage,
-    project.default_language
-  );
+  // Social Content Studio (TASK-044 phase 2): an owned, completed article of
+  // this same project becomes the prompt context. Read-only; its permalink
+  // and every other URL stay out of the context (the schema already rejects
+  // websiteUrl / pinterestUrl / analysisId alongside it).
+  let articleSource: ArticlePinterestSource | null = null;
+  if (wordpressArticleId) {
+    try {
+      articleSource = await loadArticlePinterestSource(supabase, user.id, wordpressArticleId);
+      if (articleSource.projectId !== projectId) {
+        throw new SocialGenerationError('project_mismatch', 'The article does not belong to this project');
+      }
+    } catch (err) {
+      if (!(err instanceof SocialGenerationError)) throw err;
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: err.message, code: err.code } },
+        { status: err.status }
+      );
+    }
+  }
 
-  let analysisContext: string | null = null;
+  // The article flow lets the user pick the language (the article's by
+  // default) in every mode, instead of inheriting the project's.
+  const language = articleSource
+    ? requestedLanguage
+    : resolveEffectiveLanguage(generationMode, requestedLanguage, project.default_language);
+
+  let analysisContext: string | null = articleSource
+    ? buildArticlePinterestContext(articleSource, keyword)
+    : null;
 
   if (analysisId) {
     const { data: analysis } = await supabase
@@ -297,22 +328,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const resolvedPins = plan.pins.map((pin) => ({
-      ...pin,
-      angle: aiIntegrated
-        ? resolvePinAngle(aiIntegrated.strategy, aiIntegrated.manualAngle, pin.angle)
-        : pin.angle,
-    }));
+    const resolvedPins = plan.pins.map((pin) => {
+      const resolved = {
+        ...pin,
+        angle: aiIntegrated
+          ? resolvePinAngle(aiIntegrated.strategy, aiIntegrated.manualAngle, pin.angle)
+          : pin.angle,
+      };
+      // Article flow: no link may reach a saved Pin's text.
+      return articleSource ? withoutUrls(resolved) : resolved;
+    });
 
-    const strategyIssues = validatePinterestStrategyBatch(
-      resolvedPins,
-      pinsRequested,
-      [keyword, analysisContext].filter(Boolean).join('\n'),
-      {
-        enforceBalancedAngles:
-          !aiIntegrated || aiIntegrated.strategy === 'balanced',
-      }
-    );
+    const enforceBalancedAngles = !aiIntegrated || aiIntegrated.strategy === 'balanced';
+    const strategyIssues = [
+      ...validatePinterestStrategyBatch(
+        resolvedPins,
+        pinsRequested,
+        [keyword, analysisContext].filter(Boolean).join('\n'),
+        { enforceBalancedAngles }
+      ),
+      ...(articleSource && enforceBalancedAngles
+        ? validateDistinctAngles(resolvedPins, pinsRequested).map((message) => ({
+            code: 'angle-coverage' as const,
+            message,
+          }))
+        : []),
+    ];
     if (strategyIssues.length > 0) {
       // A single flattened string argument — never a bare object — so the
       // issue codes stay legible in log viewers that summarize/collapse
@@ -350,7 +391,11 @@ export async function POST(request: Request) {
       ? resolvedPins.map(() => board)
       : resolvedPins.map((pin) => pin.board);
 
-    const boardIdByName = await findOrCreateBoardIds(supabase, projectId, user.id, boardNames);
+    // Article flow: boards are only matched, never created — an AI-suggested
+    // name with no real board stays free text on the Pin (board_id null).
+    const boardIdByName = await findOrCreateBoardIds(supabase, projectId, user.id, boardNames, {
+      create: !articleSource,
+    });
 
     const allowedBannerTemplates =
       getNicheVisualConvention(project.niche)?.allowedBannerTemplates ??
@@ -426,6 +471,19 @@ export async function POST(request: Request) {
     }
 
     await supabase.from('generations').update({ status: 'completed' }).eq('id', generation.id);
+
+    if (articleSource) {
+      // Traceability only (migration 040). Best-effort and separate from the
+      // insert above, so the generation still succeeds before the migration
+      // is applied. An internal id — never a destination URL.
+      const { error: sourceError } = await supabase
+        .from('generations')
+        .update({ source_wordpress_generation_id: articleSource.articleId })
+        .eq('id', generation.id);
+      if (sourceError) {
+        console.warn('Could not record the source article on the generation (migration 040 applied?):', sourceError.message);
+      }
+    }
 
     return NextResponse.json<ApiResponse<{ generationId: string; status: string; pinsGenerated: number }>>(
       {

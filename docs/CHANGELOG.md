@@ -18,6 +18,18 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Feature: Social Content Studio — phase 2, Pinterest page pre-filled from a WordPress article (TASK-044, 2026-09-27)
+
+* "Generate Pinterest content" on `/wordpress/[id]` now links to the new `/pinterest/create?source=wordpress&articleId=<id>` instead of generating on the article page. No AI call until "Generate Pins".
+* The page reuses the Pinterest Generator form (`PinForm` `articleSource` prop) and `POST /api/pinterest/generate`: same prompt (`pinterest-pins-v10`), angles, parser, strategy safeguards, generation modes and options, same `generations` / `pins` persistence. Pre-filled: H1 / content / keyword / meta / SEO keywords / language / featured image / Brand Profile (source card). Project fixed, language selectable in every mode, Pins default 5 (existing options, max 30), boards = the project's real boards only, filtered by an optional Content Stream; no match → a board name is suggested, never created.
+* `generatePinsSchema`: optional `wordpressArticleId`; `websiteUrl` / `pinterestUrl` / `analysisId` rejected alongside it. The route checks article + project ownership, completion and same project, passes the article through the existing `analysisContext` (no URL: excerpt and fields stripped of links / bare URLs / domains, "never write a URL" instruction), removes any URL the model writes from title / description / keywords, enforces distinct angles below 5 Pins, matches boards without creating any (`findOrCreateBoardIds(..., { create: false })`), and records the source article best-effort.
+* **No destination URL, ever**: no field, no permalink sent to the AI, no link in the Pin text, `pins.link_url` / `generations.website_url` stay empty. CSV exporter unchanged (the Link column stays as stored — empty here, filled manually by the user).
+* Result cards (`components/social/article-pin-results.tsx`): readable angle, title, description, keywords, board, image prompt, "Saved" status, no-link notice; Copy title / description / keywords / full Pin, Edit, Regenerate this Pin, Generate image, "Generate all images" behind a credits + Storage confirmation. "not saved — copy what you need" removed.
+* New `PATCH /api/pinterest/pins/[id]` (manual text edit) and `POST /api/pinterest/pins/[id]/regenerate` (one Pin, same angle, same prompt and article context, rate limit `pinterest/regenerate-pin` 30/h + trial cap after the checks) — `lib/pinterest/pin-text.ts`. Board, link, image and schedule never touched.
+* Migration `040_add_generations_source_wordpress.sql`: nullable `generations.source_wordpress_generation_id` (FK `wordpress_generations`, ON DELETE SET NULL) + partial index. Apply by hand in the Supabase SQL Editor; generation works before it (warning logged).
+* Removed the phase 1 parallel generator: `POST /api/wordpress/[id]/social` and `lib/validations/social.ts`. Facebook / Instagram / Reels / TikTok / Medium unchanged (disabled, no request). WordPress article never modified; nothing published to Pinterest.
+* Tests: `tests/renderer/social-content-studio.spec.ts` rewritten (45 cases, stubbed AI + recording in-memory Supabase); gated browser spec updated. No real AI call.
+
 ## Fix: WordPress SEO — featured image alt text and verified outbound links (TASK-FIX-057, 2026-09-27)
 
 * Root cause of missing outbound links: the link step rejected real sources (bare Node `fetch` without User-Agent → 403 on WAF-protected sites; exact character-for-character anchor match; a single search whose model-typed URL was never checked against real results) and never used the manual URL, research-note URLs or the URL-method source itself.

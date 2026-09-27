@@ -70,7 +70,16 @@ const generatePinsBaseSchema = z.object({
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),
   pinterestUrl: z.string().trim().url('Invalid Pinterest URL').optional(),
   analysisId: z.string().uuid('Invalid analysis ID').optional(),
+  // Social Content Studio (TASK-044 phase 2): the WordPress article
+  // (wordpress_generations.id) used as source context. An internal
+  // reference only — never a destination URL.
+  wordpressArticleId: z.string().uuid('Invalid article ID').optional(),
 });
+
+export const ARTICLE_SOURCE_NO_URL_MESSAGE =
+  'Destination URLs are not accepted when generating from an article. Add links manually in your CSV.';
+export const ARTICLE_SOURCE_NO_ANALYSIS_MESSAGE =
+  'A content analysis cannot be combined with an article source.';
 
 // Supabase Storage public URL from POST /api/pinterest/reference-image —
 // see app/api/pinterest/generate/route.ts for the VISION analysis step. Only
@@ -236,6 +245,15 @@ export const generatePinsSchema = z.preprocess(
           message: BOARD_SECTION_REQUIRES_BOARD_MESSAGE,
         });
       }
+      if (data.wordpressArticleId) {
+        // No destination URL may ever travel with an article-based request.
+        if (data.websiteUrl || data.pinterestUrl) {
+          ctx.addIssue({ code: 'custom', path: ['websiteUrl'], message: ARTICLE_SOURCE_NO_URL_MESSAGE });
+        }
+        if (data.analysisId) {
+          ctx.addIssue({ code: 'custom', path: ['analysisId'], message: ARTICLE_SOURCE_NO_ANALYSIS_MESSAGE });
+        }
+      }
     })
 );
 
@@ -271,3 +289,22 @@ export const openRouterPinsResponseSchema = z.object({
 });
 
 export type GeneratePinsInput = z.infer<typeof generatePinsSchema>;
+
+// PATCH /api/pinterest/pins/[id] (TASK-044 phase 2): manual edit of a saved
+// Pin's text. Same limits as the generated fields (pinResponseSchema).
+export const updatePinTextSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Title is required').max(100, 'Title is too long'),
+    description: z.string().trim().min(1, 'Description is required').max(500, 'Description is too long'),
+    keywords: z.string().trim().max(1000, 'Keywords are too long'),
+  })
+  .strict();
+
+export type UpdatePinTextInput = z.infer<typeof updatePinTextSchema>;
+
+// POST /api/pinterest/pins/[id]/regenerate (TASK-044 phase 2).
+export const regeneratePinSchema = z
+  .object({
+    wordpressArticleId: z.string().uuid('Invalid article ID'),
+  })
+  .strict();

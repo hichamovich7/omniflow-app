@@ -30,6 +30,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ReferenceImageUpload } from '@/components/pinterest/reference-image-upload';
+import { ArticleSourceSummary, type ArticleFormSource } from '@/components/social/article-source-summary';
+import { ArticleBoardPicker, type ContentStreamOption } from '@/components/social/article-board-picker';
+import { articlePinterestCreateHref } from '@/lib/social/pin-display';
 import {
   Select,
   SelectContent,
@@ -198,32 +201,41 @@ interface BoardOption {
 interface PinFormProps {
   projects: ProjectOption[];
   boards: BoardOption[];
+  /**
+   * Social Content Studio (TASK-044 phase 2): pre-fills the form from a
+   * WordPress article. The project is fixed, boards are real ones only (no
+   * creation), no destination URL is ever sent, and the result is shown on
+   * /pinterest/create instead of redirecting.
+   */
+  articleSource?: ArticleFormSource;
+  contentStreams?: ContentStreamOption[];
 }
 
-export function PinForm({ projects, boards }: PinFormProps) {
+export function PinForm({ projects, boards, articleSource, contentStreams = [] }: PinFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
 
   // Carried over from a Research result (Continue to Generate) — invisible passthrough,
   // not editable fields, just recorded on the generation for provenance.
-  const websiteUrl = searchParams.get('websiteUrl') ?? undefined;
-  const pinterestUrl = searchParams.get('pinterestUrl') ?? undefined;
+  // Never sent with an article source: no destination URL in that flow.
+  const websiteUrl = articleSource ? undefined : searchParams.get('websiteUrl') ?? undefined;
+  const pinterestUrl = articleSource ? undefined : searchParams.get('pinterestUrl') ?? undefined;
 
   // Carried over from a Research result's Analyze step — unlike websiteUrl/pinterestUrl this
   // actually changes AI output, so it's surfaced to the user (see indicator below).
-  const analysisId = searchParams.get('analysisId') ?? undefined;
+  const analysisId = articleSource ? undefined : searchParams.get('analysisId') ?? undefined;
 
   const [projectId, setProjectId] = useState(
-    searchParams.get('projectId') ?? defaultProject?.id ?? ''
+    articleSource?.projectId ?? searchParams.get('projectId') ?? defaultProject?.id ?? ''
   );
-  const [keyword, setKeyword] = useState(searchParams.get('keyword') ?? '');
-  const [board, setBoard] = useState('');
+  const [keyword, setKeyword] = useState(articleSource?.primaryKeyword ?? searchParams.get('keyword') ?? '');
+  const [board, setBoard] = useState(articleSource?.suggestedBoardName ?? '');
   const [boardSection, setBoardSection] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>(
-    (defaultProject?.default_language as SupportedLanguage) ?? 'en'
+    articleSource?.language ?? (defaultProject?.default_language as SupportedLanguage) ?? 'en'
   );
-  const [pinsRequested, setPinsRequested] = useState<PinsOption>(10);
+  const [pinsRequested, setPinsRequested] = useState<PinsOption>(articleSource ? 5 : 10);
   const [generationMode, setGenerationMode] = useState<PinterestGenerationMode>('ai-integrated');
   const [textOverlayMode, setTextOverlayMode] = useState<TextOverlayMode>('auto');
   const [creativeFormat, setCreativeFormat] = useState<PinterestCreativeFormat>('ai-chooses');
@@ -251,6 +263,9 @@ export function PinForm({ projects, boards }: PinFormProps) {
       ? selectedProject.default_language
       : language
   ) as SupportedLanguage;
+  // AI Integrated inherits the project language, except from an article,
+  // where the article's language is the default and stays editable.
+  const languageInherited = generationMode === 'ai-integrated' && !articleSource;
   const nicheConvention = getNicheVisualConvention(selectedProject?.niche);
   const showTextOverlayMode = nicheConvention?.allowTextOverlay ?? false;
   const showLegacyTextOverlayMode = generationMode === 'legacy-composite' && showTextOverlayMode;
@@ -319,13 +334,14 @@ export function PinForm({ projects, boards }: PinFormProps) {
     const basePayload = {
       projectId,
       keyword,
-      language: generationMode === 'ai-integrated' ? effectiveProjectLanguage : language,
+      language: languageInherited ? effectiveProjectLanguage : language,
       pinsRequested,
       board: board.trim() || undefined,
       boardSection: boardSection.trim() || undefined,
       websiteUrl,
       pinterestUrl,
       analysisId,
+      wordpressArticleId: articleSource?.articleId,
     };
     const parsed = generatePinsSchema.safeParse(
       generationMode === 'ai-integrated'
@@ -388,6 +404,12 @@ export function PinForm({ projects, boards }: PinFormProps) {
     }
 
     toast.success('Pins generated successfully');
+    if (articleSource) {
+      // A new generation each time: the previous one is kept, never overwritten.
+      router.push(articlePinterestCreateHref(articleSource.articleId, json.data.generationId));
+      setLoading(false);
+      return;
+    }
     router.push(`/pinterest/${json.data.generationId}`);
   }
 
@@ -396,10 +418,16 @@ export function PinForm({ projects, boards }: PinFormProps) {
       {/* Hero */}
       <GeneratorHeader
         icon={Sparkles}
-        title="Pinterest Generator"
-        description="Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts."
+        title={articleSource ? 'Pinterest from article' : 'Pinterest Generator'}
+        description={
+          articleSource
+            ? 'Pins written from your WordPress article with the same Pinterest rules. Nothing is generated until you click Generate Pins.'
+            : 'Enter a keyword and let AI create optimized pins with titles, descriptions, and image prompts.'
+        }
         className="mb-6"
       />
+
+      {articleSource && <ArticleSourceSummary source={articleSource} />}
 
       {analysisId && (
         <div className="mb-5 flex items-center gap-2 rounded-lg bg-brand-accent/5 px-3 py-2 text-xs font-medium text-brand-accent">
@@ -425,7 +453,11 @@ export function PinForm({ projects, boards }: PinFormProps) {
               <Label htmlFor="project" className="text-xs font-medium text-muted-foreground">
                 Project
               </Label>
-              <Select value={projectId} onValueChange={(v) => v && handleProjectChange(v)}>
+              <Select
+                value={projectId}
+                onValueChange={(v) => v && handleProjectChange(v)}
+                disabled={!!articleSource}
+              >
                 <SelectTrigger id="project" className="w-full" aria-describedby="project-context-help">
                   <span className="truncate text-sm">
                     {projects.find((p) => p.id === projectId)?.name ?? 'Select'}
@@ -443,9 +475,9 @@ export function PinForm({ projects, boards }: PinFormProps) {
 
             <div className="space-y-1.5">
               <Label htmlFor="language" className="text-xs font-medium text-muted-foreground">
-                {generationMode === 'ai-integrated' ? 'Effective language' : 'Language'}
+                {languageInherited ? 'Effective language' : 'Language'}
               </Label>
-              {generationMode === 'ai-integrated' ? (
+              {languageInherited ? (
                 <Input
                   id="language"
                   readOnly
@@ -499,6 +531,19 @@ export function PinForm({ projects, boards }: PinFormProps) {
           help="Choose the Pinterest board for these Pins, or leave it blank to decide later."
           helpId="board-help"
         >
+          {articleSource ? (
+            <ArticleBoardPicker
+              boards={boardOptions}
+              contentStreams={contentStreams}
+              board={board}
+              onBoardChange={(name) => {
+                setBoard(name);
+                if (!name) setBoardSection('');
+              }}
+              boardNameSuggestion={articleSource.boardNameSuggestion}
+              disabled={loading}
+            />
+          ) : (
           <div className="space-y-1.5">
             <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
               Board (optional)
@@ -533,6 +578,7 @@ export function PinForm({ projects, boards }: PinFormProps) {
               </ComboboxPopup>
             </Combobox>
           </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="board-section" className="text-xs font-medium text-muted-foreground">

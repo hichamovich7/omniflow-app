@@ -43,6 +43,8 @@ export interface Generation {
   status: GenerationStatus;
   image_status: ImageStatus;
   error_message: string | null;
+  /** Source WordPress article (migration 040, TASK-044 phase 2). Absent before the migration is applied. */
+  source_wordpress_generation_id?: string | null;
   created_at: string;
   updated_at: string;
 }

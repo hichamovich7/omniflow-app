@@ -933,6 +933,18 @@ Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42
 
 ---
 
+# Social Content Studio — Pinterest from a WordPress article (TASK-044 phases 1-2, 2026-09-27)
+
+```bash
+npx playwright test tests/renderer/social-content-studio.spec.ts --project=renderer --reporter=list
+```
+
+Offline (45 cases; the AI text service is an injected stub, Supabase an in-memory fake recording every operation and write payload — no network, no database, no AI call): platform config and the Studio card (Pinterest is a link to `/pinterest/create?source=wordpress&articleId=…`, no fetch; unavailable platforms disabled with no handler); phase 1 endpoint removed; `/pinterest/create` guards (source, UUID, ownership + completion, error state, no AI on load, real boards / Content Streams, result only for an owned generation of the same project); form pre-fill (keyword, language, 5 Pins, article id, no website / Pinterest URL / analysis, no destination field, no free-text board); request schema (article id, every existing Pin count up to 30, URLs / analysis refused with the article, keyword flow unchanged, real board); generation route reuse (article loaded before the AI call, same prompt builder / parser / safeguards, distinct angles, `withoutUrls`, no `link_url`, no board creation, best-effort source id, no write on WordPress tables); article context (all fields, user keyword, no permalink / image URL / bare URL / domain in the full prompt, excerpt stripped, model URLs removed); distinct angles below 5; board pre-selection vs suggestion and `create: false` writing nothing; ownership (another user's article / project, 404, 409, Pins-method keyword); Pin edit (only title / description / keywords written, other user forbidden with no write, schema limits); single-Pin regeneration (same prompt with 1 Pin, same angle, siblings passed, AI Integrated via Manual strategy with stored settings, wrong angle / invented number / near-duplicate refused, provider and plan errors, checks before any write, one `pins` update without link / board / image / schedule keys, article untouched); result cards (fields, labels, no "not saved", every action, confirmed batch images); Copy full Pin without link; CSV exporter unchanged (empty Link column when no link, stored link otherwise).
+
+The gated browser spec `tests/playwright/wordpress-social-content.spec.ts` (needs `PLAYWRIGHT_STORAGE_STATE` + `PLAYWRIGHT_WP_ARTICLE_ID`; `/api/pinterest/generate` always mocked) covers the six platform cards, no request from unavailable platforms, the redirect with pre-filled keyword / 5 Pins / no destination field and no API call, the Generate Pins payload (article id, no URL) and the error state for an unknown article.
+
+Validation (2026-09-27): TypeScript OK, ESLint (touched files) OK, spec 45/45, full renderer 673/674 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), browser projects 106 skipped (no session / article id in this environment), production build OK, `git diff --check` OK. No real AI generation run; migration 040 not applied by the agent.
+
 # WordPress blog-post form — array payload fix + required fields (TASK-FIX-056, 2026-09-27)
 
 ```bash
