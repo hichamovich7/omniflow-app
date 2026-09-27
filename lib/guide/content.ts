@@ -164,6 +164,7 @@ export const guideSections: GuideSection[] = [
       'Filter by keyword, Project, Board, language, or status.',
       'Results are paginated 20 at a time — use Previous / Next at the bottom of the list.',
       'From here you can revisit results, export CSV, or delete a generation.',
+      'Generations created from a WordPress article (Social Content Studio) show a "From WordPress" badge with the article title — click it to open the article. If that article is no longer available to you, the badge reads "WordPress article unavailable". Keyword generations have no such badge.',
     ],
   },
   {

@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Feature: Pinterest History — source WordPress article badge (TASK-044 follow-up, 2026-09-27)
+
+* `/history`: Pinterest generations created from a WordPress article (`generations.source_wordpress_generation_id`, migration 040) show a "From WordPress · <title>" link badge to `/wordpress/[id]`; "WordPress article unavailable" (no link) when the source is not readable by the user or has no article row. Keyword generations and older rows without relation are unchanged.
+* New `lib/queries/wordpress-source.ts` (`getGenerationsWordPressSource`, `describeWordPressSource`): at most 3 grouped queries per page (generations → owned wordpress_generations → wordpress_articles titles), explicit `user_id` filters + RLS, degrades to no badge on error (040 not applied). New `components/history/wordpress-source-badge.tsx`; `history/page.tsx` and `history-table.tsx` pass the map.
+* Unchanged: the "Pins → WordPress article" badge (`WordPressUsageBadge`, `lib/queries/wordpress-usage.ts`), pins, articles, CSV exporter. No migration, no API change.
+* Tests: new offline spec `tests/renderer/pinterest-history-wordpress-source.spec.ts` (15 cases).
+
 ## Feature: Social Content Studio — phase 2, Pinterest page pre-filled from a WordPress article (TASK-044, 2026-09-27)
 
 * "Generate Pinterest content" on `/wordpress/[id]` now links to the new `/pinterest/create?source=wordpress&articleId=<id>` instead of generating on the article page. No AI call until "Generate Pins".

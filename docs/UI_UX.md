@@ -1031,6 +1031,15 @@ Actions:
 * View
 * Export CSV Again
 
+## Source WordPress article badge
+
+Only on Pinterest generations created from a WordPress article (`generations.source_wordpress_generation_id`, TASK-044 phase 2) — keyword generations and rows before migration 040 are unchanged. Rendered next to the status badge by `components/history/wordpress-source-badge.tsx`:
+
+* Source readable → a link badge "From WordPress · <article title>" to `/wordpress/[id]` (native link, keyboard focusable, visible focus ring, screen-reader text "source article:"); long titles are truncated visually (`md:max-w-64`, CSS ellipsis) with the full title as tooltip.
+* Source id set but the article is not owned / readable or has no article row → plain text "WordPress article unavailable", no link. A deleted article nulls the column (ON DELETE SET NULL), so the row falls back to the keyword display.
+* Data: `getGenerationsWordPressSource()` (`lib/queries/wordpress-source.ts`), at most 3 grouped queries per page (never per row), explicit `user_id` filters on top of RLS; any error (e.g. 040 not applied) → no badge.
+* The opposite direction ("n/m pins → WordPress", `WordPressUsageBadge` / `lib/queries/wordpress-usage.ts`) is independent and unchanged.
+
 ---
 
 # Guide

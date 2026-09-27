@@ -933,6 +933,16 @@ Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, both specs 42
 
 ---
 
+# Pinterest History — source WordPress article badge (TASK-044 follow-up, 2026-09-27)
+
+```bash
+npx playwright test tests/renderer/pinterest-history-wordpress-source.spec.ts --project=renderer --reporter=list
+```
+
+Offline (15 cases, in-memory Supabase fake recording each query): generation from an article → title + `/wordpress/[id]`; keyword and legacy rows → no entry; missing article row → unavailable; user isolation (another user's article never exposed, `user_id` filters on both owned tables); no N+1 (exactly 3 queries for 26 rows, 1 when nothing is linked, 0 for an empty page); column error (040 not applied) → empty map; badge display (label, link, unavailable without link, keyboard / screen-reader markup, long-title truncation); wiring in the history page / table; reverse-flow helper and badge untouched.
+
+Validation (2026-09-27): TypeScript OK, ESLint (touched files) OK, spec 15/15, full renderer 688/689 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. Not checked in an authenticated browser (no session in this environment).
+
 # Social Content Studio — Pinterest from a WordPress article (TASK-044 phases 1-2, 2026-09-27)
 
 ```bash

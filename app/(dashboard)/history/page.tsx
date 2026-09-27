@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getGenerationsWordPressUsage } from '@/lib/queries/wordpress-usage';
+import { getGenerationsWordPressSource } from '@/lib/queries/wordpress-source';
 import { PageHeader } from '@/components/layout/page-header';
 import { PageContainer } from '@/components/ui/page-container';
 import { HistoryFilters } from '@/components/history/history-filters';
@@ -23,6 +24,9 @@ interface HistoryPageProps {
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const currentPage = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
 
   const { data: projects } = await supabase
@@ -68,6 +72,10 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const list = generations ?? [];
   const wordpressUsageMap = await getGenerationsWordPressUsage(supabase, list.map((g) => g.id));
   const wordpressUsage = Object.fromEntries(wordpressUsageMap);
+  const wordpressSourceMap = user
+    ? await getGenerationsWordPressSource(supabase, user.id, list.map((g) => g.id))
+    : new Map();
+  const wordpressSource = Object.fromEntries(wordpressSourceMap);
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
   const hasFilters = !!(params.q || params.project || params.language || params.status || params.board);
 
@@ -116,7 +124,11 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
               wordpressArticles: wordpressUsage[g.id]?.articles,
             }))}
           />
-          <HistoryTable generations={list} wordpressUsage={wordpressUsage} />
+          <HistoryTable
+            generations={list}
+            wordpressUsage={wordpressUsage}
+            wordpressSource={wordpressSource}
+          />
           <HistoryPagination currentPage={currentPage} totalPages={totalPages} searchParams={params} />
         </EditorialSelectionProvider>
       )}

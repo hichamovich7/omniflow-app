@@ -11,12 +11,14 @@ import {
 } from '@/components/shared/data-list';
 import { HistoryActions } from './history-actions';
 import { WordPressUsageBadge } from './wordpress-usage-badge';
+import { WordPressSourceBadge } from './wordpress-source-badge';
 import { useSelection } from '@/components/editorial/selection-provider';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
 import { StatusBadge } from '@/components/shared/status';
 import type { GenerationWordPressUsage } from '@/lib/queries/wordpress-usage';
+import type { GenerationWordPressSource } from '@/lib/queries/wordpress-source';
 
 interface GenerationRow {
   id: string;
@@ -31,9 +33,11 @@ interface GenerationRow {
 interface HistoryTableProps {
   generations: GenerationRow[];
   wordpressUsage: Record<string, GenerationWordPressUsage>;
+  /** Only generations created from a WordPress article have an entry. */
+  wordpressSource?: Record<string, GenerationWordPressSource>;
 }
 
-export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps) {
+export function HistoryTable({ generations, wordpressUsage, wordpressSource = {} }: HistoryTableProps) {
   const { isSelected, toggle } = useSelection();
 
   return (
@@ -43,6 +47,7 @@ export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps)
           ? gen.projects[0]?.name
           : gen.projects?.name;
         const usage = wordpressUsage[gen.id];
+        const source = wordpressSource[gen.id];
         const selected = isSelected(gen.id);
 
         return (
@@ -83,8 +88,9 @@ export function HistoryTable({ generations, wordpressUsage }: HistoryTableProps)
                   <span>{timeAgo(gen.created_at)}</span>
                 </p>
               </Link>
-              <div className="flex flex-wrap items-center gap-1.5 md:shrink-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:shrink-0">
                 <StatusBadge status={gen.status} />
+                {source && <WordPressSourceBadge source={source} />}
                 {usage && (
                   <WordPressUsageBadge
                     usedPinCount={usage.usedPinCount}
