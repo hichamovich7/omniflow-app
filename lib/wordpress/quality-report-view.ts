@@ -17,6 +17,7 @@ const CHECK_LABELS: Record<string, string> = {
   unresolved_markers: 'Unreplaced markers',
   first_sentence: 'First sentence',
   unauthorized_urls: 'Links',
+  outbound_link: 'Outbound link',
   meta_title: 'Meta title',
   meta_description: 'Meta description',
   slug: 'Slug',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { generateArticleSchema } from '@/lib/validations/wordpress';
 import { generateWordPressArticle } from '@/lib/wordpress/generate-article';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
@@ -190,6 +191,9 @@ export async function POST(request: Request) {
     );
   }
 
+  // Outbound-link check only: URLs of the connected site are internal links.
+  const siteUrl = (await getWordPressSiteByProjectId(supabase, projectId))?.site_url ?? null;
+
   try {
     const result = await generateWordPressArticle({
       supabase,
@@ -216,6 +220,7 @@ export async function POST(request: Request) {
       includeBold,
       seoKeywords,
       manualExternalUrls,
+      siteUrl,
     });
 
     const { data: article, error: articleError } = await supabase

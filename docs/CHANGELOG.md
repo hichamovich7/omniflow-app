@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: WordPress SEO — featured image alt text and verified outbound links (TASK-FIX-057, 2026-09-27)
+
+* Root cause of missing outbound links: the link step rejected real sources (bare Node `fetch` without User-Agent → 403 on WAF-protected sites; exact character-for-character anchor match; a single search whose model-typed URL was never checked against real results) and never used the manual URL, research-note URLs or the URL-method source itself.
+* `addExternalLink()`: existing link to a provided URL kept (no duplicate) → manual URL(s) → research-note URLs / source URL → web search → one fallback search. Internal (connected site), image, tracking and shortener URLs refused; real GET check with redirects; model URL must be one of the search's `url_citation` results; tolerant anchor, then a relevant phrase already in the article. No source → article unchanged.
+* Quality Gate: new `outbound_link` check ("Outbound link") — warning with a suggested fix when no verified external link, internal links not counted, never blocking.
+* Publish: `alt_text` sent with every `/wp/v2/media` upload (featured: H1 + keyword once, article language; internal: stored alt text), with a follow-up update when WordPress ignores it; warning if not saved. No AI call, stored article unchanged.
+* Generation routes pass the project's WordPress `site_url`. OpenRouter wrapper exposes web-search citations. No migration, prompt-model or credit change.
+* New offline spec `tests/renderer/wordpress-seo-alt-outbound.spec.ts` (22); 4 existing specs adjusted.
+
 ## Fix: WordPress blog-post — "expected string, received array" + required fields (TASK-FIX-056, 2026-09-27)
 
 * Root cause: `manualExternalUrls` — the form sent the Zod-transformed `string[]`, the route re-validated it as a string, so every keyword generation failed with "Invalid input: expected string, received array" (since TASK-FIX-037, even with the field empty).

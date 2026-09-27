@@ -563,5 +563,5 @@ test('addExternalLink keeps the article unchanged when the anchor is not found v
     source: { url: 'https://source.test/x', title: 'X' },
   });
   const result = await addExternalLink(article, 'Topic', 'en');
-  expect(result).toEqual({ content: article, source: null });
+  expect(result).toEqual({ content: article, source: null, origin: null });
 });

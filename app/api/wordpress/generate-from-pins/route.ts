@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromPins } from '@/lib/wordpress/generate-article';
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
@@ -230,6 +231,9 @@ export async function POST(request: Request) {
     );
   }
 
+  // Outbound-link check only: URLs of the connected site are internal links.
+  const siteUrl = (await getWordPressSiteByProjectId(supabase, projectId))?.site_url ?? null;
+
   try {
     const result = await generateArticleFromPins({
       supabase,
@@ -242,6 +246,7 @@ export async function POST(request: Request) {
       brandProfileDescription: project?.description ?? null,
       researchNotes,
       manualExternalUrl: externalUrl ?? null,
+      siteUrl,
     });
 
     const { data: article, error: articleError } = await supabase

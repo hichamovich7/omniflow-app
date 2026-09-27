@@ -5,7 +5,7 @@ import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
 import { buildWordPressFromPinsPrompt, resolvePinsPrimaryKeyword } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
 import type { PinSummary } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
-import { addExternalLink } from '@/lib/ai/services/external-link';
+import { addExternalLink, extractUrlsFromText } from '@/lib/ai/services/external-link';
 import { collectPinLinkUrls, collectPinsAuthorizedUrls, keepFirstLinkOnly } from '@/lib/wordpress/pins-context';
 import { applyFaqSection, type FaqItem } from '@/lib/wordpress/faq-section';
 import { runArticleQualityCheck, logArticleQuality, type ArticleQualityReport } from '@/lib/wordpress/quality-check';
@@ -171,6 +171,8 @@ interface GenerateArticleParams {
   // optional/null, manual URLs only. Purely additive to addExternalLink()
   // below, which is called unconditionally regardless of this field.
   manualExternalUrls?: string[] | null;
+  /** The project's connected WordPress site URL — its links are internal, never the outbound link. */
+  siteUrl?: string | null;
 }
 
 interface GeneratedImageResult {
@@ -237,6 +239,7 @@ export async function generateWordPressArticle(
     includeBold,
     seoKeywords,
     manualExternalUrls,
+    siteUrl,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
@@ -348,11 +351,16 @@ export async function generateWordPressArticle(
   });
   let content = faqApplied.content;
 
-  // Step 2b: best-effort single external link (real, web-search-verified source).
-  // Runs before image marker resolution so it never has to reason about
-  // {{IMAGE_N}} markers — see lib/ai/services/external-link.ts for the
-  // no-link-found / provider-error fallback (article is simply returned as-is).
-  const externalLink = await addExternalLink(content, outline.title, language);
+  // Step 2b: best-effort single verified outbound link — manual URLs first,
+  // then URLs of the research notes, then the web search. Runs before image
+  // marker resolution so it never has to reason about {{IMAGE_N}} markers —
+  // see lib/ai/services/external-link.ts for the no-source fallback (article
+  // is simply returned as-is).
+  const externalLink = await addExternalLink(content, outline.title, language, {
+    candidateUrls: [...(manualExternalUrls ?? []), ...extractUrlsFromText(researchNotes)],
+    siteUrl,
+    keyword,
+  });
   content = externalLink.content;
   const contentBeforeImages = content;
 
@@ -428,6 +436,8 @@ export async function generateWordPressArticle(
     includeTables,
     includeQuotes,
     allowedUrls: [...(manualExternalUrls ?? []), ...(externalLink.source ? [externalLink.source.url] : [])],
+    outboundLinkUrl: externalLink.source?.url ?? null,
+    siteUrl,
     finishReasons,
   });
   logArticleQuality('wordpress', quality);
@@ -474,6 +484,8 @@ interface GenerateArticleFromPinsParams {
   researchNotes?: string | null;
   /** Optional External URL from the pins form (already validated http/https). */
   manualExternalUrl?: string | null;
+  /** The project's connected WordPress site URL — its links are internal, never the outbound link. */
+  siteUrl?: string | null;
 }
 
 /**
@@ -498,6 +510,7 @@ export async function generateArticleFromPins(
     brandProfileDescription,
     researchNotes,
     manualExternalUrl,
+    siteUrl,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const imageCount = internalImageUrls.length;
@@ -593,17 +606,17 @@ export async function generateArticleFromPins(
   // An authorized URL (Pin link_url or the user's External URL) is linked at most once.
   for (const url of authorizedUrls) content = keepFirstLinkOnly(content, url);
 
-  // Step 2b: best-effort single external link (real, web-search-verified source).
-  // Runs before image marker resolution so it never has to reason about
-  // {{IMAGE_N}} markers — see lib/ai/services/external-link.ts for the
-  // no-link-found / provider-error fallback (article is simply returned as-is).
-  // A source the article already links (e.g. the user's External URL) is not
-  // linked a second time.
-  const externalLinkResult = await addExternalLink(content, outline.title, language);
-  const externalLink =
-    externalLinkResult.source && content.includes(externalLinkResult.source.url)
-      ? { content, source: null }
-      : externalLinkResult;
+  // Step 2b: best-effort single verified outbound link — the user's External
+  // URL first, then URLs of the research notes, then the web search. Runs
+  // before image marker resolution so it never has to reason about
+  // {{IMAGE_N}} markers. An outbound link the article already has (e.g. the
+  // External URL placed by the article step) is kept, never linked twice.
+  const externalLink = await addExternalLink(content, outline.title, language, {
+    candidateUrls: [manualExternalUrl, ...extractUrlsFromText(researchNotes)],
+    authorizedUrls,
+    siteUrl,
+    keyword: primaryKeyword,
+  });
   content = externalLink.content;
   const contentBeforeImages = content;
 
@@ -671,6 +684,8 @@ export async function generateArticleFromPins(
     expectedImageMarkers: outline.images.map((img) => img.placementMarker),
     faqExpected: outline.faqQuestions.length > 0,
     allowedUrls: [...authorizedUrls, ...(externalLink.source ? [externalLink.source.url] : [])],
+    outboundLinkUrl: externalLink.source?.url ?? null,
+    siteUrl,
     finishReasons,
   });
   logArticleQuality('wordpress-from-pins', quality);

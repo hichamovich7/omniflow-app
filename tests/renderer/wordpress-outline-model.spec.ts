@@ -198,7 +198,8 @@ test('keyword article: outline on AI_OUTLINE_MODEL, article and external link on
 
   const textCalls = chatCalls.filter((c) => !c.webSearch);
   expect(textCalls.map((c) => c.model)).toEqual([OUTLINE_MODEL, FAST_MODEL]);
-  expect(chatCalls.filter((c) => c.webSearch).map((c) => c.model)).toEqual([FAST_MODEL]);
+  // "No link found" on the first search triggers the single fallback search, same model.
+  expect(chatCalls.filter((c) => c.webSearch).map((c) => c.model)).toEqual([FAST_MODEL, FAST_MODEL]);
 
   expect(logs.lines).toContain(`[wordpress] outline model: openrouter/${OUTLINE_MODEL} (role OUTLINE)`);
   expect(logs.lines).toContain(`[wordpress] article model: openrouter/${FAST_MODEL} (role FAST)`);

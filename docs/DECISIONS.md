@@ -1690,6 +1690,31 @@ The FAQ was rendered into `content` from the structured response and then discar
 
 ---
 
+## 2026-09-27
+
+### Decision
+
+TASK-FIX-057 — One verified outbound link per WordPress article when possible (priority: provided URLs → research notes / source URL → web search + one fallback), Quality Gate `outbound_link`, and `alt_text` on every image uploaded to `/wp/v2/media`.
+
+### Context
+
+Articles regularly reached WordPress without any outbound link (Rank Math "no external links") although every generator calls `addExternalLink()`. Audit of `external-link.ts`: (1) the reachability check was a bare Node `fetch` (HEAD then GET, no User-Agent) — CDN/WAF-protected authoritative sites answer 403 to it, so real sources were rejected; (2) the anchor had to match the article character for character — a model that changes an apostrophe or a capital letter lost the link, with no fallback phrase; (3) one single search, and the model's URL was never compared with the URLs the search really returned (retyped/remembered URLs → 404 → no link); (4) the manual URL(s), research-note URLs and the URL-method source were never used by code as outbound candidates; (5) a response wrapped in a code fence failed `JSON.parse`. No HTML transformation removes links (`marked`, internal-link tokenizer on text nodes only), and all three generators call the step. Nothing reported the absence. Separately, the outline's `featuredImage.altText` was never stored and `uploadMedia()` sent no `alt_text`, so WordPress media had empty alt text.
+
+### Decision Taken
+
+1. `addExternalLink(content, topic, language, { candidateUrls, authorizedUrls, siteUrl, keyword })`: an existing link to a provided URL is kept (verified, never duplicated); then candidates (manual → research notes / source URL); then the web search, at most one fallback search. The model's URL must be among the search's `url_citation` results when those are reported; the search's own results are tried next. URL filter: http(s), not the connected site, not image / tracking / shortener / search redirect. Real GET with a browser-like User-Agent, 2xx, final URL still acceptable. Anchor: exact → tolerant (case, quotes, apostrophes, spaces) → most relevant 2–6-word phrase of a prose sentence. The article is never sent for rewriting; nothing else in it changes. No source → unchanged article, never an invented URL.
+2. The OpenRouter wrapper reports the web plugin's `url_citation` annotations through `onFinish` (`citations`), the only proof that a URL came from a search.
+3. Quality Gate `outbound_link`: passed with the verified link; otherwise a warning with a fix; internal links (relative or on the site host) never count; never a failure.
+4. Alt text built at publish time from stored data only (H1 + focus keyword once; internal images: stored `alt_text`), sent with the upload; no new column, no AI/vision call. The outline's featured `altText` stays unstored — adding it would need a migration (not approved).
+
+### Consequences
+
+* Up to two web-search calls per article instead of one when the first finds nothing (only then).
+* Each generation route reads the project's public WordPress site row (`site_url`) once.
+* Old articles are not re-linked; alt text applies to every future publish, old articles included.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

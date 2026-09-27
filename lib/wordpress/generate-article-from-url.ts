@@ -4,7 +4,7 @@ import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
 import { buildSourceContextSummaryPrompt } from '@/lib/ai/prompts/source-context-summary';
-import { addExternalLink } from '@/lib/ai/services/external-link';
+import { addExternalLink, extractUrlsFromText } from '@/lib/ai/services/external-link';
 import { applyFaqSection } from '@/lib/wordpress/faq-section';
 import { runArticleQualityCheck, logArticleQuality } from '@/lib/wordpress/quality-check';
 import { scrapeUrl, CONTENT_CHAR_CAP } from '@/lib/research/providers/firecrawl';
@@ -41,6 +41,8 @@ interface GenerateArticleFromUrlParams {
   pastedContent?: string;
   language: SupportedLanguage;
   brandProfileDescription: string | null;
+  /** The project's connected WordPress site URL — its links are internal, never the outbound link. */
+  siteUrl?: string | null;
 }
 
 export interface GenerateArticleFromUrlResult extends GenerateArticleResult {
@@ -91,7 +93,7 @@ function truncateAtWord(text: string, maxLength: number): string {
 export async function generateArticleFromUrl(
   params: GenerateArticleFromUrlParams
 ): Promise<GenerateArticleFromUrlResult> {
-  const { supabase, userId, generationId, sourceUrl, pastedContent, language, brandProfileDescription } = params;
+  const { supabase, userId, generationId, sourceUrl, pastedContent, language, brandProfileDescription, siteUrl } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
 
   // Step 0: get the source content — scrape (link, via the same Firecrawl
@@ -216,8 +218,13 @@ export async function generateArticleFromUrl(
   const faqApplied = applyFaqSection(articleValidated.data.content, articleValidated.data.faq, { language, useH3: true });
   let content = faqApplied.content;
 
-  // Step 3b: best-effort single external link — same as Option 1/4.
-  const externalLink = await addExternalLink(content, outline.title, language);
+  // Step 3b: best-effort single verified outbound link — same as Option 1/4;
+  // the scraped source URL is the first candidate, before the web search.
+  const externalLink = await addExternalLink(content, outline.title, language, {
+    candidateUrls: [sourceUrl, ...extractUrlsFromText(pastedContent)],
+    siteUrl,
+    keyword: resolvedKeyword,
+  });
   content = externalLink.content;
   const contentBeforeImages = content;
 
@@ -289,6 +296,8 @@ export async function generateArticleFromUrl(
     expectedImageMarkers: outline.images.map((img) => img.placementMarker),
     faqExpected: outline.faqQuestions.length > 0,
     allowedUrls: externalLink.source ? [externalLink.source.url] : [],
+    outboundLinkUrl: externalLink.source?.url ?? null,
+    siteUrl,
     finishReasons,
   });
   logArticleQuality('wordpress-from-url', quality);

@@ -71,6 +71,7 @@ function baseInput(overrides: Partial<ArticleQualityInput> = {}, build: BuildOpt
     expectedImageMarkers: ['IMAGE_1'],
     faqExpected: true,
     allowedUrls: [SOURCE_URL],
+    outboundLinkUrl: SOURCE_URL,
     finishReasons: ['stop', 'stop'],
     ...overrides,
   };
@@ -97,6 +98,7 @@ test('a clean article passes every check', () => {
     'unresolved_markers',
     'first_sentence',
     'unauthorized_urls',
+    'outbound_link',
     'meta_title',
     'meta_description',
     'slug',

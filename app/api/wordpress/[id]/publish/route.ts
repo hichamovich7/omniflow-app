@@ -8,6 +8,8 @@ import { decryptSecret } from '@/lib/wordpress/crypto';
 import { decideFaqSchema } from '@/lib/wordpress/faq-schema';
 import { sendArticleToWordPress, type FaqSchemaStatus } from '@/lib/wordpress/publish-post';
 import type { InternalLinksReport } from '@/lib/wordpress/internal-links';
+import { buildFeaturedImageAltText, resolveInternalImageAltText } from '@/lib/wordpress/image-alt-text';
+import { resolveFocusKeyword } from '@/lib/wordpress/tags';
 import {
   uploadMedia,
   toWordPressLocalDateString,
@@ -125,13 +127,26 @@ export async function POST(
     );
   }
 
+  // Pins method: tags and focus keyword come from the selected Pins and their
+  // Pinterest generation, not from the synthesized pin-title label.
+  const pins =
+    generation.source_type === 'pins' ? await getPinsSeoSource(supabase, generation.source_pin_ids ?? []) : null;
+
+  // Alt text of every uploaded image (alt_text on /wp/v2/media) — from the
+  // article's own H1 and primary keyword, or the image's stored alt text;
+  // never an AI call, never written back to the article.
+  const altSource = { title: article.title, keyword: resolveFocusKeyword(generation, pins).keyword };
+  const altWarnings: string[] = [];
+
   // Featured image has no URL-fallback on the WP side — featured_media must
   // be a media library attachment id, so a failed upload aborts the publish.
   let featuredMediaId: number | undefined;
   if (article.featured_image_url) {
     try {
-      const uploaded = await uploadMedia(credentials, article.featured_image_url, `${article.slug}-featured.png`);
+      const altText = buildFeaturedImageAltText(altSource);
+      const uploaded = await uploadMedia(credentials, article.featured_image_url, `${article.slug}-featured.png`, altText);
       featuredMediaId = uploaded.id;
+      if (altText && !uploaded.altText) altWarnings.push('WordPress did not save the featured image alt text — add it in the Media Library.');
     } catch (err) {
       const message = isAuthError(err)
         ? 'WordPress rejected the connection credentials — reconnect in Project settings.'
@@ -149,7 +164,12 @@ export async function POST(
   for (const image of images) {
     if (!image.url) continue;
     try {
-      const uploaded = await uploadMedia(credentials, image.url, `${article.slug}-${image.position}.png`);
+      const uploaded = await uploadMedia(
+        credentials,
+        image.url,
+        `${article.slug}-${image.position}.png`,
+        resolveInternalImageAltText(image.alt_text, altSource)
+      );
       content = content.split(image.url).join(uploaded.sourceUrl);
     } catch (err) {
       console.error(`[wordpress publish] Failed to upload internal image for article ${article.id}:`, err);
@@ -182,11 +202,6 @@ export async function POST(
     scheduledAt = new Date(year, month - 1, day, hours, minutes);
     date = toWordPressLocalDateString(scheduledAt);
   }
-
-  // Pins method: tags and focus keyword come from the selected Pins and their
-  // Pinterest generation, not from the synthesized pin-title label.
-  const pins =
-    generation.source_type === 'pins' ? await getPinsSeoSource(supabase, generation.source_pin_ids ?? []) : null;
 
   // One FAQPage JSON-LD at most, from the saved FAQ only (TASK-FIX-055).
   const html = exportToHtmlForWordPress({ content });
@@ -260,7 +275,7 @@ export async function POST(
       rankMath: sent.rankMath.status,
       internalLinks: sent.internalLinks,
       faqSchema: sent.faqSchema,
-      warnings: sent.warnings,
+      warnings: [...sent.warnings, ...altWarnings],
     },
     error: null,
   });

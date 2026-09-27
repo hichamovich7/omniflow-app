@@ -1,9 +1,11 @@
 import { getOutlineConfig, getRoleConfig } from '../config';
-import { chatCompletion } from '../providers/openrouter';
+import { chatCompletion, type WebCitation } from '../providers/openrouter';
 import type { AIRoleConfig, AITool, ChatMessage } from '../types';
 
 // OUTLINE is the WordPress outline step (AI_OUTLINE_MODEL, falling back to
 // FAST — see getOutlineConfig()). It is a text role, not an AIRole.
+export type { WebCitation };
+
 export type TextRole = 'FAST' | 'SMART' | 'OUTLINE';
 
 interface GenerateTextParams {
@@ -14,8 +16,11 @@ interface GenerateTextParams {
   tools?: AITool[];
   /** Overrides the provider's default fetch timeout — for calls known to routinely run long. */
   timeoutMs?: number;
-  /** Receives the provider's finish_reason once the call succeeds (truncation diagnostics). */
-  onFinish?: (info: { finishReason: string | null }) => void;
+  /**
+   * Receives the provider's finish_reason once the call succeeds (truncation
+   * diagnostics) and the URLs a web-search tool really returned ([] otherwise).
+   */
+  onFinish?: (info: { finishReason: string | null; citations: WebCitation[] }) => void;
 }
 
 // Same resolution generateText() uses, exported so callers can log the exact

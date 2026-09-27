@@ -52,6 +52,10 @@ export interface ArticleQualityInput {
   includeQuotes?: boolean | null;
   /** Links the article may contain: manual URLs + the verified external source. */
   allowedUrls: string[];
+  /** The outbound link addExternalLink() verified (reachable, external) — null when none. */
+  outboundLinkUrl?: string | null;
+  /** The project's connected WordPress site — links to it are internal, not outbound. */
+  siteUrl?: string | null;
   /** finish_reason of every text call (outline, article); null when not reported. */
   finishReasons: (string | null)[];
 }
@@ -306,6 +310,52 @@ function checkUrls(input: ArticleQualityInput): QualityCheck {
     : check('unauthorized_urls', 'passed', `${linkUrls.length + bareUrls.length} link(s), all authorized.`);
 }
 
+function linkHost(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * At least one verified outbound link (Rank Math's "external links" test).
+ * Internal links — relative, or to the connected WordPress site — never
+ * count. Never a failure: a missing link is a warning with a fix, it never
+ * blocks export, download or publishing.
+ */
+function checkOutboundLink(input: ArticleQualityInput): QualityCheck {
+  const withoutImages = input.content.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ');
+  const targets = [...withoutImages.matchAll(/\]\((\S+?)(?:\s+"[^"]*")?\)/g)].map((m) => m[1]);
+  const siteHost = input.siteUrl ? linkHost(input.siteUrl) : null;
+  const external: string[] = [];
+  let internalCount = 0;
+  for (const target of targets) {
+    const host = /^https?:\/\//i.test(target) ? linkHost(target) : null;
+    if (!host || host === siteHost) internalCount += 1;
+    else external.push(target);
+  }
+  const internalNote = internalCount > 0 ? ` ${internalCount} internal link(s) not counted.` : '';
+  const verified = input.outboundLinkUrl ? external.find((url) => url === input.outboundLinkUrl) : undefined;
+  if (verified) {
+    return check('outbound_link', 'passed', `Verified outbound link to ${linkHost(verified)}.${internalNote}`);
+  }
+  const fix =
+    'Fix: add an External URL to a reputable source (official site, study, recognized publication) and regenerate, or link one in WordPress before publishing.';
+  if (external.length > 0) {
+    return check(
+      'outbound_link',
+      'warning',
+      `${external.length} external link(s) present but none could be verified as reachable (${[...new Set(external.map((u) => linkHost(u)))].join(', ')}).${internalNote} ${fix}`
+    );
+  }
+  return check(
+    'outbound_link',
+    'warning',
+    `No outbound link: no reliable external source could be verified, so none was added (no URL is ever invented) — Rank Math will report missing external links.${internalNote} ${fix}`
+  );
+}
+
 function checkMetaTitle(input: ArticleQualityInput): QualityCheck {
   const length = input.metaTitle.trim().length;
   if (length === 0) return check('meta_title', 'failed', 'Meta title is empty.');
@@ -426,6 +476,7 @@ export function runArticleQualityCheck(input: ArticleQualityInput): ArticleQuali
     checkUnresolvedMarkers(input),
     checkFirstSentence(input),
     checkUrls(input),
+    checkOutboundLink(input),
     checkMetaTitle(input),
     checkMetaDescription(input),
     checkSlug(input),

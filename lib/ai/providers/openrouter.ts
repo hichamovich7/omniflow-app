@@ -1,10 +1,17 @@
 import type { AITool, ChatMessage } from '../types';
 
+interface OpenRouterUrlCitation {
+  type?: string;
+  url_citation?: { url?: unknown; title?: unknown };
+}
+
 interface OpenRouterChoice {
   finish_reason?: string;
   error?: { message: string; code?: number };
   message: {
     content: string;
+    /** Web search plugin results (url_citation) — the URLs the search really returned. */
+    annotations?: OpenRouterUrlCitation[];
   };
 }
 
@@ -21,8 +28,27 @@ interface ChatCompletionOptions {
   tools?: AITool[];
   /** Overrides the default 60s/90s(with plugins) fetch timeout for calls known to run long. */
   timeoutMs?: number;
-  /** Diagnostic hook: receives the final choice's finish_reason (e.g. "stop", "length"). */
-  onFinish?: (info: { finishReason: string | null }) => void;
+  /**
+   * Diagnostic hook: receives the final choice's finish_reason (e.g. "stop",
+   * "length") and, for web-search calls, the URLs the search actually returned.
+   */
+  onFinish?: (info: { finishReason: string | null; citations: WebCitation[] }) => void;
+}
+
+export interface WebCitation {
+  url: string;
+  title: string;
+}
+
+// The web plugin reports every page it fed the model as a url_citation
+// annotation — the only proof that a URL came from a real search result.
+function toWebCitations(annotations: OpenRouterUrlCitation[] | undefined): WebCitation[] {
+  if (!Array.isArray(annotations)) return [];
+  return annotations.flatMap((annotation) => {
+    const citation = annotation?.type === 'url_citation' ? annotation.url_citation : undefined;
+    if (!citation || typeof citation.url !== 'string' || !citation.url) return [];
+    return [{ url: citation.url, title: typeof citation.title === 'string' ? citation.title : '' }];
+  });
 }
 
 // Translates the provider-agnostic AITool shape into OpenRouter's actual wire
@@ -144,7 +170,7 @@ async function chatCompletionOnce({
       );
     }
 
-    onFinish?.({ finishReason: choice?.finish_reason ?? null });
+    onFinish?.({ finishReason: choice?.finish_reason ?? null, citations: toWebCitations(choice?.message?.annotations) });
     return content;
   } finally {
     clearTimeout(timeout);

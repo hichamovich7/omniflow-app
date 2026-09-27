@@ -212,12 +212,19 @@ function decodeHtmlEntities(value: string): string {
  * WordPress media library. WP's media endpoint expects the raw file bytes as
  * the request body (NOT multipart/form-data) with Content-Type set to the
  * file's mime type and Content-Disposition carrying the filename.
+ *
+ * `altText` goes in the same request as the `alt_text` query parameter (the
+ * attachments endpoint reads request params, query included). When the
+ * response does not echo it back, one follow-up `POST /wp/v2/media/{id}`
+ * sets it; if that fails too the upload still succeeds, with
+ * `altText: null` so the caller can warn — alt text never blocks a publish.
  */
 export async function uploadMedia(
   site: WordPressSiteCredentials,
   imageUrl: string,
-  filename: string
-): Promise<{ id: number; sourceUrl: string }> {
+  filename: string,
+  altText?: string | null
+): Promise<{ id: number; sourceUrl: string; altText: string | null }> {
   const imgRes = await fetch(imageUrl);
   if (!imgRes.ok) {
     throw new Error('Could not fetch source image for upload');
@@ -232,7 +239,9 @@ export async function uploadMedia(
     'image/png';
 
   const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const url = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media`;
+  const alt = altText?.trim() || null;
+  const mediaUrl = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media`;
+  const url = alt ? `${mediaUrl}?${new URLSearchParams({ alt_text: alt }).toString()}` : mediaUrl;
 
   let res: Response;
   try {
@@ -259,8 +268,30 @@ export async function uploadMedia(
     throw new WordPressApiError(await parseErrorBody(res), res.status);
   }
 
-  const data = (await res.json()) as { id: number; source_url: string };
-  return { id: data.id, sourceUrl: data.source_url };
+  const data = (await res.json()) as { id: number; source_url: string; alt_text?: unknown };
+  const savedAlt = typeof data.alt_text === 'string' && data.alt_text.trim() ? data.alt_text : null;
+  if (!alt || savedAlt) return { id: data.id, sourceUrl: data.source_url, altText: savedAlt };
+
+  return { id: data.id, sourceUrl: data.source_url, altText: await setMediaAltText(site, data.id, alt) };
+}
+
+/** Sets an attachment's alt text — returns the saved value, null on any failure (never throws). */
+async function setMediaAltText(site: WordPressSiteCredentials, mediaId: number, altText: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media/${mediaId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader(site.username, site.password),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ alt_text: altText }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { alt_text?: unknown };
+    return typeof data.alt_text === 'string' && data.alt_text.trim() ? data.alt_text : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
