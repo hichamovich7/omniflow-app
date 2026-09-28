@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## UI: Dashboard Content streams — sort by Status (2026-09-28)
+
+* `/dashboard` "Content streams": the Status header is a button with an arrow (and a "Status" button above the mobile cards). Cycle: most urgent first (Create now → Needs content → Needs setup → Warming → On track → Paused) → least urgent first → original order. Stable for equal statuses; `aria-sort` + accessible label.
+* Choice remembered per browser in `localStorage` (`omniflow:dashboard-streams-status-sort`), in-memory fallback; server / first render keep the original order. The "Planned · not started yet" section is unchanged.
+* New `lib/dashboard/stream-status-sort.ts`, client `components/dashboard/content-streams-table.tsx`, shared helpers `components/dashboard/content-stream-labels.ts`; `content-streams-overview.tsx` stays a Server Component. Guide (Dashboard) and `docs/UI_UX.md` updated.
+* No database, API or AI change. New offline spec `tests/renderer/dashboard-stream-status-sort.spec.ts` (10 cases).
+
 ## Product: "Clay Crafts & DIY" niche suggestion (2026-09-28)
 
 * `components/projects/project-form.tsx`: `Clay Crafts & DIY` added to `NICHE_SUGGESTIONS` (the canonical curated list, now exported for tests). The list is now sorted alphabetically; existing labels unchanged.
