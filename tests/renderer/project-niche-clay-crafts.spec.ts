@@ -13,8 +13,9 @@ import { buildArticlePinterestSource } from '@/lib/social/pinterest-from-article
 /**
  * "Clay Crafts & DIY" niche. Niches are stored by label (free text,
  * projects.niche, no DB constraint), so the stable identifier `clay-crafts-diy`
- * is documentary only. No visual convention entry on purpose: the niche uses
- * DEFAULT_NICHE_CONVENTION. Offline — no AI call, no Supabase.
+ * is documentary only. Its own "Modern Handmade" visual convention and niche
+ * profile (lib/niche/profiles.ts) keep the previous overlay/template behavior.
+ * Offline — no AI call, no Supabase.
  */
 const CLAY = 'Clay Crafts & DIY';
 const PROJECT_ID = '11111111-1111-4111-8111-111111111111';
@@ -83,13 +84,20 @@ test.describe('Clay Crafts & DIY niche', () => {
     expect(parsed.data && 'niche' in parsed.data).toBe(false);
   });
 
-  test('uses the default visual convention (no dedicated entry)', () => {
-    expect(NICHE_VISUAL_CONVENTIONS[CLAY]).toBeUndefined();
-    expect(getNicheVisualConvention(CLAY)).toBeNull();
-    expect(DEFAULT_NICHE_CONVENTION.allowTextOverlay).toBe(false);
+  test('has its own Modern Handmade convention that keeps the previous overlay and template behavior', () => {
+    const clay = getNicheVisualConvention(CLAY);
+    expect(clay).toBe(NICHE_VISUAL_CONVENTIONS[CLAY]);
+    expect(clay?.styleGuidance).toContain('Modern Handmade');
+    expect(clay?.framingMode).toBe('object');
+    // Same as before the entry existed: no overlay, default template list (no torn-paper).
+    expect(clay?.allowTextOverlay).toBe(DEFAULT_NICHE_CONVENTION.allowTextOverlay);
+    expect(clay?.allowedBannerTemplates).toBeUndefined();
+    // Nothing inherited from Crochet.
+    expect(clay?.styleGuidance).not.toBe(NICHE_VISUAL_CONVENTIONS.Crochet.styleGuidance);
+    expect(clay?.styleGuidance.toLowerCase()).not.toContain('crochet');
   });
 
-  test('is passed to the prompt builder and resolves to the default: same prompt as no niche, text overlay forced off', () => {
+  test('is passed to the prompt builder with its own niche context; text overlay stays forced off', () => {
     const source = buildArticlePinterestSource(
       { id: 'g', project_id: PROJECT_ID, language: 'en', seo_keywords: 'clay earrings' },
       { title: 'T', meta_title: null, meta_description: 'D', content: 'C', featured_image_url: null, featured_image_prompt: null },
@@ -98,8 +106,10 @@ test.describe('Clay Crafts & DIY niche', () => {
     );
     expect(source.niche).toBe(CLAY);
 
-    expect(prompt(CLAY)).toBe(prompt(null));
-    // Requested 'always' is clamped to 'never' because the default convention disallows overlays.
+    expect(prompt(CLAY)).not.toBe(prompt(null));
+    expect(prompt(CLAY)).toContain('<niche_context>');
+    expect(prompt(CLAY)).toContain('Profile: Clay Crafts & DIY');
+    // Requested 'always' is clamped to 'never' because the Clay convention disallows overlays.
     expect(prompt(CLAY, 'always')).toBe(prompt(CLAY, 'never'));
     // Crochet keeps its own convention — Clay does not inherit it.
     expect(prompt('Crochet')).not.toBe(prompt(CLAY));
@@ -109,7 +119,9 @@ test.describe('Clay Crafts & DIY niche', () => {
     const parsed = createProjectSchema.safeParse({ name: 'Other', niche: 'Pottery Wheel Throwing' });
     expect(parsed.success).toBe(true);
     expect(getNicheVisualConvention('Pottery Wheel Throwing')).toBeNull();
-    expect(prompt('Pottery Wheel Throwing')).toBe(prompt(null));
+    // Generic profile, with its own label — same rules otherwise.
+    expect(prompt('Pottery Wheel Throwing')).toContain('Niche: Pottery Wheel Throwing');
+    expect(prompt('Pottery Wheel Throwing')).toContain('Profile: generic');
     // The slug form is not a label and is not mapped to the niche.
     expect(NICHE_SUGGESTIONS).not.toContain('clay-crafts-diy');
     // Length limit still enforced.

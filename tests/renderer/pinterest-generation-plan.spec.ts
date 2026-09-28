@@ -258,7 +258,7 @@ test('the planning prompt demands strict JSON only and keeps the existing data c
 
   expect(integrated.user).toContain('"integratedText"');
   expect(legacy.user).not.toContain('"integratedText"');
-  expect(PROMPT_ID).toBe('pinterest-pins-v10');
+  expect(PROMPT_ID).toBe('pinterest-pins-v11');
 });
 
 // --- Route behavior (Supabase, AI engine, rate limit and boards replaced) ------

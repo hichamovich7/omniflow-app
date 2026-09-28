@@ -9,6 +9,7 @@ import { imageStyleAnalysisSchema } from '@/lib/validations/vision';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import { buildVisionStyleAnalysisPrompt } from '@/lib/ai/prompts/vision-style-analysis';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
+import { listContentStreamNamesForBoard } from '@/lib/queries/niche-context';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { buildImageAnalysisContext } from '@/lib/vision/context';
 import {
@@ -253,6 +254,13 @@ export async function POST(request: Request) {
     }
   }
 
+  // Sub-niche context: the Content Stream of the board the user chose, then
+  // (article flow) the Streams of the article's WordPress category.
+  const contentStreams = [
+    ...(await listContentStreamNamesForBoard(supabase, user.id, projectId, board)),
+    ...(articleSource?.contentStreams ?? []),
+  ];
+
   const model = getRoleConfig('FAST').model;
 
   const { data: generation, error: genError } = await supabase
@@ -287,6 +295,7 @@ export async function POST(request: Request) {
       language,
       pinsRequested,
       niche: project.niche,
+      contentStreams,
       textOverlayMode,
       generationMode,
       aiIntegrated,

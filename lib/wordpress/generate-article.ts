@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { generateText, generateImage, resolveTextModel } from '@/lib/ai/engine';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
+import type { ResolvedNicheContext } from '@/lib/niche/types';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
 import { buildWordPressFromPinsPrompt, resolvePinsPrimaryKeyword } from '@/lib/ai/prompts/wordpress-from-pins-prompt';
@@ -173,6 +174,8 @@ interface GenerateArticleParams {
   manualExternalUrls?: string[] | null;
   /** The project's connected WordPress site URL — its links are internal, never the outbound link. */
   siteUrl?: string | null;
+  /** Resolved niche profile (lib/niche/resolve.ts) — null keeps the prompts unchanged. */
+  niche?: ResolvedNicheContext | null;
 }
 
 interface GeneratedImageResult {
@@ -240,6 +243,7 @@ export async function generateWordPressArticle(
     seoKeywords,
     manualExternalUrls,
     siteUrl,
+    niche,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
@@ -253,6 +257,7 @@ export async function generateWordPressArticle(
   const { system: outlineSystem, user: outlineUser } = buildWordPressOutlinePrompt({
     keyword,
     brandProfileContext: brandProfileContext || undefined,
+    niche,
     researchNotes: researchNotes || undefined,
     language,
     articleType: articleType || undefined,
@@ -305,6 +310,7 @@ export async function generateWordPressArticle(
     language,
     primaryKeyword: keyword,
     brandProfileContext: brandProfileContext || undefined,
+    niche,
     researchNotes: researchNotes || undefined,
     articleType: articleType || undefined,
     articleSize: articleSize || undefined,
@@ -486,6 +492,8 @@ interface GenerateArticleFromPinsParams {
   manualExternalUrl?: string | null;
   /** The project's connected WordPress site URL — its links are internal, never the outbound link. */
   siteUrl?: string | null;
+  /** Resolved niche profile (lib/niche/resolve.ts) — null keeps the prompts unchanged. */
+  niche?: ResolvedNicheContext | null;
 }
 
 /**
@@ -511,6 +519,7 @@ export async function generateArticleFromPins(
     researchNotes,
     manualExternalUrl,
     siteUrl,
+    niche,
   } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const imageCount = internalImageUrls.length;
@@ -523,6 +532,7 @@ export async function generateArticleFromPins(
     primaryKeyword,
     pins,
     brandProfileContext: brandProfileContext || undefined,
+    niche,
     researchNotes: researchNotes || undefined,
     language,
     imageCount,
@@ -564,6 +574,7 @@ export async function generateArticleFromPins(
     language,
     primaryKeyword,
     brandProfileContext: brandProfileContext || undefined,
+    niche,
     researchNotes: researchNotes || undefined,
     pinsContext: { promise: outline.promise, pins, pinLinkUrls, manualExternalUrl: manualExternalUrl || null },
   });

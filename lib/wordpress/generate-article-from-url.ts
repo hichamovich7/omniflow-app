@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { generateText, generateImage } from '@/lib/ai/engine';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
+import type { ResolvedNicheContext } from '@/lib/niche/types';
 import { buildWordPressOutlinePrompt } from '@/lib/ai/prompts/wordpress-outline-prompt';
 import { buildWordPressArticlePrompt } from '@/lib/ai/prompts/wordpress-article-prompt';
 import { buildSourceContextSummaryPrompt } from '@/lib/ai/prompts/source-context-summary';
@@ -43,6 +44,8 @@ interface GenerateArticleFromUrlParams {
   brandProfileDescription: string | null;
   /** The project's connected WordPress site URL — its links are internal, never the outbound link. */
   siteUrl?: string | null;
+  /** Resolved niche profile (lib/niche/resolve.ts) — null keeps the prompts unchanged. */
+  niche?: ResolvedNicheContext | null;
 }
 
 export interface GenerateArticleFromUrlResult extends GenerateArticleResult {
@@ -93,7 +96,7 @@ function truncateAtWord(text: string, maxLength: number): string {
 export async function generateArticleFromUrl(
   params: GenerateArticleFromUrlParams
 ): Promise<GenerateArticleFromUrlResult> {
-  const { supabase, userId, generationId, sourceUrl, pastedContent, language, brandProfileDescription, siteUrl } = params;
+  const { supabase, userId, generationId, sourceUrl, pastedContent, language, brandProfileDescription, siteUrl, niche } = params;
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
 
   // Step 0: get the source content — scrape (link, via the same Firecrawl
@@ -155,6 +158,7 @@ export async function generateArticleFromUrl(
   const { system: outlineSystem, user: outlineUser } = buildWordPressOutlinePrompt({
     keyword: resolvedKeyword,
     brandProfileContext: brandProfileContext || undefined,
+    niche,
     researchNotes,
     language,
   });
@@ -196,6 +200,7 @@ export async function generateArticleFromUrl(
     language,
     primaryKeyword: resolvedKeyword,
     brandProfileContext: brandProfileContext || undefined,
+    niche,
     researchNotes,
   });
 

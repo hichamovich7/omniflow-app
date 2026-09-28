@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
+import { listContentStreamNamesForCategory } from '@/lib/queries/niche-context';
+import { resolveNicheContext } from '@/lib/niche/resolve';
 import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromPins } from '@/lib/wordpress/generate-article';
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
@@ -178,7 +180,7 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from('projects')
-    .select('description')
+    .select('description, niche')
     .eq('id', projectId)
     .single();
 
@@ -234,6 +236,16 @@ export async function POST(request: Request) {
   // Outbound-link check only: URLs of the connected site are internal links.
   const siteUrl = (await getWordPressSiteByProjectId(supabase, projectId))?.site_url ?? null;
 
+  // Niche profile. Sub-niche: the chosen category's Content Stream first,
+  // then the Streams of the selected Pins' boards.
+  const niche = resolveNicheContext({
+    niche: project?.niche ?? null,
+    contentStreams: [
+      ...(await listContentStreamNamesForCategory(supabase, user.id, projectId, categoryId)),
+      ...pinSummaries.map((pin) => pin.contentStream),
+    ],
+  });
+
   try {
     const result = await generateArticleFromPins({
       supabase,
@@ -244,6 +256,7 @@ export async function POST(request: Request) {
       generationKeyword: generationRef.keyword,
       language,
       brandProfileDescription: project?.description ?? null,
+      niche,
       researchNotes,
       manualExternalUrl: externalUrl ?? null,
       siteUrl,

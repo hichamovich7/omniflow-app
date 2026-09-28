@@ -100,7 +100,7 @@ Target length: ${opts.minWords}-${opts.maxWords} words for the full body content
 Links — never invent a URL:
 - Only use URLs that are explicitly provided in these instructions. Never invent, guess, or reconstruct a URL from memory, and never cite a source you were not given.
 - If no URL is provided, do not add any external link.
-- Internal links (to other pages on the target site) are out of scope — do not invent internal links.`;
+- Internal links (to other pages on the target site) are added automatically by the server after generation — never write internal links yourself.`;
 }
 
 /**

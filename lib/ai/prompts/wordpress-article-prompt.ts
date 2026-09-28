@@ -1,5 +1,7 @@
 import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRules } from './seo-guidelines';
 import { buildPinsContextRules, formatPinsContextBlock, type PinSummary } from './wordpress-from-pins-prompt';
+import { buildWordPressNicheBlocks } from '@/lib/niche/prompt-blocks';
+import type { ResolvedNicheContext } from '@/lib/niche/types';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import {
@@ -12,7 +14,7 @@ import {
   type POINTS_OF_VIEW,
 } from '@/lib/validations/wordpress';
 
-export const ARTICLE_PROMPT_ID = 'wordpress-article-v3';
+export const ARTICLE_PROMPT_ID = 'wordpress-article-v4';
 
 /**
  * Placeholder line the article model writes where the FAQ belongs. The FAQ
@@ -97,6 +99,9 @@ interface ArticlePromptContext {
   // Pins → article (method A) only. Undefined — the keyword and URL methods —
   // reproduces the exact prompt text this function produced before it existed.
   pinsContext?: PinsArticleContext;
+  // Niche profile (resolveNicheContext) — every method. Null / undefined (no
+  // niche, no Content Stream) adds nothing to the prompt.
+  niche?: ResolvedNicheContext | null;
 }
 
 export interface PinsArticleContext {
@@ -182,6 +187,9 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
       : '';
 
   const pinsContextBlock = ctx.pinsContext ? buildPinsArticleBlock(ctx.pinsContext) : '';
+
+  const nicheBlocks = buildWordPressNicheBlocks(ctx.niche, { visual: false });
+  const nicheBlock = nicheBlocks ? `\n\n${nicheBlocks}\n` : '';
 
   const researchNotesBlock = ctx.researchNotes
     ? `\n\nResearch notes provided for this article — the only source of specific facts, figures, or named sources you may use (beyond widely established general knowledge):\n${ctx.researchNotes}\n`
@@ -286,7 +294,7 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const system = `You are an expert SEO copywriter. You write the full body of a WordPress article from an approved outline, following a fixed ${structureSteps.length}-block AEO structure. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown fences around the JSON itself, no explanations, no extra text — but the "content" field value must itself be Markdown.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
   const user = `Write the full article for the outline below. Follow the section order and summaries exactly — do not add, remove, or reorder the Main Content H2 sections.
-${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}${pinsContextBlock}${researchNotesBlock}
+${voiceBlock}${formattingBlock}${seoKeywordsBlock}${manualLinksBlock}${pinsContextBlock}${researchNotesBlock}${nicheBlock}
 Primary keyword: ${ctx.primaryKeyword}
 Title: ${outline.title}
 Quick Answer angle: ${outline.quickAnswerAngle}${keyTakeawaysContextBlock}

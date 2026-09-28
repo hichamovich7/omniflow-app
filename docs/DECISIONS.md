@@ -1715,6 +1715,35 @@ Articles regularly reached WordPress without any outbound link (Rank Math "no ex
 
 ---
 
+## 2026-09-28
+
+### Decision
+
+Niche profiles, Phase 1 — **Shared Core + Niche-Specific Configuration**. One shared generation core (generation, validation, Quality Gate, FAQ, internal/external links, images, WordPress publishing, Pinterest generation, history, credits, errors); niches only supply configuration, through typed profiles in `lib/niche/`. Extends — and for prompt text supersedes — 2026-07-26 (3) and the TASK-034 note that niche stays "storage only" outside Pinterest visuals.
+
+### Context
+
+Audit (2026-09-28): `projects.niche` reached Pinterest only, and only as a visual convention looked up by exact label ("Recipes", "Home Decor", "Clay", "crochet" matched nothing). WordPress (keyword, Pins, URL) never read it; the Content Stream reached only the Pins → WordPress flow although the keyword/URL flows already know the category and Pinterest the board. Contradictions: Pinterest asked for a board "that reflects the content niche" without the niche; it banned lighting instructions while niche conventions add light; its title/genre examples were Home Decor only; a Clay identity "Easy / beginner-friendly" collided with the anti-invention rule; the Brand Profile sat in the system prompt with no stated priority; WordPress called internal links "out of scope" while the server adds them on publish. Priority niches: Crochet, Clay, Home Decor, Recipes — future niches TBD.
+
+### Decision Taken
+
+1. `lib/niche/profiles.ts`: one profile per niche (`shared`, `wordpress`, `pinterest`, `visual`, aliases, sub-niches) plus `GENERIC_NICHE_SECTIONS`. The canonical `label` is the value already stored in `projects.niche` (`Crochet`, `Clay Crafts & DIY`, `Home Organization & Decor`, `Food & Recipes`); `Clay`, `Clay Crafts`, `clay-crafts-diy`, `Home Decor`, `Recipes`… are aliases, never duplicate profiles. Adding a niche = adding one entry.
+2. `resolveNicheContext({ niche, contentStreams })` (`lib/niche/resolve.ts`): generic → niche profile → Content Stream sub-niche (field by field). Matching is case-, accent- and punctuation-insensitive. Unknown / free-text niche → generic profile with its own label, never rejected, never an enum. No niche and no stream → `null` → no block, prompts byte-for-byte unchanged.
+3. Delimited blocks (`lib/niche/prompt-blocks.ts`): `<niche_context>` (shared) + `<wordpress_rules>` **or** `<pinterest_rules>` (never both) + `<visual_rules>` where the prompt writes image prompts, followed by usage rules: blocks are OmniFlow configuration, not user requests; priority 1 safety / anti-invention / language / length / link / format rules → 2 explicit user options → 3 source facts (article, URL, Pins, research notes, keyword) → 4 Content Stream → 5 niche → 6 Brand Profile → 7 generic; "easy" / "beginner-friendly" are voice, never unconfirmed facts. User-typed labels are sanitized (one line, no block tags, 300 chars).
+4. Content Stream as sub-niche: keyword / URL → the chosen category's streams; Pins → category streams then the Pins' board streams; Pinterest → the chosen board's streams, then (article flow) the article category's streams. Read-only, best-effort (`lib/queries/niche-context.ts`), archived streams ignored.
+5. Visual conventions: `getNicheVisualConvention()` is alias- and case-tolerant (exact label first — existing entries unchanged). New `Clay Crafts & DIY` "Modern Handmade" entry that keeps Clay's previous behavior (no overlay, default templates without torn-paper, no mandatory CTA, nothing inherited from Crochet).
+6. Contradictions fixed in the shared prompts: Pinterest board line refers to the niche context, light mood allowed when the niche art direction asks for it (no camera settings / studio setups), examples marked as structure only, neutral photography genres; `buildBrandProfileContext()` states it never overrides source facts or explicit options; WordPress SEO guidelines say internal links are added by the server. Prompt ids: `pinterest-pins-v11`, `wordpress-outline-v4`, `wordpress-article-v4`, `wordpress-from-pins-outline-v4`.
+7. No migration, no schema change, no UI change. **Phase 2** (not done): persistent per-project customization (recommended / user-added / user-disabled values, never overwriting user values) through migration 041 `projects.niche_settings jsonb` (NULL = OmniFlow defaults) and a prefilled editor in the project form; new sub-niches reuse Content Stream creation.
+
+### Consequences
+
+* Existing projects: exact-label niches keep the same visual convention; alias-typed niches ("Home Decor", "Recipes", "crochet"…) now get their niche's convention (framing, overlay permission, templates) and profile.
+* Prompts grow by one context block when a niche or stream exists; generations run 1-2 extra read queries (streams).
+* Destination URLs unchanged: Pins keep `link_url` empty in the article flow, `website_url` only stores Research provenance, CSV unchanged.
+* Every new feature is tested first on Crochet, Clay, Home Decor and Recipes.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

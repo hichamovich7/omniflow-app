@@ -348,7 +348,7 @@ test('invalid link_url values are dropped, never repaired', () => {
 // ------------------------------------------------------------------ promise
 
 test('the pins outline asks for a promise and the schema requires it', () => {
-  expect(FROM_PINS_OUTLINE_PROMPT_ID).toBe('wordpress-from-pins-outline-v3');
+  expect(FROM_PINS_OUTLINE_PROMPT_ID).toBe('wordpress-from-pins-outline-v4');
   const { user } = buildWordPressFromPinsPrompt({
     primaryKeyword: 'k',
     pins: buildPinSummaries([pinRow()], STREAMS),

@@ -1,6 +1,7 @@
 // Per-niche visual conventions for Pinterest image generation. Keyed by the
 // exact niche label from the curated suggestion list in
-// components/projects/project-form.tsx (NICHE_SUGGESTIONS) — free text that
+// components/projects/project-form.tsx (NICHE_SUGGESTIONS), also reached
+// through niche profile aliases (getNicheVisualConvention) — free text that
 // doesn't match an entry here falls back to DEFAULT_NICHE_CONVENTION, not an
 // error. See docs/DECISIONS.md 2026-07-26 (3) for why this replaced
 // keyword-based classification (classifyPinComposition in
@@ -9,6 +10,7 @@
 
 import type { BannerTemplate } from '@/lib/validations/pinterest';
 import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
+import { findNicheProfile, normalizeNicheKey } from '@/lib/niche/resolve';
 
 export type FramingMode = 'space' | 'object';
 
@@ -68,9 +70,30 @@ export const NICHE_VISUAL_CONVENTIONS: Record<string, NicheVisualConvention> = {
     // Only niche where 'torn-paper' fits the craft/DIY mood — all 5 shapes eligible.
     allowedBannerTemplates: [...BANNER_TEMPLATES],
   },
+  // Own "Modern Handmade" direction — nothing inherited from Crochet. Text
+  // overlay and banner templates keep the default behavior Clay had before
+  // this entry existed (no overlay, no torn-paper, no mandatory CTA).
+  'Clay Crafts & DIY': {
+    framingMode: 'object',
+    allowTextOverlay: false,
+    styleGuidance:
+      'Modern Handmade craft photography: the finished air-dry or polymer clay piece is clearly visible as the main subject, showing its handmade texture — sculpted edges, matte or glazed surfaces, subtle tool marks — on a clean, lightly styled surface such as light wood, linen or plaster. Soft natural daylight. Soft or earthy colors such as terracotta, sand, sage, cream or blush. Overhead or 45-degree framing only.',
+  },
 };
 
+/**
+ * Exact label first (unchanged behavior), then case/accent/punctuation-
+ * insensitive label, then a niche profile alias ("Home Decor" → "Home
+ * Organization & Decor", "Recipes" → "Food & Recipes", "Clay" → "Clay Crafts &
+ * DIY" — see lib/niche/profiles.ts). Unknown niches still return null.
+ */
 export function getNicheVisualConvention(niche: string | null | undefined): NicheVisualConvention | null {
-  if (!niche) return null;
-  return NICHE_VISUAL_CONVENTIONS[niche.trim()] ?? null;
+  if (!niche?.trim()) return null;
+  const exact = NICHE_VISUAL_CONVENTIONS[niche.trim()];
+  if (exact) return exact;
+  const key = normalizeNicheKey(niche);
+  const byKey = Object.keys(NICHE_VISUAL_CONVENTIONS).find((label) => normalizeNicheKey(label) === key);
+  if (byKey) return NICHE_VISUAL_CONVENTIONS[byKey];
+  const profileLabel = findNicheProfile(niche)?.label;
+  return profileLabel ? NICHE_VISUAL_CONVENTIONS[profileLabel] ?? null : null;
 }

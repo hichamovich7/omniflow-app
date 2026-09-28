@@ -6,14 +6,18 @@ import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import type { AiIntegratedSettings } from '@/lib/pinterest/ai-integrated';
 import type { PinterestGenerationMode } from '@/types/pinterest';
 import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
+import { resolveNicheContext } from '@/lib/niche/resolve';
+import { buildPinterestNicheBlocks } from '@/lib/niche/prompt-blocks';
 
-export const PROMPT_ID = 'pinterest-pins-v10';
+export const PROMPT_ID = 'pinterest-pins-v11';
 
 interface PromptContext {
   keyword: string;
   language: SupportedLanguage;
   pinsRequested: number;
   niche?: string | null;
+  /** Live Content Stream names (board or article category) — sub-niche context, most specific first. */
+  contentStreams?: (string | null | undefined)[];
   textOverlayMode: TextOverlayMode;
   generationMode?: PinterestGenerationMode;
   aiIntegrated?: AiIntegratedSettings;
@@ -103,6 +107,12 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
 
   const referenceStyleInstruction = ctx.referenceStyleGuidance ? ` ${ctx.referenceStyleGuidance}` : '';
 
+  // Niche profile (lib/niche) — shared identity + Pinterest-only rules +
+  // visual rules. No niche and no Content Stream: nothing is added.
+  const nicheBlocks = buildPinterestNicheBlocks(resolveNicheContext({ niche: ctx.niche, contentStreams: ctx.contentStreams }));
+  const nicheBlock = nicheBlocks ? `\n\n${nicheBlocks}\n` : '';
+  const nicheImageInstruction = nicheBlocks ? ' Apply <visual_rules> to every image_prompt while still varying the scene between pins.' : '';
+
   const isAiIntegrated = ctx.generationMode === 'ai-integrated' && Boolean(ctx.aiIntegrated);
   const isLegacyComposite = !ctx.generationMode || ctx.generationMode === 'legacy-composite';
 
@@ -186,15 +196,15 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
 
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
 
-  const user = `Generate ${ctx.pinsRequested} unique Pinterest pins for the keyword: "${ctx.keyword}"
+  const user = `Generate ${ctx.pinsRequested} unique Pinterest pins for the keyword: "${ctx.keyword}"${nicheBlock}
 
 For each pin, provide:
 - angle: exactly one of "curiosity", "problem-solution", "listicle", "discovery", "article-promise"
 - title: SEO-optimized Pinterest title (max 100 characters)
 - description: SEO-optimized Pinterest description with call to action (max 500 characters)
 - keywords: 10 to 15 relevant Pinterest keywords, comma separated, no hashtags
-- board: suggested Pinterest board name that accurately reflects the content niche
-- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre (e.g. "architectural photography", "editorial interior photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include camera settings or lighting instructions.${compositionInstruction}${styleGuidanceInstruction}${referenceStyleInstruction}
+- board: suggested Pinterest board name that accurately reflects the pin's topic and, when <niche_context> is provided, the project niche and Content Stream
+- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre that fits this topic (e.g. "editorial interior photography", "food photography", "craft product photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include technical camera settings (lens, aperture, ISO) or studio lighting setups; a short phrase about the mood of the light is allowed only when the niche art direction asks for it.${compositionInstruction}${styleGuidanceInstruction}${nicheImageInstruction}${referenceStyleInstruction}
 ${overlayFieldInstruction}
 ${bannerTemplateInstruction}
 ${integratedTextInstruction}
@@ -207,6 +217,7 @@ Rules:
   - listicle: promise multiple useful ideas; use an unnumbered list framing unless the source explicitly confirms an exact count (e.g. "Small Bathroom Storage Ideas Worth Saving").
   - discovery: surface a fresh observation or unexpected direction (e.g. "Small Bathroom Storage Can Look This Calm").
   - article-promise: state the article's grounded value without revealing the full answer (e.g. "A Practical Guide to Small Bathroom Storage").
+  - These examples only illustrate each angle's structure: never reuse their subject (bathroom storage) unless it is this keyword's topic.
 - ${angleDistributionInstruction}
 - Titles must differ in sentence structure and promise, not only by one adjective, number, or synonym. Do not start every title with the main keyword.
 - Distribute the main keyword naturally across title, description, and keywords. Preserve its meaning in every pin, but vary its exact placement; the keywords field must include the main keyword or a faithful localized equivalent.

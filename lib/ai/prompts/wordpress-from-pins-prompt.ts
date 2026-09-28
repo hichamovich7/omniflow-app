@@ -2,8 +2,10 @@ import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRu
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { DEFAULT_SECTIONS_RANGE, DEFAULT_WORDS_RANGE } from '@/lib/validations/wordpress';
+import { buildWordPressNicheBlocks } from '@/lib/niche/prompt-blocks';
+import type { ResolvedNicheContext } from '@/lib/niche/types';
 
-export const FROM_PINS_OUTLINE_PROMPT_ID = 'wordpress-from-pins-outline-v3';
+export const FROM_PINS_OUTLINE_PROMPT_ID = 'wordpress-from-pins-outline-v4';
 
 export interface PinSummary {
   title: string;
@@ -92,6 +94,8 @@ interface FromPinsPromptContext {
   researchNotes?: string;
   language: SupportedLanguage;
   imageCount: number;
+  /** Niche profile (resolveNicheContext); null / undefined adds nothing to the prompt. */
+  niche?: ResolvedNicheContext | null;
 }
 
 /**
@@ -150,6 +154,10 @@ export function buildWordPressFromPinsPrompt(ctx: FromPinsPromptContext) {
     ? `\n\nThe user has provided this prior SEO research — take it into account for the structure and secondary keywords (e.g. secondary keywords to weave into sections/FAQ, a search intent to match, or specific angles to cover). Treat it as informed guidance, not a rigid script — still use your own judgment on structure:\n${ctx.researchNotes}`
     : '';
 
+  const nicheBlocks = buildWordPressNicheBlocks(ctx.niche, { visual: true });
+  const nicheBlock = nicheBlocks ? `\n\n${nicheBlocks}` : '';
+  const nicheImageRule = nicheBlocks ? '\n- Apply <visual_rules> to featuredImage.prompt.' : '';
+
   const imageMarkerNames = Array.from({ length: ctx.imageCount }, (_, i) => `"IMAGE_${i + 1}"`).join(', ');
 
   const imagesInstruction =
@@ -165,7 +173,7 @@ Pins:
 ${pinsBlock}
 
 ${buildPinsContextRules()}${hasPinLinkUrl ? `\n${PIN_LINK_URL_RULE}` : ''}
-${researchNotesBlock}
+${researchNotesBlock}${nicheBlock}
 
 ${guidelines}
 
@@ -192,7 +200,7 @@ ${imagesInstruction}
 
 Image prompt rules (apply to featuredImage${ctx.imageCount > 0 ? ' and the "prompt" field of each images entry' : ''}):
 - featuredImage.prompt is a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences): the main subject, its setting, 3-5 supporting details, specific materials/textures, a 2-3 color palette, and a camera angle. Replace vague words like "beautiful" or "stunning" with concrete visual details. Never include text, typography, logos, or watermarks in the scene. Always in English regardless of the content language.
-- altText (featuredImage and each images entry) must be in ${langName} and describe what is actually visible in that specific image (subject, setting, action) — write it like a natural caption, not a template. Do not reuse the same sentence structure across images. The primary keyword must appear naturally in at least one alt text across the set, but not in all of them and not in the same position each time.
+- altText (featuredImage and each images entry) must be in ${langName} and describe what is actually visible in that specific image (subject, setting, action) — write it like a natural caption, not a template. Do not reuse the same sentence structure across images. The primary keyword must appear naturally in at least one alt text across the set, but not in all of them and not in the same position each time.${nicheImageRule}
 
 Respond with this exact JSON structure:
 {

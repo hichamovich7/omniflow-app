@@ -1,4 +1,6 @@
 import { buildSeoGuidelines, buildFactualIntegrityRules, buildEditorialQualityRules } from './seo-guidelines';
+import { buildWordPressNicheBlocks } from '@/lib/niche/prompt-blocks';
+import type { ResolvedNicheContext } from '@/lib/niche/types';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import {
@@ -11,7 +13,7 @@ import {
   type POINTS_OF_VIEW,
 } from '@/lib/validations/wordpress';
 
-export const OUTLINE_PROMPT_ID = 'wordpress-outline-v3';
+export const OUTLINE_PROMPT_ID = 'wordpress-outline-v4';
 
 type ArticleType = (typeof ARTICLE_TYPES)[number];
 type ArticleSize = (typeof ARTICLE_SIZES)[number];
@@ -44,6 +46,9 @@ interface OutlinePromptContext {
   // they only keep the guidelines from requesting a disabled block here.
   includeTables?: boolean;
   includeH3?: boolean;
+  // Niche profile (resolveNicheContext) — keyword and URL methods. Null /
+  // undefined (no niche, no Content Stream) adds nothing to the prompt.
+  niche?: ResolvedNicheContext | null;
 }
 
 export const ARTICLE_TYPE_GUIDANCE: Record<ArticleType, string> = {
@@ -112,6 +117,12 @@ export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
 
   const system = `You are an expert SEO content strategist. You plan long-form WordPress articles optimized for search engines, featured snippets, and AI answer engines — before a single word of the article is written. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfileContext ? ` ${ctx.brandProfileContext}` : ''}`;
 
+  const nicheBlocks = buildWordPressNicheBlocks(ctx.niche, { visual: true });
+  const nicheBlock = nicheBlocks ? `\n\n${nicheBlocks}` : '';
+  const nicheImageRule = nicheBlocks
+    ? '\n- Apply <visual_rules> to every image prompt (featured and internal) while still varying the scene between images.'
+    : '';
+
   const researchNotesBlock = ctx.researchNotes
     ? `\n\nThe user has provided this prior SEO research — take it into account for the structure and secondary keywords (e.g. secondary keywords to weave into sections/FAQ, a search intent to match, or specific angles to cover). Treat it as informed guidance, not a rigid script — still use your own judgment on structure:\n${ctx.researchNotes}`
     : '';
@@ -140,7 +151,7 @@ export function buildWordPressOutlinePrompt(ctx: OutlinePromptContext) {
       ? '- faqQuestions: return an empty array []. Do not plan any FAQ questions for this article.'
       : '- faqQuestions: 4 to 6 real, distinct questions a reader would actually search for about this topic — not generic "what is X" filler, and not overlapping with each other or with the Main Content sections';
 
-  const user = `Plan the outline for a WordPress article targeting the keyword: "${ctx.keyword}"${researchNotesBlock}${coreSettingsBlock}${structureBlock}
+  const user = `Plan the outline for a WordPress article targeting the keyword: "${ctx.keyword}"${researchNotesBlock}${coreSettingsBlock}${structureBlock}${nicheBlock}
 
 ${guidelines}
 
@@ -168,7 +179,7 @@ Image prompt rules (apply to both featuredImage and images):
 - Each prompt is a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences): the main subject, its setting, 3-5 supporting details, specific materials/textures, a 2-3 color palette, and a camera angle.
 - Replace vague words like "beautiful" or "stunning" with concrete visual details. Never include text, typography, logos, or watermarks in the scene.
 - Image prompts must always be in English regardless of the content language.
-- altText must be in ${langName} and describe what is actually visible in that specific image (subject, setting, action) — write it like a natural caption, not a template. Do not reuse the same sentence structure across images (e.g. never repeat a pattern like "X als [keyword] für Y" on every image) — vary the phrasing so each alt text reads as if written independently. The primary keyword must appear naturally in at least one alt text across the set, but not in all of them and not in the same position each time.
+- altText must be in ${langName} and describe what is actually visible in that specific image (subject, setting, action) — write it like a natural caption, not a template. Do not reuse the same sentence structure across images (e.g. never repeat a pattern like "X als [keyword] für Y" on every image) — vary the phrasing so each alt text reads as if written independently. The primary keyword must appear naturally in at least one alt text across the set, but not in all of them and not in the same position each time.${nicheImageRule}
 
 Respond with this exact JSON structure:
 {

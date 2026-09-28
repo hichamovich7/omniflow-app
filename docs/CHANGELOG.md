@@ -18,6 +18,17 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## AI: Niche Profiles — Phase 1, Shared Core + Niche-Specific Configuration (2026-09-28)
+
+* New `lib/niche/` (`types.ts`, `profiles.ts`, `resolve.ts`, `prompt-blocks.ts`): typed profiles (shared identity, WordPress rules, Pinterest rules, visual rules, aliases, sub-niches) for Crochet, Clay Crafts & DIY, Home Organization & Decor, Food & Recipes, plus a generic fallback. Aliases (`Clay`, `Clay Crafts`, `clay-crafts-diy`, `Home Decor`, `Recipes`…) resolve case/accent/punctuation-insensitively to one profile; unknown niches are accepted with the generic profile and their own label.
+* `resolveNicheContext()`: generic → niche → Content Stream sub-niche. Streams come from the chosen WordPress category (keyword, URL, Pins), the Pins' boards (Pins), the chosen board (Pinterest) and the article's category (Pinterest from article, Pin regeneration) — new read-only, best-effort `lib/queries/niche-context.ts`.
+* Prompts: delimited `<niche_context>` + `<wordpress_rules>` (WordPress) or `<pinterest_rules>` (Pinterest) + `<visual_rules>` (image prompts), with usage rules and the context priority (safety → explicit options → source facts → Content Stream → niche → Brand Profile → generic). WordPress outline + article for keyword, Pins and URL; Pinterest normal, from article and Pin regeneration. No niche and no stream → prompts unchanged.
+* Visual conventions: alias/case-tolerant lookup; new `Clay Crafts & DIY` "Modern Handmade" convention (overlay off and default templates, as before).
+* Contradictions fixed: Pinterest board line uses the niche context; light mood allowed when the niche asks for it (no camera settings / studio setups); title examples are structure only; neutral photography genres; "easy" / "beginner-friendly" are voice only; Brand Profile never overrides source facts or explicit options (`buildBrandProfileContext`); WordPress internal links are added by the server, never by the model.
+* Prompt ids: `pinterest-pins-v11`, `wordpress-outline-v4`, `wordpress-article-v4`, `wordpress-from-pins-outline-v4`. No migration, no UI change, no destination URL change (`link_url` stays empty in the article flow, CSV unchanged). Guide (Projects → Niche) updated.
+* Tests: new offline `tests/renderer/niche-profiles.spec.ts`; `project-niche-clay-crafts.spec.ts` updated for the Clay convention; prompt-id assertions bumped.
+* Phase 2 (not done): per-project customization with migration 041 `projects.niche_settings`.
+
 ## UI: Dashboard Content streams — sort by Status (2026-09-28)
 
 * `/dashboard` "Content streams": the Status header is a button with an arrow (and a "Status" button above the mobile cards). Cycle: most urgent first (Create now → Needs content → Needs setup → Warming → On track → Paused) → least urgent first → original order. Stable for equal statuses; `aria-sort` + accessible label.

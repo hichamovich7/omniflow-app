@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
+import { listContentStreamNamesForCategory } from '@/lib/queries/niche-context';
+import { resolveNicheContext } from '@/lib/niche/resolve';
 import { generateArticleFromUrlSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromUrl } from '@/lib/wordpress/generate-article-from-url';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
 
   const { data: project } = await supabase
     .from('projects')
-    .select('id, description, user_id')
+    .select('id, description, niche, user_id')
     .eq('id', projectId)
     .single();
 
@@ -201,6 +203,12 @@ export async function POST(request: Request) {
   // Outbound-link check only: URLs of the connected site are internal links.
   const siteUrl = (await getWordPressSiteByProjectId(supabase, projectId))?.site_url ?? null;
 
+  // Niche profile, with the chosen category's Content Stream as sub-niche.
+  const niche = resolveNicheContext({
+    niche: project.niche,
+    contentStreams: await listContentStreamNamesForCategory(supabase, user.id, projectId, categoryId),
+  });
+
   try {
     const result = await generateArticleFromUrl({
       supabase,
@@ -210,6 +218,7 @@ export async function POST(request: Request) {
       pastedContent: sourceType === 'pasted' ? pastedContent : undefined,
       language,
       brandProfileDescription: project.description,
+      niche,
       siteUrl,
     });
 

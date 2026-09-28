@@ -151,7 +151,7 @@ lib/ai/
   types.ts            AIRole, AIProvider, AIRoleConfig, ChatMessage
   config.ts            getRoleConfig(role) — resuelve provider/modelo por rol
   engine.ts             facade: generateText, analyzeImage, generateImage
-  niche-visual-conventions.ts   getNicheVisualConvention(niche) — framingMode/allowTextOverlay/styleGuidance por niche (TASK-034)
+  niche-visual-conventions.ts   getNicheVisualConvention(niche) — framingMode/allowTextOverlay/styleGuidance por niche (TASK-034), alias/case-tolerant (Niche Profiles Phase 1)
   prompts/
     vision-style-analysis.ts   buildVisionStyleAnalysisPrompt() — instrucciones VISION para TASK-013 (solo estilo, nunca composición)
     wordpress-*.ts       prompts del generador WordPress (TASK-035+)
@@ -252,7 +252,7 @@ La modale attend 300 ms après un changement de template ou position, annule la 
 
 ### Niche Visual Conventions (TASK-034)
 
-`lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback.
+`lib/ai/niche-visual-conventions.ts` — `getNicheVisualConvention(niche)` mapea el `projects.niche` (texto libre, TASK-033) a una convención de cadrage por niche: `framingMode` (`space` | `object`), `allowTextOverlay` (boolean), `styleGuidance` (texto libre de dirección artística). Niches sin entrada devuelven `null`; el llamador decide el fallback. Resolución: label exacto primero, luego label sin mayúsculas/acentos/puntuación, luego alias de perfil de niche (`lib/niche/profiles.ts`: "Home Decor" → `Home Organization & Decor`, "Recipes" → `Food & Recipes`, "Clay" → `Clay Crafts & DIY`). Ver "Niche Profiles".
 
 `lib/prompts/pinterest-pins.ts` (`buildPinterestPinsPrompt`) es el único consumidor: prioriza la convención del niche cuando existe; si no, cae en `classifyPinComposition(keyword)` (heurística mot-clé, ver decisión 2026-07-26 (2)/(3)) solo para `framingMode` — `allowTextOverlay` sin convención de niche es siempre `false`. Esto evita romper proyectos Home Decor existentes creados antes de que `niche` existiera o que lo dejaron vacío.
 
@@ -328,6 +328,35 @@ Project Description (TASK-022, actual)
 ↓
 Project Memory / Knowledge Base (futuro)
 ```
+
+---
+
+# Niche Profiles (Implemented — Phase 1, 2026-09-28)
+
+Architecture: **Shared Core + Niche-Specific Configuration** (DECISIONS.md 2026-09-28). The core stays common (generation, validation, Quality Gate, FAQ, links, images, publishing, history, credits, errors); a niche only supplies configuration.
+
+```txt
+lib/niche/
+  types.ts           NicheProfile { shared, wordpress, pinterest, visual, aliases, subNiches }, ResolvedNicheContext
+  profiles.ts        NICHE_PROFILES (Crochet, Clay Crafts & DIY, Home Organization & Decor, Food & Recipes) + GENERIC_NICHE_SECTIONS
+  resolve.ts         normalizeNicheKey, findNicheProfile, findSubNiche, resolveNicheContext
+  prompt-blocks.ts   <niche_context> + <wordpress_rules> | <pinterest_rules> + <visual_rules> + usage/priority rules
+lib/queries/niche-context.ts   Content Stream names for a WordPress category or a board (read-only, best-effort)
+```
+
+Flow:
+
+```txt
+projects.niche (free text) + Content Stream names (category / board / Pins)
+↓ resolveNicheContext()   generic → niche profile → sub-niche; null when neither exists
+↓ buildWordPressNicheBlocks() / buildPinterestNicheBlocks()
+WordPress outline (keyword, URL, Pins) · WordPress article (all methods) · Pinterest pins (normal, from article, Pin regeneration)
+```
+
+* Context priority (stated in every block): safety / anti-invention / language / length / link / format rules → explicit user options → source facts → Content Stream → niche → Brand Profile → generic.
+* WordPress receives `<wordpress_rules>` only; Pinterest `<pinterest_rules>` only. `<visual_rules>` go where image prompts are written (WordPress outlines, Pinterest `image_prompt`); Pin images get them through `image_prompt`, WordPress images through the outline's prompts.
+* Unknown / free-text niche → generic profile + its label. No niche and no stream → no block (legacy prompts unchanged).
+* Profiles are code only in Phase 1. Phase 2: per-project customization (migration 041 `projects.niche_settings`, prefilled editor) — not implemented.
 
 ---
 
