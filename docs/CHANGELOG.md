@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Product: "Clay Crafts & DIY" niche suggestion (2026-09-28)
+
+* `components/projects/project-form.tsx`: `Clay Crafts & DIY` added at the end of `NICHE_SUGGESTIONS` (the canonical curated list, now exported for tests). Existing niches unchanged.
+* Niches are stored by label in `projects.niche` (free text, no DB constraint), so the identifier `clay-crafts-diy` is documentary only — no slug column, no mapping. Content Streams inherit the niche from their project.
+* No entry in `lib/ai/niche-visual-conventions.ts` (founder decision): the niche uses `DEFAULT_NICHE_CONVENTION` (object framing, no text overlay, no `torn-paper`). Unknown niches stay accepted and fall back to the default.
+* No migration, API, prompt or AI change. New offline spec `tests/renderer/project-niche-clay-crafts.spec.ts` (7 cases).
+
 ## UI: WordPress Categories — compact, expandable project cards (2026-09-27)
 
 * `/wordpress/categories`: each project card is compact by default (chevron, name, site domain + "Connected" / "No WordPress site", category count, "Import from WordPress" / "New Category"). Expanded: the existing category list (rename / delete) and WordPress mapping, unchanged and kept mounted while hidden.

@@ -41,7 +41,7 @@ import {
 // Curated suggestions only — free text is always accepted, nothing here is
 // enforced in the database. See docs/DECISIONS.md for why this stays a flat
 // list rather than growing per-niche prompt logic.
-const NICHE_SUGGESTIONS = [
+export const NICHE_SUGGESTIONS = [
   'Insurance',
   'Mortgages & Home Loans',
   'Legal / Attorney Services',
@@ -63,6 +63,7 @@ const NICHE_SUGGESTIONS = [
   'Travel',
   'Food & Recipes',
   'Crochet',
+  'Clay Crafts & DIY',
 ];
 
 const NO_DEFAULT_LANGUAGE = 'none';
