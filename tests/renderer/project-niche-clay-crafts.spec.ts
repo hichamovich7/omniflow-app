@@ -59,9 +59,12 @@ test.describe('Clay Crafts & DIY niche', () => {
     expect(NICHE_SUGGESTIONS.filter((n) => n === CLAY)).toHaveLength(1);
   });
 
-  test('existing niches are unchanged, in the same order', () => {
-    expect(NICHE_SUGGESTIONS.slice(0, PREVIOUS_NICHES.length)).toEqual(PREVIOUS_NICHES);
-    expect(NICHE_SUGGESTIONS).toHaveLength(PREVIOUS_NICHES.length + 1);
+  test('existing niches are unchanged', () => {
+    expect([...NICHE_SUGGESTIONS].sort()).toEqual([...PREVIOUS_NICHES, CLAY].sort());
+  });
+
+  test('suggestions are listed in alphabetical order', () => {
+    expect(NICHE_SUGGESTIONS).toEqual([...NICHE_SUGGESTIONS].sort((a, b) => a.localeCompare(b, 'en')));
   });
 
   test('a project can be created and updated with the niche; the label is saved verbatim', () => {
