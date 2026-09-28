@@ -7,6 +7,7 @@ import type { AiIntegratedSettings } from '@/lib/pinterest/ai-integrated';
 import type { PinterestGenerationMode } from '@/types/pinterest';
 import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
 import { resolveNicheContext } from '@/lib/niche/resolve';
+import type { NicheSettings } from '@/lib/niche/settings';
 import { buildPinterestNicheBlocks } from '@/lib/niche/prompt-blocks';
 
 export const PROMPT_ID = 'pinterest-pins-v11';
@@ -18,6 +19,8 @@ interface PromptContext {
   niche?: string | null;
   /** Live Content Stream names (board or article category) — sub-niche context, most specific first. */
   contentStreams?: (string | null | undefined)[];
+  /** projects.niche_settings (parsed) — project customizations, null = defaults. */
+  nicheSettings?: NicheSettings | null;
   textOverlayMode: TextOverlayMode;
   generationMode?: PinterestGenerationMode;
   aiIntegrated?: AiIntegratedSettings;
@@ -109,7 +112,7 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
 
   // Niche profile (lib/niche) — shared identity + Pinterest-only rules +
   // visual rules. No niche and no Content Stream: nothing is added.
-  const nicheBlocks = buildPinterestNicheBlocks(resolveNicheContext({ niche: ctx.niche, contentStreams: ctx.contentStreams }));
+  const nicheBlocks = buildPinterestNicheBlocks(resolveNicheContext({ niche: ctx.niche, contentStreams: ctx.contentStreams, settings: ctx.nicheSettings }));
   const nicheBlock = nicheBlocks ? `\n\n${nicheBlocks}\n` : '';
   const nicheImageInstruction = nicheBlocks ? ' Apply <visual_rules> to every image_prompt while still varying the scene between pins.' : '';
 

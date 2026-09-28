@@ -19,6 +19,8 @@ import {
 } from '@/lib/pinterest/ai-integrated';
 import { getPinsSeoSource, getWordPressArticleByGenerationId } from '@/lib/queries/wordpress';
 import { listContentStreamNamesForCategory } from '@/lib/queries/niche-context';
+import { getProjectNicheSettings } from '@/lib/queries/niche-settings';
+import type { NicheSettings } from '@/lib/niche/settings';
 import { resolveFocusKeyword } from '@/lib/wordpress/tags';
 import { getMetaTitle } from '@/lib/wordpress/export';
 import { PINTEREST_ANGLES, SUPPORTED_LANGUAGES } from '@/types/pinterest';
@@ -57,6 +59,8 @@ export interface ArticlePinterestSource {
   niche: string | null;
   /** Live Content Streams of the article's WordPress category — sub-niche context only. */
   contentStreams?: string[];
+  /** Project niche settings (migration 041) — null / absent = defaults. */
+  nicheSettings?: NicheSettings | null;
   brandProfileDescription: string | null;
 }
 
@@ -155,6 +159,7 @@ export async function loadArticlePinterestSource(
   return {
     ...source,
     contentStreams: await listContentStreamNamesForCategory(supabase, userId, generation.project_id, article.category_id),
+    nicheSettings: await getProjectNicheSettings(supabase, userId, generation.project_id),
   };
 }
 
@@ -383,6 +388,7 @@ export async function regenerateArticlePin(
     pinsRequested: 1,
     niche: source.niche,
     contentStreams: source.contentStreams,
+    nicheSettings: source.nicheSettings,
     textOverlayMode: pin.visual_format === 'text-overlay' ? 'always' : 'never',
     generationMode,
     // The existing Manual strategy is how the prompt pins an angle.

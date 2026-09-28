@@ -94,4 +94,6 @@ export interface ResolvedNicheContext extends NicheSections {
   contentStream: string | null;
   /** The sub-niche profile the Content Stream matched, if any. */
   subNiche: { slug: string; label: string } | null;
+  /** True when project niche settings (Phase 2) changed at least one value. */
+  customized: boolean;
 }

@@ -341,22 +341,24 @@ lib/niche/
   profiles.ts        NICHE_PROFILES (Crochet, Clay Crafts & DIY, Home Organization & Decor, Food & Recipes) + GENERIC_NICHE_SECTIONS
   resolve.ts         normalizeNicheKey, findNicheProfile, findSubNiche, resolveNicheContext
   prompt-blocks.ts   <niche_context> + <wordpress_rules> | <pinterest_rules> + <visual_rules> + usage/priority rules
+  settings.ts        Phase 2: niche_settings Zod schema, parse/normalize, Recommended/Custom/Disabled resolution, editing helpers
 lib/queries/niche-context.ts   Content Stream names for a WordPress category or a board (read-only, best-effort)
+lib/queries/niche-settings.ts  Phase 2: read (best-effort, migration-independent) / save projects.niche_settings
 ```
 
 Flow:
 
 ```txt
-projects.niche (free text) + Content Stream names (category / board / Pins)
-↓ resolveNicheContext()   generic → niche profile → sub-niche; null when neither exists
+projects.niche (free text) + Content Stream names (category / board / Pins) + projects.niche_settings
+↓ resolveNicheContext()   generic → niche profile → sub-niche → project settings; null when none exists
 ↓ buildWordPressNicheBlocks() / buildPinterestNicheBlocks()
 WordPress outline (keyword, URL, Pins) · WordPress article (all methods) · Pinterest pins (normal, from article, Pin regeneration)
 ```
 
-* Context priority (stated in every block): safety / anti-invention / language / length / link / format rules → explicit user options → source facts → Content Stream → niche → Brand Profile → generic.
+* Context priority (stated in every block): safety / anti-invention / language / length / link / format rules → explicit user options → source facts → project niche settings → Content Stream → niche → Brand Profile → generic.
 * WordPress receives `<wordpress_rules>` only; Pinterest `<pinterest_rules>` only. `<visual_rules>` go where image prompts are written (WordPress outlines, Pinterest `image_prompt`); Pin images get them through `image_prompt`, WordPress images through the outline's prompts.
 * Unknown / free-text niche → generic profile + its label. No niche and no stream → no block (legacy prompts unchanged).
-* Profiles are code only in Phase 1. Phase 2: per-project customization (migration 041 `projects.niche_settings`, prefilled editor) — not implemented.
+* Phase 2 (TASK-045): per-project customization of seven fields in `projects.niche_settings` (migration 041, customizations only), edited in the "Niche settings" section of `/projects/[id]` (`components/projects/niche-settings-section.tsx`) and saved through `PUT /api/projects/[id]/niche-settings`. Generations read the column best-effort, so they keep working before the migration is applied.
 
 ---
 

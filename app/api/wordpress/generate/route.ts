@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { listContentStreamNamesForCategory } from '@/lib/queries/niche-context';
 import { resolveNicheContext } from '@/lib/niche/resolve';
+import { getProjectNicheSettings } from '@/lib/queries/niche-settings';
 import { generateArticleSchema } from '@/lib/validations/wordpress';
 import { generateWordPressArticle } from '@/lib/wordpress/generate-article';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
@@ -200,6 +201,7 @@ export async function POST(request: Request) {
   const niche = resolveNicheContext({
     niche: project.niche,
     contentStreams: await listContentStreamNamesForCategory(supabase, user.id, projectId, categoryId),
+    settings: await getProjectNicheSettings(supabase, user.id, projectId),
   });
 
   try {

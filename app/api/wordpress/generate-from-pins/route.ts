@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { listContentStreamNamesForCategory } from '@/lib/queries/niche-context';
 import { resolveNicheContext } from '@/lib/niche/resolve';
+import { getProjectNicheSettings } from '@/lib/queries/niche-settings';
 import { generateArticleFromPinsSchema } from '@/lib/validations/wordpress';
 import { generateArticleFromPins } from '@/lib/wordpress/generate-article';
 import { getActivePinImageUrls } from '@/lib/queries/pin-images';
@@ -244,6 +245,7 @@ export async function POST(request: Request) {
       ...(await listContentStreamNamesForCategory(supabase, user.id, projectId, categoryId)),
       ...pinSummaries.map((pin) => pin.contentStream),
     ],
+    settings: await getProjectNicheSettings(supabase, user.id, projectId),
   });
 
   try {

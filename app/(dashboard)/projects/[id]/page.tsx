@@ -5,6 +5,8 @@ import { getWordPressSiteByProjectId } from '@/lib/queries/wordpress-sites';
 import { listWordPressCategories } from '@/lib/queries/wordpress-categories';
 import { listContentStreams, listBoardOccupants, findBoardOccupant } from '@/lib/queries/content-streams';
 import { ContentStreamsSection } from '@/components/projects/content-streams-section';
+import { NicheSettingsSection } from '@/components/projects/niche-settings-section';
+import { parseNicheSettings } from '@/lib/niche/settings';
 import { MetricCard, MetricGrid } from '@/components/shared/metric-card';
 import { PageContainer } from '@/components/ui/page-container';
 import { ResourceHeader } from '@/components/shared/resource-header';
@@ -157,6 +159,16 @@ export default async function ProjectDetailPage({
         categories={categoryOptions}
         boards={boardOptions}
         streamBoardMap={streamBoardMap}
+      />
+
+      {/* select('*') simply has no niche_settings key before migration 041: defaults. */}
+      <NicheSettingsSection
+        projectId={project.id}
+        niche={project.niche ?? null}
+        initialSettings={parseNicheSettings(project.niche_settings)}
+        streams={contentStreams.filter((s) => s.status !== 'archived').map((s) => ({ id: s.id, name: s.name }))}
+        categories={categoryOptions}
+        boards={boardOptions}
       />
 
       <MetricGrid>

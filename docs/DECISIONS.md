@@ -1744,6 +1744,34 @@ Audit (2026-09-28): `projects.niche` reached Pinterest only, and only as a visua
 
 ---
 
+## 2026-09-28 (bis)
+
+### Decision
+
+TASK-045 — Niche Profiles Phase 2: **per-project niche settings**, limited to seven fields (tone, audience, keywords, sub-niches / Content Streams, Pinterest angles, visual style, CTA), stored in the new nullable `projects.niche_settings jsonb` (migration 041).
+
+### Context
+
+Phase 1 (same day) made niche profiles reach every WordPress and Pinterest prompt, but they were code-only: a project could not adapt the recommended tone, audience or angles. The audit had shown no existing column could hold the customizations (`description` is the Brand Profile read by every prompt; `content_streams` has name/targets/status only).
+
+### Decision Taken
+
+1. **Only customizations are stored**, versioned: `{ version: 1, fields: { <field>: { custom: string[], disabled: string[] }, subNiches: { disabled: slug[] } } }`. Recommended values always come from `lib/niche/profiles.ts`, so a profile update never overwrites a custom value. `NULL` = defaults; invalid / unknown version is read as `NULL` (never blocks a generation).
+2. Per field: **Recommended** (profile), **Custom** (user-added, always active), **Disabled** (recommended value switched off, matched by normalized text). Replace = disable + add; "Reset field" / "Reset to defaults" remove customizations (everything empty → `NULL`).
+3. Final priority: safety / anti-invention / language / length / link / format rules → explicit form options → source facts (article, URL, Pins) → **project settings** → Content Stream / sub-niche → niche profile → Brand Profile → generic. Implemented in `resolveNicheContext({ niche, contentStreams, settings })`: settings are applied last on the merged sections (active = enabled recommended + custom), and disabled sub-niches are skipped when matching streams.
+4. Platform separation kept: tone, audience, keywords (→ `priorityTopics`) are shared; Pinterest angles and CTA only change `<pinterest_rules>` (the WordPress soft CTA is untouched); visual style only changes `<visual_rules>` (image prompts of both platforms). WordPress structures stay WordPress-only.
+5. **Sub-niches = Content Streams**: no sub-niche table; "Create new Content Stream" reuses the existing dialog / `POST /api/content-streams`.
+6. Custom values cannot contain links or domain names (Zod): they reach the prompts, and Pins never get a destination URL automatically.
+7. Migration-independent: generations read the column in a separate best-effort select (`readProjectNicheSettings`); the project page reads it through the existing `select('*')`; only `PUT /api/projects/[id]/niche-settings` fails, with `503 migration_required` and a clear message. The normal project save (`PATCH /api/projects/[id]`) never touches the column.
+
+### Consequences
+
+* Migration 041 must be applied manually in the Supabase SQL Editor before settings can be saved.
+* One extra read query per generation (the settings).
+* A disabled recommended value re-appears if its profile wording changes later (disabled values are matched by text); custom values are never affected.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

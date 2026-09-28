@@ -1008,3 +1008,24 @@ npx playwright test tests/renderer/wordpress-publish-seo.spec.ts --project=rende
 Offline (36 cases, the WordPress site is a stubbed global `fetch`, Supabase stubbed — no network, no paid call): post payload (H1 `title`, `excerpt` = meta description, explicit `slug`, categories, featured image, draft / publish / future + date), update of the existing post and 404 fallback; tags from `seo_keywords` → Pin keywords → focus keyword, existing tag reused, missing tag created, refused creation skipped, no minimum, max 8, duplicates / empty / over-long / placeholder / pin-title label dropped, post sent without tags + warning; focus keyword per method (Keyword user keyword, URL resolved keyword only when completed, Pins source Pinterest keyword, never the pin-title concatenation, empty + warning when unreliable); `getPinsSeoSource()` order and shared keyword; Rank Math `updateMeta` payload, absent / route missing / HTTP error never blocking; retry with no duplicate post or tag; no credentials or content in logs; route wiring.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 36/36, full renderer 440/441 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. La validation d'écriture réelle sur Rank Math et la vérification finale des tags sur le site WordPress n'ont pas été exécutées, afin d'éviter une consommation supplémentaire d'API payante. Les tests offline et les mocks couvrent le comportement attendu. À vérifier ultérieurement si un problème Rank Math ou tags est signalé.
+
+---
+
+# Niche Profiles — Phase 1 and Phase 2 per-project niche settings (TASK-045, 2026-09-28)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/niche-profiles.spec.ts tests/renderer/niche-settings.spec.ts tests/renderer/project-niche-clay-crafts.spec.ts --project=renderer --reporter=list
+```
+
+Offline (no AI call, no network, no database — prompt builders are pure, `generateText` is a stub, Supabase is a recording fake query chain):
+
+* `niche-profiles.spec.ts` (38, Phase 1): the four priority niches and their aliases, generic fallback, Content Stream sub-niche and priority, visual conventions, WordPress outline / article / Pins / URL and Pinterest normal / from article / regeneration prompts, WordPress vs Pinterest rule separation, no destination URL, contradiction fixes, legacy prompts unchanged, stream lookups.
+* `niche-settings.spec.ts` (27, Phase 2): `niche_settings` NULL / valid / invalid / future version, Zod (extra keys, empty, too long, too many, links), add / disable / enable / replace / remove / reset, only customizations stored, the four priority niches with settings, unknown and empty niches, priority settings > stream > niche, disabled sub-niche, final values in every WordPress and Pinterest prompt and in the image rules, no destination URL, legacy prompts unchanged, migration not applied (reads → defaults, save → `migration_required`), reads never write, saves write only `projects.niche_settings` of the owner.
+
+Browser (`tests/playwright/niche-settings.spec.ts`, 4): the seven fields, Add custom value / unsaved state, inline link rejection, Create new Content Stream dialog — skipped without `PLAYWRIGHT_STORAGE_STATE`, and never clicks Save (no write to a real project).
+
+Manual check after applying migration 041: open a Clay project, disable a recommended tone, add a custom keyword, save, reload (values kept), generate one WordPress article and one Pinterest batch, then "Reset to defaults".
+
+Validation (2026-09-28): TypeScript OK, ESLint (touched files) OK, niche specs 73/73, full renderer 785 passed / 1 failed (same pre-existing `pinterest-text-importance-none.spec.ts`), browser spec 4 skipped (no session), production build OK, `git diff --check` OK.

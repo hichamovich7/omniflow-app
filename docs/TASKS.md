@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-045 (Phase 2 — Per-project niche settings) is implemented and committed. Seven fields (tone, audience, keywords, sub-niches / Content Streams, Pinterest angles, visual style, CTA) pre-filled from the niche profile on `/projects/[id]` ("Niche settings"), customizable (Recommended / Custom / Disabled, Add custom value, Reset field / Reset to defaults, Create new Content Stream), saved in `projects.niche_settings` (migration 041 — **apply manually in Supabase**) and applied to every WordPress and Pinterest prompt after source facts and explicit options. Works before the migration (defaults; only saving reports it). New specs `niche-settings.spec.ts` (renderer, 27) and `tests/playwright/niche-settings.spec.ts` (4, skipped without session). See TASK-045 below and CHANGELOG.md. Migration 041 still to apply manually in Supabase.
+
 Niche Profiles — Phase 1 (Shared Core + Niche-Specific Configuration) is implemented and committed. Typed profiles in `lib/niche/` (Crochet, Clay Crafts & DIY, Home Organization & Decor, Food & Recipes + generic fallback; aliases such as `Clay`, `Home Decor`, `Recipes`, no duplicate profile), `resolveNicheContext()` (generic → niche → Content Stream sub-niche; unknown niche accepted with its label; no niche and no stream → no block), delimited `<niche_context>` + `<wordpress_rules>` / `<pinterest_rules>` + `<visual_rules>` blocks with the context priority order. Reaches WordPress outline + article for keyword, Pins and URL (category / Pins streams), Pinterest normal (board stream), from article (category stream) and Pin regeneration; visual rules reach WordPress image prompts and Pin `image_prompt`. Visual conventions alias/case-tolerant + new Clay "Modern Handmade" entry (same overlay/template behavior as before). Contradictions fixed (board without niche, light mood, Home Decor examples, "easy"/"beginner" as voice only, Brand Profile below source facts and explicit options, internal links added by the server). Prompt ids bumped. No migration, no UI, no destination URL change. New spec `tests/renderer/niche-profiles.spec.ts` (38), Clay spec updated; see CHANGELOG.md "Niche Profiles — Phase 1". Phase 2 (per-project customization, migration 041) not started.
 
 Dashboard Content streams — sort by Status is implemented locally, not committed. The Status header of `/dashboard` "Content streams" (and a "Status" button above the mobile cards) cycles most urgent first → least urgent first → original order; stable for equal statuses; remembered per browser in `localStorage`. Planned section unchanged. No database, API or AI change. TypeScript, ESLint (touched files), new spec 10/10, full renderer 720/721 (same pre-existing, unrelated `pinterest-text-importance-none.spec.ts` failure), production build and `git diff --check` pass. Not checked in a browser (no authenticated session). See CHANGELOG.md "Dashboard Content streams — sort by Status". Do not commit automatically.
@@ -110,7 +112,7 @@ All tasks through TASK-026 are completed. TASK-023 and TASK-024 also completed o
 * Every new feature is tested first on these four niches.
 * Architecture: **Shared Core + Niche-Specific Configuration** (`lib/niche/`, DECISIONS.md 2026-09-28). A future niche is added as one profile entry — no major refactor, no separate project per niche; a niche stays a reusable context.
 * Existing projects and data stay compatible: `projects.niche` remains free text (never an enum), unknown niches use the generic profile, projects without a niche keep their prompts unchanged.
-* Phase 2 (planned, not started): persistent per-project profile customization (recommended / user-added / user-disabled values, user values never overwritten, "Add custom value", new sub-niche = new Content Stream) with migration 041 `projects.niche_settings jsonb` and a prefilled editor in the project form.
+* Phase 2 (TASK-045, implemented): per-project niche settings for seven fields in `projects.niche_settings` (migration 041), pre-filled Recommended / Custom / Disabled editor on the project page, new sub-niche = new Content Stream.
 
 ---
 
@@ -521,6 +523,42 @@ TASK-028 (WordPress Generator). Credit consumption depends on TASK-011 (Credits 
 ### Success Criteria
 
 A completed article shows Generate Social Content; selected platforms produce reviewable, editable, copyable, exportable content in the article's language; nothing is published; the original article and its images are unchanged; history is persisted under RLS; unit, API and Playwright tests pass; TypeScript, ESLint and build pass; DATABASE/API/UI_UX/TESTING/DECISIONS/CHANGELOG docs and the in-app Guide are updated. Full detail: `docs/tasks/TASK-044-SOCIAL-CONTENT-STUDIO-FROM-WORDPRESS-ARTICLE.md`.
+
+---
+
+## [TASK-045] Phase 2 — Per-project niche settings
+
+### Status: IMPLEMENTED (2026-09-28 — offline tests passed, validated by the user; committed; migration 041 to apply manually in Supabase)
+
+### Goal
+
+Let each project customize the niche rules the AI uses for WordPress and Pinterest, on top of the Phase 1 profiles (Shared Core + Niche-Specific Configuration, `lib/niche/`), without turning the project into an AI-profile editor.
+
+### Supported fields (seven, no more)
+
+```txt
+tone             shared (WordPress + Pinterest)
+audience         shared
+keywords         shared (priority keywords & topics)
+subNiches        Content Streams — recommended sub-niches can be disabled; new ones = new Content Stream
+pinterestAngles  Pinterest only
+visualStyle      image prompts (WordPress + Pinterest images)
+cta              Pinterest only (the WordPress soft CTA is unchanged)
+```
+
+### What ships
+
+* Migration `041_add_project_niche_settings.sql`: nullable `projects.niche_settings jsonb`, no RLS change, no backfill. **Must be applied manually in the Supabase SQL Editor.** Until then the app works with the recommended values; only "Save niche settings" returns `migration_required` with a clear message.
+* Versioned JSON storing only the user's customizations (`lib/niche/settings.ts`, Zod); recommended values stay in the profiles, so profile updates never overwrite custom values.
+* Values are **pre-filled** from the niche profile and **customizable**: every value is labeled **Recommended / Custom / Disabled**; disable / enable, "Add custom value" (no links), remove, "Reset field", "Reset to defaults", "Create new Content Stream" (existing dialog).
+* **Content Streams serve as sub-niches** (no new table).
+* Resolution: safety → explicit options → source facts → project settings → Content Stream → niche → Brand Profile → generic (`resolveNicheContext({ niche, contentStreams, settings })`), in WordPress outline / article (keyword, Pins, URL), Pinterest (normal, from article, Pin regeneration) and image prompts.
+* **Compatible with existing data**: `NULL` (all existing rows) = exactly the Phase 1 prompts; unknown niches editable with the generic profile; invalid / future-version JSON read as defaults.
+* `PUT /api/projects/[id]/niche-settings` (auth, UUID, ownership, Zod, writes only `niche_settings`).
+
+### Success Criteria
+
+Recommended values visible and editable for known, unknown and empty niches; saved customizations survive reloads and reach every generation path; resetting restores the profile; nothing breaks before the migration is applied. Validated by `tests/renderer/niche-settings.spec.ts` (27) + the Phase 1 specs; browser spec written, skipped without `PLAYWRIGHT_STORAGE_STATE`.
 
 ---
 

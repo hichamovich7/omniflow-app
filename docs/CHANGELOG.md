@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## AI / Projects: Per-project niche settings — Niche Profiles Phase 2, TASK-045 (2026-09-28)
+
+* Migration `041_add_project_niche_settings.sql`: nullable `projects.niche_settings jsonb` (NULL = OmniFlow recommended values; no RLS change, no backfill). **Apply manually in Supabase.**
+* `lib/niche/settings.ts`: versioned Zod schema `{ version: 1, fields: { tone, audience, keywords, pinterestAngles, visualStyle, cta: { custom, disabled }, subNiches: { disabled } } }` — only customizations are stored; parse (invalid / future version → defaults), normalize, Recommended / Custom / Disabled resolution, editing helpers. Custom values: ≤ 20 per field, 1-200 chars, no links or domain names.
+* `resolveNicheContext()` gains `settings`, applied after the Content Stream sub-niche and the niche profile; disabled sub-niches no longer match streams. Priority text in the prompts: safety → explicit options → source facts → project settings → Content Stream → niche → Brand Profile → generic; a "Project settings: customized" line when applied.
+* Settings read best-effort (`lib/queries/niche-settings.ts`) in WordPress keyword / Pins / URL, Pinterest normal, Pinterest from article and Pin regeneration. Tone, audience, keywords shared; angles and CTA Pinterest-only; visual style in image prompts.
+* New `PUT /api/projects/[id]/niche-settings` (auth, UUID, ownership, Zod; writes only `niche_settings`; `503 migration_required` before 041).
+* `/projects/[id]`: new "Niche settings" section (`components/projects/niche-settings-section.tsx`) — pre-filled values, Disable / Enable, Add custom value, Reset field, Reset to defaults, Save, Create new Content Stream (existing dialog, new optional `initialName`). Guide (Projects) updated.
+* Tests: new offline `tests/renderer/niche-settings.spec.ts` (27); new browser `tests/playwright/niche-settings.spec.ts` (4, skipped without `PLAYWRIGHT_STORAGE_STATE`); Phase 1 spec priority wording updated.
+
 ## AI: Niche Profiles — Phase 1, Shared Core + Niche-Specific Configuration (2026-09-28)
 
 * New `lib/niche/` (`types.ts`, `profiles.ts`, `resolve.ts`, `prompt-blocks.ts`): typed profiles (shared identity, WordPress rules, Pinterest rules, visual rules, aliases, sub-niches) for Crochet, Clay Crafts & DIY, Home Organization & Decor, Food & Recipes, plus a generic fallback. Aliases (`Clay`, `Clay Crafts`, `clay-crafts-diy`, `Home Decor`, `Recipes`…) resolve case/accent/punctuation-insensitively to one profile; unknown niches are accepted with the generic profile and their own label.

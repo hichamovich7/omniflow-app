@@ -54,6 +54,8 @@ interface ContentStreamFormDialogProps {
   boards: BoardOption[];
   /** undefined = create mode. Provided = edit mode, pre-filled from this stream. */
   editing?: EditingContentStream;
+  /** Pre-filled name for a new stream (e.g. a recommended sub-niche from the niche settings). */
+  initialName?: string;
 }
 
 /** '' (empty) parses to null (not set); a non-integer or negative value is rejected client-side too, ahead of the server's own Zod check. */
@@ -72,6 +74,7 @@ export function ContentStreamFormDialog({
   categories,
   boards,
   editing,
+  initialName,
 }: ContentStreamFormDialogProps) {
   const router = useRouter();
   const isEditMode = !!editing;
@@ -80,7 +83,7 @@ export function ContentStreamFormDialog({
   // component (via a `key` tied to open state + which stream, if any, is
   // being edited) every time it opens, so this lazy init always runs fresh
   // instead of needing an effect + setState to resync on prop changes.
-  const [name, setName] = useState(() => editing?.name ?? '');
+  const [name, setName] = useState(() => editing?.name ?? initialName ?? '');
   const [categoryId, setCategoryId] = useState(() => editing?.wordpressCategoryId ?? NO_CATEGORY_VALUE);
   const [boardId, setBoardId] = useState(() => editing?.boardId ?? NO_BOARD_VALUE);
   const [status, setStatus] = useState<ContentStreamStatus>(() => editing?.status ?? 'active');

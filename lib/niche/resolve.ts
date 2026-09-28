@@ -1,4 +1,5 @@
 import { GENERIC_NICHE_SECTIONS, NICHE_PROFILES } from './profiles';
+import { applyNicheSettings, hasNicheCustomizations, type NicheSettings } from './settings';
 import type { NicheProfile, NicheSections, ResolvedNicheContext, SubNicheProfile } from './types';
 
 /**
@@ -33,14 +34,19 @@ export function findNicheProfile(niche: string | null | undefined): NicheProfile
  * name that contains a sub-niche label/alias as whole words
  * ("Polymer Clay Earrings" → Polymer Clay).
  */
-export function findSubNiche(profile: NicheProfile | null, streamName: string): SubNicheProfile | null {
+export function findSubNiche(
+  profile: NicheProfile | null,
+  streamName: string,
+  disabledSlugs: string[] = []
+): SubNicheProfile | null {
   if (!profile) return null;
   const key = normalizeNicheKey(streamName);
   if (!key) return null;
-  const exact = profile.subNiches.find((sub) => profileKeys(sub).includes(key));
+  const subNiches = profile.subNiches.filter((sub) => !disabledSlugs.includes(sub.slug));
+  const exact = subNiches.find((sub) => profileKeys(sub).includes(key));
   if (exact) return exact;
   const padded = ` ${key} `;
-  return profile.subNiches.find((sub) => profileKeys(sub).some((alias) => alias && padded.includes(` ${alias} `))) ?? null;
+  return subNiches.find((sub) => profileKeys(sub).some((alias) => alias && padded.includes(` ${alias} `))) ?? null;
 }
 
 function mergeSections(base: NicheSections, override: Partial<{ [K in keyof NicheSections]: Partial<NicheSections[K]> }>): NicheSections {
@@ -61,26 +67,31 @@ export interface ResolveNicheContextInput {
    * wins; otherwise the first one is kept as a plain label.
    */
   contentStreams?: (string | null | undefined)[];
+  /** projects.niche_settings, already parsed (parseNicheSettings) — null = OmniFlow defaults. */
+  settings?: NicheSettings | null;
 }
 
 /**
  * Niche context for prompt builders. Layers, most specific last:
- * generic fallback → project niche profile → Content Stream sub-niche.
- * Returns null only when there is neither a niche nor a Content Stream, so
- * projects without a niche keep their prompts byte-for-byte unchanged.
+ * generic fallback → project niche profile → Content Stream sub-niche →
+ * project niche settings (Phase 2 customizations win over everything above).
+ * Returns null only when there is no niche, no Content Stream and no
+ * customization, so such projects keep their prompts byte-for-byte unchanged.
  * An unknown or free-text niche is never rejected: it gets the generic
  * profile, with its own label.
  */
 export function resolveNicheContext(input: ResolveNicheContextInput): ResolvedNicheContext | null {
   const nicheLabel = input.niche?.trim() || null;
   const streams = [...new Set((input.contentStreams ?? []).map((s) => s?.trim()).filter((s): s is string => !!s))];
-  if (!nicheLabel && streams.length === 0) return null;
+  const customized = hasNicheCustomizations(input.settings);
+  if (!nicheLabel && streams.length === 0 && !customized) return null;
+  const disabledSubNiches = input.settings?.fields.subNiches?.disabled ?? [];
 
   const profile = findNicheProfile(nicheLabel);
   let contentStream: string | null = streams[0] ?? null;
   let subNiche: SubNicheProfile | null = null;
   for (const stream of streams) {
-    const match = findSubNiche(profile, stream);
+    const match = findSubNiche(profile, stream, disabledSubNiches);
     if (match) {
       contentStream = stream;
       subNiche = match;
@@ -91,6 +102,7 @@ export function resolveNicheContext(input: ResolveNicheContextInput): ResolvedNi
   let sections: NicheSections = GENERIC_NICHE_SECTIONS;
   if (profile) sections = mergeSections(sections, profile);
   if (subNiche) sections = mergeSections(sections, subNiche);
+  if (customized) sections = applyNicheSettings(sections, input.settings);
 
   return {
     ...sections,
@@ -100,5 +112,16 @@ export function resolveNicheContext(input: ResolveNicheContextInput): ResolvedNi
     isGeneric: !profile,
     contentStream,
     subNiche: subNiche ? { slug: subNiche.slug, label: subNiche.label } : null,
+    customized,
   };
+}
+
+/**
+ * Recommended values for a project's niche (generic → niche profile), before
+ * any Content Stream or project customization — what the niche settings
+ * editor pre-fills. Works for free-text, unknown and empty niches.
+ */
+export function recommendedNicheSections(niche: string | null | undefined): { profile: NicheProfile | null; sections: NicheSections } {
+  const profile = findNicheProfile(niche);
+  return { profile, sections: profile ? mergeSections(GENERIC_NICHE_SECTIONS, profile) : GENERIC_NICHE_SECTIONS };
 }

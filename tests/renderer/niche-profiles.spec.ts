@@ -280,7 +280,7 @@ test.describe('WordPress prompts', () => {
     expect(user).toContain('Apply <visual_rules> to every image prompt');
     // Brand Profile preserved, below source facts and explicit options.
     expect(system).toContain(BRAND);
-    expect(user).toContain('6. the Brand Profile');
+    expect(user).toContain('7. the Brand Profile');
   });
 
   test('URL method: the source summary (research notes) and the niche context are both present', () => {

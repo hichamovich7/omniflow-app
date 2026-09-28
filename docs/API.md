@@ -1388,6 +1388,47 @@ invalid_request
 
 ---
 
+# PUT /api/projects/[id]/niche-settings
+
+Save a project's niche settings (TASK-045, migration 041). Writes only `projects.niche_settings` of the owned project. Generations never call it — they read the column best-effort.
+
+## Request
+
+```json
+{
+  "settings": {
+    "version": 1,
+    "fields": {
+      "tone": { "custom": ["playful but precise"], "disabled": ["beginner-friendly voice"] },
+      "subNiches": { "disabled": ["polymer-clay"] }
+    }
+  }
+}
+```
+
+`settings: null` resets to OmniFlow's recommended values (stored as `NULL`). Fields: `tone`, `audience`, `keywords`, `pinterestAngles`, `visualStyle`, `cta` (`{ custom: string[] ≤ 20, each 1-200 chars, no link/domain; disabled: string[] }`) and `subNiches` (`{ disabled: slug[] }`). Unknown keys are rejected (Zod `saveNicheSettingsSchema`, `lib/niche/settings.ts`). Settings are normalized before saving (trimmed, deduplicated, empty → `NULL`).
+
+## Response
+
+```json
+{ "data": { "settings": { "version": 1, "fields": { "...": "..." } } }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized         401
+invalid_id           400
+invalid_json         400
+invalid_request      400  (Zod — first issue message)
+not_found            404
+forbidden            403
+migration_required   503  migration 041 not applied: "Niche settings cannot be saved yet: …"
+server_error         500
+```
+
+---
+
 # DELETE /api/projects/[id]
 
 Delete project.

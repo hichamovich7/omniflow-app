@@ -256,6 +256,15 @@ A card section between "WordPress Connection" and the usage-stats grid — no ne
 * A card's Archive icon opens a light confirmation dialog (`Dialog`, not a full-page navigation) before calling the archive action — never a physical delete.
 * All of it is `sonner` toast-driven (success, warning for a partial create where the stream saved but the board link failed, error), keyboard-focusable, and dark-mode/responsive via the same tokens as the rest of the page.
 
+### Niche settings (TASK-045)
+
+A card section right below Content Streams (`components/projects/niche-settings-section.tsx`), `data-testid="niche-settings"`. Intro line: "Recommended by OmniFlow for \<profile\>", or general recommendations for an unknown niche / no niche — always editable, a niche is never rejected.
+
+* Seven fields: Tone, Audience, Keywords & topics (WordPress + Pinterest), Pinterest angles, CTA (Pinterest), Visual style (Images), Sub-niches (Content Streams). Each field shows a scope badge and its values pre-filled from the niche profile, one row per value with a badge: **Recommended** (with "Disable"), **Disabled** (struck through, with "Enable"), **Custom** (with a remove ✕ button, `aria-label="Remove custom value …"`).
+* Under each list: a labeled input ("Custom \<field\> value", Enter submits) + "Add custom value". Links / domain names are rejected inline (`aria-invalid` + message). "Reset field" appears once a field is customized.
+* Sub-niches: the profile's recommended sub-niches (Disable / Enable, "Create stream" when no Content Stream matches yet, "· Content Stream “name”" when one does), the project's other live streams as **Custom**, and "Create new Content Stream" — the existing Content Stream dialog (optionally pre-filled with the sub-niche name). No separate sub-niche storage.
+* Footer: "Unsaved changes" hint + "Save niche settings" (disabled until something changed); header: "Reset to defaults" (clears every customization, saved with the button). Toasts on success / error; an error (e.g. migration 041 not applied yet: "Niche settings cannot be saved yet: …") is also shown inline with `role="alert"`. Viewing the page and generating never depend on the migration.
+
 ---
 
 ## WordPress Connection (New / Edit Project form)

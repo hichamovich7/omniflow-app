@@ -10,6 +10,7 @@ import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/pr
 import { buildVisionStyleAnalysisPrompt } from '@/lib/ai/prompts/vision-style-analysis';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { listContentStreamNamesForBoard } from '@/lib/queries/niche-context';
+import { getProjectNicheSettings } from '@/lib/queries/niche-settings';
 import { buildAnalysisContext } from '@/lib/analyzer/context';
 import { buildImageAnalysisContext } from '@/lib/vision/context';
 import {
@@ -260,6 +261,10 @@ export async function POST(request: Request) {
     ...(await listContentStreamNamesForBoard(supabase, user.id, projectId, board)),
     ...(articleSource?.contentStreams ?? []),
   ];
+  // Project niche settings (migration 041) — best-effort, defaults when absent.
+  const nicheSettings = articleSource
+    ? articleSource.nicheSettings ?? null
+    : await getProjectNicheSettings(supabase, user.id, projectId);
 
   const model = getRoleConfig('FAST').model;
 
@@ -296,6 +301,7 @@ export async function POST(request: Request) {
       pinsRequested,
       niche: project.niche,
       contentStreams,
+      nicheSettings,
       textOverlayMode,
       generationMode,
       aiIntegrated,
