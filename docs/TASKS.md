@@ -609,6 +609,79 @@ Generate 6 Pins (keyword flow) and 7 Pins from an article; rewrite one keyword a
 
 ---
 
+## [TASK-047] Pattern & Tutorial Content Mode for Crochet and Clay
+
+### Status: PLANNED (2026-10-04 — not started, not the active task; to be developed in a later phase, after the Crochet and Clay needs are validated)
+
+Documentation only for now: no code, no migration, no prompt change, no AI call. The specification below is the starting point; it must be reviewed and validated with real Crochet and Clay use cases before any implementation is planned.
+
+### Goal
+
+Let OmniFlow generate WordPress articles as detailed tutorials or original patterns — materials, tools, calculations and structured steps — for the Crochet and Clay niches, without ever inventing information silently.
+
+### Three levels
+
+1. **Tutorial article**
+   * The keyword can be enough.
+   * The AI writes a general tutorial.
+   * Any unconfirmed detail is presented as a suggestion or assumption.
+2. **Pattern draft**
+   * The keyword can be enough.
+   * The AI may choose default parameters: size; yarn or material; hook or tools; colors; dimensions; structure; difficulty level.
+   * Assumptions are shown clearly.
+   * Calculated values are distinguished from values provided by the user.
+3. **Detailed pattern**
+   * Uses the parameters provided by the user.
+   * Checks the mathematical calculations.
+   * Checks the consistency of stitches, rounds, dimensions, increases and decreases.
+   * States that the pattern is AI-generated and not physically tested, unless proven otherwise.
+
+### Crochet content
+
+Materials; yarn type and weight; hook size; gauge / tension; dimensions; abbreviations; head, body, legs, ears and tail; stitch and round counts; increases and decreases; assembly; finishing; tips and common mistakes.
+
+### Clay content
+
+Clay type; materials; tools; dimensions; preparation; modeling; drying or baking; painting; varnish or protection; assembly; safety; common mistakes; possible variations.
+
+### Core rule — no silent invention
+
+The AI must not invent information silently. It may calculate a value or propose an assumption only when the required parameters are available. Every value is labelled as one of:
+
+```txt
+user source        provided by the user
+calculated value   derived deterministically from user / default parameters
+AI assumption      a default chosen by the AI, shown as such
+to be confirmed    unknown or unverifiable — the reader must check it
+```
+
+**Clay:** baking / curing temperatures and durations always depend on the exact clay type and the manufacturer's instructions — never stated as universal values.
+
+### Planned for later (not part of the first step)
+
+* A WordPress article type `Tutorial` or `Pattern`.
+* Crochet- and Clay-specific prompts.
+* Structured schemas for patterns.
+* A deterministic calculation engine (stitch counts, increases / decreases, dimensions).
+* Automatic step validation.
+* A UI with pre-filled, customizable parameters.
+* A specialized Quality Gate for patterns.
+* The classic SEO article mode stays available and unchanged.
+
+### Constraints (this planning step)
+
+No code change, no migration, no change to existing prompts, no AI call, nothing committed or pushed.
+
+### Depends On
+
+Validation of the Crochet and Clay needs with the founder (real examples of expected tutorials and patterns). Builds on TASK-028 (WordPress Generator) and the Niche Profiles (Phase 1, TASK-045 Phase 2) for the Crochet and Clay niche context.
+
+### Success Criteria (to be refined before implementation)
+
+Each level produces a structured, readable article; every value carries its label (user source / calculated / AI assumption / to be confirmed); detailed patterns pass a deterministic consistency check; Clay baking instructions always defer to the manufacturer; the classic SEO article mode is unaffected.
+
+---
+
 # MVP RELEASE CHECKLIST
 
 ```txt
