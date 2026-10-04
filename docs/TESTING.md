@@ -1048,3 +1048,22 @@ Offline (no AI call, no network, no WordPress call — prompt builders are pure;
 Browser (`tests/playwright/pins-count-and-article-rewrite.spec.ts`, 3 × desktop + mobile): Custom 0 / 31 refused without request and 6 sent; Rewrite dialog Cancel sends nothing; Confirm shows progress then the error and stays on the page. All routes mocked. **Skipped without `PLAYWRIGHT_STORAGE_STATE`** (and `PLAYWRIGHT_WP_ARTICLE_ID` for the rewrite cases).
 
 Validation (2026-10-04): TypeScript OK, ESLint (touched files) OK, new specs 16/16 and 28/28, Pinterest specs (strategy, generation plan, AI Integrated, board section, Social Content Studio, niche) and WordPress specs pass, full renderer 829 passed / 1 failed (same pre-existing `pinterest-text-importance-none.spec.ts`, also failing without this change), browser spec 6 skipped (no session), production build OK, `git diff --check` OK. No real AI generation was run.
+
+---
+
+# Pinterest scheduling timezone (TASK-048, 2026-10-04)
+
+```bash
+npx playwright test tests/renderer/pinterest-schedule-timezone.spec.ts --project=renderer --reporter=list
+```
+
+Offline (24 cases, no AI, no network; the schedule route runs against a recording Supabase fake; the process zone is switched with `process.env.TZ` to prove nothing depends on the server machine's zone): 13:00 Europe/Madrid summer → 11:00 UTC, winter → 12:00 UTC, on UTC / Tokyo / Los Angeles / Madrid runtimes; day change after conversion (00:30 Madrid, New York evening, New Year in Los Angeles); spring forward (02:30 refused, 01:30 / 03:30 correct) and fall back (first occurrence); daily 13:00 across the change stays 13:00; other zones (Kolkata, New York, UTC, Sydney); invalid / missing zones refused (offsets, abbreviations, unknown names) by the helper and the schema; minutes and seconds kept; every-weekday in the chosen calendar; display after reading the stored instant (13:00); dialog sends / previews the browser zone; pin table displays in the browser zone; CSV in UTC, identical whatever the browser zone, end to end converted once, seconds and day change kept; dashboard buckets by Madrid day, coverage and week plan correct on any runtime; query margin; route stores 11:00Z on a UTC server, refuses a missing / invalid zone and a skipped time without writing, judges "future" in the zone, writes only the requested Pins; legacy dates read as stored, never rewritten.
+
+Validation (2026-10-04): see TASKS.md TASK-048 — TypeScript, ESLint (touched files), spec 24/24, dashboard / CSV / publishing-activity specs (also under `TZ=UTC`), full renderer, production build, `git diff --check`.
+
+### Manual Pinterest check (pending — founder)
+
+1. Schedule one Pin at 13:00 (browser in Europe/Madrid), confirm; OmniFlow must show 13:00 and the preview "Times in Europe/Madrid".
+2. Export the CSV: the "Publish date" cell must be `YYYY-MM-DDT11:00:00` (summer) / `T12:00:00` (winter).
+3. Controlled import with two rows of a future day, same Pin data otherwise: row A `…T11:00:00` (UTC, new format), row B `…T13:00:00` (local, as the former export would write the typed time). Expected if Pinterest reads UTC: A shows 13:00, B shows 15:00.
+4. Record which row shows 13:00 in TASKS.md TASK-048 ("CSV format"). If row B shows 13:00 instead, Pinterest reads local time and the CSV must be switched back to local wall time in the planning zone.

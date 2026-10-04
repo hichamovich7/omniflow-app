@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-048 (Fix Pinterest scheduling timezone conversion) is implemented and committed. Reported case: 13:00 chosen → 15:00 shown → CSV `2026-09-22T15:00:00` → 17:00 on Pinterest. Cause confirmed: the server built the date with its own zone (UTC) and the CSV wrote the browser's local hour without offset, which Pinterest reads as UTC. Fix: the client sends the wall time + its IANA zone, the server converts to UTC once (`lib/scheduling/timezone.ts`), the CSV writes the UTC instant (`YYYY-MM-DDTHH:mm:ss`, UTC). Dashboard buckets Pins by Europe/Madrid day. No migration; old Pins not modified. New spec `pinterest-schedule-timezone.spec.ts` (24). **Real Pinterest import test still to do by the founder.** See TASK-048 below.
+
 TASK-046 (Custom number of Pinterest Pins + Rewrite WordPress article) is implemented and committed. Only these two improvements; third improvement: TBD; no other feature included. **Pins:** any whole number from 1 to 30 ("Custom…" in the Pins select; presets and defaults 10 / 5 unchanged; 0, negatives, decimals and > 30 refused client- and server-side), used by Pinterest normal, from a WordPress article and Regenerate; balanced angle plan (every angle before any repeat) in the prompt and the strategy check, near-copies refused above 5 Pins; no destination URL added. **Rewrite article** on `/wordpress/[id]` (completed articles): confirmation dialog, new `POST /api/wordpress/[id]/rewrite` creates a **new version** (new generation + article rows, original options copied, same H1 / H2 outline / images copied to the new storage folder / slug / meta / category / links), FAQ regenerated or kept, Quality Gate re-run, previous version never modified, never published. No migration. New specs `pinterest-custom-pin-count.spec.ts` (16) and `wordpress-rewrite-article.spec.ts` (28), browser spec skipped without session; full renderer 829/830 (same pre-existing `pinterest-text-importance-none.spec.ts` failure). No real AI call made. See TASK-046 below and CHANGELOG.md.
 
 TASK-045 (Phase 2 — Per-project niche settings) is implemented and committed. Seven fields (tone, audience, keywords, sub-niches / Content Streams, Pinterest angles, visual style, CTA) pre-filled from the niche profile on `/projects/[id]` ("Niche settings"), customizable (Recommended / Custom / Disabled, Add custom value, Reset field / Reset to defaults, Create new Content Stream), saved in `projects.niche_settings` (migration 041 — **apply manually in Supabase**) and applied to every WordPress and Pinterest prompt after source facts and explicit options. Works before the migration (defaults; only saving reports it). New specs `niche-settings.spec.ts` (renderer, 27) and `tests/playwright/niche-settings.spec.ts` (4, skipped without session). See TASK-045 below and CHANGELOG.md. Migration 041 still to apply manually in Supabase.
@@ -679,6 +681,50 @@ Validation of the Crochet and Clay needs with the founder (real examples of expe
 ### Success Criteria (to be refined before implementation)
 
 Each level produces a structured, readable article; every value carries its label (user source / calculated / AI assumption / to be confirmed); detailed patterns pass a deterministic consistency check; Clay baking instructions always defer to the manufacturer; the classic SEO article mode is unaffected.
+
+---
+
+## [TASK-048] Fix Pinterest scheduling timezone conversion
+
+### Status: IMPLEMENTED (2026-10-04 — offline tests pass; committed; real Pinterest import test pending)
+
+### Problem
+
+Real case: the user chooses **13:00** in OmniFlow → the interface shows **15:00** after confirming → the CSV contains `2026-09-22T15:00:00` → Pinterest shows **17:00**.
+
+### Cause (confirmed in the code)
+
+1. The client sent `startDate` + `startTime` without a time zone.
+2. The server built the date with `new Date(y, m, d, h, min)` — the server machine's zone (UTC on Vercel) — so 13:00 was stored as `13:00Z` in `pins.publish_date` (`timestamptz`).
+3. The interface converted that instant back to local time: 15:00 in Madrid (UTC+2).
+4. The CSV used local getters: `15:00:00` without offset.
+5. Pinterest reads an offset-less value as UTC and showed it in Madrid: 17:00.
+
+### Fix
+
+* **Zone**: an explicit IANA zone — projects have no zone setting (adding one would need a migration, not required), so the **browser's zone at input** (`Intl…resolvedOptions().timeZone`). Never the server's zone, never "already UTC".
+* **Client** (`components/pinterest/schedule-dialog.tsx`): sends `startDate`, `startTime` (HH:mm or HH:mm:ss) and `timeZone`; the preview is computed and shown in that zone ("Times in Europe/Madrid"); default start date from the browser calendar.
+* **Server** (`PATCH /api/pinterest/schedule`, `lib/validations/schedule.ts`, new `lib/scheduling/timezone.ts`): `timeZone` required and validated; the wall time is converted to UTC exactly once and the instant stored in `publish_date` (database unchanged). Days mode keeps the same wall time each day across summer / winter time; a skipped time (spring forward) is refused, a repeated one (autumn) takes its first occurrence.
+* **Display**: the stored UTC instant is shown in the browser's zone (pin table, preview) → 13:00.
+* **CSV** (`lib/csv/pinterest.ts`): `YYYY-MM-DDTHH:mm:ss` written **in UTC** (UTC getters) — one conversion only. 13:00 Madrid → `2026-09-22T11:00:00`.
+* **Dashboard / Content Streams coverage**: Pins bucketed by their Europe/Madrid day (`PROJECT_TIME_ZONE`, same as "today"), planned-Pins query with one day of margin.
+
+```txt
+Before: 13:00 typed → stored 13:00Z → shown 15:00 → CSV 15:00:00 → Pinterest 17:00
+After:  13:00 Europe/Madrid → stored 2026-09-22T11:00:00Z → shown 13:00 → CSV 2026-09-22T11:00:00 → Pinterest 13:00 (expected)
+```
+
+### CSV format
+
+Kept: `YYYY-MM-DDTHH:mm:ss`, no suffix, now **UTC**. Basis: the reported case shows Pinterest reads an offset-less value as UTC (15:00:00 → 17:00 in Madrid). Pinterest's public documentation does not state the zone. **The controlled two-line import test (UTC row vs. former local row) has not been run** — no Pinterest access from the agent; procedure in TESTING.md. Until it is done, the CSV format is supported by the reported case only.
+
+### Old Pins
+
+Not modified: no migration, no backfill. Pins scheduled before the fix keep `publish_date` = typed time stored as UTC; they now show +2 h (summer) in OmniFlow and the CSV writes their stored UTC value (13:00 typed → CSV 13:00:00 → 15:00 on Pinterest instead of 17:00). Re-applying the schedule fixes them.
+
+### Success Criteria
+
+13:00 chosen → 13:00 in OmniFlow, `11:00:00` (summer) in the CSV, 13:00 on Pinterest. Offline: `tests/renderer/pinterest-schedule-timezone.spec.ts` (24). Manual: choose 13:00, confirm, check OmniFlow, download the CSV, import a test line in Pinterest, check 13:00.
 
 ---
 

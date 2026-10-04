@@ -178,7 +178,7 @@ Recent Activity:
 
 ### Command Center (TASK-FIX-042 — operational Command Center)
 
-Replaces the Phase 1.1 layout (TASK-FIX-038). Every value is read from Supabase or explicitly shown as "—" / "Not tracked yet"; `lib/dashboard/command-center-mock.ts` no longer exists. Pure calculations live in `lib/dashboard/build-*.ts`, reads in `lib/queries/command-center.ts`. Days are computed in the runtime's local calendar (`lib/dashboard/local-date.ts`) — the same convention used to write `pins.publish_date` — never by slicing `toISOString()`.
+Replaces the Phase 1.1 layout (TASK-FIX-038). Every value is read from Supabase or explicitly shown as "—" / "Not tracked yet"; `lib/dashboard/command-center-mock.ts` no longer exists. Pure calculations live in `lib/dashboard/build-*.ts`, reads in `lib/queries/command-center.ts`. Days are computed with `lib/dashboard/local-date.ts`, never by slicing `toISOString()`. Since TASK-048 `pins.publish_date` is the real UTC instant, so Pins are bucketed on their calendar day in `PROJECT_TIME_ZONE` (Europe/Madrid), the same calendar as "today" of the coverage grid (TASK-FIX-054); the planned-Pins query starts one day before the runtime's week start so early-Monday Pins are not missed.
 
 Order of `/dashboard`:
 
@@ -1323,7 +1323,7 @@ Spread by Hours
 
 ### Preview
 
-Shows first 5 pins with calculated dates + "N more" count.
+Shows first 5 pins with calculated dates + "N more" count, computed and displayed in the browser's IANA zone, with the line "Times in Europe/Madrid" (`data-testid="schedule-time-zone"`, TASK-048). That zone is sent with the request (`timeZone`); the server converts the typed time to UTC once. A time that does not exist in that zone (daylight-saving change) shows no preview and the API refuses it with a message.
 
 ### Actions
 
@@ -1333,11 +1333,11 @@ Shows first 5 pins with calculated dates + "N more" count.
 
 ### PinTable Integration
 
-Publish Date column shown conditionally when any pin has a date.
+Publish Date column shown conditionally when any pin has a date — the stored UTC instant displayed in the browser's zone (13:00 typed in Madrid → 13:00 shown).
 
 ### CSV Integration
 
-publish_date exported in ISO 8601 format: YYYY-MM-DDTHH:mm:ss
+publish_date exported as `YYYY-MM-DDTHH:mm:ss` **in UTC** (no suffix), from UTC getters only — never the browser's local hour (TASK-048). Pinterest reads this offset-less value as UTC and shows it in the account's zone: 13:00 Madrid → stored `11:00Z` → CSV `2026-09-22T11:00:00` → 13:00 on Pinterest (to confirm with the manual import test, see TESTING.md).
 
 ---
 

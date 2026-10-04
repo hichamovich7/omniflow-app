@@ -95,11 +95,16 @@ export function computeMissingPins(requiredBuffer: number | null, plannedPins: n
   return Math.max(0, requiredBuffer - plannedPins);
 }
 
-/** Pins per local day key. */
+/**
+ * Pins per calendar day of the project zone (PROJECT_TIME_ZONE, the same
+ * calendar as "today" of the grid). Since TASK-048 publish_date is the real
+ * UTC instant, so the day is read in that zone — never the runtime's own
+ * (UTC on the server), which would move a 00:30 Pin onto the previous day.
+ */
 export function countPinsByDay(publishDates: string[]): Map<string, number> {
   const byDay = new Map<string, number>();
   for (const iso of publishDates) {
-    const key = toLocalDayKey(new Date(iso));
+    const key = toDayKeyInTimeZone(new Date(iso));
     byDay.set(key, (byDay.get(key) ?? 0) + 1);
   }
   return byDay;
@@ -161,7 +166,7 @@ export function buildContentCoverage({
     const upcoming = plannedPins
       .filter((pin) => pin.boardId && boardIds.has(pin.boardId))
       .map((pin) => pin.publishDate)
-      .filter((iso) => toLocalDayKey(new Date(iso)) >= todayKey);
+      .filter((iso) => toDayKeyInTimeZone(new Date(iso)) >= todayKey);
 
     const byDay = countPinsByDay(upcoming);
     const lastPlannedDate = [...byDay.keys()].sort().at(-1) ?? null;

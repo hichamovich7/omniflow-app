@@ -6,6 +6,7 @@ import {
   calculateDaySchedule,
   calculateHourSchedule,
 } from '@/lib/validations/schedule';
+import { ScheduleTimeError, zonedWallTimeToUtc } from '@/lib/scheduling/timezone';
 import type { ApiResponse } from '@/types/api';
 
 export async function PATCH(request: Request) {
@@ -83,9 +84,20 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const { generationId, startDate, startTime, pinIds } = parsed.data;
+  const { generationId, startDate, startTime, timeZone, pinIds } = parsed.data;
 
-  const startDateTime = new Date(`${startDate}T${startTime}`);
+  // The typed wall time is read in the client's IANA zone and converted to
+  // UTC once (TASK-048) — never the server's zone, never assumed UTC.
+  let startDateTime: Date;
+  try {
+    startDateTime = zonedWallTimeToUtc(startDate, startTime, timeZone);
+  } catch (err) {
+    if (!(err instanceof ScheduleTimeError)) throw err;
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: err.message, code: 'invalid_request' } },
+      { status: 400 }
+    );
+  }
   if (startDateTime <= new Date()) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Start date must be in the future', code: 'invalid_request' } },
@@ -134,10 +146,20 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const dates =
-    parsed.data.mode === 'hours'
-      ? calculateHourSchedule(pinList.length, startDate, startTime, parsed.data.intervalMinutes)
-      : calculateDaySchedule(pinList.length, startDate, startTime, parsed.data.frequency);
+  let dates: Date[];
+  try {
+    dates =
+      parsed.data.mode === 'hours'
+        ? calculateHourSchedule(pinList.length, startDate, startTime, parsed.data.intervalMinutes, timeZone)
+        : calculateDaySchedule(pinList.length, startDate, startTime, parsed.data.frequency, timeZone);
+  } catch (err) {
+    // A later day can land on a time skipped by a daylight-saving change.
+    if (!(err instanceof ScheduleTimeError)) throw err;
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: err.message, code: 'invalid_request' } },
+      { status: 400 }
+    );
+  }
 
   for (let i = 0; i < pinList.length; i++) {
     await supabase

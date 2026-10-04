@@ -1,14 +1,14 @@
 /**
  * Calendar-day helpers for the Command Center.
  *
- * Timezone convention: every day key is derived from the runtime's *local*
- * calendar (getFullYear/getMonth/getDate) — the exact convention already
- * used to write and read `pins.publish_date` (lib/validations/schedule.ts
- * builds the planned Date with the local `new Date(y, m, d, h, min)`
- * constructor, and lib/csv/pinterest.ts formats it back with local
- * getters). Never slice `toISOString()` for a day key: that silently
+ * Timezone convention: `toLocalDayKey()` uses the runtime's *local*
+ * calendar (getFullYear/getMonth/getDate). `pins.publish_date` is the real
+ * UTC instant since TASK-048 (typed wall time + IANA zone, converted once in
+ * lib/scheduling/timezone.ts), so pins are bucketed with
+ * `toDayKeyInTimeZone()` in PROJECT_TIME_ZONE — the same calendar as the
+ * grid's "today". Never slice `toISOString()` for a day key: that silently
  * switches to UTC and shifts every pin planned between 00:00 and the UTC
- * offset onto the previous day (the UTC / Europe-Paris mismatch).
+ * offset onto the previous day.
  */
 
 /** YYYY-MM-DD of `date` in the runtime's local calendar. */

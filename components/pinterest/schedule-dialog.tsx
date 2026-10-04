@@ -32,6 +32,8 @@ import {
   calculateHourSchedule,
 } from '@/lib/validations/schedule';
 import type { ScheduleMode, DayFrequency, HourInterval } from '@/lib/validations/schedule';
+import { getBrowserTimeZone, ScheduleTimeError } from '@/lib/scheduling/timezone';
+import { toLocalDayKey } from '@/lib/dashboard/local-date';
 
 interface ScheduleDialogProps {
   generationId: string;
@@ -42,26 +44,21 @@ interface ScheduleDialogProps {
 
 const PREVIEW_LIMIT = 5;
 
-function formatPreviewDate(date: Date): string {
+// Preview in the zone the time is typed in, so it shows exactly the
+// wall-clock time chosen (TASK-048).
+function formatPreviewDate(date: Date, timeZone: string): string {
   return (
-    date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }) +
+    date.toLocaleDateString('en-US', { timeZone, month: 'short', day: 'numeric', year: 'numeric' }) +
     ' ' +
-    date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
+    date.toLocaleTimeString('en-US', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   );
 }
 
+// Tomorrow in the browser's calendar (never a UTC day from toISOString()).
 function getDefaultStartDate(): string {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().split('T')[0];
+  return toLocalDayKey(tomorrow);
 }
 
 export function ScheduleDialog({ generationId, pinCount, hasSchedule, selectedPinIds }: ScheduleDialogProps) {
@@ -75,13 +72,21 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule, selectedPi
   const [dayFrequency, setDayFrequency] = useState<DayFrequency>('daily');
   const [hourInterval, setHourInterval] = useState<HourInterval>(60);
   const [loading, setLoading] = useState(false);
+  // IANA zone of this browser: the typed time is read in it, sent with the
+  // request and converted to UTC once on the server.
+  const [timeZone] = useState(getBrowserTimeZone);
 
   const previewDates = useMemo(() => {
     if (!startDate || !startTime) return [];
-    return mode === 'hours'
-      ? calculateHourSchedule(effectivePinCount, startDate, startTime, hourInterval)
-      : calculateDaySchedule(effectivePinCount, startDate, startTime, dayFrequency);
-  }, [effectivePinCount, startDate, startTime, mode, dayFrequency, hourInterval]);
+    try {
+      return mode === 'hours'
+        ? calculateHourSchedule(effectivePinCount, startDate, startTime, hourInterval, timeZone)
+        : calculateDaySchedule(effectivePinCount, startDate, startTime, dayFrequency, timeZone);
+    } catch (err) {
+      if (err instanceof ScheduleTimeError) return [];
+      throw err;
+    }
+  }, [effectivePinCount, startDate, startTime, mode, dayFrequency, hourInterval, timeZone]);
 
   async function handleApply() {
     setLoading(true);
@@ -89,8 +94,8 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule, selectedPi
     const pinIdsArray = hasSelection ? Array.from(selectedPinIds) : undefined;
     const payload =
       mode === 'hours'
-        ? { generationId, mode, startDate, startTime, intervalMinutes: hourInterval, pinIds: pinIdsArray }
-        : { generationId, mode, startDate, startTime, frequency: dayFrequency, pinIds: pinIdsArray };
+        ? { generationId, mode, startDate, startTime, timeZone, intervalMinutes: hourInterval, pinIds: pinIdsArray }
+        : { generationId, mode, startDate, startTime, timeZone, frequency: dayFrequency, pinIds: pinIdsArray };
 
     const res = await fetch('/api/pinterest/schedule', {
       method: 'PATCH',
@@ -234,10 +239,13 @@ export function ScheduleDialog({ generationId, pinCount, hasSchedule, selectedPi
             {previewDates.length > 0 && (
               <div className="rounded-md border p-3">
                 <p className="mb-2 text-sm font-medium">Preview</p>
+                <p className="mb-2 text-xs text-muted-foreground" data-testid="schedule-time-zone">
+                  Times in {timeZone}
+                </p>
                 <div className="space-y-1 text-sm text-muted-foreground">
                   {previewDates.slice(0, PREVIEW_LIMIT).map((date, i) => (
                     <div key={i}>
-                      Pin {i + 1} → {formatPreviewDate(date)}
+                      Pin {i + 1} → {formatPreviewDate(date, timeZone)}
                     </div>
                   ))}
                   {previewDates.length > PREVIEW_LIMIT && (

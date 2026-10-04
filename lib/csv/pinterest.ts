@@ -7,16 +7,24 @@ function escapeCsvField(field: string): string {
   return field;
 }
 
+/**
+ * "Publish date" column: the stored instant written in **UTC**, as
+ * `YYYY-MM-DDTHH:mm:ss` (TASK-048). Pinterest reads this offset-less value
+ * as UTC and shows it in the account's zone — the reported case: a value of
+ * 15:00:00 appeared at 17:00 in Madrid (UTC+2). Writing the browser's local
+ * hour here was the second conversion of the 13:00 → 15:00 → 17:00 bug.
+ * UTC getters only: the result never depends on the browser's zone.
+ */
 export function formatPinterestPublishDate(dateString: string | null): string {
   if (!dateString) return '';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return '';
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
+  const ss = String(d.getUTCSeconds()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
 }
 

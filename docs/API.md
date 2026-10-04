@@ -1304,6 +1304,8 @@ Apply or clear schedule dates for pins in a generation.
 
 Sets publish_date on all pins in a generation based on start date, time, and frequency. Supports "Spread by Days" and "Spread by Hours" modes.
 
+**Time zone (TASK-048).** `startDate` + `startTime` are the wall-clock date and time the user typed, and `timeZone` (required) is the IANA zone they were typed in — the browser's zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`), since projects have no zone setting. The server converts that wall time to UTC exactly once (`zonedWallTimeToUtc()`, `lib/scheduling/timezone.ts`) and stores the UTC instant in `publish_date` (`timestamptz`, unchanged). It never uses its own runtime zone and never assumes the typed time is UTC. Example: `13:00` + `Europe/Madrid` on 2026-09-22 → `2026-09-22T11:00:00Z` (12:00Z in winter). Days mode keeps the same wall time on every day (13:00 stays 13:00 across a summer / winter change); hours mode adds a real elapsed interval to the first instant. `startTime` accepts `HH:mm` or `HH:mm:ss`. Missing / invalid zone (not an IANA name — offsets and abbreviations refused) → 400 `Invalid time zone. Reload the page and try again.`; a time skipped by a daylight-saving change (e.g. 02:30 on the spring-forward night) → 400 with an explicit message; a repeated autumn time resolves to its first occurrence. "Start date must be in the future" is judged on the converted instant. Only the Pins of the request are written; Pins scheduled before the fix are never rewritten.
+
 ## Request (Apply Schedule — Days Mode)
 
 ```json
@@ -1313,6 +1315,7 @@ Sets publish_date on all pins in a generation based on start date, time, and fre
   "mode": "days",
   "startDate": "2026-07-01",
   "startTime": "09:00",
+  "timeZone": "Europe/Madrid",
   "frequency": "daily"
 }
 ```
@@ -1326,6 +1329,7 @@ Sets publish_date on all pins in a generation based on start date, time, and fre
   "mode": "hours",
   "startDate": "2026-07-01",
   "startTime": "09:00",
+  "timeZone": "Europe/Madrid",
   "interval": "2h"
 }
 ```

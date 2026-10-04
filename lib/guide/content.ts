@@ -147,6 +147,8 @@ export const guideSections: GuideSection[] = [
     summary: 'Assign publish dates to your pins so your CSV export is ready to schedule in bulk.',
     points: [
       'Auto-Schedule spreads your pins across days or hours starting from a date and time you choose.',
+      'The time you choose is read in your browser\'s time zone (shown under the preview, e.g. "Times in Europe/Madrid") and kept as that exact time: 13:00 stays 13:00 in OmniFlow and in the CSV for Pinterest, including across summer / winter time. A time that does not exist because of the clock change (e.g. 02:30 on the spring-forward night) is refused — pick another one.',
+      'Pins scheduled before this fix keep their stored date: they may still show two hours later than the time you had chosen. Re-apply the schedule on them if needed.',
       'Clear Schedule removes all publish dates in one click if you want to start over.',
     ],
   },

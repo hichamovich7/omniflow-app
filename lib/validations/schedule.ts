@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  INVALID_TIME_ZONE_MESSAGE,
+  addDaysToDateKey,
+  dayOfWeekOfDateKey,
+  isValidTimeZone,
+  zonedWallTimeToUtc,
+} from '@/lib/scheduling/timezone';
 
 export const SCHEDULE_MODES = ['days', 'hours'] as const;
 export type ScheduleMode = (typeof SCHEDULE_MODES)[number];
@@ -36,11 +43,18 @@ export const HOUR_INTERVAL_LABELS: Record<HourInterval, string> = {
   240: '4 hours',
 };
 
+// Wall-clock time typed by the user; seconds optional (HH:mm or HH:mm:ss).
+const startTimeSchema = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Invalid time format');
+// IANA zone the time was typed in (the browser's zone) — required: the
+// server never falls back to its own zone or to UTC (TASK-048).
+const timeZoneSchema = z.string({ error: INVALID_TIME_ZONE_MESSAGE }).refine(isValidTimeZone, { message: INVALID_TIME_ZONE_MESSAGE });
+
 export const scheduleDaysSchema = z.object({
   generationId: z.string().uuid(),
   mode: z.literal('days'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
+  startTime: startTimeSchema,
+  timeZone: timeZoneSchema,
   frequency: z.enum(DAY_FREQUENCY_OPTIONS),
   pinIds: z.array(z.string().uuid()).optional(),
 });
@@ -49,7 +63,8 @@ export const scheduleHoursSchema = z.object({
   generationId: z.string().uuid(),
   mode: z.literal('hours'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
+  startTime: startTimeSchema,
+  timeZone: timeZoneSchema,
   intervalMinutes: z.coerce.number().refine(
     (v): v is HourInterval => (HOUR_INTERVAL_OPTIONS as readonly number[]).includes(v),
     { message: 'Invalid interval' }
@@ -70,79 +85,50 @@ export const clearScheduleSchema = z.object({
 
 export type ScheduleInput = z.infer<typeof scheduleSchema>;
 
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
+function nextWeekdayKey(dateKey: string): string {
+  let next = addDaysToDateKey(dateKey, 1);
+  while (dayOfWeekOfDateKey(next) === 0 || dayOfWeekOfDateKey(next) === 6) next = addDaysToDateKey(next, 1);
+  return next;
 }
 
-function addMinutes(date: Date, minutes: number): Date {
-  return new Date(date.getTime() + minutes * 60000);
-}
+const DAY_STEP: Record<Exclude<DayFrequency, 'every_weekday'>, number> = {
+  daily: 1,
+  every_2_days: 2,
+  every_3_days: 3,
+  weekly: 7,
+};
 
-function nextWeekday(date: Date): Date {
-  const result = addDays(date, 1);
-  while (result.getDay() === 0 || result.getDay() === 6) {
-    result.setDate(result.getDate() + 1);
-  }
-  return result;
-}
-
-function buildFirst(startDate: string, startTime: string): Date {
-  const [year, month, day] = startDate.split('-').map(Number);
-  const [hours, minutes] = startTime.split(':').map(Number);
-  return new Date(year, month - 1, day, hours, minutes);
-}
-
+/**
+ * One publish instant (UTC) per Pin, every Pin at the same wall-clock time
+ * in `timeZone` on successive calendar days — 13:00 stays 13:00 across a
+ * summer / winter time change. Each day is converted to UTC exactly once.
+ */
 export function calculateDaySchedule(
   count: number,
   startDate: string,
   startTime: string,
-  frequency: DayFrequency
+  frequency: DayFrequency,
+  timeZone: string
 ): Date[] {
-  const first = buildFirst(startDate, startTime);
-  const dates: Date[] = [first];
-
+  const dateKeys: string[] = [startDate];
   for (let i = 1; i < count; i++) {
-    const prev = dates[i - 1];
-    let next: Date;
-
-    switch (frequency) {
-      case 'daily':
-        next = addDays(prev, 1);
-        break;
-      case 'every_2_days':
-        next = addDays(prev, 2);
-        break;
-      case 'every_3_days':
-        next = addDays(prev, 3);
-        break;
-      case 'weekly':
-        next = addDays(prev, 7);
-        break;
-      case 'every_weekday':
-        next = nextWeekday(prev);
-        break;
-    }
-
-    dates.push(next);
+    const prev = dateKeys[i - 1];
+    dateKeys.push(frequency === 'every_weekday' ? nextWeekdayKey(prev) : addDaysToDateKey(prev, DAY_STEP[frequency]));
   }
-
-  return dates;
+  return dateKeys.map((dateKey) => zonedWallTimeToUtc(dateKey, startTime, timeZone));
 }
 
+/**
+ * First Pin at the wall-clock time in `timeZone` (converted to UTC once),
+ * then a real elapsed interval between Pins.
+ */
 export function calculateHourSchedule(
   count: number,
   startDate: string,
   startTime: string,
-  intervalMinutes: number
+  intervalMinutes: number,
+  timeZone: string
 ): Date[] {
-  const first = buildFirst(startDate, startTime);
-  const dates: Date[] = [first];
-
-  for (let i = 1; i < count; i++) {
-    dates.push(addMinutes(dates[i - 1], intervalMinutes));
-  }
-
-  return dates;
+  const first = zonedWallTimeToUtc(startDate, startTime, timeZone);
+  return Array.from({ length: count }, (_, i) => new Date(first.getTime() + i * intervalMinutes * 60000));
 }

@@ -27,7 +27,7 @@ import {
 import { buildContentCoverage, buildWeekPlan } from '@/lib/dashboard/build-content-coverage';
 import { buildRecommendations, pickFocusRecommendation } from '@/lib/dashboard/build-recommendations';
 import { buildSundayReviewStatus } from '@/lib/dashboard/build-sunday-review';
-import { startOfLocalWeek, toDayKeyInTimeZone } from '@/lib/dashboard/local-date';
+import { addLocalDays, startOfLocalWeek, toDayKeyInTimeZone } from '@/lib/dashboard/local-date';
 import { listPublishingActivityFrom } from '@/lib/queries/stream-publishing-activity';
 import {
   countPinLifecycle,
@@ -109,7 +109,9 @@ export default async function DashboardPage() {
     supabase.rpc('is_rate_limit_bypassed'),
     // Command Center (TASK-FIX-042) — real planning data only.
     listCommandCenterStreams(supabase),
-    listPlannedPinsFrom(supabase, startOfLocalWeek(now).toISOString()),
+    // One day of margin: pins are bucketed by the project-zone day
+    // (TASK-048), which can start before the runtime's Monday 00:00.
+    listPlannedPinsFrom(supabase, addLocalDays(startOfLocalWeek(now), -1).toISOString()),
     countPinLifecycle(supabase, now),
     countWeeklyActivity(supabase, now),
     listDashboardTasks(supabase, userId, now),

@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest: Fix scheduling timezone conversion — TASK-048 (2026-10-04)
+
+* Bug: 13:00 chosen → 15:00 shown → CSV `15:00:00` → 17:00 on Pinterest. The server built the date in its own zone (UTC) and the CSV wrote the browser's local hour, which Pinterest reads as UTC.
+* New `lib/scheduling/timezone.ts`: IANA validation, wall time + zone → UTC once (summer / winter time, skipped and repeated times), display in a zone.
+* `PATCH /api/pinterest/schedule`: new required `timeZone` (IANA); `startTime` accepts seconds; `calculateDaySchedule()` / `calculateHourSchedule()` take the zone (same wall time every day in days mode). Database unchanged (`publish_date timestamptz` holds the real UTC instant).
+* Schedule dialog: sends the browser's zone, preview in that zone ("Times in …"), default date from the browser calendar.
+* CSV "Publish date": UTC `YYYY-MM-DDTHH:mm:ss` (UTC getters, no local conversion).
+* Dashboard coverage / week plan: Pins bucketed by Europe/Madrid day; planned-Pins query with one day of margin.
+* No migration; Pins scheduled before the fix are not modified. Guide (Scheduling) updated. New offline spec `pinterest-schedule-timezone.spec.ts` (24). Real Pinterest import test pending.
+
 ## Pinterest + WordPress: Custom number of Pins and Rewrite article — TASK-046 (2026-10-04)
 
 Only these two improvements; third improvement TBD; no other feature.
