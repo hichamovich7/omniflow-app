@@ -17,6 +17,10 @@ import { WpSendStatusBadge } from '@/components/wordpress/wp-send-status-badge';
 import { ArticleCategoryEditor } from '@/components/wordpress/article-category-editor';
 import { ArticleQualityReportCard } from '@/components/wordpress/article-quality-report';
 import { SocialContentStudio } from '@/components/wordpress/social-content-studio';
+import { RewriteArticleButton } from '@/components/wordpress/rewrite-article-button';
+import { canRewriteArticle, readRewrittenFrom, REWRITTEN_FROM_PARAM } from '@/lib/wordpress/rewrite-view';
+import Link from 'next/link';
+import { Alert } from '@/components/ui/alert';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { FileText } from 'lucide-react';
@@ -25,10 +29,13 @@ import { StatusBadge } from '@/components/shared/status';
 
 export default async function WordPressArticlePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const rewrittenFrom = readRewrittenFrom((await searchParams)[REWRITTEN_FROM_PARAM], id);
   const supabase = await createClient();
   const { generation, article, images, qualityReport } = await getWordPressArticleByGenerationId(supabase, id);
 
@@ -72,6 +79,18 @@ export default async function WordPressArticlePage({
       {/* Article */}
       {article ? (
         <div className="space-y-6">
+          {rewrittenFrom && (
+            <Alert variant="info" data-testid="rewritten-version-notice">
+              <span>
+                This is a rewritten version, not yet published to WordPress. The previous version is kept unchanged
+                in your history:{' '}
+                <Link href={`/wordpress/${rewrittenFrom}`} className="font-medium underline underline-offset-2">
+                  open the previous version
+                </Link>
+                .
+              </span>
+            </Alert>
+          )}
           {wordpressSite && (
             <PublishControl generationId={id} article={article} wordpressSite={wordpressSite} />
           )}
@@ -86,6 +105,8 @@ export default async function WordPressArticlePage({
           />
 
           <ArticleQualityReportCard report={qualityReport} generationId={id} />
+
+          {canRewriteArticle(generation, article) && <RewriteArticleButton generationId={id} />}
 
           {generation.status === 'completed' && article.status === 'completed' && (
             <SocialContentStudio generationId={id} />

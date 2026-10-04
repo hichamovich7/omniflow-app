@@ -112,6 +112,8 @@ Creates one generation request and produces Pinterest content using AI.
 }
 ```
 
+`pinsRequested` is required: any whole number from 1 to 30 (custom number of Pins, TASK-046 — `pinsRequestedSchema`, `lib/validations/pinterest.ts`). A number or a numeric string is accepted; 0, negatives, decimals, values above 30, empty / non-numeric values and booleans are rejected with HTTP 400 `invalid_request` (`Choose between 1 and 30 Pins.` / `The number of Pins must be a whole number.`) — never rounded or clamped. The form's presets (1, 3, 5, 7, 8, 10, 20, 30) are shortcuts only; defaults are unchanged (10, or 5 with `wordpressArticleId`). With balanced angles (Legacy Composite, Photo Only, AI Integrated `balanced`) the prompt gives each pin its angle from the round-robin plan (`buildPinterestAnglePlan()`: every angle once before any repeats) and the strategy check refuses a complete batch whose per-angle count is outside `floor(n/5)`–`ceil(n/5)`; Pins sharing an angle (any batch above 5) are compared pairwise and near-copies are refused (`near-duplicate-variant`, HTTP 422 `invalid_strategy_plan`, nothing saved). No destination URL is ever added: `website_url` only stores the request's `websiteUrl`, and `link_url` is never written by this route.
+
 `board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
 
 `boardSection` is optional and only meaningful together with `board`. Trimmed; an empty/whitespace-only value is treated as absent. Max 100 characters; rejected (HTTP 400 `invalid_request`) if it contains `/`, `\`, a line break, or another control character — `/` is Pinterest's own Board/Section separator (see the CSV export below). Rejected with the message `Select a board before entering a board section.` when present without `board`. When accepted, every generated pin in the batch stores the same `board_section` value (`pins.board_section`, migration 032) — it is never AI-suggested per pin, same convention as `board` itself.
@@ -970,6 +972,67 @@ rate_limited
 ```
 
 A WordPress problem is never an error: the original export is returned. On any request failure the client copies its own original export.
+
+---
+
+# POST /api/wordpress/[id]/rewrite
+
+"Rewrite article" (TASK-046). Regenerates the full text of a completed article as a **new version**: a new `wordpress_generations` row (every option column copied: keyword, language, `source_type`, `research_notes`, `source_pin_ids`, `source_url`, Core Settings, Structure toggles, `seo_keywords`, `manual_external_urls`) with its own `wordpress_articles` / `wordpress_article_images` rows. `[id]` is the previous `wordpress_generations.id`. The previous version is only read — never updated or deleted — and stays in WordPress History. Nothing is sent to WordPress. No migration: the two versions are not linked in the database; the client opens the new one with `?rewrittenFrom=<previous id>` to show a link back.
+
+## Description
+
+1. Auth, UUID check, Zod body (`rewriteArticleSchema`, `lib/validations/wordpress-rewrite.ts`: `{ "confirm": true }` exactly — the confirmation given in the dialog; anything else → 400, no AI call).
+2. Ownership (`generation.user_id`, project `user_id`), then generation and article `completed` with non-empty content, else 409 `article_not_ready`.
+3. Rate limit `wordpress/rewrite` (20/hour) + trial cap, same family as the other WordPress generators.
+4. `prepareRewriteSource()` (`lib/wordpress/rewrite-article.ts`): images → `{{IMAGE_N}}` markers, FAQ section → `{{FAQ}}` line, H2 headings (the reused outline), Markdown link URLs. FAQ: regenerated when `resolveArticleFaq()` finds Q/A (stored `faq` column, or the H3 FAQ section for articles before migration 039), kept verbatim when the section is not parseable, none otherwise.
+5. Insert the new generation (`processing`), resolve niche context (project niche + article category's Content Streams + project niche settings) and the connected site URL.
+6. One text call (`TEXT_ROLE`, `ARTICLE_MAX_TOKENS` / `_LARGE`, prompt `wordpress-rewrite-v1`, `lib/ai/prompts/wordpress-rewrite-prompt.ts`) with the original options, Brand Profile, research notes, niche blocks and the current article. No outline call, no image generation, no web search.
+7. `finalizeRewrittenContent()`: stored H1 forced, every image marker exactly once (a dropped one is put back), FAQ rendered from the regenerated items (`applyFaqSection()`) or the original section put back. Quality Gate (`runArticleQualityCheck()`) with the stored title / meta title / meta description / slug, the original H2s and markers, the original links as allowed URLs.
+8. Images in the previous version's storage folder (`<user>/<previous generation>/…`, removed when that version is deleted) are copied to `<user>/<new generation>/…` and the URLs replaced; other URLs (reused Pin images) are kept. A failed copy keeps the original URL and returns a warning.
+9. Insert the new article (title, slug, meta title, meta description, category, featured image prompt / URL kept; no `wp_post_id`, default `publish_status`), its image rows, mark `completed`, then `saveQualityReport()` and `saveArticleFaq()` on the new rows.
+
+## Request
+
+```json
+{ "confirm": true }
+```
+
+## Response (201)
+
+```json
+{
+  "data": {
+    "generationId": "uuid (new version)",
+    "previousGenerationId": "uuid",
+    "status": "completed",
+    "quality": { "status": "passed", "qualityIssues": [], "warnings": [], "checks": [] },
+    "warnings": []
+  },
+  "error": null
+}
+```
+
+## Credits
+
+No credit is debited (same as the other WordPress generators — credits are deferred); the call counts toward the hourly limit and free-trial generations.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request      (confirmation missing)
+not_found
+forbidden
+article_not_ready    (409)
+rate_limited
+invalid_rewrite      (422 — invalid JSON / format from the AI, new version marked failed)
+generation_failed    (500 — provider error, new version marked failed)
+server_error
+```
+
+On any failure the previous version is unchanged; only the new generation row is marked `failed` (visible in history, like any failed generation).
 
 ---
 

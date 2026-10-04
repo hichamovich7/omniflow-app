@@ -1029,3 +1029,22 @@ Browser (`tests/playwright/niche-settings.spec.ts`, 4): the seven fields, Add cu
 Manual check after applying migration 041: open a Clay project, disable a recommended tone, add a custom keyword, save, reload (values kept), generate one WordPress article and one Pinterest batch, then "Reset to defaults".
 
 Validation (2026-09-28): TypeScript OK, ESLint (touched files) OK, niche specs 73/73, full renderer 785 passed / 1 failed (same pre-existing `pinterest-text-importance-none.spec.ts`), browser spec 4 skipped (no session), production build OK, `git diff --check` OK.
+
+---
+
+# Custom number of Pins + Rewrite article (TASK-046, 2026-10-04)
+
+Focused command:
+
+```bash
+npx playwright test tests/renderer/pinterest-custom-pin-count.spec.ts tests/renderer/wordpress-rewrite-article.spec.ts --project=renderer --reporter=list
+```
+
+Offline (no AI call, no network, no WordPress call — prompt builders are pure; the rewrite route runs with a fake Supabase / Storage and a stub `generateText` injected through `require.cache`):
+
+* `pinterest-custom-pin-count.spec.ts` (16): defaults 10 / 5 and presets unchanged; custom 6 (number and string), 7, 12; bounds 1 and 30 in both flows; 0, negatives, decimals, > 30, empty, non-numeric, boolean, NaN refused with the right message; form "Custom…" field checked before the request; Regenerate re-sends the stored count; angle plan (all five before any repeat, counts within one); prompt order for 3 / 6 / 30 and unchanged 5 / 10 wording; balanced 6 / 7 / 12 accepted; early repeats refused (3, 6) unless the strategy is free; near-copy variants refused above 5; partial batch not judged; no `link_url`, `website_url` only from the request, article flow refuses URLs for any count; Guide.
+* `wordpress-rewrite-article.spec.ts` (28): source preparation (images → markers, single `{{FAQ}}`, headings, links; stored and legacy FAQ; preserved and absent FAQ; article without images); finalization (stored H1, every image kept with its URL / alt, dropped marker restored before the FAQ, duplicate removed, regenerated or preserved FAQ, copied URLs applied); prompt carries brief, options, niche block, keywords, outline, images, links, FAQ questions; article prompt unchanged by the shared helpers; new rows (options copied, slug / meta / category / featured image kept, no `wp_post_id` / publish status, image rows with new URLs, Pin images untouched); confirmation required; completed-only; link back; UI (button, confirmation before request, state, errors, locked dialog, notice); route — new version with the original context, images copied, new Quality Gate and FAQ saved on the new rows; previous version never updated / deleted, no publish import; no confirmation → nothing; invalid id / other user / not completed → no AI call; provider error, invalid JSON, wrong FAQ count → only the new generation `failed`; failed copy → old URL + warning; legacy article; Guide.
+
+Browser (`tests/playwright/pins-count-and-article-rewrite.spec.ts`, 3 × desktop + mobile): Custom 0 / 31 refused without request and 6 sent; Rewrite dialog Cancel sends nothing; Confirm shows progress then the error and stays on the page. All routes mocked. **Skipped without `PLAYWRIGHT_STORAGE_STATE`** (and `PLAYWRIGHT_WP_ARTICLE_ID` for the rewrite cases).
+
+Validation (2026-10-04): TypeScript OK, ESLint (touched files) OK, new specs 16/16 and 28/28, Pinterest specs (strategy, generation plan, AI Integrated, board section, Social Content Studio, niche) and WordPress specs pass, full renderer 829 passed / 1 failed (same pre-existing `pinterest-text-importance-none.spec.ts`, also failing without this change), browser spec 6 skipped (no session), production build OK, `git diff --check` OK. No real AI generation was run.

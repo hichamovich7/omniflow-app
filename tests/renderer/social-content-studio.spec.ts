@@ -393,7 +393,7 @@ test.describe('/pinterest/create page', () => {
     expect(page).toContain('<PinForm');
     expect(form).toContain("articleSource?.primaryKeyword ?? searchParams.get('keyword')");
     expect(form).toContain('articleSource?.language ??');
-    expect(form).toContain('useState<PinsOption>(articleSource ? 5 : 10)');
+    expect(form).toContain('articleSource ? DEFAULT_ARTICLE_PINS_REQUESTED : DEFAULT_PINS_REQUESTED');
     expect(form).toContain('wordpressArticleId: articleSource?.articleId');
     expect(form).toContain("const websiteUrl = articleSource ? undefined");
     expect(form).toContain("const pinterestUrl = articleSource ? undefined");
@@ -420,7 +420,9 @@ test.describe('Request schema (POST /api/pinterest/generate)', () => {
     }
     expect(Math.max(...PINS_OPTIONS)).toBe(30);
     expect(generatePinsSchema.safeParse({ ...base, pinsRequested: 31 }).success).toBe(false);
-    expect(generatePinsSchema.safeParse({ ...base, pinsRequested: 2 }).success).toBe(false);
+    // Custom number of Pins: any whole number from 1 to 30, not only the presets.
+    expect(generatePinsSchema.safeParse({ ...base, pinsRequested: 2 }).success).toBe(true);
+    expect(generatePinsSchema.safeParse({ ...base, pinsRequested: 0 }).success).toBe(false);
     expect(ARTICLE_PINS_DEFAULT).toBe(5);
   });
 

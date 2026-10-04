@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-046 (Custom number of Pinterest Pins + Rewrite WordPress article) is implemented and committed. Only these two improvements; third improvement: TBD; no other feature included. **Pins:** any whole number from 1 to 30 ("Custom…" in the Pins select; presets and defaults 10 / 5 unchanged; 0, negatives, decimals and > 30 refused client- and server-side), used by Pinterest normal, from a WordPress article and Regenerate; balanced angle plan (every angle before any repeat) in the prompt and the strategy check, near-copies refused above 5 Pins; no destination URL added. **Rewrite article** on `/wordpress/[id]` (completed articles): confirmation dialog, new `POST /api/wordpress/[id]/rewrite` creates a **new version** (new generation + article rows, original options copied, same H1 / H2 outline / images copied to the new storage folder / slug / meta / category / links), FAQ regenerated or kept, Quality Gate re-run, previous version never modified, never published. No migration. New specs `pinterest-custom-pin-count.spec.ts` (16) and `wordpress-rewrite-article.spec.ts` (28), browser spec skipped without session; full renderer 829/830 (same pre-existing `pinterest-text-importance-none.spec.ts` failure). No real AI call made. See TASK-046 below and CHANGELOG.md.
+
 TASK-045 (Phase 2 — Per-project niche settings) is implemented and committed. Seven fields (tone, audience, keywords, sub-niches / Content Streams, Pinterest angles, visual style, CTA) pre-filled from the niche profile on `/projects/[id]` ("Niche settings"), customizable (Recommended / Custom / Disabled, Add custom value, Reset field / Reset to defaults, Create new Content Stream), saved in `projects.niche_settings` (migration 041 — **apply manually in Supabase**) and applied to every WordPress and Pinterest prompt after source facts and explicit options. Works before the migration (defaults; only saving reports it). New specs `niche-settings.spec.ts` (renderer, 27) and `tests/playwright/niche-settings.spec.ts` (4, skipped without session). See TASK-045 below and CHANGELOG.md. Migration 041 still to apply manually in Supabase.
 
 Niche Profiles — Phase 1 (Shared Core + Niche-Specific Configuration) is implemented and committed. Typed profiles in `lib/niche/` (Crochet, Clay Crafts & DIY, Home Organization & Decor, Food & Recipes + generic fallback; aliases such as `Clay`, `Home Decor`, `Recipes`, no duplicate profile), `resolveNicheContext()` (generic → niche → Content Stream sub-niche; unknown niche accepted with its label; no niche and no stream → no block), delimited `<niche_context>` + `<wordpress_rules>` / `<pinterest_rules>` + `<visual_rules>` blocks with the context priority order. Reaches WordPress outline + article for keyword, Pins and URL (category / Pins streams), Pinterest normal (board stream), from article (category stream) and Pin regeneration; visual rules reach WordPress image prompts and Pin `image_prompt`. Visual conventions alias/case-tolerant + new Clay "Modern Handmade" entry (same overlay/template behavior as before). Contradictions fixed (board without niche, light mood, Home Decor examples, "easy"/"beginner" as voice only, Brand Profile below source facts and explicit options, internal links added by the server). Prompt ids bumped. No migration, no UI, no destination URL change. New spec `tests/renderer/niche-profiles.spec.ts` (38), Clay spec updated; see CHANGELOG.md "Niche Profiles — Phase 1". Phase 2 (per-project customization, migration 041) not started.
@@ -559,6 +561,51 @@ cta              Pinterest only (the WordPress soft CTA is unchanged)
 ### Success Criteria
 
 Recommended values visible and editable for known, unknown and empty niches; saved customizations survive reloads and reach every generation path; resetting restores the profile; nothing breaks before the migration is applied. Validated by `tests/renderer/niche-settings.spec.ts` (27) + the Phase 1 specs; browser spec written, skipped without `PLAYWRIGHT_STORAGE_STATE`.
+
+---
+
+## [TASK-046] Custom number of Pinterest Pins + Rewrite WordPress article
+
+### Status: IMPLEMENTED (2026-10-04 — offline tests pass; committed; no real AI call; browser spec skipped without session)
+
+### Scope (this task only)
+
+```txt
+1. Custom number of Pinterest Pins
+2. Rewrite WordPress article
+3. Third improvement: TBD (not started, not part of this task)
+```
+
+No other feature is included.
+
+### Allowed files
+
+Pinterest form / validation / strategy / prompt (`components/pinterest/pin-form.tsx`, `lib/validations/pinterest.ts`, `lib/pinterest/strategy.ts`, `lib/prompts/pinterest-pins.ts`, `types/pinterest.ts`); WordPress review page and the new rewrite route / helpers / prompt / button (`app/(dashboard)/wordpress/[id]/page.tsx`, `app/api/wordpress/[id]/rewrite/route.ts`, `lib/wordpress/rewrite-article.ts`, `lib/wordpress/rewrite-view.ts`, `lib/ai/prompts/wordpress-rewrite-prompt.ts`, `lib/validations/wordpress-rewrite.ts`, `components/wordpress/rewrite-article-button.tsx`); shared voice / formatting helpers extracted from `lib/ai/prompts/wordpress-article-prompt.ts` (identical output); tests; docs; in-app Guide.
+
+### 1. Custom number of Pinterest Pins
+
+* Any whole number from 1 to 30 (`pinsRequestedSchema`); presets 1, 3, 5, 7, 8, 10, 20, 30 kept as shortcuts plus "Custom…" with a number field; defaults unchanged (10, or 5 from an article). 0, negatives, decimals, > 30 and non-numbers refused (inline message, no request; 400 on the API).
+* Used by Pinterest normal, Pinterest from a WordPress article (same form and route) and Regenerate (re-sends the stored count). Single-Pin regeneration is unchanged (one Pin).
+* Five main angles kept. Balanced batches (Legacy Composite, Photo Only, AI Integrated "Balanced"): the prompt assigns each pin its angle from the round-robin plan (`buildPinterestAnglePlan()`); the strategy check accepts `floor(n/5)`–`ceil(n/5)` Pins per angle for any n (exactly 1 for 5 and 2 for 10 as before, all different below 5). Pins sharing an angle are compared pairwise for near-copies (previously only for 10). AI recommends / Manual keep their freedom.
+* Validation, quality and no-destination-URL rules unchanged; `link_url` / `website_url` never added. Image generation rules untouched. Prompt id `pinterest-pins-v12`.
+
+### 2. Rewrite WordPress article
+
+* "Rewrite article" card on `/wordpress/[id]` for completed articles; the button opens a confirmation dialog, nothing is sent before Confirm.
+* `POST /api/wordpress/[id]/rewrite` (`{ confirm: true }`): auth, UUID, ownership, completed article, rate limit + trial cap. Creates a **new version**: a new `wordpress_generations` row with every original option (brief, language, tone, POV, country, size, structure toggles, SEO keywords, manual URLs, research notes, source fields) and a new `wordpress_articles` row. Niche, Content Stream and project niche settings resolved as at generation time.
+* Reused outline = the existing article (same H1, same H2 sections in order). One text call rewrites every paragraph; images, slug, meta title, meta description, category and links kept. Images in the previous version's storage folder are copied to the new folder (deleting either version never breaks the other); a failed copy keeps the old URL with a warning.
+* FAQ regenerated (same questions, new answers) when it can be read as Q/A, kept verbatim otherwise; saved with `saveArticleFaq()`. Quality Gate re-run and saved on the new generation.
+* Never published: no WordPress call, no `wp_post_id`, default publish status. Clear state: "Rewriting…", status line, dialog locked, inline error + toast; a failure marks only the new generation `failed`.
+* Previous version never modified or deleted; the new page links back to it (`?rewrittenFrom=`). Older articles (no FAQ column, no options, no image rows) supported.
+* No migration: versions are separate generations in the existing history (no link column is needed to keep them recoverable).
+
+### Success Criteria
+
+Custom counts 1-30 accepted everywhere and invalid ones refused; angles balanced with real variants; no URL added. Rewrite asks for confirmation, reuses the original context, keeps images / slug / meta, regenerates FAQ and Quality Gate, keeps the old version, never publishes, shows its state and errors, works on older articles. Validated by `tests/renderer/pinterest-custom-pin-count.spec.ts` (16) and `tests/renderer/wordpress-rewrite-article.spec.ts` (28); `tests/playwright/pins-count-and-article-rewrite.spec.ts` (3 × 2 projects) written, skipped without `PLAYWRIGHT_STORAGE_STATE` / `PLAYWRIGHT_WP_ARTICLE_ID`. TypeScript, ESLint, full renderer (829/830, pre-existing failure only), production build and `git diff --check` pass.
+
+### Manual check (founder)
+
+Generate 6 Pins (keyword flow) and 7 Pins from an article; rewrite one keyword article and one Pins article, compare the two versions, check the Quality report and that nothing appears on WordPress.
 
 ---
 

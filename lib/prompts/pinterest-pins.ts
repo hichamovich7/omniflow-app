@@ -1,5 +1,6 @@
-import { LANGUAGE_LABELS } from '@/types/pinterest';
+import { LANGUAGE_LABELS, PINTEREST_ANGLES } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
+import { buildPinterestAnglePlan } from '@/lib/pinterest/strategy';
 import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
 import { BANNER_TEMPLATES, isIntegratedTextEnabled } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
@@ -10,7 +11,7 @@ import { resolveNicheContext } from '@/lib/niche/resolve';
 import type { NicheSettings } from '@/lib/niche/settings';
 import { buildPinterestNicheBlocks } from '@/lib/niche/prompt-blocks';
 
-export const PROMPT_ID = 'pinterest-pins-v11';
+export const PROMPT_ID = 'pinterest-pins-v12';
 
 interface PromptContext {
   keyword: string;
@@ -156,7 +157,7 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
       ? 'Use each of the five angles exactly once in this batch.'
       : ctx.pinsRequested === 10
         ? 'Use each of the five angles exactly twice. The two pins sharing an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
-        : 'Balance the five angles across the batch and use every angle once before repeating one whenever the batch size allows it.';
+        : buildCustomAngleInstruction(ctx.pinsRequested);
 
   // An element is omitted when its text mode is "none" or its importance is
   // "none": the key must be absent from integratedText (never "None", "N/A" or
@@ -253,6 +254,21 @@ Respond with this exact JSON structure:
 }`;
 
   return { system, user };
+}
+
+/**
+ * Custom number of Pins (any batch other than 5 or 10): the exact angle of
+ * each pin, from the balanced round-robin plan — every angle once before any
+ * repeats. Above five, pins sharing an angle must be real variants.
+ */
+function buildCustomAngleInstruction(pinsRequested: number): string {
+  const plan = buildPinterestAnglePlan(pinsRequested)
+    .map((angle, index) => `pin ${index + 1} = "${angle}"`)
+    .join(', ');
+  const variation = pinsRequested > PINTEREST_ANGLES.length
+    ? ' Pins that share an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
+    : ' Every pin uses a different angle.';
+  return `Use the angles in this exact order, one per pin: ${plan}.${variation}`;
 }
 
 // AI Integrated asks for an extra `integratedText` object (headline, subtitle,

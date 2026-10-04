@@ -6,7 +6,8 @@ import {
   PINTEREST_STRATEGIES,
   PINTEREST_TEXT_IMPORTANCE,
   SUPPORTED_LANGUAGES,
-  PINS_OPTIONS,
+  PINS_MIN,
+  PINS_MAX,
 } from '@/types/pinterest';
 
 export const TEXT_OVERLAY_MODES = ['auto', 'always', 'never'] as const;
@@ -57,14 +58,32 @@ const boardSectionSchema = z
     { message: 'Board section cannot contain "/", "\\", or line breaks.' }
   );
 
+export const PINS_REQUESTED_RANGE_MESSAGE = `Choose between ${PINS_MIN} and ${PINS_MAX} Pins.`;
+export const PINS_REQUESTED_WHOLE_MESSAGE = 'The number of Pins must be a whole number.';
+
+// Any whole number from PINS_MIN to PINS_MAX (custom number of Pins). A
+// numeric string (form input, query string) is accepted; anything else —
+// empty, boolean, decimal, NaN — is refused, never rounded or clamped.
+export const pinsRequestedSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() !== '' ? Number(value.trim()) : value),
+  z
+    .number({ error: PINS_REQUESTED_RANGE_MESSAGE })
+    .int({ error: PINS_REQUESTED_WHOLE_MESSAGE })
+    .min(PINS_MIN, { error: PINS_REQUESTED_RANGE_MESSAGE })
+    .max(PINS_MAX, { error: PINS_REQUESTED_RANGE_MESSAGE })
+);
+
+/** Client-side check of the Pins field — same rule as the API. */
+export function validatePinsRequested(value: unknown): { ok: true; value: number } | { ok: false; message: string } {
+  const parsed = pinsRequestedSchema.safeParse(value);
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, message: parsed.error.issues[0].message };
+}
+
 const generatePinsBaseSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   keyword: z.string().trim().min(1, 'Keyword is required').max(200, 'Keyword is too long'),
   language: z.enum(SUPPORTED_LANGUAGES, { message: 'Invalid language' }),
-  pinsRequested: z.coerce.number().refine(
-    (v): v is (typeof PINS_OPTIONS)[number] => (PINS_OPTIONS as readonly number[]).includes(v),
-    { message: 'Invalid number of pins' }
-  ),
+  pinsRequested: pinsRequestedSchema,
   board: z.string().trim().max(100, 'Board name is too long').optional(),
   boardSection: boardSectionSchema,
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),

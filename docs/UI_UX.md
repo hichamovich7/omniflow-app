@@ -483,24 +483,22 @@ Displayed (read-only) in the Pin table's board badge as `Board / Section`, and a
 Type:
 
 ```txt
-Select
+Select (presets) + "Custom…" number field (TASK-046)
 ```
 
 Options:
 
 ```txt
-1
-5
-10
-20
-30
+1, 3, 5, 7, 8, 10, 20, 30, Custom…
 ```
 
 Default:
 
 ```txt
-10
+10 (5 on /pinterest/create?source=wordpress)
 ```
+
+Choosing **Custom…** reveals a number input under the select (`id="pins-custom"`, `min=1`, `max=30`, `step=1`, placeholder "1-30", help "Any whole number from 1 to 30."). On submit the value is checked with the API rule (`validatePinsRequested()`): 0, negatives, decimals, empty and values above 30 show the message under the field in red ("Choose between 1 and 30 Pins." / "The number of Pins must be a whole number."), `aria-invalid` is set, the field is focused and no request is sent. Same field in the keyword flow and the article flow; Regenerate reuses the stored count. With balanced angles, each pin gets its angle from the round-robin plan (all five angles before any repeat); above 5 Pins, Pins sharing an angle must be real variants.
 
 ---
 
@@ -845,6 +843,7 @@ Displayed after generation. Header mirrors the Pinterest Results page (back link
 * Social Content Studio (`components/wordpress/social-content-studio.tsx`, TASK-044) — shown below the Quality report only when the generation and the article are `completed`. Title "Social Content Studio", subtitle "Turn this article into social content. Nothing is published and the article is never modified." A responsive grid (1 / 2 / 3 columns) of six platform cards built from `lib/social/platforms.ts`:
   * **Pinterest — Available**: "Generate Pinterest content" is a link (phase 2) to `/pinterest/create?source=wordpress&articleId=<id>` — see "Pinterest from an article" in the Pinterest Generator section. Nothing is generated or requested from this page.
   * **Facebook — Coming soon**; **Instagram, Reels, TikTok, Medium — Planned**: dashed muted cards with the status badge and a disabled outline button labeled with the status. No click handler (no API call, no AI call, no database write). The card's `title` tooltip and a screen-reader text referenced by the button's `aria-describedby` explain "… content generation is coming soon." / "… is planned and will be available in a later release."
+* Rewrite article (`components/wordpress/rewrite-article-button.tsx`, TASK-046) — compact card right below the Quality report, shown only when the generation and the article are `completed` (`canRewriteArticle()`): title "Rewrite article", one line "Regenerate the full text with the same brief, settings, outline and images. Creates a new version.", outline button "Rewrite article". The button only opens a `Dialog` "Rewrite this article?" (same brief, project settings, language, tone, keywords, size and outline; images, slug and meta data kept; FAQ regenerated; Quality Gate re-run; one AI generation; current version unchanged; nothing published). Cancel closes it with no request. Confirm calls `POST /api/wordpress/[id]/rewrite` with `{ confirm: true }`: both buttons read "Rewriting…" (spinner on the primary one), a `role="status"` line says "Rewriting the article… this can take up to two minutes. Keep this page open.", and the dialog cannot be closed while it runs. Error → red `Alert` in the dialog + error toast ("… Your current version is unchanged."), the page stays. Success → success toast "New version created. The previous version is kept in your history.", copy warnings as warning toasts, then the new version opens at `/wordpress/<new id>?rewrittenFrom=<previous id>`, where an info `Alert` at the top reads "This is a rewritten version, not yet published to WordPress. The previous version is kept unchanged in your history: open the previous version." (link; the parameter is ignored unless it is a valid UUID different from the page id). Both versions are ordinary entries of WordPress History.
 * Category editor (`components/wordpress/article-category-editor.tsx`) — a select reusing the same `CategorySelect` component as the generation forms (own lightweight "+ New Category" quick-create included), saves immediately on change via `PATCH /api/wordpress/[id]`. If the article was already sent to WordPress (`wp_post_id` set), a note explains the change only takes effect on the next publish/update — it never re-publishes automatically
 * Publish control (`components/wordpress/publish-control.tsx`, shown only when the Project has a connected WordPress site) — a mode select (Save as Draft / Publish Now / Schedule, the last showing Date/Time fields) plus a submit button labeled after the selected mode. Below it: a send-status badge (`components/wordpress/wp-send-status-badge.tsx` — Not sent to WordPress / Sent as Draft / Published / Scheduled for [date] / Failed to send / Update failed), the last-published timestamp, a "View on WordPress" link when a `wp_post_id` exists, and the stored `publish_error` inline when the status is `failed`
 * Rendered article (Markdown → HTML via `marked`, styled with Tailwind child-selector utilities — no typography plugin, see RULES.md Rule #30)

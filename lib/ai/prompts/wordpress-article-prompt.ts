@@ -141,6 +141,50 @@ ${urlRule}${manualUrlRule}
 `;
 }
 
+/**
+ * Voice instructions (article type, tone, point of view, country) — shared
+ * by the article prompt and the rewrite prompt (wordpress-rewrite-prompt.ts).
+ */
+export function buildArticleVoiceNotes(opts: {
+  articleType?: ArticleType;
+  toneOfVoice?: ToneOfVoice;
+  pointOfView?: PointOfView;
+  targetCountry?: string;
+}): string[] {
+  const voiceNotes: string[] = [];
+  if (opts.articleType) voiceNotes.push(`Article type: this is ${ARTICLE_TYPE_WRITING_GUIDANCE[opts.articleType]}.`);
+  if (opts.toneOfVoice) voiceNotes.push(`Tone of voice: write the entire article body in a ${TONE_OF_VOICE_GUIDANCE[opts.toneOfVoice]} tone. This is a sentence-level voice instruction, distinct from and layered on top of any Brand Profile context given in your system instructions.`);
+  if (opts.pointOfView) voiceNotes.push(`Point of view: narrate in ${POINT_OF_VIEW_GUIDANCE[opts.pointOfView]}.`);
+  if (opts.targetCountry) voiceNotes.push(`Localize for readers in ${opts.targetCountry} — prefer examples, references, units, and cultural context relevant to that country wherever the topic naturally allows it.`);
+  return voiceNotes;
+}
+
+/**
+ * Structure formatting directives (TASK-FIX-035) — shared by the article
+ * prompt and the rewrite prompt. "Non" (false) is always phrased as an
+ * explicit ban naming the literal Markdown syntax.
+ */
+export function buildArticleFormattingNotes(opts: {
+  includeH3?: boolean;
+  includeLists?: boolean;
+  includeItalics?: boolean;
+  includeQuotes?: boolean;
+  includeBold?: boolean;
+}): string[] {
+  const formattingNotes: string[] = [];
+  if (opts.includeH3 === true) formattingNotes.push('Use Markdown H3 subheadings ("### ...") within Main Content sections where a section has multiple distinct sub-points worth breaking out.');
+  if (opts.includeH3 === false) formattingNotes.push('Do not use any H3 subheadings ("### ...") or any other nested heading level anywhere in the article — keep every section flat directly under its H2.');
+  if (opts.includeLists === true) formattingNotes.push('Use Markdown bullet or numbered lists within Main Content, Introduction, or Conclusion prose where listing distinct items, steps, or options improves scannability.');
+  if (opts.includeLists === false) formattingNotes.push('Do not use any Markdown bullet or numbered lists ("- ", "* ", "1. ", etc.) within Main Content, Introduction, or Conclusion prose — write those sections as flowing paragraphs only. (This does not apply to the separate Key Takeaways/Common Mistakes sections, which keep their own fixed list format regardless.)');
+  if (opts.includeItalics === true) formattingNotes.push('Use Markdown italics ("*text*") occasionally to emphasize a key term or phrase where it aids clarity.');
+  if (opts.includeItalics === false) formattingNotes.push('Do not use any italic text (no "*single asterisks*" or "_underscores_") anywhere in the article.');
+  if (opts.includeQuotes === true) formattingNotes.push('Use at least one Markdown blockquote ("> ...") to call out a standout statement, tip, or quotation where it fits naturally.');
+  if (opts.includeQuotes === false) formattingNotes.push('Do not use any Markdown blockquotes ("> ...") anywhere in the article.');
+  if (opts.includeBold === true) formattingNotes.push('Use Markdown bold ("**text**") occasionally to highlight key terms or phrases for scannability.');
+  if (opts.includeBold === false) formattingNotes.push('Do not use any bold text (no "**double asterisks**" or "__double underscores__") anywhere in the article.');
+  return formattingNotes;
+}
+
 export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const langName = LANGUAGE_LABELS[ctx.language];
   const { outline } = ctx;
@@ -148,27 +192,13 @@ export function buildWordPressArticlePrompt(ctx: ArticlePromptContext) {
   const minWords = sizeConfig?.minWords ?? DEFAULT_WORDS_RANGE.minWords;
   const maxWords = sizeConfig?.maxWords ?? DEFAULT_WORDS_RANGE.maxWords;
 
-  const voiceNotes: string[] = [];
-  if (ctx.articleType) voiceNotes.push(`Article type: this is ${ARTICLE_TYPE_WRITING_GUIDANCE[ctx.articleType]}.`);
-  if (ctx.toneOfVoice) voiceNotes.push(`Tone of voice: write the entire article body in a ${TONE_OF_VOICE_GUIDANCE[ctx.toneOfVoice]} tone. This is a sentence-level voice instruction, distinct from and layered on top of any Brand Profile context given in your system instructions.`);
-  if (ctx.pointOfView) voiceNotes.push(`Point of view: narrate in ${POINT_OF_VIEW_GUIDANCE[ctx.pointOfView]}.`);
-  if (ctx.targetCountry) voiceNotes.push(`Localize for readers in ${ctx.targetCountry} — prefer examples, references, units, and cultural context relevant to that country wherever the topic naturally allows it.`);
+  const voiceNotes = buildArticleVoiceNotes(ctx);
   const voiceBlock = voiceNotes.length > 0 ? `\n\nVoice instructions for this article:\n${voiceNotes.map((n) => `- ${n}`).join('\n')}\n` : '';
 
   // Structure formatting directives (TASK-FIX-035). "Non" ("false") is always
   // phrased as an explicit ban naming the literal Markdown syntax, not just a
   // soft "no need to" — forcing absence, not merely not requiring presence.
-  const formattingNotes: string[] = [];
-  if (ctx.includeH3 === true) formattingNotes.push('Use Markdown H3 subheadings ("### ...") within Main Content sections where a section has multiple distinct sub-points worth breaking out.');
-  if (ctx.includeH3 === false) formattingNotes.push('Do not use any H3 subheadings ("### ...") or any other nested heading level anywhere in the article — keep every section flat directly under its H2.');
-  if (ctx.includeLists === true) formattingNotes.push('Use Markdown bullet or numbered lists within Main Content, Introduction, or Conclusion prose where listing distinct items, steps, or options improves scannability.');
-  if (ctx.includeLists === false) formattingNotes.push('Do not use any Markdown bullet or numbered lists ("- ", "* ", "1. ", etc.) within Main Content, Introduction, or Conclusion prose — write those sections as flowing paragraphs only. (This does not apply to the separate Key Takeaways/Common Mistakes sections, which keep their own fixed list format regardless.)');
-  if (ctx.includeItalics === true) formattingNotes.push('Use Markdown italics ("*text*") occasionally to emphasize a key term or phrase where it aids clarity.');
-  if (ctx.includeItalics === false) formattingNotes.push('Do not use any italic text (no "*single asterisks*" or "_underscores_") anywhere in the article.');
-  if (ctx.includeQuotes === true) formattingNotes.push('Use at least one Markdown blockquote ("> ...") to call out a standout statement, tip, or quotation where it fits naturally.');
-  if (ctx.includeQuotes === false) formattingNotes.push('Do not use any Markdown blockquotes ("> ...") anywhere in the article.');
-  if (ctx.includeBold === true) formattingNotes.push('Use Markdown bold ("**text**") occasionally to highlight key terms or phrases for scannability.');
-  if (ctx.includeBold === false) formattingNotes.push('Do not use any bold text (no "**double asterisks**" or "__double underscores__") anywhere in the article.');
+  const formattingNotes = buildArticleFormattingNotes(ctx);
   const formattingBlock = formattingNotes.length > 0 ? `\n\nFormatting directives for this article:\n${formattingNotes.map((n) => `- ${n}`).join('\n')}\n` : '';
 
   // SEO Keywords (TASK-FIX-036): each entry must appear naturally at least

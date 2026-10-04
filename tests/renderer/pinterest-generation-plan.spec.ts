@@ -258,7 +258,7 @@ test('the planning prompt demands strict JSON only and keeps the existing data c
 
   expect(integrated.user).toContain('"integratedText"');
   expect(legacy.user).not.toContain('"integratedText"');
-  expect(PROMPT_ID).toBe('pinterest-pins-v11');
+  expect(PROMPT_ID).toBe('pinterest-pins-v12');
 });
 
 // --- Route behavior (Supabase, AI engine, rate limit and boards replaced) ------
@@ -578,7 +578,22 @@ test('Strategy validation failure returns 422 invalid_strategy_plan (not 500), b
 });
 
 test('AI Integrated + pattern-guide + ai-recommends, 7 pins (the reported production case): accepted, no angle-coverage enforcement, language follows the project default', async () => {
-  await withRoute(JSON.stringify(plan(7)), async (harness) => {
+  // Pins 6 and 7 repeat an angle: since the custom number of Pins they must
+  // be real variants (different description / scene), not copies of 1 and 2.
+  const sevenPins = {
+    pins: plan(7).pins.map((p, index) =>
+      index < 5
+        ? p
+        : {
+            ...p,
+            description: index === 5
+              ? 'Ein Mini-Bad braucht keinen Umbau: ein schmaler Rollwagen neben der Wanne und Haken an der Tür reichen oft schon. Sehen Sie, welche Ecke bei Ihnen noch ungenutzt ist.'
+              : 'Offene Körbe unter dem Waschtisch, beschriftet nach Familienmitglied, halten Handtücher und Pflege getrennt. Finden Sie heraus, welche Größe in Ihren Schrank passt.',
+            image_prompt: `${index === 5 ? 'A narrow rolling cart beside a freestanding tub' : 'Woven baskets under a floating vanity'}, terracotta and cream palette, overhead, craft product photography, photorealistic, highly detailed.`,
+          }
+    ),
+  };
+  await withRoute(JSON.stringify(sevenPins), async (harness) => {
     const response = await harness.post({
       ...aiIntegratedRequest,
       keyword: 'winter crochet sweater',

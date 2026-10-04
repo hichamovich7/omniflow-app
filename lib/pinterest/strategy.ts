@@ -82,25 +82,50 @@ function tokenSimilarity(left: string, right: string): number {
   return (2 * intersection) / (leftTokens.size + rightTokens.size);
 }
 
+/**
+ * Balanced angle order for a batch of any size (custom number of Pins):
+ * round-robin over the five angles, so every angle is used once before any
+ * repeats and the counts never differ by more than one. 5 → each once,
+ * 10 → each twice, 7 → the first two angles twice.
+ */
+export function buildPinterestAnglePlan(pinsRequested: number): PinterestAngle[] {
+  const size = Math.max(0, Math.floor(pinsRequested));
+  return Array.from({ length: size }, (_, index) => PINTEREST_ANGLES[index % PINTEREST_ANGLES.length]);
+}
+
+/** Allowed pins per angle in a balanced batch: floor(n/5) to ceil(n/5). */
+function balancedAngleRange(pinsRequested: number): { min: number; max: number } {
+  return {
+    min: Math.floor(pinsRequested / PINTEREST_ANGLES.length),
+    max: Math.ceil(pinsRequested / PINTEREST_ANGLES.length),
+  };
+}
+
 function validateAngleCoverage(
   pins: PinterestStrategyPin[],
   pinsRequested: number
 ): PinterestStrategyIssue[] {
-  if (pins.length !== pinsRequested || (pinsRequested !== 5 && pinsRequested !== 10)) return [];
+  // A partial batch is reported separately (route log); only a complete one
+  // can be checked for balance.
+  if (pins.length !== pinsRequested || pinsRequested < 1) return [];
 
-  const expectedPerAngle = pinsRequested / PINTEREST_ANGLES.length;
+  const { min, max } = balancedAngleRange(pinsRequested);
   const counts = new Map<PinterestAngle, number>(
     PINTEREST_ANGLES.map((angle) => [angle, 0])
   );
   for (const pin of pins) counts.set(pin.angle, (counts.get(pin.angle) ?? 0) + 1);
 
-  const invalid = PINTEREST_ANGLES.filter((angle) => counts.get(angle) !== expectedPerAngle);
+  const invalid = PINTEREST_ANGLES.filter((angle) => {
+    const count = counts.get(angle) ?? 0;
+    return count < min || count > max;
+  });
   if (invalid.length === 0) return [];
 
+  const expected = min === max ? `${min}` : `${min}-${max}`;
   return [{
     code: 'angle-coverage',
     message:
-      `Expected ${expectedPerAngle} pin(s) per Pinterest angle for a batch of ${pinsRequested}; ` +
+      `Expected ${expected} pin(s) per Pinterest angle for a batch of ${pinsRequested}; ` +
       invalid.map((angle) => `${angle}=${counts.get(angle) ?? 0}`).join(', '),
   }];
 }
@@ -121,31 +146,37 @@ function validateTitleDiversity(pins: PinterestStrategyPin[]): PinterestStrategy
   return issues;
 }
 
-function validateTenPinVariants(pins: PinterestStrategyPin[], pinsRequested: number): PinterestStrategyIssue[] {
-  if (pinsRequested !== 10 || pins.length !== 10) return [];
-
+// Pins sharing an angle (any batch above five, e.g. 6, 7, 10 or 30) must be
+// real variants — different promise and scene — not near-copies. Every pair
+// within the same angle is compared; for 10 Pins this is the former
+// two-variants-per-angle check.
+function validateRepeatedAngleVariants(pins: PinterestStrategyPin[]): PinterestStrategyIssue[] {
   const issues: PinterestStrategyIssue[] = [];
   for (const angle of PINTEREST_ANGLES) {
     const variants = pins
       .map((pin, index) => ({ pin, index }))
       .filter(({ pin }) => pin.angle === angle);
-    if (variants.length !== 2) continue;
 
-    const [first, second] = variants;
-    const descriptionSimilarity = tokenSimilarity(first.pin.description, second.pin.description);
-    const imageSimilarity = tokenSimilarity(first.pin.image_prompt, second.pin.image_prompt);
-    if (
-      descriptionSimilarity < VARIANT_SIMILARITY_LIMIT &&
-      imageSimilarity < VARIANT_SIMILARITY_LIMIT
-    ) continue;
+    for (let left = 0; left < variants.length; left++) {
+      for (let right = left + 1; right < variants.length; right++) {
+        const first = variants[left];
+        const second = variants[right];
+        const descriptionSimilarity = tokenSimilarity(first.pin.description, second.pin.description);
+        const imageSimilarity = tokenSimilarity(first.pin.image_prompt, second.pin.image_prompt);
+        if (
+          descriptionSimilarity < VARIANT_SIMILARITY_LIMIT &&
+          imageSimilarity < VARIANT_SIMILARITY_LIMIT
+        ) continue;
 
-    issues.push({
-      code: 'near-duplicate-variant',
-      message:
-        `${angle} variants ${first.index + 1} and ${second.index + 1} need different ` +
-        `promises and scenes (description=${descriptionSimilarity.toFixed(2)}, image=${imageSimilarity.toFixed(2)})`,
-      pinIndexes: [first.index, second.index],
-    });
+        issues.push({
+          code: 'near-duplicate-variant',
+          message:
+            `${angle} variants ${first.index + 1} and ${second.index + 1} need different ` +
+            `promises and scenes (description=${descriptionSimilarity.toFixed(2)}, image=${imageSimilarity.toFixed(2)})`,
+          pinIndexes: [first.index, second.index],
+        });
+      }
+    }
   }
   return issues;
 }
@@ -205,7 +236,7 @@ export function validatePinterestStrategyBatch(
       ? []
       : validateAngleCoverage(pins, pinsRequested)),
     ...validateTitleDiversity(pins),
-    ...validateTenPinVariants(pins, pinsRequested),
+    ...validateRepeatedAngleVariants(pins),
     ...validateGroundedClaims(pins, sourceEvidence),
   ];
 }

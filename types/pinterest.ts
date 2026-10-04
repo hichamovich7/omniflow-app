@@ -40,8 +40,16 @@ export const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   fr: 'Français',
 };
 
+// Quick presets of the "Pins" select. Any whole number between PINS_MIN and
+// PINS_MAX is accepted (custom value) — the presets are only shortcuts.
 export const PINS_OPTIONS = [1, 3, 5, 7, 8, 10, 20, 30] as const;
 export type PinsOption = (typeof PINS_OPTIONS)[number];
+export const PINS_MIN = 1;
+export const PINS_MAX = 30;
+/** Default batch size of the keyword flow. */
+export const DEFAULT_PINS_REQUESTED = 10;
+/** Default batch size when generating from a WordPress article. */
+export const DEFAULT_ARTICLE_PINS_REQUESTED = 5;
 
 export interface GenerateRequest {
   projectId: string;

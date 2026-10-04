@@ -8,12 +8,20 @@ import {
   generatePinsSchema,
   TEXT_OVERLAY_MODES,
   BOARD_SECTION_REQUIRES_BOARD_MESSAGE,
+  validatePinsRequested,
 } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
-import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, PINS_OPTIONS } from '@/types/pinterest';
+import {
+  SUPPORTED_LANGUAGES,
+  LANGUAGE_LABELS,
+  PINS_OPTIONS,
+  PINS_MIN,
+  PINS_MAX,
+  DEFAULT_PINS_REQUESTED,
+  DEFAULT_ARTICLE_PINS_REQUESTED,
+} from '@/types/pinterest';
 import type {
   SupportedLanguage,
-  PinsOption,
   PinterestAngle,
   PinterestCreativeFormat,
   PinterestGenerationMode,
@@ -70,6 +78,9 @@ const TEXT_OVERLAY_DESCRIPTIONS: Record<TextOverlayMode, string> = {
   always: 'Every pin gets a headline overlay. The Save CTA is also always added.',
   never: 'Headline overlays are disabled. The Save CTA is still added to every image.',
 };
+
+// Select value that reveals the custom number field.
+const CUSTOM_PINS_VALUE = 'custom';
 
 type RequiredTextMode = 'generate' | 'exact';
 type OptionalTextMode = RequiredTextMode | 'none';
@@ -235,7 +246,13 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
   const [language, setLanguage] = useState<SupportedLanguage>(
     articleSource?.language ?? (defaultProject?.default_language as SupportedLanguage) ?? 'en'
   );
-  const [pinsRequested, setPinsRequested] = useState<PinsOption>(articleSource ? 5 : 10);
+  // Custom number of Pins: a preset of the select, or "custom" + any whole
+  // number from PINS_MIN to PINS_MAX typed in the field below it.
+  const [pinsChoice, setPinsChoice] = useState<string>(
+    String(articleSource ? DEFAULT_ARTICLE_PINS_REQUESTED : DEFAULT_PINS_REQUESTED)
+  );
+  const [customPins, setCustomPins] = useState('');
+  const [pinsError, setPinsError] = useState<string | null>(null);
   const [generationMode, setGenerationMode] = useState<PinterestGenerationMode>('ai-integrated');
   const [textOverlayMode, setTextOverlayMode] = useState<TextOverlayMode>('auto');
   const [creativeFormat, setCreativeFormat] = useState<PinterestCreativeFormat>('ai-chooses');
@@ -330,6 +347,17 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
       setError(boardSectionError);
       return;
     }
+
+    // Same rule as the API (1-30, whole number): an invalid custom value is
+    // shown under the field and nothing is sent.
+    const pinsCheck = validatePinsRequested(pinsChoice === CUSTOM_PINS_VALUE ? customPins : pinsChoice);
+    if (!pinsCheck.ok) {
+      setPinsError(pinsCheck.message);
+      document.getElementById('pins-custom')?.focus();
+      return;
+    }
+    setPinsError(null);
+    const pinsRequested = pinsCheck.value;
 
     const basePayload = {
       projectId,
@@ -506,10 +534,14 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
                 Pins
               </Label>
               <Select
-                value={String(pinsRequested)}
-                onValueChange={(v) => v && setPinsRequested(Number(v) as PinsOption)}
+                value={pinsChoice}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  setPinsChoice(v);
+                  setPinsError(null);
+                }}
               >
-                <SelectTrigger id="pins" className="w-full sm:w-28">
+                <SelectTrigger id="pins" className="w-full sm:w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -518,8 +550,37 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
                       {n} {n === 1 ? 'Pin' : 'Pins'}
                     </SelectItem>
                   ))}
+                  <SelectItem value={CUSTOM_PINS_VALUE}>Custom…</SelectItem>
                 </SelectContent>
               </Select>
+              {pinsChoice === CUSTOM_PINS_VALUE && (
+                <div className="space-y-1">
+                  <Label htmlFor="pins-custom" className="sr-only">
+                    Custom number of Pins
+                  </Label>
+                  <Input
+                    id="pins-custom"
+                    type="number"
+                    inputMode="numeric"
+                    min={PINS_MIN}
+                    max={PINS_MAX}
+                    step={1}
+                    placeholder={`${PINS_MIN}-${PINS_MAX}`}
+                    value={customPins}
+                    onChange={(e) => {
+                      setCustomPins(e.target.value);
+                      setPinsError(null);
+                    }}
+                    aria-invalid={!!pinsError}
+                    aria-describedby="pins-custom-help"
+                    className="w-full sm:w-32"
+                    data-testid="pins-custom-input"
+                  />
+                  <p id="pins-custom-help" className={cn('text-xs', pinsError ? 'text-destructive' : 'text-muted-foreground')}>
+                    {pinsError ?? `Any whole number from ${PINS_MIN} to ${PINS_MAX}.`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </FormSection>

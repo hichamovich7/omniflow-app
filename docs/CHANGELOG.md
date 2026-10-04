@@ -18,6 +18,17 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest + WordPress: Custom number of Pins and Rewrite article — TASK-046 (2026-10-04)
+
+Only these two improvements; third improvement TBD; no other feature.
+
+* **Custom number of Pins.** `pinsRequested` accepts any whole number from 1 to 30 (`pinsRequestedSchema` / `validatePinsRequested()`, `lib/validations/pinterest.ts`; `PINS_MIN`, `PINS_MAX`, `DEFAULT_PINS_REQUESTED` = 10, `DEFAULT_ARTICLE_PINS_REQUESTED` = 5 in `types/pinterest.ts`). The Pins select keeps its presets and gains "Custom…" + a number field with inline validation (no request on an invalid value). Same field for Pinterest normal, from a WordPress article and Regenerate.
+* **Angles.** `buildPinterestAnglePlan()` (round-robin: every angle once before any repeat). The prompt (`pinterest-pins-v12`) gives the exact per-pin angle for counts other than 5 / 10 (wording for 5 and 10 unchanged). `validatePinterestStrategyBatch()` checks balance for any complete batch (`floor(n/5)`–`ceil(n/5)` per angle) and compares every pair of Pins sharing an angle for near-copies (was 10 Pins only). No destination URL added; image rules unchanged.
+* **Rewrite article.** New `POST /api/wordpress/[id]/rewrite` + "Rewrite article" card and confirmation dialog on `/wordpress/[id]` (`components/wordpress/rewrite-article-button.tsx`). Creates a new version (new generation + article rows, original options copied) from the existing article as outline and source (`lib/wordpress/rewrite-article.ts`, prompt `wordpress-rewrite-v1` in `lib/ai/prompts/wordpress-rewrite-prompt.ts`): same H1 / H2 / images / slug / meta / category / links, FAQ regenerated or kept, Quality Gate re-run, images copied to the new storage folder. One text call, no image or web-search call, never published; the previous version is untouched and linked from the new page (`?rewrittenFrom=`). No migration.
+* `lib/ai/prompts/wordpress-article-prompt.ts`: voice and formatting directives extracted into `buildArticleVoiceNotes()` / `buildArticleFormattingNotes()` (shared with the rewrite prompt; article prompt text unchanged).
+* Guide: Generate (Pinterest), WordPress Generator and Social Content Studio sections updated.
+* Tests: new offline `pinterest-custom-pin-count.spec.ts` (16) and `wordpress-rewrite-article.spec.ts` (28); new browser `tests/playwright/pins-count-and-article-rewrite.spec.ts` (skipped without session); `pinterest-generation-plan.spec.ts` (7-Pin fixture now uses distinct variants, prompt id v12) and `social-content-studio.spec.ts` (2 Pins now valid, new default constants) updated.
+
 ## AI / Projects: Per-project niche settings — Niche Profiles Phase 2, TASK-045 (2026-09-28)
 
 * Migration `041_add_project_niche_settings.sql`: nullable `projects.niche_settings jsonb` (NULL = OmniFlow recommended values; no RLS change, no backfill). **Apply manually in Supabase.**
