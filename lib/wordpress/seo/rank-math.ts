@@ -1,4 +1,4 @@
-import { normalizeSiteUrl, type WordPressSiteCredentials } from '@/lib/wordpress/rest-client';
+import { normalizeSiteUrl, WORDPRESS_TIMEOUTS_MS, type WordPressSiteCredentials } from '@/lib/wordpress/rest-client';
 
 /**
  * Rank Math adapter. Writes SEO meta through Rank Math's own REST route —
@@ -65,6 +65,7 @@ export async function detectRankMath(
   try {
     res = await fetch(`${normalizeSiteUrl(site.siteUrl)}/wp-json/rankmath/v1`, {
       headers: { Authorization: authHeader(site) },
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.rankMath),
     });
   } catch {
     return 'unavailable';
@@ -116,6 +117,7 @@ export async function saveRankMathMeta(
       method: 'POST',
       headers: { Authorization: authHeader(site), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.rankMath),
     });
   } catch {
     return { status: 'failed', message: 'Could not reach the WordPress site.' };

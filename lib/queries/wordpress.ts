@@ -47,6 +47,36 @@ export async function getWordPressArticleByGenerationId(supabase: SupabaseClient
   };
 }
 
+/**
+ * True when another article of the same project (same WordPress site)
+ * already holds this WordPress post id — publish reconciliation never adopts
+ * such a post (TASK-FIX-058). Throws on a query error: the caller treats an
+ * unverifiable id as claimed.
+ */
+export async function isWordPressPostIdClaimed(
+  supabase: SupabaseClient,
+  input: { projectId: string; postId: number; excludeArticleId: string }
+): Promise<boolean> {
+  const { data: generations, error: generationsError } = await supabase
+    .from('wordpress_generations')
+    .select('id')
+    .eq('project_id', input.projectId);
+  if (generationsError) throw generationsError;
+
+  const generationIds = (generations ?? []).map((g: { id: string }) => g.id);
+  if (generationIds.length === 0) return false;
+
+  const { data, error } = await supabase
+    .from('wordpress_articles')
+    .select('id')
+    .eq('wp_post_id', input.postId)
+    .neq('id', input.excludeArticleId)
+    .in('generation_id', generationIds)
+    .limit(1);
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
 interface PinSeoRow {
   id: string;
   keywords: string | null;

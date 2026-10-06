@@ -168,7 +168,8 @@ export async function DELETE(
       .from('wordpress_articles')
       .update({ publish_status: 'draft', wp_post_id: null, published_at: null, publish_error: null })
       .in('generation_id', generationIds)
-      .in('publish_status', ['scheduled', 'published']);
+      // 'uncertain' / 'publishing' may also hold an id on the old site (TASK-FIX-058).
+      .in('publish_status', ['scheduled', 'published', 'uncertain', 'publishing']);
 
     if (resetError) {
       console.error('DELETE /api/wordpress/sites/[id] — failed to reset publish tracking:', resetError);

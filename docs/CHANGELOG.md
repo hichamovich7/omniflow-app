@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## WordPress publish: idempotent publish, lock and uncertain outcomes — TASK-FIX-058 (2026-10-06)
+
+* Bug (P0 audit): a publish could show a failure although WordPress had created the post (answer lost, platform timeout, FAQ re-send error after creation), and the retry created a duplicate — `wp_post_id` was only saved at the very end and nothing looked for an existing post before creating.
+* Reconciliation (`lib/wordpress/publish-reconcile.ts`): without `wp_post_id`, `GET /wp/v2/posts?slug=&status=any&context=edit`; adopted only on exact slug + raw title and when no other article of the project holds the id; never on a slug-only match. Also run after a create whose answer is lost (timeout, network, unreadable 2xx, 5xx).
+* `sendArticleToWordPress()` saves every created / updated / adopted id at once (`onPostId`), before FAQ re-send and Rank Math; new `WordPressPublishUncertainError`; structured step logs (`lib/wordpress/publish-log.ts`).
+* `rest-client.ts`: explicit timeouts on media, tags, post write, lookup and Rank Math calls; error `kind` (`http` / `timeout` / `network` / `invalid_response`); guarded JSON parsing; new `findPostsBySlug()`.
+* Lock: migration **042** `wordpress_articles.publish_started_at` + `publish_status = 'publishing'` set by one conditional UPDATE; `409 publish_in_progress` for a concurrent publish; stale after 90 s; released on every end. Works without 042 (lock skipped and logged).
+* New statuses `publishing` / `uncertain`; `504 publish_uncertain`. Publish control: `try/catch/finally`, non-JSON and network errors shown as uncertain, double-click guard, confirmation before retrying an unconfirmed publish; badges "Publishing…" / "Unconfirmed — check WordPress". Disconnecting a site also resets `uncertain` / `publishing` rows.
+* Unchanged: prompts, article content, Rank Math meta, FAQ schema rules, internal links, Quality Gate, tags. Existing duplicates are never deleted. No parallel uploads yet (P1). Guide updated. New offline spec `wordpress-publish-idempotency.spec.ts` (34). **Migration 042 must be applied by hand in Supabase.**
+
 ## Pinterest: Fix scheduling timezone conversion — TASK-048 (2026-10-04)
 
 * Bug: 13:00 chosen → 15:00 shown → CSV `15:00:00` → 17:00 on Pinterest. The server built the date in its own zone (UTC) and the CSV wrote the browser's local hour, which Pinterest reads as UTC.

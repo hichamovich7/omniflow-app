@@ -1,7 +1,9 @@
 export type WordPressSourceType = 'keyword' | 'url' | 'pins';
 export type WordPressGenerationStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type WordPressArticleStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WordPressPublishStatus = 'draft' | 'scheduled' | 'published' | 'failed';
+// publishing = lock held by an in-flight publish (migration 042); uncertain =
+// WordPress did not confirm the outcome — check WordPress before retrying.
+export type WordPressPublishStatus = 'draft' | 'scheduled' | 'published' | 'failed' | 'publishing' | 'uncertain';
 
 // Core Settings (TASK-FIX-034, "1-Click Blog Post" / Option 1 only). Each is
 // optional and null means "None" — Option 3/4 generations never set these.
@@ -109,6 +111,9 @@ export interface WordPressArticle {
   published_at: string | null;
   scheduled_at: string | null;
   publish_error: string | null;
+  // Publish lock start (TASK-FIX-058, migration 042). Absent before 042;
+  // null when no publish is running.
+  publish_started_at?: string | null;
   // Structured FAQ (TASK-FIX-055, migration 039). Raw jsonb as stored — read
   // it through parseStoredFaq()/resolveArticleFaq() (lib/wordpress/faq-data.ts).
   // Null before 039; [] when the article was generated without a FAQ.

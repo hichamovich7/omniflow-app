@@ -1,11 +1,42 @@
+/**
+ * Why a WordPress call failed. `timeout`, `network` and `invalid_response`
+ * mean the outcome on the WordPress side is unknown — a write may have been
+ * committed even though no usable answer came back.
+ */
+export type WordPressErrorKind = 'http' | 'timeout' | 'network' | 'invalid_response';
+
 export class WordPressApiError extends Error {
   status?: number;
+  kind: WordPressErrorKind;
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, kind: WordPressErrorKind = 'http') {
     super(message);
     this.name = 'WordPressApiError';
     this.status = status;
+    this.kind = kind;
   }
+}
+
+/** Per-request ceilings — the publish route has a 60s budget for the whole flow. */
+export const WORDPRESS_TIMEOUTS_MS = {
+  imageDownload: 15_000,
+  mediaUpload: 25_000,
+  mediaAltText: 8_000,
+  tag: 8_000,
+  postWrite: 20_000,
+  postLookup: 8_000,
+  rankMath: 10_000,
+} as const;
+
+// AbortSignal.timeout() rejects fetch with a DOMException named TimeoutError.
+function isTimeoutError(err: unknown): boolean {
+  const name = typeof err === 'object' && err !== null ? (err as { name?: unknown }).name : undefined;
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
+/** A WP error whose outcome is unknown (timeout, network, unreadable 2xx). */
+export function isUncertainWordPressError(err: unknown): boolean {
+  return err instanceof WordPressApiError && err.kind !== 'http';
 }
 
 export interface WordPressSiteCredentials {
@@ -147,7 +178,10 @@ export async function findOrCreateTag(site: WordPressSiteCredentials, name: stri
   const wanted = name.trim().toLowerCase();
 
   try {
-    const res = await fetch(`${base}?search=${encodeURIComponent(name)}&per_page=100`, { headers });
+    const res = await fetch(`${base}?search=${encodeURIComponent(name)}&per_page=100`, {
+      headers,
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.tag),
+    });
     if (res.ok) {
       const found = (await res.json()) as { id: number; name: string }[];
       const match = found.find((t) => decodeHtmlEntities(t.name).trim().toLowerCase() === wanted);
@@ -162,6 +196,7 @@ export async function findOrCreateTag(site: WordPressSiteCredentials, name: stri
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.tag),
     });
     const data = (await res.json().catch(() => null)) as
       | { id?: number; code?: string; data?: { term_id?: number } }
@@ -225,12 +260,18 @@ export async function uploadMedia(
   filename: string,
   altText?: string | null
 ): Promise<{ id: number; sourceUrl: string; altText: string | null }> {
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) {
-    throw new Error('Could not fetch source image for upload');
+  let imgRes: Response;
+  let bytes: ArrayBuffer;
+  try {
+    imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.imageDownload) });
+    if (!imgRes.ok) {
+      throw new Error('Could not fetch source image for upload');
+    }
+    bytes = await imgRes.arrayBuffer();
+  } catch (err) {
+    if (isTimeoutError(err)) throw new Error('Timed out while fetching the source image for upload');
+    throw err;
   }
-
-  const bytes = await imgRes.arrayBuffer();
   const mime =
     (imgRes.headers.get('content-type')?.split(';')[0].trim().startsWith('image/')
       ? imgRes.headers.get('content-type')?.split(';')[0].trim()
@@ -253,9 +294,13 @@ export async function uploadMedia(
         'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
       },
       body: bytes,
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.mediaUpload),
     });
-  } catch {
-    throw new WordPressApiError('Could not reach that WordPress site while uploading media.');
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new WordPressApiError('WordPress did not answer in time while uploading media.', undefined, 'timeout');
+    }
+    throw new WordPressApiError('Could not reach that WordPress site while uploading media.', undefined, 'network');
   }
 
   if (!res.ok) {
@@ -268,7 +313,10 @@ export async function uploadMedia(
     throw new WordPressApiError(await parseErrorBody(res), res.status);
   }
 
-  const data = (await res.json()) as { id: number; source_url: string; alt_text?: unknown };
+  const data = (await res.json().catch(() => null)) as { id?: unknown; source_url?: unknown; alt_text?: unknown } | null;
+  if (!data || typeof data.id !== 'number' || typeof data.source_url !== 'string') {
+    throw new WordPressApiError('WordPress returned an unreadable media response.', res.status, 'invalid_response');
+  }
   const savedAlt = typeof data.alt_text === 'string' && data.alt_text.trim() ? data.alt_text : null;
   if (!alt || savedAlt) return { id: data.id, sourceUrl: data.source_url, altText: savedAlt };
 
@@ -285,6 +333,7 @@ async function setMediaAltText(site: WordPressSiteCredentials, mediaId: number, 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ alt_text: altText }),
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.mediaAltText),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { alt_text?: unknown };
@@ -332,9 +381,15 @@ export async function upsertPost(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.postWrite),
     });
-  } catch {
-    throw new WordPressApiError('Could not reach that WordPress site while creating the post.');
+  } catch (err) {
+    // The request may have reached WordPress: the post can exist even though
+    // no answer came back — callers reconcile before concluding anything.
+    if (isTimeoutError(err)) {
+      throw new WordPressApiError('WordPress did not answer in time while creating the post.', undefined, 'timeout');
+    }
+    throw new WordPressApiError('Could not reach that WordPress site while creating the post.', undefined, 'network');
   }
 
   if (!res.ok) {
@@ -347,9 +402,79 @@ export async function upsertPost(
     throw new WordPressApiError(await parseErrorBody(res), res.status);
   }
 
-  const data = (await res.json()) as { id: number; link: string; status: string; content?: { raw?: unknown } };
+  const post = toPostResult(await res.json().catch(() => null));
+  if (!post) {
+    // 2xx: WordPress accepted the write, but the body (e.g. a PHP notice
+    // before the JSON) does not say which post it is.
+    throw new WordPressApiError('WordPress returned an unreadable response while saving the post.', res.status, 'invalid_response');
+  }
+  return post;
+}
+
+function toPostResult(value: unknown): WordPressPostResult | null {
+  if (!value || typeof value !== 'object') return null;
+  const data = value as { id?: unknown; link?: unknown; status?: unknown; content?: { raw?: unknown } };
+  if (typeof data.id !== 'number' || !Number.isInteger(data.id) || data.id <= 0) return null;
   const contentRaw = typeof data.content?.raw === 'string' ? data.content.raw : undefined;
-  return { id: data.id, link: data.link, status: data.status, ...(contentRaw !== undefined ? { contentRaw } : {}) };
+  return {
+    id: data.id,
+    link: typeof data.link === 'string' ? data.link : '',
+    status: typeof data.status === 'string' ? data.status : '',
+    ...(contentRaw !== undefined ? { contentRaw } : {}),
+  };
+}
+
+/** A post found by slug — raw (edit-context) title for exact comparison. */
+export interface WordPressPostMatch extends WordPressPostResult {
+  slug: string;
+  titleRaw: string | null;
+}
+
+/**
+ * Posts whose slug is `slug`, any status but trash (`status=any`), in edit
+ * context so the raw title is returned. Read-only. Throws WordPressApiError
+ * (kind timeout / network / http / invalid_response) — the caller decides
+ * what an unknown answer means.
+ */
+export async function findPostsBySlug(site: WordPressSiteCredentials, slug: string): Promise<WordPressPostMatch[]> {
+  const url =
+    `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/posts` +
+    `?slug=${encodeURIComponent(slug)}&status=any&context=edit&per_page=20&_fields=id,slug,title,status,link,content`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: authHeader(site.username, site.password) },
+      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.postLookup),
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new WordPressApiError('WordPress did not answer in time while looking up the post.', undefined, 'timeout');
+    }
+    throw new WordPressApiError('Could not reach that WordPress site while looking up the post.', undefined, 'network');
+  }
+
+  if (!res.ok) {
+    throw new WordPressApiError(await parseErrorBody(res), res.status);
+  }
+
+  const data = (await res.json().catch(() => null)) as unknown;
+  if (!Array.isArray(data)) {
+    throw new WordPressApiError('WordPress returned an unexpected post lookup response.', res.status, 'invalid_response');
+  }
+
+  const matches: WordPressPostMatch[] = [];
+  for (const raw of data as Record<string, unknown>[]) {
+    const post = toPostResult(raw);
+    if (!post) continue;
+    const title = raw.title as { raw?: unknown } | undefined;
+    matches.push({
+      ...post,
+      slug: typeof raw.slug === 'string' ? raw.slug : '',
+      titleRaw: typeof title?.raw === 'string' ? title.raw : null,
+    });
+  }
+  return matches;
 }
 
 /** Only the fields internal linking needs — never the post content. */

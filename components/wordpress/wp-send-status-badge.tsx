@@ -1,16 +1,27 @@
 import { Badge } from '@/components/ui/badge';
 import { getStatusPresentation, type StatusTone } from '@/lib/utils/status';
+import { displayedPublishStatus } from '@/lib/wordpress/publish-lock';
 import type { WordPressArticle } from '@/types/wordpress';
 
 type SendStatusArticle = Pick<
   WordPressArticle,
-  'wp_post_id' | 'publish_status' | 'published_at' | 'scheduled_at'
+  'wp_post_id' | 'publish_status' | 'published_at' | 'scheduled_at' | 'publish_started_at'
 >;
 
 // Specialized: combines whether the article was ever sent (`wp_post_id`) with
 // `publish_status`, so the labels carry more than one stored value. Tones come
 // from the shared status mapping (`lib/utils/status.ts`), not a local palette.
-function getSendStatus(article: SendStatusArticle): { label: string; tone: StatusTone } {
+export function getSendStatus(article: SendStatusArticle): { label: string; tone: StatusTone } {
+  // Checked first: an in-flight or unconfirmed publish says nothing reliable
+  // about the previous send. A stale "publishing" lock shows as unconfirmed.
+  const status = displayedPublishStatus(article);
+  if (status === 'publishing') {
+    return { label: 'Publishing…', tone: getStatusPresentation('publishing').tone };
+  }
+  if (status === 'uncertain') {
+    return { label: 'Unconfirmed — check WordPress', tone: getStatusPresentation('uncertain').tone };
+  }
+
   if (!article.wp_post_id) {
     if (article.publish_status === 'failed') {
       return { label: 'Failed to send', tone: getStatusPresentation('failed').tone };

@@ -989,6 +989,16 @@ The existing `wordpress-internal-links.spec.ts` (43) and `wordpress-publish-seo.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 28/28, WordPress internal-links + publish SEO specs 79/79, full renderer 511/512 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. The authenticated browser tests stay skipped without `PLAYWRIGHT_STORAGE_STATE`; clipboard behavior in a real browser is a manual check.
 
+# WordPress publish — idempotency, lock, uncertain outcomes (TASK-FIX-058, 2026-10-06)
+
+```bash
+npx playwright test tests/renderer/wordpress-publish-idempotency.spec.ts --project=renderer --reporter=list
+```
+
+Offline (34 cases, WordPress = a stateful stubbed global `fetch` that can commit a post and still lose the answer; Supabase = an in-memory stub evaluating the lock's conditional UPDATE — no network, no database, no AI call): id saved before Rank Math; creation then FAQ re-send failure (id kept, retry updates the same post) and re-send timeout (uncertain with the id); creation then Rank Math timeout / 403 (id kept, warning); answer lost after commit by timeout, network error, invalid 2xx JSON and 5xx → reconciled, adopted, one creation, retry updates; invalid 2xx with failed lookup → uncertain, never a raw `SyntaxError`; timeout with the post landing late → uncertain, then the retry adopts it (no duplicate); 5xx with the post absent → real failure; existing exact match adopted before creating; same slug / other title never adopted; id held by another article or unverifiable claim never adopted; existing duplicates: oldest adopted, nothing deleted; lookup failure → normal creation; known id: plain update, update timeout uncertain with the id, 404 → one fresh creation; slug decoding / title trimming; Keyword, Pins and URL methods (focus keyword, Rank Math unchanged); concurrent publishes → one lock, the other busy (409), one creation; stale lock taken over, fresh lock busy; migration 042 absent → `unavailable`, nothing written, publish still reconciles; stale `publishing` shown as uncertain; claimed-id query scoped to the project; client: non-JSON 504 and network error → uncertain, 409 / uncertain / failed / success told apart, `finally` releases the button, double-click guard; route wiring (lock, 409, 504, every terminal write releases the lock and keeps the id); logs carry attempt / step / ms / http / wp_post_id and never the password, the auth header or the content; migration 042 is the only 042 and only adds the column.
+
+Manual, after applying migration 042 in the Supabase SQL Editor: (1) publish a draft, then simulate a lost answer (e.g. a very slow site or a network cut during "Publishing...") and publish again — the same WordPress post must be updated, no `-2` slug created; (2) open the article in two tabs and click Publish in both — one gets "Another publish of this article is already in progress". Before 042, (2) is not protected; (1) still is.
+
 # WordPress publish — automatic internal links (TASK-FIX-051, 2026-09-26)
 
 ```bash

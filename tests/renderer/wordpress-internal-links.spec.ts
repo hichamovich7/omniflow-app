@@ -110,7 +110,8 @@ function installFakeSite(fake: FakeSite = {}) {
     restore: () => {
       globalThis.fetch = original;
     },
-    listCalls: () => calls.filter((c) => c.method === 'GET' && c.url.includes('/wp/v2/posts?')),
+    // Published-posts listing only — the publish reconciliation lookup (?slug=, TASK-FIX-058) is not one.
+    listCalls: () => calls.filter((c) => c.method === 'GET' && c.url.includes('/wp/v2/posts?') && !c.url.includes('slug=')),
     sentContent: () => (calls.find((c) => c.method === 'POST' && c.url.includes('/wp/v2/posts'))?.body as { content: string })?.content,
   };
 }

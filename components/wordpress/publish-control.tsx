@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { UploadCloud } from 'lucide-react';
@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/shared/status';
 import type { PublishMode } from '@/lib/validations/wordpress-publish';
+import { displayedPublishStatus } from '@/lib/wordpress/publish-lock';
+import { requestPublish } from '@/lib/wordpress/publish-outcome';
 import type { WordPressArticle } from '@/types/wordpress';
 
 const MODE_LABELS: Record<PublishMode, string> = {
@@ -36,10 +38,13 @@ interface PublishControlProps {
   generationId: string;
   article: Pick<
     WordPressArticle,
-    'id' | 'slug' | 'publish_status' | 'wp_post_id' | 'published_at' | 'scheduled_at' | 'publish_error'
+    'id' | 'slug' | 'publish_status' | 'wp_post_id' | 'published_at' | 'scheduled_at' | 'publish_error' | 'publish_started_at'
   >;
   wordpressSite: { id: string; site_url: string };
 }
+
+const UNCONFIRMED_RETRY_MESSAGE =
+  'The last publish was not confirmed by WordPress. Check WordPress first — OmniFlow looks for the post it already sent and updates it instead of creating a duplicate.';
 
 function alreadySentMessage(
   article: Pick<WordPressArticle, 'published_at' | 'scheduled_at'>
@@ -60,9 +65,15 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
   const [scheduledTime, setScheduledTime] = useState('09:00');
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Synchronous guard: a second click before React re-renders the disabled
+  // button never sends a second request.
+  const inFlight = useRef(false);
+  const status = displayedPublishStatus(article);
+  const unconfirmed = status === 'uncertain';
 
   function handleSubmitClick() {
-    if (article.wp_post_id) {
+    if (inFlight.current) return;
+    if (article.wp_post_id || unconfirmed) {
       setConfirmOpen(true);
       return;
     }
@@ -70,43 +81,50 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
   }
 
   async function handleSubmit() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setConfirmOpen(false);
     setLoading(true);
 
-    const res = await fetch(`/api/wordpress/${generationId}/publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      const outcome = await requestPublish(fetch, `/api/wordpress/${generationId}/publish`, {
         mode,
         ...(mode === 'schedule' ? { scheduledDate, scheduledTime } : {}),
-      }),
-    });
-    const json = await res.json();
+      });
 
-    setLoading(false);
+      if (outcome.kind === 'uncertain') {
+        toast.warning(outcome.message);
+        return;
+      }
+      if (outcome.kind === 'busy') {
+        toast.info(outcome.message);
+        return;
+      }
+      if (outcome.kind === 'failed') {
+        toast.error(outcome.message);
+        return;
+      }
 
-    if (!res.ok || json.error) {
-      toast.error(json.error?.message ?? 'Failed to publish to WordPress');
+      toast.success(
+        mode === 'draft'
+          ? 'Saved as draft on WordPress'
+          : mode === 'now'
+            ? 'Published to WordPress'
+            : 'Scheduled on WordPress'
+      );
+      const insertedLinks = outcome.data.internalLinks?.insertedCount ?? 0;
+      if (insertedLinks > 0) {
+        toast.info(`${insertedLinks} internal link${insertedLinks === 1 ? '' : 's'} added to older posts`);
+      }
+      // Non-blocking SEO issues (e.g. Rank Math, internal links) — the post itself was sent.
+      for (const warning of outcome.data.warnings ?? []) {
+        toast.warning(warning);
+      }
+    } finally {
+      inFlight.current = false;
+      setLoading(false);
       router.refresh();
-      return;
     }
-
-    toast.success(
-      mode === 'draft'
-        ? 'Saved as draft on WordPress'
-        : mode === 'now'
-          ? 'Published to WordPress'
-          : 'Scheduled on WordPress'
-    );
-    const insertedLinks = (json.data?.internalLinks?.insertedCount ?? 0) as number;
-    if (insertedLinks > 0) {
-      toast.info(`${insertedLinks} internal link${insertedLinks === 1 ? '' : 's'} added to older posts`);
-    }
-    // Non-blocking SEO issues (e.g. Rank Math, internal links) — the post itself was sent.
-    for (const warning of (json.data?.warnings ?? []) as string[]) {
-      toast.warning(warning);
-    }
-    router.refresh();
   }
 
   return (
@@ -160,7 +178,7 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <StatusBadge status={article.publish_status} />
+        <StatusBadge status={status} />
         {article.published_at && (
           <span className="text-muted-foreground">{new Date(article.published_at).toLocaleString()}</span>
         )}
@@ -175,15 +193,20 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
           </a>
         )}
       </div>
-      {article.publish_status === 'failed' && article.publish_error && (
+      {status === 'failed' && article.publish_error && (
         <p className="text-sm text-destructive">{article.publish_error}</p>
+      )}
+      {unconfirmed && (
+        <p className="text-sm text-muted-foreground">
+          {article.publish_error ?? 'WordPress did not confirm the last publish. Check WordPress before retrying.'}
+        </p>
       )}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update the existing WordPress post?</DialogTitle>
-            <DialogDescription>{alreadySentMessage(article)}</DialogDescription>
+            <DialogTitle>{unconfirmed ? 'Publish again?' : 'Update the existing WordPress post?'}</DialogTitle>
+            <DialogDescription>{unconfirmed ? UNCONFIRMED_RETRY_MESSAGE : alreadySentMessage(article)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)} disabled={loading}>

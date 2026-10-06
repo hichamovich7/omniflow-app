@@ -19,6 +19,8 @@ const STATUS_PRESENTATION = {
   draft: { label: 'Draft', tone: 'neutral' },
   scheduled: { label: 'Scheduled', tone: 'primary' },
   published: { label: 'Published', tone: 'success' },
+  publishing: { label: 'Publishing', tone: 'primary' },
+  uncertain: { label: 'Unconfirmed', tone: 'warning' },
   // Content streams.
   active: { label: 'Active', tone: 'success' },
   planned: { label: 'Planned', tone: 'primary' },
