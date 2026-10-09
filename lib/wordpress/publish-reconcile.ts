@@ -1,6 +1,7 @@
 import {
   findPostsBySlug,
   WordPressApiError,
+  type TimeoutLimiter,
   type WordPressPostMatch,
   type WordPressSiteCredentials,
 } from '@/lib/wordpress/rest-client';
@@ -44,13 +45,14 @@ export function isExactPostMatch(post: Pick<WordPressPostMatch, 'slug' | 'titleR
 export async function findReconcilablePost(
   site: WordPressSiteCredentials,
   article: { slug: string; title: string },
-  isClaimed: PostIdClaimCheck
+  isClaimed: PostIdClaimCheck,
+  limit?: TimeoutLimiter
 ): Promise<ReconcileResult> {
   if (!article.slug.trim() || !article.title.trim()) return { outcome: 'none' };
 
   let posts: WordPressPostMatch[];
   try {
-    posts = await findPostsBySlug(site, article.slug);
+    posts = await findPostsBySlug(site, article.slug, limit);
   } catch (err) {
     return { outcome: 'unknown', http: err instanceof WordPressApiError ? err.status : undefined };
   }

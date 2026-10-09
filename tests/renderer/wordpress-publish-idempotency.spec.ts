@@ -631,12 +631,17 @@ test('route: lock, immediate id save, 409 / 504 responses, release on every end'
   expect(route).toContain("code: 'publish_uncertain'");
   expect(route).toContain('onPostId: persistPostId');
   expect(route).toContain('isWordPressPostIdClaimed(supabase');
-  // Every terminal write releases the lock and never drops a known id.
-  const updates = [...route.matchAll(/\.update\(\{([\s\S]*?)\}\)/g)].map((m) => m[1]);
-  const terminal = updates.filter((u) => /publish_status/.test(u));
+  // Every terminal write goes through saveTerminal, which releases the lock
+  // and never drops a known id (TASK-FIX-059).
+  expect(route).toContain('.update({ ...values, ...lockRelease })');
+  const terminal = [...route.matchAll(/saveTerminal\(\{([\s\S]*?)\}\)/g)].map((m) => m[1]);
   expect(terminal.length).toBe(3);
-  for (const u of terminal) expect(u).toContain('...lockRelease');
+  for (const u of terminal) expect(u).toMatch(/publish_status: /);
   for (const u of terminal) expect(u).toMatch(/wp_post_id: (knownPostId|postResult\.id)/);
+  // …and a finally that frees the lock when that write failed.
+  const finallyBlock = route.slice(route.lastIndexOf('} finally {'));
+  expect(finallyBlock).toContain('if (!lockReleased)');
+  expect(finallyBlock).toContain('.update({ publish_started_at: null })');
 });
 
 test('logs: attempt id, step, duration, HTTP status, post id — never credentials or content', async () => {

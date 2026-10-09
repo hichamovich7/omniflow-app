@@ -19,7 +19,7 @@ import {
 import { StatusBadge } from '@/components/shared/status';
 import type { PublishMode } from '@/lib/validations/wordpress-publish';
 import { displayedPublishStatus } from '@/lib/wordpress/publish-lock';
-import { requestPublish } from '@/lib/wordpress/publish-outcome';
+import { describePublishSuccess, requestPublish } from '@/lib/wordpress/publish-outcome';
 import type { WordPressArticle } from '@/types/wordpress';
 
 const MODE_LABELS: Record<PublishMode, string> = {
@@ -105,19 +105,16 @@ export function PublishControl({ generationId, article, wordpressSite }: Publish
         return;
       }
 
-      toast.success(
-        mode === 'draft'
-          ? 'Saved as draft on WordPress'
-          : mode === 'now'
-            ? 'Published to WordPress'
-            : 'Scheduled on WordPress'
-      );
+      // The post was sent; warnings (skipped image, links, Rank Math…) never mean a failure.
+      const warnings = outcome.data.warnings ?? [];
+      const success = describePublishSuccess(mode, warnings);
+      if (warnings.length === 0) toast.success(success.headline);
+      else toast.warning(success.headline);
       const insertedLinks = outcome.data.internalLinks?.insertedCount ?? 0;
       if (insertedLinks > 0) {
         toast.info(`${insertedLinks} internal link${insertedLinks === 1 ? '' : 's'} added to older posts`);
       }
-      // Non-blocking SEO issues (e.g. Rank Math, internal links) — the post itself was sent.
-      for (const warning of outcome.data.warnings ?? []) {
+      for (const warning of success.details) {
         toast.warning(warning);
       }
     } finally {

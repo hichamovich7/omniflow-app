@@ -18,6 +18,17 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## WordPress publish: global time budget, the post always first — TASK-FIX-059 (2026-10-09)
+
+* Bug (P0.1, regression after TASK-FIX-058): sequential media uploads (featured image up to 48 s, aborting the publish on timeout), tags and internal links all ran before the post with no global ceiling, so the route hit Vercel's 60 s limit — 504 "uncertain", then 409 for 90 s on retry, every retry re-uploading everything.
+* New `lib/wordpress/publish-budget.ts`: deadlines from `maxDuration` (unchanged, 60 s) — preparation by 25 s, post write by 45 s, secondary steps by 51 s, answer before ~55 s; per-call timeouts capped to the time left; `withDeadline`, `mapWithConcurrency`.
+* New `lib/wordpress/publish-media.ts`: media uploads at most 3 at a time, featured first; featured image failed / out of time → post sent without `featured_media` + warning (no more 502); internal image → Storage URL kept (as before) + warning; placeholder tokens let internal links run during the uploads. Nothing deleted.
+* `sendArticleToWordPress()`: media ∥ tags (3 at a time) → internal links ∥ reconciliation, then the post, then FAQ re-send and Rank Math only with time left — skipped steps return explicit warnings, status stays `published` / `scheduled` / `draft`. Reconciliation, immediate `wp_post_id` save and no-duplicate rules unchanged.
+* `rest-client.ts`: optional `TimeoutLimiter` on media, tag, post and lookup calls; new error kind `budget` (not sent → real failure, never "uncertain").
+* Route: terminal writes through `saveTerminal()` (errors logged, never replacing the outcome), lock freed in `finally` when the final write failed.
+* Publish control: "Published to WordPress" / "Published, but the featured image could not be uploaded." / "Published to WordPress with N warnings." / "Publication status is uncertain. Check WordPress before retrying." / failure.
+* Unchanged: prompts, article content, Quality Gate, FAQ schema rules, Rank Math meta, `maxDuration`. No migration, no `.env` change, no AI call. Guide updated. New offline spec `wordpress-publish-budget.spec.ts` (20); 3 source assertions of older specs adapted to the new wiring.
+
 ## WordPress publish: idempotent publish, lock and uncertain outcomes — TASK-FIX-058 (2026-10-06)
 
 * Bug (P0 audit): a publish could show a failure although WordPress had created the post (answer lost, platform timeout, FAQ re-send error after creation), and the retry created a duplicate — `wp_post_id` was only saved at the very end and nothing looked for an existing post before creating.

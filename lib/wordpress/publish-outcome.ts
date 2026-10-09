@@ -6,8 +6,7 @@
  * saved the post.
  */
 
-export const PUBLISH_UNCERTAIN_MESSAGE =
-  'Sent to WordPress, but the confirmation is uncertain. Check WordPress before retrying.';
+export const PUBLISH_UNCERTAIN_MESSAGE = 'Publication status is uncertain. Check WordPress before retrying.';
 export const PUBLISH_IN_PROGRESS_MESSAGE =
   'Another publish of this article is already in progress. Wait for it to finish, then refresh the page.';
 export const PUBLISH_FAILED_MESSAGE = 'Failed to publish to WordPress';
@@ -67,6 +66,49 @@ export async function readPublishResponse(res: Response): Promise<PublishOutcome
     return { kind: 'failed', message: body.error?.message || PUBLISH_FAILED_MESSAGE };
   }
   return { kind: 'success', data: body.data ?? {} };
+}
+
+export type PublishedMode = 'draft' | 'now' | 'schedule';
+
+const DONE_LABEL: Record<PublishedMode, string> = {
+  draft: 'Saved as draft on WordPress',
+  now: 'Published to WordPress',
+  schedule: 'Scheduled on WordPress',
+};
+const DONE_SHORT: Record<PublishedMode, string> = {
+  draft: 'Saved as draft',
+  now: 'Published',
+  schedule: 'Scheduled',
+};
+
+// One-warning headlines for the time-budget cases (TASK-FIX-059), matched on
+// the warning's opening words (the server constants in publish-post.ts /
+// publish-media.ts).
+const SINGLE_WARNING_HEADLINES: [prefix: string, clause: string][] = [
+  ['Featured image could not be uploaded', 'the featured image could not be uploaded'],
+  ['Internal links were skipped because the time limit was reached', 'internal links were skipped because the time limit was reached'],
+  ['Rank Math metadata was skipped because the time limit was reached', 'Rank Math metadata was skipped because the time limit was reached'],
+  ['Some tags were skipped because the time limit was reached', 'some tags were skipped because the time limit was reached'],
+];
+
+/**
+ * The success toast: plain success, or success with warnings — the post was
+ * sent either way (warnings never mean a failure). `details` = the warnings
+ * to list after the headline (none when the headline already says it all).
+ */
+export function describePublishSuccess(
+  mode: PublishedMode,
+  warnings: string[] = []
+): { headline: string; details: string[] } {
+  if (warnings.length === 0) return { headline: DONE_LABEL[mode], details: [] };
+  if (warnings.length === 1) {
+    const known = SINGLE_WARNING_HEADLINES.find(([prefix]) => warnings[0].startsWith(prefix));
+    if (known) return { headline: `${DONE_SHORT[mode]}, but ${known[1]}.`, details: [] };
+  }
+  return {
+    headline: `${DONE_LABEL[mode]} with ${warnings.length} warning${warnings.length === 1 ? '' : 's'}.`,
+    details: warnings,
+  };
 }
 
 /** The request + its reading. A network error after sending is an unknown outcome, not a failure. */

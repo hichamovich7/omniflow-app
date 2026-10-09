@@ -5,14 +5,23 @@ import {
   type InternalLinkContext,
   type InternalLinksReport,
 } from '@/lib/wordpress/internal-links';
+import { mapWithConcurrency, withDeadline, type PublishBudget } from '@/lib/wordpress/publish-budget';
 import { silentPublishLogger, type PublishLogger } from '@/lib/wordpress/publish-log';
+import {
+  applyMediaReplacements,
+  uploadPublishMedia,
+  type PublishMediaPlan,
+  type PublishMediaResult,
+} from '@/lib/wordpress/publish-media';
 import { findReconcilablePost, type PostIdClaimCheck, type ReconcileResult } from '@/lib/wordpress/publish-reconcile';
 import {
   findOrCreateTag,
   isUncertainWordPressError,
   upsertPost,
+  WORDPRESS_TIMEOUTS_MS,
   WordPressApiError,
   type CreatePostInput,
+  type TimeoutLimiter,
   type WordPressPostResult,
   type WordPressSiteCredentials,
 } from '@/lib/wordpress/rest-client';
@@ -42,7 +51,19 @@ export interface SendArticleInput {
   status: CreatePostInput['status'];
   date?: string;
   categoryIds?: number[];
+  /** An already-uploaded featured image — ignored when `media` plans one. */
   featuredMediaId?: number;
+  /**
+   * Images to upload during the preparation phase (TASK-FIX-059): the
+   * featured image and the internal images, whose URLs in `html` are
+   * placeholder tokens (publish-media.ts). Omitted = no upload.
+   */
+  media?: PublishMediaPlan | null;
+  /**
+   * Global time budget (publish-budget.ts). Omitted = only the fixed
+   * per-request timeouts apply (no global ceiling).
+   */
+  budget?: PublishBudget | null;
   /**
    * Link a few of the site's published posts from the body before sending
    * (TASK-FIX-051). Off by default; the publish route turns it on.
@@ -82,6 +103,16 @@ export const FAQ_SCHEMA_REMOVED_WARNING =
 export const NO_TAGS_WARNING = 'No reliable tags found — the post was sent without tags.';
 export const TAGS_NOT_CREATED_WARNING = 'Tags could not be found or created on WordPress — the post was sent without tags.';
 export const NO_FOCUS_KEYWORD_WARNING = 'No reliable focus keyword found — the Rank Math focus keyword was left empty.';
+
+// Time-budget warnings (TASK-FIX-059): the post was sent, a secondary step was not.
+export const TAGS_TIME_LIMIT_WARNING = 'Some tags were skipped because the time limit was reached.';
+export const INTERNAL_LINKS_TIME_LIMIT_WARNING = 'Internal links were skipped because the time limit was reached.';
+export const RANK_MATH_TIME_LIMIT_WARNING =
+  'Rank Math metadata was skipped because the time limit was reached — publish again to save it.';
+export const FAQ_SCHEMA_TIME_LIMIT_WARNING =
+  'WordPress filtered the FAQ schema and there was no time left to re-send the post without it — publish again to fix it.';
+
+export const TAG_CONCURRENCY = 3;
 
 export function buildPostInput(
   input: SendArticleInput,
@@ -126,13 +157,25 @@ export function buildInternalLinkContext(input: {
   };
 }
 
-async function resolveTagIds(site: WordPressSiteCredentials, names: string[]): Promise<number[]> {
+/** Tag ids in tag order, TAG_CONCURRENCY at a time; `skipped` = not tried for lack of time. Never throws. */
+async function resolveTagIds(
+  site: WordPressSiteCredentials,
+  names: string[],
+  limit?: TimeoutLimiter
+): Promise<{ ids: number[]; skipped: number }> {
+  let skipped = 0;
+  const settled = await mapWithConcurrency(names, TAG_CONCURRENCY, async (name) => {
+    if (limit && limit(WORDPRESS_TIMEOUTS_MS.tag) <= 0) {
+      skipped++;
+      return null;
+    }
+    return findOrCreateTag(site, name, limit);
+  });
   const ids: number[] = [];
-  for (const name of names) {
-    const id = await findOrCreateTag(site, name);
-    if (id !== null && !ids.includes(id)) ids.push(id);
+  for (const outcome of settled) {
+    if (outcome.status === 'fulfilled' && outcome.value !== null && !ids.includes(outcome.value)) ids.push(outcome.value);
   }
-  return ids;
+  return { ids, skipped };
 }
 
 /**
@@ -165,14 +208,23 @@ function errorResult(err: unknown): { http?: number; result: string } {
 type PostIdSource = 'created' | 'updated' | 'adopted';
 
 /**
- * Reconcile (adopt a post OmniFlow already created) → create or update the
- * post → persist its WP id at once (onPostId) → FAQ check → Rank Math meta.
+ * Preparation → post → secondary steps, inside the publish budget (TASK-FIX-059):
+ *
+ *   1. Preparation, in parallel and bounded by `prepareDeadline`: media
+ *      uploads ∥ tags → internal links ∥ reconciliation (adopt a post
+ *      OmniFlow already created). A step out of time is skipped with a
+ *      warning — never a failure.
+ *   2. Create or update the post (bounded by `postDeadline`), persist its WP
+ *      id at once (onPostId).
+ *   3. FAQ check / re-send and Rank Math, only with time left before
+ *      `finishDeadline`; otherwise skipped with a warning.
  *
  * The post step throws: a WordPressPublishUncertainError when the outcome is
- * unknown, any other error when it really failed. Every id obtained (created,
- * updated or adopted) is handed to onPostId before any secondary step, so a
- * later failure never loses it and a retry updates the same post. Rank Math
- * never throws — its failure only adds a warning.
+ * unknown, any other error when it really failed (including a post write
+ * never sent for lack of time). Every id obtained (created, updated or
+ * adopted) is handed to onPostId before any secondary step, so a later
+ * failure never loses it and a retry updates the same post. Rank Math never
+ * throws — its failure only adds a warning.
  */
 export async function sendArticleToWordPress(
   site: WordPressSiteCredentials,
@@ -181,11 +233,14 @@ export async function sendArticleToWordPress(
   const log = input.log ?? silentPublishLogger;
   const isClaimed: PostIdClaimCheck = input.isPostIdClaimed ?? (async () => false);
   const pins = input.pins ?? null;
+  const budget = input.budget ?? null;
+  const prepareLimit = budget?.limiter(budget.prepareDeadline);
+  const postLookupLimit = budget?.limiter(budget.postDeadline);
+  const postLimit = budget?.limiter(budget.postDeadline, budget.minWriteMs);
+  const finishLookupLimit = budget?.limiter(budget.finishDeadline);
+  const finishWriteLimit = budget?.limiter(budget.finishDeadline, budget.minWriteMs);
 
-  let started = Date.now();
   const tagNames = buildWordPressTags(input.generation, pins);
-  const tagIds = await resolveTagIds(site, tagNames);
-  log.step('tags', { ms: Date.now() - started, count: tagIds.length });
   const focusKeyword = resolveFocusKeyword(input.generation, pins);
 
   let persistedId = input.article.wp_post_id;
@@ -201,9 +256,13 @@ export async function sendArticleToWordPress(
     }
   }
 
-  async function reconcile(step: string, claimCheck: PostIdClaimCheck = isClaimed): Promise<ReconcileResult> {
+  async function reconcile(
+    step: string,
+    claimCheck: PostIdClaimCheck = isClaimed,
+    limit?: TimeoutLimiter
+  ): Promise<ReconcileResult> {
     const t = Date.now();
-    const found = await findReconcilablePost(site, input.article, claimCheck);
+    const found = await findReconcilablePost(site, input.article, claimCheck, limit);
     log.step(step, {
       ms: Date.now() - t,
       result: found.outcome,
@@ -213,43 +272,88 @@ export async function sendArticleToWordPress(
     return found;
   }
 
-  // A post an earlier attempt created but never recorded is adopted, never duplicated.
-  let knownPostId = input.article.wp_post_id;
-  if (!knownPostId) {
-    const found = await reconcile('reconcile_before_create');
-    if (found.outcome === 'found') {
-      knownPostId = found.post.id;
-      await remember(knownPostId, 'adopted');
-    }
-  }
-  const article = { ...input.article, wp_post_id: knownPostId };
+  // ------------------------------------------------ 1. preparation (parallel)
 
-  // Never blocking: on any failure the HTML is sent unchanged.
-  let html = input.html;
-  let internalLinks = skippedInternalLinks();
-  if (input.insertInternalLinks) {
+  // Tags then internal links (links score candidates by tag). Never throws.
+  async function prepareTagsAndLinks(): Promise<{
+    tagIds: number[];
+    tagsSkipped: number;
+    html: string;
+    internalLinks: InternalLinksReport;
+  }> {
+    let started = Date.now();
+    const tags = await resolveTagIds(site, tagNames, prepareLimit);
+    log.step('tags', { ms: Date.now() - started, count: tags.ids.length, ...(tags.skipped ? { result: 'time_limit' } : {}) });
+
+    // Never blocking: on any failure or lack of time the HTML is sent unchanged.
+    if (!input.insertInternalLinks) {
+      return { tagIds: tags.ids, tagsSkipped: tags.skipped, html: input.html, internalLinks: skippedInternalLinks() };
+    }
     started = Date.now();
-    const linked = await addInternalLinks(
-      site,
-      input.html,
-      buildInternalLinkContext({ ...input, article, pins, categoryIds: input.categoryIds ?? [], tagIds })
-    );
-    html = linked.html;
-    internalLinks = linked.report;
+    const link = () =>
+      addInternalLinks(
+        site,
+        input.html,
+        buildInternalLinkContext({ ...input, pins, categoryIds: input.categoryIds ?? [], tagIds: tags.ids })
+      );
+    // Not started at all without time left; otherwise not awaited past the
+    // preparation deadline (read-only GETs, safe to abandon).
+    const linked = !budget
+      ? { timedOut: false as const, value: await link() }
+      : budget.remaining(budget.prepareDeadline) < budget.minCallMs
+        ? { timedOut: true as const }
+        : await withDeadline(link(), budget.prepareDeadline, budget.now);
+    if (linked.timedOut) {
+      log.warn('internal_links', { ms: Date.now() - started, result: 'time_limit' });
+      return {
+        tagIds: tags.ids,
+        tagsSkipped: tags.skipped,
+        html: input.html,
+        internalLinks: { ...skippedInternalLinks(), warnings: [INTERNAL_LINKS_TIME_LIMIT_WARNING] },
+      };
+    }
+    const internalLinks = linked.value.report;
     log.step('internal_links', { ms: Date.now() - started, result: internalLinks.status, count: internalLinks.insertedCount });
+    return { tagIds: tags.ids, tagsSkipped: tags.skipped, html: linked.value.html, internalLinks };
   }
+
+  const [prepared, media, foundBefore] = await Promise.all([
+    prepareTagsAndLinks(),
+    input.media ? uploadPublishMedia(site, input.media, { limit: prepareLimit, log }) : Promise.resolve<PublishMediaResult | null>(null),
+    // A post an earlier attempt created but never recorded is adopted, never duplicated.
+    input.article.wp_post_id ? Promise.resolve(null) : reconcile('reconcile_before_create', isClaimed, prepareLimit),
+  ]);
+
+  let knownPostId = input.article.wp_post_id;
+  if (foundBefore?.outcome === 'found') {
+    knownPostId = foundBefore.post.id;
+    await remember(knownPostId, 'adopted');
+  }
+
+  const tagIds = prepared.tagIds;
+  const internalLinks = prepared.internalLinks;
+  const html = input.media ? applyMediaReplacements(prepared.html, input.media.internal, media?.replacements ?? new Map()) : prepared.html;
+  const featuredMediaId = input.media ? media?.featuredMediaId : input.featuredMediaId;
+  const sendInput: SendArticleInput = { ...input, featuredMediaId };
+
+  // ------------------------------------------------------------------ 2. post
 
   // Appended after internal linking, so the link tokenizer never sees it.
   const faqSchema = input.faqSchema?.trim() || null;
-  const postInput = buildPostInput({ ...input, html: faqSchema ? `${html.trimEnd()}
+  const postInput = buildPostInput({ ...sendInput, html: faqSchema ? `${html.trimEnd()}
 ${faqSchema}
 ` : html }, tagIds);
 
   /** Update an existing post. 'missing' = 404, the post no longer exists. */
-  async function updatePost(postId: number, payload: CreatePostInput, step: string): Promise<WordPressPostResult | 'missing'> {
+  async function updatePost(
+    postId: number,
+    payload: CreatePostInput,
+    step: string,
+    limit: TimeoutLimiter | undefined
+  ): Promise<WordPressPostResult | 'missing'> {
     const t = Date.now();
     try {
-      const post = await upsertPost(site, postId, payload);
+      const post = await upsertPost(site, postId, payload, limit);
       log.step(step, { ms: Date.now() - t, wpPostId: post.id, result: 'updated' });
       return post;
     } catch (err) {
@@ -264,17 +368,17 @@ ${faqSchema}
   async function createPost(): Promise<{ post: WordPressPostResult; source: 'created' | 'adopted' }> {
     const t = Date.now();
     try {
-      const post = await upsertPost(site, null, postInput);
+      const post = await upsertPost(site, null, postInput, postLimit);
       log.step('post_create', { ms: Date.now() - t, wpPostId: post.id, result: 'created' });
       return { post, source: 'created' };
     } catch (err) {
       log.warn('post_create', { ms: Date.now() - t, ...errorResult(err) });
       // A timeout, a lost connection, an unreadable 2xx or a 5xx can all come
-      // after WordPress committed the post.
+      // after WordPress committed the post. A write never sent (no time) cannot.
       const uncertain = isUncertainWordPressError(err);
       const serverError = err instanceof WordPressApiError && (err.status ?? 0) >= 500;
       if (!uncertain && !serverError) throw err;
-      const found = await reconcile('reconcile_after_create');
+      const found = await reconcile('reconcile_after_create', isClaimed, finishLookupLimit);
       if (found.outcome === 'found') return { post: found.post, source: 'adopted' };
       // A 5xx with the post confirmed absent is a real failure. After a
       // timeout the request may still be running on WordPress: unknown.
@@ -285,17 +389,21 @@ ${faqSchema}
 
   let post: WordPressPostResult | null = null;
   if (knownPostId) {
-    const updated = await updatePost(knownPostId, postInput, 'post_update');
+    const updated = await updatePost(knownPostId, postInput, 'post_update', postLimit);
     if (updated !== 'missing') {
       post = updated;
     } else {
       // The previously-sent post no longer exists on WordPress — adopt another
       // exact match if there is one, else fall back to creating a fresh post.
       const missingId = knownPostId;
-      const found = await reconcile('reconcile_after_missing', async (id) => id === missingId || (await isClaimed(id)));
+      const found = await reconcile(
+        'reconcile_after_missing',
+        async (id) => id === missingId || (await isClaimed(id)),
+        postLookupLimit
+      );
       if (found.outcome === 'found') {
         await remember(found.post.id, 'adopted');
-        const retried = await updatePost(found.post.id, postInput, 'post_update');
+        const retried = await updatePost(found.post.id, postInput, 'post_update', postLimit);
         if (retried !== 'missing') post = retried;
       }
     }
@@ -305,8 +413,13 @@ ${faqSchema}
     await remember(created.post.id, created.source);
     if (created.source === 'adopted') {
       // Adopted after a lost answer: re-sent so the post holds exactly this
-      // attempt's content and status.
-      const updated = await updatePost(created.post.id, postInput, 'post_update');
+      // attempt's content and status. No time left to re-send: the post is
+      // known (id saved) but its final state is not — uncertain, a retry
+      // updates the same post.
+      if (finishWriteLimit && finishWriteLimit(WORDPRESS_TIMEOUTS_MS.postWrite) <= 0) {
+        throw new WordPressPublishUncertainError(created.post.id, 'post_update');
+      }
+      const updated = await updatePost(created.post.id, postInput, 'post_update', finishWriteLimit);
       if (updated === 'missing') throw new WordPressPublishUncertainError(null, 'post_update');
       post = updated;
     } else {
@@ -315,19 +428,26 @@ ${faqSchema}
   }
   await remember(post.id, 'updated');
 
+  // ------------------------------------------------------- 3. secondary steps
+
   // A user without unfiltered_html gets <script> stripped by kses, which
   // would leave the JSON as visible text: unless the saved content still
   // holds the exact script, the same post is re-sent without it.
   let faqSchemaStatus: FaqSchemaStatus = 'not_added';
+  let faqOutOfTime = false;
   if (faqSchema) {
     if (post.contentRaw?.includes(faqSchema)) {
       faqSchemaStatus = 'added';
+    } else if (finishWriteLimit && finishWriteLimit(WORDPRESS_TIMEOUTS_MS.postWrite) <= 0) {
+      // The post and its id are saved; a retry re-sends it (update, never a new post).
+      faqOutOfTime = true;
+      log.warn('faq_resend', { wpPostId: post.id, result: 'time_limit' });
     } else {
       console.warn(
         `[wordpress publish] step=faq_schema article=${input.article.id} post=${post.id} ` +
           `result=${post.contentRaw === undefined ? 'unverifiable' : 'filtered'} — re-sending without schema`
       );
-      const resent = await updatePost(post.id, buildPostInput({ ...input, html }, tagIds), 'faq_resend');
+      const resent = await updatePost(post.id, buildPostInput({ ...sendInput, html }, tagIds), 'faq_resend', finishWriteLimit);
       // Deleted between two calls: the id is kept, the outcome is unknown.
       if (resent === 'missing') throw new WordPressPublishUncertainError(post.id, 'faq_resend');
       post = resent;
@@ -335,25 +455,43 @@ ${faqSchema}
     }
   }
 
-  started = Date.now();
-  const rankMath = await saveRankMathMeta(site, post.id, {
-    title: getMetaTitle(input.article),
-    description: input.article.meta_description,
-    focusKeyword: focusKeyword.keyword,
-  });
+  const started = Date.now();
+  const savingRankMath = (postId: number) =>
+    saveRankMathMeta(site, postId, {
+      title: getMetaTitle(input.article),
+      description: input.article.meta_description,
+      focusKeyword: focusKeyword.keyword,
+    });
+  let rankMath: RankMathResult;
+  let rankMathOutOfTime = false;
+  if (budget) {
+    // Rank Math's own calls are not cancellable; it never throws and
+    // updateMeta is idempotent, so an unfinished call is simply not awaited.
+    const outcome =
+      budget.remaining(budget.finishDeadline) < budget.minCallMs
+        ? { timedOut: true as const }
+        : await withDeadline(savingRankMath(post.id), budget.finishDeadline, budget.now);
+    rankMathOutOfTime = outcome.timedOut;
+    rankMath = outcome.timedOut ? { status: 'failed', message: 'Time limit reached before Rank Math finished.' } : outcome.value;
+  } else {
+    rankMath = await savingRankMath(post.id);
+  }
   log.step('rank_math', {
     ms: Date.now() - started,
     wpPostId: post.id,
-    result: rankMath.status,
+    result: rankMathOutOfTime ? 'time_limit' : rankMath.status,
     ...(rankMath.status === 'failed' && rankMath.httpStatus !== undefined ? { http: rankMath.httpStatus } : {}),
   });
 
   const warnings: string[] = [];
   if (tagNames.length === 0) warnings.push(NO_TAGS_WARNING);
+  else if (prepared.tagsSkipped > 0) warnings.push(TAGS_TIME_LIMIT_WARNING);
   else if (tagIds.length === 0) warnings.push(TAGS_NOT_CREATED_WARNING);
   if (!focusKeyword.keyword && rankMath.status !== 'not_detected') warnings.push(NO_FOCUS_KEYWORD_WARNING);
   if (rankMath.status === 'not_detected') {
     warnings.push(RANK_MATH_NOT_DETECTED_WARNING);
+  } else if (rankMathOutOfTime) {
+    warnings.push(RANK_MATH_TIME_LIMIT_WARNING);
   } else if (rankMath.status === 'failed') {
     warnings.push(RANK_MATH_FAILED_WARNING);
     // Step, HTTP code and technical message only — no credentials, no content.
@@ -365,6 +503,8 @@ ${faqSchema}
 
   warnings.push(...internalLinks.warnings);
   if (faqSchemaStatus === 'removed') warnings.push(FAQ_SCHEMA_REMOVED_WARNING);
+  if (faqOutOfTime) warnings.push(FAQ_SCHEMA_TIME_LIMIT_WARNING);
+  if (media) warnings.push(...media.warnings);
 
   return { post, tagIds, focusKeyword, rankMath, internalLinks, faqSchema: faqSchemaStatus, warnings };
 }

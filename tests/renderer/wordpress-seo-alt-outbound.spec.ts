@@ -229,7 +229,12 @@ test('uploadMedia sets alt_text with one follow-up call when WordPress ignores i
 test('publish route: alt text on featured and internal uploads, the stored article is never rewritten', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/wordpress/[id]/publish/route.ts'), 'utf8');
   expect(route).toContain('buildFeaturedImageAltText(altSource)');
-  expect(route).toMatch(/uploadMedia\(credentials, article\.featured_image_url, `\$\{article\.slug\}-featured\.png`, altText\)/);
+  // Uploads moved to publish-media.ts (TASK-FIX-059): the route plans them with the same alt texts.
+  expect(route).toMatch(/\{ url: article\.featured_image_url, filename: `\$\{article\.slug\}-featured\.png`, altText: featuredAltText \}/);
+  expect(route).toContain('const featuredAltText = buildFeaturedImageAltText(altSource);');
+  expect(readFileSync(join(process.cwd(), 'lib/wordpress/publish-media.ts'), 'utf8')).toContain(
+    'uploadMedia(site, job.request.url, job.request.filename, job.request.altText, options.limit)'
+  );
   expect(route).toContain('resolveInternalImageAltText(image.alt_text, altSource)');
   // The only wordpress_articles writes are publish status fields — never `content`.
   const updates = [...route.matchAll(/\.update\(\{([\s\S]*?)\}\)/g)].map((m) => m[1]);

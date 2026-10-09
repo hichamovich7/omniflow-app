@@ -329,7 +329,8 @@ test.describe('publish route wiring', () => {
   test('delegates to sendArticleToWordPress and no longer sends meta_title as the post title', () => {
     expect(route).toContain('sendArticleToWordPress(credentials');
     expect(route).not.toContain('getMetaTitle');
-    expect(route).toContain('warnings: [...sent.warnings, ...altWarnings]');
+    // Alt-text and media warnings now come back inside sent.warnings (TASK-FIX-059).
+    expect(route).toContain('warnings: sent.warnings,');
   });
 });
 

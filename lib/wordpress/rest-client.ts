@@ -1,9 +1,10 @@
 /**
  * Why a WordPress call failed. `timeout`, `network` and `invalid_response`
  * mean the outcome on the WordPress side is unknown — a write may have been
- * committed even though no usable answer came back.
+ * committed even though no usable answer came back. `budget` means the
+ * request was never sent: the publish time budget had run out (TASK-FIX-059).
  */
-export type WordPressErrorKind = 'http' | 'timeout' | 'network' | 'invalid_response';
+export type WordPressErrorKind = 'http' | 'timeout' | 'network' | 'invalid_response' | 'budget';
 
 export class WordPressApiError extends Error {
   status?: number;
@@ -28,15 +29,26 @@ export const WORDPRESS_TIMEOUTS_MS = {
   rankMath: 10_000,
 } as const;
 
+/**
+ * Caps a call's timeout to the time left in the publish budget
+ * (lib/wordpress/publish-budget.ts): the timeout to use, or 0 when there is
+ * not enough time left to start the call. Omitted = the fixed cap.
+ */
+export type TimeoutLimiter = (capMs: number) => number;
+
+function budgetError(action: string): WordPressApiError {
+  return new WordPressApiError(`Not enough time left to ${action}.`, undefined, 'budget');
+}
+
 // AbortSignal.timeout() rejects fetch with a DOMException named TimeoutError.
 function isTimeoutError(err: unknown): boolean {
   const name = typeof err === 'object' && err !== null ? (err as { name?: unknown }).name : undefined;
   return name === 'TimeoutError' || name === 'AbortError';
 }
 
-/** A WP error whose outcome is unknown (timeout, network, unreadable 2xx). */
+/** A WP error whose outcome is unknown (timeout, network, unreadable 2xx) — never a request that was not sent. */
 export function isUncertainWordPressError(err: unknown): boolean {
-  return err instanceof WordPressApiError && err.kind !== 'http';
+  return err instanceof WordPressApiError && err.kind !== 'http' && err.kind !== 'budget';
 }
 
 export interface WordPressSiteCredentials {
@@ -172,15 +184,22 @@ export async function fetchCategories(
  * the manage_categories capability — so one bad tag never blocks a publish.
  * `search` is a fuzzy match on WP's side, hence the exact-name filter here.
  */
-export async function findOrCreateTag(site: WordPressSiteCredentials, name: string): Promise<number | null> {
+export async function findOrCreateTag(
+  site: WordPressSiteCredentials,
+  name: string,
+  limit?: TimeoutLimiter
+): Promise<number | null> {
   const base = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/tags`;
   const headers = { Authorization: authHeader(site.username, site.password) };
   const wanted = name.trim().toLowerCase();
+  const timeout = () => (limit ? limit(WORDPRESS_TIMEOUTS_MS.tag) : WORDPRESS_TIMEOUTS_MS.tag);
 
   try {
+    const searchTimeout = timeout();
+    if (searchTimeout <= 0) return null;
     const res = await fetch(`${base}?search=${encodeURIComponent(name)}&per_page=100`, {
       headers,
-      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.tag),
+      signal: AbortSignal.timeout(searchTimeout),
     });
     if (res.ok) {
       const found = (await res.json()) as { id: number; name: string }[];
@@ -192,11 +211,13 @@ export async function findOrCreateTag(site: WordPressSiteCredentials, name: stri
   }
 
   try {
+    const createTimeout = timeout();
+    if (createTimeout <= 0) return null;
     const res = await fetch(base, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
-      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.tag),
+      signal: AbortSignal.timeout(createTimeout),
     });
     const data = (await res.json().catch(() => null)) as
       | { id?: number; code?: string; data?: { term_id?: number } }
@@ -258,12 +279,17 @@ export async function uploadMedia(
   site: WordPressSiteCredentials,
   imageUrl: string,
   filename: string,
-  altText?: string | null
+  altText?: string | null,
+  limit?: TimeoutLimiter
 ): Promise<{ id: number; sourceUrl: string; altText: string | null }> {
+  const timeout = (cap: number) => (limit ? limit(cap) : cap);
+  const downloadTimeout = timeout(WORDPRESS_TIMEOUTS_MS.imageDownload);
+  if (downloadTimeout <= 0) throw budgetError('upload this image');
+
   let imgRes: Response;
   let bytes: ArrayBuffer;
   try {
-    imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.imageDownload) });
+    imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(downloadTimeout) });
     if (!imgRes.ok) {
       throw new Error('Could not fetch source image for upload');
     }
@@ -283,6 +309,8 @@ export async function uploadMedia(
   const alt = altText?.trim() || null;
   const mediaUrl = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media`;
   const url = alt ? `${mediaUrl}?${new URLSearchParams({ alt_text: alt }).toString()}` : mediaUrl;
+  const uploadTimeout = timeout(WORDPRESS_TIMEOUTS_MS.mediaUpload);
+  if (uploadTimeout <= 0) throw budgetError('upload this image');
 
   let res: Response;
   try {
@@ -294,7 +322,7 @@ export async function uploadMedia(
         'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
       },
       body: bytes,
-      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.mediaUpload),
+      signal: AbortSignal.timeout(uploadTimeout),
     });
   } catch (err) {
     if (isTimeoutError(err)) {
@@ -320,11 +348,19 @@ export async function uploadMedia(
   const savedAlt = typeof data.alt_text === 'string' && data.alt_text.trim() ? data.alt_text : null;
   if (!alt || savedAlt) return { id: data.id, sourceUrl: data.source_url, altText: savedAlt };
 
-  return { id: data.id, sourceUrl: data.source_url, altText: await setMediaAltText(site, data.id, alt) };
+  const altTimeout = timeout(WORDPRESS_TIMEOUTS_MS.mediaAltText);
+  // No time left for the follow-up: the image is uploaded, its alt text reported missing.
+  if (altTimeout <= 0) return { id: data.id, sourceUrl: data.source_url, altText: null };
+  return { id: data.id, sourceUrl: data.source_url, altText: await setMediaAltText(site, data.id, alt, altTimeout) };
 }
 
 /** Sets an attachment's alt text — returns the saved value, null on any failure (never throws). */
-async function setMediaAltText(site: WordPressSiteCredentials, mediaId: number, altText: string): Promise<string | null> {
+async function setMediaAltText(
+  site: WordPressSiteCredentials,
+  mediaId: number,
+  altText: string,
+  timeoutMs: number
+): Promise<string | null> {
   try {
     const res = await fetch(`${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media/${mediaId}`, {
       method: 'POST',
@@ -333,7 +369,7 @@ async function setMediaAltText(site: WordPressSiteCredentials, mediaId: number, 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ alt_text: altText }),
-      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.mediaAltText),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { alt_text?: unknown };
@@ -353,8 +389,13 @@ async function setMediaAltText(site: WordPressSiteCredentials, mediaId: number, 
 export async function upsertPost(
   site: WordPressSiteCredentials,
   existingWpPostId: number | null,
-  input: CreatePostInput
+  input: CreatePostInput,
+  limit?: TimeoutLimiter
 ): Promise<WordPressPostResult> {
+  const writeTimeout = limit ? limit(WORDPRESS_TIMEOUTS_MS.postWrite) : WORDPRESS_TIMEOUTS_MS.postWrite;
+  // Never sent: WordPress cannot have saved anything — a known outcome, not an uncertain one.
+  if (writeTimeout <= 0) throw budgetError('send the post to WordPress');
+
   const base = normalizeSiteUrl(site.siteUrl);
   const url = existingWpPostId
     ? `${base}/wp-json/wp/v2/posts/${existingWpPostId}`
@@ -381,7 +422,7 @@ export async function upsertPost(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.postWrite),
+      signal: AbortSignal.timeout(writeTimeout),
     });
   } catch (err) {
     // The request may have reached WordPress: the post can exist even though
@@ -436,7 +477,13 @@ export interface WordPressPostMatch extends WordPressPostResult {
  * (kind timeout / network / http / invalid_response) — the caller decides
  * what an unknown answer means.
  */
-export async function findPostsBySlug(site: WordPressSiteCredentials, slug: string): Promise<WordPressPostMatch[]> {
+export async function findPostsBySlug(
+  site: WordPressSiteCredentials,
+  slug: string,
+  limit?: TimeoutLimiter
+): Promise<WordPressPostMatch[]> {
+  const lookupTimeout = limit ? limit(WORDPRESS_TIMEOUTS_MS.postLookup) : WORDPRESS_TIMEOUTS_MS.postLookup;
+  if (lookupTimeout <= 0) throw budgetError('look up the post');
   const url =
     `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/posts` +
     `?slug=${encodeURIComponent(slug)}&status=any&context=edit&per_page=20&_fields=id,slug,title,status,link,content`;
@@ -445,7 +492,7 @@ export async function findPostsBySlug(site: WordPressSiteCredentials, slug: stri
   try {
     res = await fetch(url, {
       headers: { Authorization: authHeader(site.username, site.password) },
-      signal: AbortSignal.timeout(WORDPRESS_TIMEOUTS_MS.postLookup),
+      signal: AbortSignal.timeout(lookupTimeout),
     });
   } catch (err) {
     if (isTimeoutError(err)) {

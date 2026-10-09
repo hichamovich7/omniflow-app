@@ -989,6 +989,18 @@ The existing `wordpress-internal-links.spec.ts` (43) and `wordpress-publish-seo.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 28/28, WordPress internal-links + publish SEO specs 79/79, full renderer 511/512 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. The authenticated browser tests stay skipped without `PLAYWRIGHT_STORAGE_STATE`; clipboard behavior in a real browser is a manual check.
 
+# WordPress publish — time budget (TASK-FIX-059, 2026-10-09)
+
+```bash
+npx playwright test tests/renderer/wordpress-publish-budget.spec.ts --project=renderer --reporter=list
+```
+
+Offline (20 cases, WordPress = a stubbed global `fetch` whose routes answer after real delays that honour the request's `AbortSignal`; the budget is scaled to 3 s so the suite runs in ~13 s — no network, no database, no AI call): budget deadlines derived from `maxDuration` (25 / 45 / 51 s for 60 s) and the limiter's minimums; concurrency helper (cap 3, order kept) and `withDeadline`; `budget` error kind never uncertain; media placeholder tokens (12 images, no prefix clash, every token resolved, images not in the content skipped); featured image slow but in time → uploaded; featured image timeout → post created without `featured_media` + warning, bounded by the preparation deadline; ≤ 3 uploads in flight, a slow internal image keeps its Storage URL; slow tags → post in time, `TAGS_TIME_LIMIT_WARNING`; slow internal links → skipped + warning; links run in parallel with media; everything optional slow → post created before expiry with all warnings; budget exhausted before creation → nothing sent, real failure; slow Rank Math → id saved first, warning; FAQ filtered with no time to re-send → warning, the retry fixes it on the same post; retry after a publish without featured image → same post updated, existing featured image untouched, no duplicate; existing post adopted under budget; Keyword / Pins / URL non-regression; client headlines (success / with warnings / uncertain / failure, 504 non-JSON, network error); route wiring (budget from `maxDuration`, no inline upload, no featured failure path, lock released in `finally`, `maxDuration` still 60).
+
+Validation (2026-10-09): TypeScript OK, ESLint (touched files) OK, new spec 20/20 (3 consecutive runs), full renderer 907/908 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK.
+
+Manual, minimal real test (no AI call): on one article, Save as Draft and read the Vercel logs `[wordpress publish] attempt=…` (`media_featured`, `media`, `tags`, `internal_links`, `post_create`, `rank_math`, `publish_end` with `ms=`) — `publish_end` must stay under ~55 000 ms; then Publish Now on the same article — the same WordPress post id is updated, no new post, no `-2` slug.
+
 # WordPress publish — idempotency, lock, uncertain outcomes (TASK-FIX-058, 2026-10-06)
 
 ```bash
