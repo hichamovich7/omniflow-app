@@ -6,6 +6,7 @@ import {
   type InternalLinksReport,
 } from '@/lib/wordpress/internal-links';
 import { mapWithConcurrency, withDeadline, type PublishBudget } from '@/lib/wordpress/publish-budget';
+import type { MediaAssetStore } from '@/lib/wordpress/media-reuse';
 import { silentPublishLogger, type PublishLogger } from '@/lib/wordpress/publish-log';
 import {
   applyMediaReplacements,
@@ -59,6 +60,11 @@ export interface SendArticleInput {
    * placeholder tokens (publish-media.ts). Omitted = no upload.
    */
   media?: PublishMediaPlan | null;
+  /**
+   * WordPress media mapping of this site (TASK-FIX-060): images already on
+   * the site are reused, never uploaded twice. Omitted = every image uploaded.
+   */
+  mediaStore?: MediaAssetStore | null;
   /**
    * Global time budget (publish-budget.ts). Omitted = only the fixed
    * per-request timeouts apply (no global ceiling).
@@ -319,7 +325,7 @@ export async function sendArticleToWordPress(
 
   const [prepared, media, foundBefore] = await Promise.all([
     prepareTagsAndLinks(),
-    input.media ? uploadPublishMedia(site, input.media, { limit: prepareLimit, log }) : Promise.resolve<PublishMediaResult | null>(null),
+    input.media ? uploadPublishMedia(site, input.media, { limit: prepareLimit, log, store: input.mediaStore }) : Promise.resolve<PublishMediaResult | null>(null),
     // A post an earlier attempt created but never recorded is adopted, never duplicated.
     input.article.wp_post_id ? Promise.resolve(null) : reconcile('reconcile_before_create', isClaimed, prepareLimit),
   ]);

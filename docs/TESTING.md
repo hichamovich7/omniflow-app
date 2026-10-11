@@ -989,6 +989,18 @@ The existing `wordpress-internal-links.spec.ts` (43) and `wordpress-publish-seo.
 
 Validation (2026-09-26): TypeScript OK, ESLint (touched files) OK, spec 28/28, WordPress internal-links + publish SEO specs 79/79, full renderer 511/512 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build OK, `git diff --check` OK. The authenticated browser tests stay skipped without `PLAYWRIGHT_STORAGE_STATE`; clipboard behavior in a real browser is a manual check.
 
+# WordPress media reuse (TASK-FIX-060, 2026-10-11)
+
+```bash
+npx playwright test tests/renderer/wordpress-media-reuse.spec.ts --project=renderer --reporter=list
+```
+
+Offline (24 cases; WordPress — two sites — and image storage are a stubbed global `fetch`, Supabase an in-memory `wordpress_media_assets` enforcing the `(wordpress_site_id, source_asset_key)` unique key and the conditional claim updates — no network, no database, no AI call): source keys (Supabase public / sign / render / encoded URLs, other Supabase host, same file name in another folder, CDN origin = same key, foreign URL fallback without query, invalid / `data:` URLs, no `..`); first publish → one upload per image, mapping complete (id, URL, hash, claim cleared) when the post is written; second publish → no `POST /wp/v2/media`, same `featured_media`, same internal URLs, one `GET /wp/v2/media/<id>` per image; featured alone and internal alone reused; same image in two articles of one site; same image on two sites (one upload and one row per site, site B never checks site A's ids); same file name, different key → two uploads; rewritten version (copied path, same bytes) reused via `source_hash`; Keyword / Pins / URL; attachment deleted (404) or no longer an image → one new upload, mapping updated, no DELETE, no warning; re-upload failing → featured warning, claim freed, row kept; first upload failing → own claim row removed, Storage URL kept, next publish uploads; media check timeout / 5xx → reused unverified, no upload, no warning; connection edited to another site URL → not reused; two simultaneous publishes → one upload per image, same attachment; unique collision → re-read and reused; stale claim taken over, fresh claim waited for then given up without uploading; migration 043 absent → all images uploaded, publish OK, one `unavailable_migration_043_not_applied` log; no store / broken store → post still published; Supabase → CDN switch keeps the mapping, undeclared CDN URL reused by hash; logs without password, auth header, URLs or content; migration 043 static checks (only 043, unique key, columns, RLS `WITH CHECK` on site ownership, no change to other tables); route wiring. Uploads avoided in the spec: 26.
+
+`wordpress-seo-alt-outbound.spec.ts`: one source assertion adapted to the new upload call in `publish-media.ts`.
+
+Manual, after applying migration 043 in the Supabase SQL Editor: publish an article as Draft, note the Media Library count, then Publish Now — the post is updated and the Media Library gets no new item; logs show `media_featured … result=reused`. Delete the featured image in WordPress and publish again — one new item, `wordpress_media_assets.wp_media_id` updated. Before 043: same behavior as before (every publish uploads) plus the `unavailable_migration_043_not_applied` log line.
+
 # WordPress publish — time budget (TASK-FIX-059, 2026-10-09)
 
 ```bash

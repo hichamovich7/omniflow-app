@@ -49,6 +49,7 @@ auth.users
               └── wordpress_article_images
 
   └── wordpress_categories (TASK-032, scoped to project like boards)
+  └── wordpress_sites → wordpress_media_assets (TASK-FIX-060, migration 043 — WordPress attachment per site + source image)
 
   └── content_streams (TASK-FIX-039 Phase 2a, scoped to project)
         │
@@ -942,6 +943,56 @@ unique (project_id)
 
 No separate index needed — the UNIQUE constraint on `project_id` already
 provides a single-column unique btree index for exact lookups.
+
+---
+
+# wordpress_media_assets
+
+WordPress media reuse (TASK-FIX-060, migration `043_add_wordpress_media_assets.sql`). One row per (WordPress site, source image): the attachment an OmniFlow image was uploaded as, so a retry, a republish, another article or a rewritten version using the same image reuses it instead of sending `POST /wp/v2/media` again. Read and written only by the publish route through `createWordPressMediaAssetStore()` (`lib/queries/wordpress-media-assets.ts`) and `obtainReusableMedia()` (`lib/wordpress/media-reuse.ts`).
+
+## Columns
+
+| Column             | Type                                   | Description |
+| ------------------ | -------------------------------------- | ----------- |
+| id                 | uuid PK                                |             |
+| user_id            | uuid FK → profiles.id                  | ON DELETE CASCADE. Denormalized for RLS (same as `wordpress_sites`) |
+| wordpress_site_id  | uuid FK → wordpress_sites.id           | ON DELETE CASCADE — disconnecting a site drops its mappings (never its WordPress media) |
+| wordpress_site_url | text NOT NULL                          | Normalized site URL the attachment was created on. A connection edited to another URL keeps its id: a row whose URL differs from the connected site is never reused (re-uploaded, row updated) |
+| source_asset_key   | text NOT NULL                          | Storage-independent identity of the image (`lib/wordpress/media-source.ts`): `storage:<bucket>/<object path>` for Supabase Storage URLs (public / sign / render variants) and declared CDN origins; `url:<host><path>` (no query) for any other URL. Never the public URL, never the bare file name |
+| source_hash        | text nullable                          | SHA-256 hex of the image bytes when known. Lets a copy of the same bytes under another path (rewritten versions copy their images) reuse the attachment. Not unique |
+| wp_media_id        | bigint nullable, CHECK > 0             | WordPress attachment id. NULL only while an upload holds the row's claim |
+| wp_media_url       | text nullable                          | `source_url` returned by WordPress |
+| upload_started_at  | timestamptz nullable                   | Claim of the upload in progress, NULL once done. Older than 90 s (publish lock's stale delay) = killed request, may be taken over |
+| created_at         | timestamptz                            |             |
+| updated_at         | timestamptz                            | Set by the code on each claim / completion |
+
+## Constraints
+
+```sql
+unique (wordpress_site_id, source_asset_key)
+check (wp_media_id is null or wp_media_id > 0)
+check (wp_media_id is not null or upload_started_at is not null)
+```
+
+## Purpose
+
+Lookup before any upload: mapped and `GET /wp/v2/media/<id>` finds an image → reused (no `POST /wp/v2/media`); 404 / 410 / 400 or not an image → one new upload, row updated, old attachment never deleted; WordPress cannot answer (timeout / 5xx / auth) → the mapped attachment is reused unverified (never duplicated). Not mapped → the claim row is inserted **before** uploading; a concurrent publish hitting the unique key re-reads the row and waits (bounded by the time budget) for the attachment instead of uploading a copy. Before uploading, rows with the same `source_hash` on the same site are tried. The mapping is saved right after the upload, before the post is written. Without the table (043 not applied: `42P01` / `PGRST205`) or on any database error, images are uploaded exactly as before and `step=media_reuse result=unavailable_migration_043_not_applied` is logged once per publish. Nothing existing was backfilled or modified.
+
+## RLS
+
+```sql
+using (user_id = auth.uid())
+with check (user_id = auth.uid() and wordpress_site_id in (select id from wordpress_sites where user_id = auth.uid()))
+```
+
+Grants: `SELECT, INSERT, UPDATE, DELETE` to `authenticated` (DELETE only removes an unfinished claim row of the same publish).
+
+## Indexes
+
+```sql
+unique (wordpress_site_id, source_asset_key)
+(wordpress_site_id, source_hash) where source_hash is not null
+```
 
 ---
 

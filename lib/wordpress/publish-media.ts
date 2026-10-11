@@ -1,3 +1,4 @@
+import { obtainReusableMedia, type MediaAssetStore, type MediaOutcome } from '@/lib/wordpress/media-reuse';
 import { mapWithConcurrency } from '@/lib/wordpress/publish-budget';
 import { silentPublishLogger, type PublishLogger } from '@/lib/wordpress/publish-log';
 import {
@@ -16,6 +17,10 @@ import {
  *   - internal image failed / out of time → its original (public) Supabase
  *     Storage URL stays in the content, as before.
  * Nothing is ever deleted, on WordPress or in Storage.
+ *
+ * With a media mapping store (TASK-FIX-060, media-reuse.ts) an image already
+ * on the site is reused instead of uploaded again; without one (or before
+ * migration 043) every image is uploaded as before.
  *
  * Internal image URLs are swapped for inert placeholder tokens before the
  * HTML export, so internal linking can run while the uploads are in flight;
@@ -56,6 +61,8 @@ export interface PublishMediaResult {
   /** token → uploaded WordPress URL (uploaded images only). */
   replacements: Map<string, string>;
   uploadedCount: number;
+  /** Images taken from the media mapping — no POST /wp/v2/media (featured included). */
+  reusedCount: number;
   warnings: string[];
 }
 
@@ -99,13 +106,32 @@ function failureFields(err: unknown): { http?: number; result: string } {
   return { result: 'failed' };
 }
 
+function isReused(outcome: MediaOutcome): boolean {
+  return outcome.source === 'reused' || outcome.source === 'reused_unverified' || outcome.source === 'reused_hash';
+}
+
 /** Never throws. */
 export async function uploadPublishMedia(
   site: WordPressSiteCredentials,
   plan: PublishMediaPlan,
-  options: { limit?: TimeoutLimiter; log?: PublishLogger } = {}
+  options: { limit?: TimeoutLimiter; log?: PublishLogger; store?: MediaAssetStore | null } = {}
 ): Promise<PublishMediaResult> {
   const log = options.log ?? silentPublishLogger;
+  const reuseState = { unavailable: false };
+  const upload = async (request: MediaUploadRequest): Promise<MediaOutcome> =>
+    options.store
+      ? obtainReusableMedia(
+          {
+            site,
+            store: options.store,
+            limit: options.limit,
+            log,
+            state: reuseState,
+            plainUpload: (job) => uploadMedia(site, job.url, job.filename, job.altText, options.limit),
+          },
+          request
+        )
+      : { media: await uploadMedia(site, request.url, request.filename, request.altText, options.limit), source: 'uploaded_unmapped' };
   const jobs: { kind: 'featured' | 'internal'; request: MediaUploadRequest; token?: string }[] = [];
   // Featured first: it starts in the first wave.
   if (plan.featured) jobs.push({ kind: 'featured', request: plan.featured });
@@ -116,31 +142,33 @@ export async function uploadPublishMedia(
     const t = Date.now();
     const step = job.kind === 'featured' ? 'media_featured' : 'media_internal_item';
     try {
-      const uploaded = await uploadMedia(site, job.request.url, job.request.filename, job.request.altText, options.limit);
-      log.step(step, { ms: Date.now() - t, result: 'uploaded' });
-      return uploaded;
+      const outcome = await upload(job.request);
+      log.step(step, { ms: Date.now() - t, result: outcome.source === 'uploaded_unmapped' ? 'uploaded' : outcome.source });
+      return outcome;
     } catch (err) {
       log.warn(step, { ms: Date.now() - t, ...failureFields(err) });
       throw err;
     }
   });
 
-  const result: PublishMediaResult = { replacements: new Map(), uploadedCount: 0, warnings: [] };
+  const result: PublishMediaResult = { replacements: new Map(), uploadedCount: 0, reusedCount: 0, warnings: [] };
   let internalFallbacks = 0;
   settled.forEach((outcome, index) => {
     const job = jobs[index];
     if (job.kind === 'featured') {
       if (outcome.status === 'fulfilled') {
-        result.featuredMediaId = outcome.value.id;
-        if (job.request.altText && !outcome.value.altText) result.warnings.push(FEATURED_ALT_TEXT_WARNING);
+        result.featuredMediaId = outcome.value.media.id;
+        if (isReused(outcome.value)) result.reusedCount++;
+        if (job.request.altText && !outcome.value.media.altText) result.warnings.push(FEATURED_ALT_TEXT_WARNING);
       } else {
         result.warnings.unshift(FEATURED_IMAGE_FAILED_WARNING);
       }
       return;
     }
     if (outcome.status === 'fulfilled' && job.token) {
-      result.replacements.set(job.token, outcome.value.sourceUrl);
+      result.replacements.set(job.token, outcome.value.media.sourceUrl);
       result.uploadedCount++;
+      if (isReused(outcome.value)) result.reusedCount++;
     } else {
       internalFallbacks++;
     }
@@ -152,5 +180,6 @@ export async function uploadPublishMedia(
     count: result.uploadedCount + (result.featuredMediaId !== undefined ? 1 : 0),
     result: plan.featured ? (result.featuredMediaId !== undefined ? 'featured_uploaded' : 'featured_skipped') : 'no_featured',
   });
+  if (options.store) log.step('media_reuse', { count: result.reusedCount, result: reuseState.unavailable ? 'unavailable' : 'done' });
   return result;
 }

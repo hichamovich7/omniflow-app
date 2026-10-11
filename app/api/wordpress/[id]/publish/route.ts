@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { publishArticleSchema } from '@/lib/validations/wordpress-publish';
 import { getPinsSeoSource, getWordPressArticleByGenerationId, isWordPressPostIdClaimed } from '@/lib/queries/wordpress';
 import { getWordPressSiteWithSecretByProjectId } from '@/lib/queries/wordpress-sites';
+import { createWordPressMediaAssetStore } from '@/lib/queries/wordpress-media-assets';
 import { exportToHtmlForWordPress } from '@/lib/wordpress/export';
 import { decryptSecret } from '@/lib/wordpress/crypto';
 import { decideFaqSchema } from '@/lib/wordpress/faq-schema';
@@ -304,6 +305,8 @@ export async function POST(
         status: wpStatus,
         date,
         categoryIds,
+        // Media already on this site are reused (migration 043); before it, uploaded as before.
+        mediaStore: createWordPressMediaAssetStore(supabase, { id: site.id, userId: user.id }),
         media,
         budget,
         insertInternalLinks: true,

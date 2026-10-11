@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## WordPress publish: media reused instead of re-uploaded — TASK-FIX-060 (2026-10-11)
+
+* P1 after TASK-FIX-059: every publish attempt re-uploaded the featured and internal images, filling the WordPress Media Library with copies on each retry / republish.
+* Migration `043_add_wordpress_media_assets.sql` (apply manually): `wordpress_media_assets` — `user_id`, `wordpress_site_id`, `wordpress_site_url`, `source_asset_key`, `source_hash`, `wp_media_id`, `wp_media_url`, `upload_started_at`, `created_at`, `updated_at`; unique `(wordpress_site_id, source_asset_key)`; RLS on user + site ownership. No backfill, nothing existing modified.
+* New `lib/wordpress/media-source.ts`: storage-independent key (`storage:<bucket>/<path>`) for Supabase Storage URLs and declared CDN origins, `url:<host><path>` fallback — a provider switch keeps every mapping.
+* New `lib/wordpress/media-reuse.ts` + `lib/queries/wordpress-media-assets.ts`: lookup → `GET /wp/v2/media/<id>` → reuse (no `POST /wp/v2/media`); missing / not an image / other site URL → one new upload, mapping updated, the old attachment never deleted; claim row inserted before uploading so concurrent publishes never upload twice (collision re-read, bounded wait, stale claim takeover); identical bytes reused through `source_hash` (rewritten versions); mapping saved before the post. Missing table or database error → plain upload as before + one log warning.
+* `rest-client.ts`: `downloadSourceImage()`, `uploadMediaBytes()`, `getMedia()`, `updateMediaAltText()` (`uploadMedia()` unchanged for callers); `publish-media.ts` / `publish-post.ts` take an optional `mediaStore`; the publish route passes the site's store.
+* Unchanged: prompts, article content, Quality Gate, Rank Math, FAQ schema, idempotency / lock / time budget. No `.env` change, no AI call. Guide updated. New offline spec `wordpress-media-reuse.spec.ts` (24); one source assertion of `wordpress-seo-alt-outbound.spec.ts` adapted.
+
 ## WordPress publish: global time budget, the post always first — TASK-FIX-059 (2026-10-09)
 
 * Bug (P0.1, regression after TASK-FIX-058): sequential media uploads (featured image up to 48 s, aborting the publish on timeout), tags and internal links all ran before the post with no global ceiling, so the route hit Vercel's 60 s limit — 504 "uncertain", then 409 for 90 s on retry, every retry re-uploading everything.

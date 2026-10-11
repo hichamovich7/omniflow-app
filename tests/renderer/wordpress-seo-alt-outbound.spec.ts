@@ -233,7 +233,7 @@ test('publish route: alt text on featured and internal uploads, the stored artic
   expect(route).toMatch(/\{ url: article\.featured_image_url, filename: `\$\{article\.slug\}-featured\.png`, altText: featuredAltText \}/);
   expect(route).toContain('const featuredAltText = buildFeaturedImageAltText(altSource);');
   expect(readFileSync(join(process.cwd(), 'lib/wordpress/publish-media.ts'), 'utf8')).toContain(
-    'uploadMedia(site, job.request.url, job.request.filename, job.request.altText, options.limit)'
+    'uploadMedia(site, request.url, request.filename, request.altText, options.limit)'
   );
   expect(route).toContain('resolveInternalImageAltText(image.alt_text, altSource)');
   // The only wordpress_articles writes are publish status fields — never `content`.

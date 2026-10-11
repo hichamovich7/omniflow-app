@@ -23,6 +23,7 @@ export const WORDPRESS_TIMEOUTS_MS = {
   imageDownload: 15_000,
   mediaUpload: 25_000,
   mediaAltText: 8_000,
+  mediaLookup: 8_000,
   tag: 8_000,
   postWrite: 20_000,
   postLookup: 8_000,
@@ -263,27 +264,25 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&gt;/g, '>');
 }
 
-/**
- * Downloads an image from its current (public) URL and uploads it to the
- * WordPress media library. WP's media endpoint expects the raw file bytes as
- * the request body (NOT multipart/form-data) with Content-Type set to the
- * file's mime type and Content-Disposition carrying the filename.
- *
- * `altText` goes in the same request as the `alt_text` query parameter (the
- * attachments endpoint reads request params, query included). When the
- * response does not echo it back, one follow-up `POST /wp/v2/media/{id}`
- * sets it; if that fails too the upload still succeeds, with
- * `altText: null` so the caller can warn — alt text never blocks a publish.
- */
-export async function uploadMedia(
-  site: WordPressSiteCredentials,
+/** Image bytes downloaded from their source URL, ready for POST /wp/v2/media. */
+export interface SourceImage {
+  bytes: ArrayBuffer;
+  mime: string;
+}
+
+export interface WordPressMediaResult {
+  id: number;
+  sourceUrl: string;
+  altText: string | null;
+}
+
+/** Downloads an image from its current (public) URL — Supabase Storage, CDN or any object store. */
+export async function downloadSourceImage(
   imageUrl: string,
   filename: string,
-  altText?: string | null,
   limit?: TimeoutLimiter
-): Promise<{ id: number; sourceUrl: string; altText: string | null }> {
-  const timeout = (cap: number) => (limit ? limit(cap) : cap);
-  const downloadTimeout = timeout(WORDPRESS_TIMEOUTS_MS.imageDownload);
+): Promise<SourceImage> {
+  const downloadTimeout = limit ? limit(WORDPRESS_TIMEOUTS_MS.imageDownload) : WORDPRESS_TIMEOUTS_MS.imageDownload;
   if (downloadTimeout <= 0) throw budgetError('upload this image');
 
   let imgRes: Response;
@@ -304,7 +303,41 @@ export async function uploadMedia(
       : null) ??
     guessMimeFromFilename(filename) ??
     'image/png';
+  return { bytes, mime };
+}
 
+/**
+ * Downloads an image from its current (public) URL and uploads it to the
+ * WordPress media library. WP's media endpoint expects the raw file bytes as
+ * the request body (NOT multipart/form-data) with Content-Type set to the
+ * file's mime type and Content-Disposition carrying the filename.
+ *
+ * `altText` goes in the same request as the `alt_text` query parameter (the
+ * attachments endpoint reads request params, query included). When the
+ * response does not echo it back, one follow-up `POST /wp/v2/media/{id}`
+ * sets it; if that fails too the upload still succeeds, with
+ * `altText: null` so the caller can warn — alt text never blocks a publish.
+ */
+export async function uploadMedia(
+  site: WordPressSiteCredentials,
+  imageUrl: string,
+  filename: string,
+  altText?: string | null,
+  limit?: TimeoutLimiter
+): Promise<WordPressMediaResult> {
+  const image = await downloadSourceImage(imageUrl, filename, limit);
+  return uploadMediaBytes(site, image, filename, altText, limit);
+}
+
+/** POST /wp/v2/media with already-downloaded bytes — see uploadMedia. */
+export async function uploadMediaBytes(
+  site: WordPressSiteCredentials,
+  image: SourceImage,
+  filename: string,
+  altText?: string | null,
+  limit?: TimeoutLimiter
+): Promise<WordPressMediaResult> {
+  const timeout = (cap: number) => (limit ? limit(cap) : cap);
   const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
   const alt = altText?.trim() || null;
   const mediaUrl = `${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media`;
@@ -318,10 +351,10 @@ export async function uploadMedia(
       method: 'POST',
       headers: {
         Authorization: authHeader(site.username, site.password),
-        'Content-Type': mime,
+        'Content-Type': image.mime,
         'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
       },
-      body: bytes,
+      body: image.bytes,
       signal: AbortSignal.timeout(uploadTimeout),
     });
   } catch (err) {
@@ -352,6 +385,64 @@ export async function uploadMedia(
   // No time left for the follow-up: the image is uploaded, its alt text reported missing.
   if (altTimeout <= 0) return { id: data.id, sourceUrl: data.source_url, altText: null };
   return { id: data.id, sourceUrl: data.source_url, altText: await setMediaAltText(site, data.id, alt, altTimeout) };
+}
+
+/**
+ * An existing attachment, read with `GET /wp/v2/media/{id}` (TASK-FIX-060):
+ *   - `found`   — it exists on this site and is an image;
+ *   - `missing` — 404 / 410 / invalid id, or not an image (unusable).
+ * Throws a WordPressApiError when the answer is unknown (timeout, network,
+ * 5xx, auth, unreadable body) or there is no time left to ask.
+ */
+export async function getMedia(
+  site: WordPressSiteCredentials,
+  mediaId: number,
+  limit?: TimeoutLimiter
+): Promise<{ status: 'found'; media: WordPressMediaResult } | { status: 'missing'; http?: number }> {
+  const lookupTimeout = limit ? limit(WORDPRESS_TIMEOUTS_MS.mediaLookup) : WORDPRESS_TIMEOUTS_MS.mediaLookup;
+  if (lookupTimeout <= 0) throw budgetError('check this image on WordPress');
+
+  const params = new URLSearchParams({ context: 'edit', _fields: 'id,source_url,media_type,alt_text' });
+  let res: Response;
+  try {
+    res = await fetch(`${normalizeSiteUrl(site.siteUrl)}/wp-json/wp/v2/media/${mediaId}?${params.toString()}`, {
+      headers: { Authorization: authHeader(site.username, site.password) },
+      signal: AbortSignal.timeout(lookupTimeout),
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      throw new WordPressApiError('WordPress did not answer in time while checking media.', undefined, 'timeout');
+    }
+    throw new WordPressApiError('Could not reach that WordPress site while checking media.', undefined, 'network');
+  }
+
+  // 400 = rest_post_invalid_id on some setups; 410 = gone.
+  if (res.status === 404 || res.status === 410 || res.status === 400) return { status: 'missing', http: res.status };
+  if (!res.ok) throw new WordPressApiError(await parseErrorBody(res), res.status);
+
+  const data = (await res.json().catch(() => null)) as
+    | { id?: unknown; source_url?: unknown; media_type?: unknown; alt_text?: unknown }
+    | null;
+  if (!data || typeof data.id !== 'number') {
+    throw new WordPressApiError('WordPress returned an unreadable media response.', res.status, 'invalid_response');
+  }
+  if (data.id !== mediaId || data.media_type !== 'image' || typeof data.source_url !== 'string' || !data.source_url) {
+    return { status: 'missing', http: res.status };
+  }
+  const altText = typeof data.alt_text === 'string' && data.alt_text.trim() ? data.alt_text : null;
+  return { status: 'found', media: { id: data.id, sourceUrl: data.source_url, altText } };
+}
+
+/** Sets an existing attachment's alt text (never a new upload) — the saved value, null on any failure or no time. */
+export async function updateMediaAltText(
+  site: WordPressSiteCredentials,
+  mediaId: number,
+  altText: string,
+  limit?: TimeoutLimiter
+): Promise<string | null> {
+  const altTimeout = limit ? limit(WORDPRESS_TIMEOUTS_MS.mediaAltText) : WORDPRESS_TIMEOUTS_MS.mediaAltText;
+  if (altTimeout <= 0) return null;
+  return setMediaAltText(site, mediaId, altText, altTimeout);
 }
 
 /** Sets an attachment's alt text — returns the saved value, null on any failure (never throws). */

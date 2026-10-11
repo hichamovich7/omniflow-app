@@ -185,3 +185,24 @@ export type WordPressArticleImageInsert = Omit<WordPressArticleImage, 'id' | 'cr
   id?: string;
   url?: string | null;
 };
+
+/**
+ * wordpress_media_assets (migration 043, TASK-FIX-060) — the WordPress
+ * attachment an OmniFlow image was uploaded as, per WordPress site.
+ * wp_media_id is null while an upload holds the row's claim.
+ */
+export interface WordPressMediaAsset {
+  id: string;
+  user_id: string;
+  wordpress_site_id: string;
+  wordpress_site_url: string;
+  /** Storage-independent image identity: `storage:<bucket>/<path>` (lib/wordpress/media-source.ts). */
+  source_asset_key: string;
+  /** SHA-256 hex of the image bytes, when known. */
+  source_hash: string | null;
+  wp_media_id: number | null;
+  wp_media_url: string | null;
+  upload_started_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
