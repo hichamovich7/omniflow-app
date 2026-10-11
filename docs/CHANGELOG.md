@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest from WordPress articles — shared WordPressArticleContext — TASK-051 (2026-10-11)
+
+* **Existing WordPress posts → Pinterest (new source):** `/pinterest/from-wordpress` — pick a connected site, search posts by title or keyword (published, or drafts when the account can edit posts), see title / date / status / category / featured image, select, review the summary, then the existing Pinterest form. New `GET /api/wordpress/sites/[id]/posts`; `POST /api/pinterest/generate` and Pin regeneration accept `wordpressPost: { siteId, postId }`. WordPress is only read (GET); 401 / 403 / 404 / timeout / empty / password-protected posts give clear errors.
+* **OmniFlow articles → Pinterest (improved):** the article is the source of truth. New shared extractor `lib/wordpress/article-context/` (sections H1/H2/H3 with their text and images, chrome / ads / related posts / hidden text removed, instruction-like text neutralized, visual terms only when really present). Each Pin gets a real section of the article and a visual brief (Article subject … Forbidden elements) used by the text prompt (`pinterest-pins-v13`, article flow only) and appended to the image prompt; Pins showing something absent from the article (e.g. a cowl or a chunky scarf in a scarf list) are refused. Article photos are described in text only (alt text first, else VISION) — never used as image references.
+* Each Pin keeps its source section (`pins.image_analysis._articleSource`, shown as a badge on the result cards); the summary lists the subjects found in the article.
+* Migration 044 (applied in Supabase on 2026-10-11): `generations.source_type`, `source_wordpress_site_id`, `source_wordpress_post_id`; written best-effort; the history shows "From WordPress post". `source_wordpress_generation_id` unchanged for OmniFlow articles.
+* Unchanged: no destination URL (`link_url` / `website_url` empty), no board created, no WordPress write, no automatic Pinterest publication, niche rules, Content Streams, angles, custom Pin count, Quality Gate, 1000×1500 images, keyword flow. New specs `pinterest-article-grounding.spec.ts` (29) and `pinterest-wordpress-post-source.spec.ts` (29). Real controlled test passed on 2026-10-11 (5 Pins on the colorful crochet scarf article, ≈ 0.23 USD — see TESTING.md).
+* Board pre-selection for article Pins ignores generic words (free, easy, ideas…) and plurals, so "crochet scarf pattern" wins over "Free Crochet Cat Patterns" for a scarf article.
+
 ## Image optimization before storage + media profiles — TASK-050 (2026-10-11)
 
 * New `lib/media/media-profiles.ts`: the single configuration of output size, fit, format, quality, size limit, transparency, extension, content type and R2 prefix per platform / use. Active: `pinterest-pin` (exactly 1000×1500, JPEG q88), `wordpress-article` (longest side ≤ 1600, WebP q85) and its explicit JPEG fallback. Planned (configuration only, refused by the optimizer): Facebook feed 1080×1359 / 1080×1080, story 1080×1920, cover 851×315; Instagram post 1080×1350 / 1080×1080, story / reel 1080×1920; TikTok and Reels 1080×1920.

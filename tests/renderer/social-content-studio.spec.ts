@@ -35,6 +35,7 @@ import {
   updatePinTextSchema,
 } from '@/lib/validations/pinterest';
 import { generatePinterestCsv } from '@/lib/csv/pinterest';
+import { buildArticleContextFromMarkdown } from '@/lib/wordpress/article-context';
 import { buildPinterestPinsPrompt } from '@/lib/prompts';
 import { attachPinterestStrategyMetadata, readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { attachAiIntegratedMetadata, readAiIntegratedMetadata } from '@/lib/pinterest/ai-integrated';
@@ -250,8 +251,10 @@ function db(
 // AI stub
 
 function source(overrides: Partial<ArticlePinterestSource> = {}): ArticlePinterestSource {
-  return {
+  const fields: Omit<ArticlePinterestSource, 'context'> = {
     articleId: ARTICLE_GEN_ID,
+    sourceType: 'omniflow_article',
+    externalPost: null,
     projectId: PROJECT_ID,
     title: 'Small Bathroom Storage That Actually Works',
     metaTitle: 'Small Bathroom Storage Ideas',
@@ -265,6 +268,12 @@ function source(overrides: Partial<ArticlePinterestSource> = {}): ArticlePintere
     niche: 'home decor',
     brandProfileDescription: 'Calm Scandinavian home blog.',
     ...overrides,
+  };
+  return {
+    ...fields,
+    context:
+      overrides.context ??
+      buildArticleContextFromMarkdown(fields.content, { sourceType: 'omniflow_article', title: fields.title, language: fields.language }),
   };
 }
 
@@ -459,7 +468,8 @@ test.describe('Generation route reuses the existing Pinterest pipeline', () => {
   });
 
   test('same prompt builder, article only as analysisContext, same parser and safeguards', () => {
-    expect(route).toContain('buildArticlePinterestContext(articleSource, keyword)');
+    expect(route).toContain('buildArticlePinterestContext(articleSource, keyword, articleGrounding)');
+    expect(route).toContain('validateArticleGroundedPins(resolvedPins, articleGrounding)');
     expect(route.match(/buildPinterestPinsPrompt\(/g)).toHaveLength(1);
     expect(route).toContain('parsePinterestGenerationPlan(content)');
     expect(route).toContain('validatePinterestStrategyBatch(');

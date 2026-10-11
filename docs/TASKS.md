@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-051 (Pinterest from WordPress articles — shared `WordPressArticleContext`, Volet A + Volet B) is implemented locally, not committed. **Volet B** (OmniFlow article → Pinterest): the article is now the source of truth — a shared, dependency-free extractor (`lib/wordpress/article-context/`) turns the body into sections (H1/H2/H3 + their own text, images, alt / captions), drops scripts / menus / ads / share / related-post blocks / hidden text, neutralizes instruction-like text and keeps only visual terms really present (materials, colors, techniques, patterns, shapes, textures, projects). Each Pin is assigned a real subject section before the AI call (5 of 10 → spread), gets a visual brief (Article subject … Forbidden elements) passed to the text prompt (`pinterest-pins-v13`, article flow only), stored on the Pin (`pins.image_analysis._articleSource`, no migration) and appended to the image prompt; a validator refuses Pins without a planned section, duplicated sections, an image that does not show its section's project, or project elements absent from the article (cowl, chunky, knit, wool, invented colors… — English articles). Article photos only become text (descriptive alt / caption first, else VISION, best-effort) — never an image-model reference. **Volet A** (existing WordPress post → Pinterest): new `/pinterest/from-wordpress` (site → search title / keyword → results with title, date, status, category, featured image → summary → existing form) and `GET /api/wordpress/sites/[id]/posts`; `POST /api/pinterest/generate` and Pin regeneration accept `wordpressPost: { siteId, postId }`; WordPress is read with GET only (401 / 403 / 404 / timeout / empty / protected handled). Traceability: **migration 044 (`generations.source_type`, `source_wordpress_site_id`, `source_wordpress_post_id`) — applied in Supabase by the founder on 2026-10-11**; written best-effort, `source_wordpress_generation_id` kept for OmniFlow articles. No destination URL, no board created, no WordPress write, no automatic Pinterest publication, images stay 1000×1500. New specs `pinterest-article-grounding.spec.ts` (29) and `pinterest-wordpress-post-source.spec.ts` (29); full renderer 1036/1037 (same pre-existing `pinterest-text-importance-none.spec.ts` failure). **Real controlled test done 2026-10-11** (5 Pins on article 1527, board "crochet scarf pattern": five different scarves of the article, no cowl / chunky scarf, 1000×1500, no link, no WordPress write, ≈ 0.23 USD) — see TESTING.md. See TASK-051 below.
+
 TASK-050 (Image optimization before storage + media profiles) is implemented locally, not committed. New `lib/media/media-profiles.ts` (single source of dimensions / formats / quality) and `lib/media/optimize-image.ts` (sharp: EXIF orientation, resize without enlargement, format + quality, metadata stripped, size limit, explicit failure). Active: **Pinterest Pin** 1000×1500 JPEG q88 (`.jpg`, `image/jpeg`), **WordPress article** longest side ≤ 1600 WebP q85 (`.webp`, `image/webp`) with an explicit JPEG fallback profile. Facebook / Instagram / TikTok / Reels profiles configured as `planned` only (refused by the optimizer). One stored variant per use; `.source` photos stay raw on Supabase (always `.source.png`); old images untouched. WordPress upload filenames now follow the real format. New spec `media-optimization.spec.ts` (20); 6 assertions of older specs adapted. See TASK-050 below.
 
 TASK-049 (Cloudflare R2 media storage behind a feature flag) is implemented locally, not committed. New `lib/storage/` (common `MediaStorage` interface, Supabase provider = the exact historical calls, R2 provider over a dependency-free SigV4 S3 client), selected by `MEDIA_STORAGE_PROVIDER` (`supabase` default, `r2`). With `r2`, new Pinterest images go to `images/pinterest/<user>/<generation>/<pin>/<version>.<ext>` and new WordPress images to `images/wordpress/<user>/<generation>/<MARKER>.png`, served from `https://media.n8nflow.org`; `.source` photos stay in Supabase; no migration, no backfill, old Supabase URLs untouched; a missing R2 config or failed upload is an explicit error (no fallback, no URL saved). New spec `media-storage-r2.spec.ts` (27); full renderer 958/959 (same pre-existing `pinterest-text-importance-none.spec.ts` failure); real R2 smoke test OK. See TASK-049 below.
@@ -841,6 +843,60 @@ Offline `tests/renderer/media-optimization.spec.ts` (20) + adapted older specs; 
 
 * Manual check on real generated images (costs AI credits): Pin legibility at 1000×1500 JPEG, WebP featured image in a real WordPress Media Library (WordPress ≥ 5.8; some hosts lack WebP thumbnail support — switch `wordpress-article` to the JPEG profile if needed).
 * Pinterest CSV / bulk upload with `.jpg` URLs to confirm on the founder's account.
+
+---
+
+## [TASK-051] Pinterest from WordPress articles — shared WordPressArticleContext (existing posts + OmniFlow articles)
+
+### Status: IMPLEMENTED (2026-10-11 — offline tests pass; migration 044 applied by the founder; real controlled test passed; not committed)
+
+### Goal
+
+Pinterest Pins built from a WordPress article must show what the article really presents. Two complementary sources share one model:
+
+* **Volet A — new source:** an existing post of a connected WordPress site (never generated by OmniFlow) → Pinterest.
+* **Volet B — improvement:** an OmniFlow-generated article → Pinterest, with the article as the source of truth for every Pin and its image.
+
+### Audit findings (why images were generic)
+
+1. The image model only ever received `pin.image_prompt` (+ style / negative presets) — no article context at the image step.
+2. The text model saw the first 6000 characters of the Markdown, flattened: on a 10-pattern list the last five patterns never reached it, and the section structure was lost.
+3. The image_prompt instructions pushed invention (3-5 supporting objects, sample materials "white oak, brushed brass", a 2-3 color palette, vary objects and palette between Pins).
+4. No Pin was tied to a section; the strategy check validated titles / descriptions only, never image_prompt.
+5. Article photos and alt texts were unused (only `featured_image_prompt`).
+6. The image provider (OpenRouter `/api/v1/images`, `openai/gpt-image-2.5-flare`, text+image→image) does accept `input_references`, but article photos can be third-party (Yarnspirations on the test article): decision **option B** — photos become text only, never image references.
+
+### Architecture
+
+* `lib/wordpress/article-context/` — `WordPressArticleContext` (`sourceType` `omniflow_article` | `external_wordpress_post`, site / post / article ids, title, excerpt, plainText, headings, sections with kind `intro` / `subject` / `support` / `faq`, materials, colors, techniques, patterns, shapes, textures, objects, visualDetails, featured + internal images, alt texts, categories, tags, language, `permalink` for traceability only). HTML walker (no dependency), section extraction, lexicon-based visual attributes (a capitalized color followed by a name — "Red Heart" — is a brand, not a color), prompt formatter bounded at 9000 characters that never drops a heading, instruction neutralization (no angle bracket; instruction-like sentences replaced). Markdown (OmniFlow) goes through `marked`, then the same extractor.
+* `lib/pinterest/article-briefs.ts` — section plan per Pin, visual brief (`Article subject / Source section / Pattern or project represented / Materials / Colors / Techniques / Shape / Texture / Visual details / Allowed elements / Forbidden elements`), `<pin_plan>` prompt block, grounded-Pin validator, `_articleSource` metadata, `appendArticleVisualBrief()` for the image prompt.
+* `lib/pinterest/article-vision.ts` — descriptive alt / caption first, else one VISION call per planned section photo (≤ 5, 25 s each, allowed hosts: the connected site + OmniFlow storage), JSON → text; failures fall back to text; only counts are logged.
+* `lib/wordpress/post-reader.ts` — `searchWordPressPosts()` / `getWordPressPost()`, GET only, user-facing errors (`unauthorized`, `forbidden`, `not_found`, `timeout`, `network`, `invalid_response`, `empty_content`), 3 MB ceiling.
+* `lib/social/pinterest-from-wordpress-post.ts` — owned connection (password decrypted server-side only) + owned project → the same `ArticlePinterestSource` (Content Streams through mapped WordPress categories, project niche settings).
+
+### Allowed scope
+
+The files above; `POST /api/pinterest/generate`, `POST /api/pinterest/generate-images` (brief appended), `POST /api/pinterest/pins/[id]/regenerate`, new `GET /api/wordpress/sites/[id]/posts`, `/pinterest/from-wordpress` + `WordPressPostPicker`, `PinForm` / `ArticleSourceSummary` / `ArticlePinResults` (source-generic), `/pinterest` entry link, history source badge, `lib/prompts/pinterest-pins.ts` (`articleGrounded`, v13), schemas, migration 044, docs, Guide. Out of scope: publishing to Pinterest, writing to WordPress, destination URLs, board creation, image-to-image, changing the keyword flow.
+
+### Rules kept
+
+Niche rules, Content Streams (board stream + article category stream), the five angles and their distribution, custom Pin count (1-30), board choice (real boards only, never created), Quality Gate, 1024×1536 generation → 1000×1500 JPEG, every generation mode, Brand Profile. Keyword-flow prompt text unchanged apart from the id.
+
+### Migration 044 (applied in Supabase by the founder, 2026-10-11)
+
+`supabase/migrations/044_add_generations_source_type.sql`: `generations.source_type` (`omniflow_article` | `external_wordpress_post`, NULL = keyword), `source_wordpress_site_id` (FK `wordpress_sites`, ON DELETE SET NULL), `source_wordpress_post_id` (bigint > 0, only with `external_wordpress_post`). Additive, no backfill. Written best-effort after the generation: everything works before it is applied (the history shows the existing-post badge only after).
+
+### Success Criteria
+
+* Offline: `tests/renderer/pinterest-article-grounding.spec.ts` (29) and `tests/renderer/pinterest-wordpress-post-source.spec.ts` (28); adapted `social-content-studio`, `pinterest-generation-plan`, `pinterest-history-wordpress-source` specs; full renderer suite; TypeScript, ESLint, build, `git diff --check`.
+* Real controlled test (authorized, AI credits accepted): article `https://crochet.ciencia-y-tecnologia.com/colorful-crochet-scarf-patterns/` (post 1527), Crochet project, existing Crochet board, 5 Pins, existing angles; 5 different scarves really in the article, no cowl / chunky scarf, `link_url` / `website_url` empty, 1000×1500, saved in history, no WordPress write, no Pinterest publication. See TESTING.md "Pinterest from WordPress articles".
+
+### Remaining
+
+* Real controlled test — **passed 2026-10-11** (see TESTING.md "Pinterest from WordPress articles"): 5 Pins / 5 scarves of the article, visually faithful to each section's photo, ≈ 0.23 USD. Board pre-selection fixed on the way (generic words and plurals).
+* The image model can still add a small finishing detail absent from the brief (fringe on one Pin): the checks cover the prompts, not the pixels.
+* The service-role keys of `.env.local` are refused by the database (`permission denied for table`) — scripts must use a user session.
+* The vocabulary check runs on English articles only (English lexicon); other languages keep the section checks and the brief.
 
 ---
 

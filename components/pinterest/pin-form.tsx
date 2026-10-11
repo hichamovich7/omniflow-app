@@ -40,7 +40,7 @@ import { Label } from '@/components/ui/label';
 import { ReferenceImageUpload } from '@/components/pinterest/reference-image-upload';
 import { ArticleSourceSummary, type ArticleFormSource } from '@/components/social/article-source-summary';
 import { ArticleBoardPicker, type ContentStreamOption } from '@/components/social/article-board-picker';
-import { articlePinterestCreateHref } from '@/lib/social/pin-display';
+import { articlePinterestCreateHref, wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import {
   Select,
   SelectContent,
@@ -369,7 +369,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
       websiteUrl,
       pinterestUrl,
       analysisId,
-      wordpressArticleId: articleSource?.articleId,
+      wordpressArticleId: articleSource?.articleId ?? undefined,
+      wordpressPost: articleSource?.externalPost ?? undefined,
     };
     const parsed = generatePinsSchema.safeParse(
       generationMode === 'ai-integrated'
@@ -434,7 +435,11 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
     toast.success('Pins generated successfully');
     if (articleSource) {
       // A new generation each time: the previous one is kept, never overwritten.
-      router.push(articlePinterestCreateHref(articleSource.articleId, json.data.generationId));
+      router.push(
+        articleSource.articleId
+          ? articlePinterestCreateHref(articleSource.articleId, json.data.generationId)
+          : wordpressPostPinterestHref(articleSource.externalPost ?? { siteId: '' }, json.data.generationId)
+      );
       setLoading(false);
       return;
     }

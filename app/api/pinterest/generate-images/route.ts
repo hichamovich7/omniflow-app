@@ -29,6 +29,7 @@ import {
 import { BANNER_TEMPLATES } from '@/lib/validations/pinterest';
 import { IMAGE_CONFIG } from '@/lib/prompts/image-generator';
 import { promisePool } from '@/lib/utils/promise-pool';
+import { appendArticleVisualBrief } from '@/lib/pinterest/article-briefs';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import type { Pin } from '@/types/database';
@@ -207,10 +208,15 @@ export async function POST(request: Request) {
           throw new Error('AI Integrated pin is missing its validated rendering contract');
         }
         const { model: imageModel } = resolveImageModel(pin.visual_format);
+        // Article-grounded Pins carry their section's visual brief; any
+        // other Pin gets its prompt back unchanged.
         const rawImageBuffer = await generateImage({
-          prompt: integratedMetadata
-            ? buildAiIntegratedImagePrompt(pin, integratedMetadata, nextVersion)
-            : buildImagePrompt(pin, nextVersion),
+          prompt: appendArticleVisualBrief(
+            integratedMetadata
+              ? buildAiIntegratedImagePrompt(pin, integratedMetadata, nextVersion)
+              : buildImagePrompt(pin, nextVersion),
+            pin.image_analysis
+          ),
           size: IMAGE_CONFIG.size,
           visualFormat: pin.visual_format,
         });

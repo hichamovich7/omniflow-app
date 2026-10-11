@@ -11,7 +11,7 @@ import { resolveNicheContext } from '@/lib/niche/resolve';
 import type { NicheSettings } from '@/lib/niche/settings';
 import { buildPinterestNicheBlocks } from '@/lib/niche/prompt-blocks';
 
-export const PROMPT_ID = 'pinterest-pins-v12';
+export const PROMPT_ID = 'pinterest-pins-v13';
 
 interface PromptContext {
   keyword: string;
@@ -30,6 +30,13 @@ interface PromptContext {
   /** From buildImageAnalysisContext() (TASK-013) — additive to the niche's
    * styleGuidance, never a replacement. Both can be present at once. */
   referenceStyleGuidance?: string;
+  /**
+   * Article flow (article-grounded Pins): the article is the source of truth.
+   * Each Pin carries the planned `sourceSectionId` and its image_prompt is
+   * written from that section's visual brief (passed in analysisContext as
+   * <pin_plan>) instead of free art direction. Absent = keyword flow, unchanged.
+   */
+  articleGrounded?: boolean;
 }
 
 // Room/space nouns across the 4 supported content languages (en, de, es, fr).
@@ -110,6 +117,17 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
     : '';
 
   const referenceStyleInstruction = ctx.referenceStyleGuidance ? ` ${ctx.referenceStyleGuidance}` : '';
+
+  // Keyword flow: free art direction (unchanged). Article flow: the scene is
+  // the assigned section's project, described only with its visual brief —
+  // no invented supporting objects, materials or palette.
+  const imagePromptSubjectInstruction = ctx.articleGrounded
+    ? `- sourceSectionId: the id of the article section this pin is built from, copied exactly from <pin_plan> (e.g. "s2"). Follow the <pin_plan> assignment in order.
+- image_prompt: a hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). The main subject, front and center, is the exact project of the pin's assigned section ("Pattern or project represented" in its visual brief), described only with the materials, colors, techniques, shape, texture and visual details of that brief. When the brief leaves a detail unspecified, keep it plain instead of inventing one. Never add another project, garment or object type, and never use anything listed under the brief's Forbidden elements. The setting is limited to a plain neutral surface or backdrop (white, cream, beige, light gray or natural wood), soft natural light and at most one or two text-free props. State the camera angle (${cameraAngles}).`
+    : `- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}).`;
+  const imageVariationRule = ctx.articleGrounded
+    ? `- Image prompts must each show their own assigned section's project. Vary only the camera angle (choosing only from: ${cameraAngles}), framing and neutral backdrop between pins — never the facts of the project. Never describe the same scene twice.`
+    : `- Image prompts must describe a single concrete visual scene that a photographer could set up and shoot. Every image prompt must vary the setting, objects, color palette, and camera angle across pins, choosing only from: ${cameraAngles}. Never describe the same scene twice.`;
 
   // Niche profile (lib/niche) — shared identity + Pinterest-only rules +
   // visual rules. No niche and no Content Stream: nothing is added.
@@ -208,7 +226,7 @@ For each pin, provide:
 - description: SEO-optimized Pinterest description with call to action (max 500 characters)
 - keywords: 10 to 15 relevant Pinterest keywords, comma separated, no hashtags
 - board: suggested Pinterest board name that accurately reflects the pin's topic and, when <niche_context> is provided, the project niche and Content Stream
-- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}). Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre that fits this topic (e.g. "editorial interior photography", "food photography", "craft product photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include technical camera settings (lens, aperture, ISO) or studio lighting setups; a short phrase about the mood of the light is allowed only when the niche art direction asks for it.${compositionInstruction}${styleGuidanceInstruction}${nicheImageInstruction}${referenceStyleInstruction}
+${imagePromptSubjectInstruction} Write the scene as a single flowing descriptive paragraph, then end it with 2-4 concrete style keywords appended as the final clause — never at the start, so the main subject stays the focal point of the prompt: one photography genre that fits this topic (e.g. "editorial interior photography", "food photography", "craft product photography"), one realism level (e.g. "photorealistic"), and one quality modifier (e.g. "highly detailed"). Replace vague words like "beautiful", "nice", "elegant", or "stunning" with concrete visual details — this applies to the style keywords too: no vague style words, only concrete, specific ones. Do not include technical camera settings (lens, aperture, ISO) or studio lighting setups; a short phrase about the mood of the light is allowed only when the niche art direction asks for it.${compositionInstruction}${styleGuidanceInstruction}${nicheImageInstruction}${referenceStyleInstruction}
 ${overlayFieldInstruction}
 ${bannerTemplateInstruction}
 ${integratedTextInstruction}
@@ -229,7 +247,7 @@ Rules:
 - The description must give enough information to attract interest, but not enough to satisfy the curiosity created by the title — never state the specific technique, number, or answer that the article reveals. End on an open loop that only clicking through resolves. Keep the natural keyword integration and call to action, but the CTA must point toward discovering something ("see how", "find out which"), never restate the content itself. Stay within 500 characters.
 - Keywords must be relevant to the pin topic, no duplicates across pins.
 - Board name must be a real, specific Pinterest board category.
-- Image prompts must describe a single concrete visual scene that a photographer could set up and shoot. Every image prompt must vary the setting, objects, color palette, and camera angle across pins, choosing only from: ${cameraAngles}. Never describe the same scene twice. Never include text, typography, logos, watermarks, or graphic overlays in the scene description itself — any on-image text is handled separately via overlayText, not by describing it inside image_prompt.
+${imageVariationRule} Never include text, typography, logos, watermarks, or graphic overlays in the scene description itself — any on-image text is handled separately via overlayText, not by describing it inside image_prompt.
 - Any supporting object that customarily carries writing — a notebook, book, journal, magazine, label, tag, sign, chart, graph, or piece of paper — must be described in a state that implies no legible text: closed, blank, turned away from camera, or described as an abstract/textural detail (e.g. "a closed leather notebook", "a stack of blank-spined books", "an unlabeled glass jar", "a sketch with no caption"). Never describe it in a state that implies readable content (e.g. "a notebook with handwritten notes", "an open book with visible text", "a labeled jar", "a chart with numbers"), even without quoting the text itself — describing the object that way is what causes illegible pseudo-text to render on it. This is separate from overlayText and the CTA banner, which remain the only places actual on-image text is ever intentionally rendered.
 - All text content (title, description, keywords, board, overlayText) must be in ${langName}. Image prompts must always be in English regardless of the content language.
 - Before finalizing, verify that title and description together never fully answer the question or reveal the complete technique — if they do, rewrite the description to remove the giveaway detail while keeping it compelling.
@@ -245,7 +263,7 @@ Respond with this exact JSON structure:
       "description": "...",
       "keywords": "keyword1, keyword2, keyword3, ...",
       "board": "...",
-      "image_prompt": "...",
+      "image_prompt": "...",${ctx.articleGrounded ? '\n      "sourceSectionId": "s1",' : ''}
       "visualFormat": "photo",
       "overlayText": "...",
       "ctaBannerTemplate": "clean-band"${isAiIntegrated ? `,\n      "integratedText": { ${integratedTextExample} }` : ''}
@@ -277,11 +295,18 @@ function buildCustomAngleInstruction(pinsRequested: number): string {
 // headroom for it. This is a ceiling, not a target: unused tokens cost nothing.
 const INTEGRATED_TEXT_TOKENS_PER_PIN = 150;
 
+// Article-grounded image prompts restate the brief's facts and add a
+// sourceSectionId — a little more room per pin.
+const ARTICLE_GROUNDED_TOKENS_PER_PIN = 120;
+
 export function estimateMaxTokens(
   pinsRequested: number,
-  options: { integratedText?: boolean } = {}
+  options: { integratedText?: boolean; articleGrounded?: boolean } = {}
 ): number {
-  const tokensPerPin = 350 + (options.integratedText ? INTEGRATED_TEXT_TOKENS_PER_PIN : 0);
+  const tokensPerPin =
+    350 +
+    (options.integratedText ? INTEGRATED_TEXT_TOKENS_PER_PIN : 0) +
+    (options.articleGrounded ? ARTICLE_GROUNDED_TOKENS_PER_PIN : 0);
   const overhead = 100;
   return pinsRequested * tokensPerPin + overhead;
 }

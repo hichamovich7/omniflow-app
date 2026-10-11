@@ -35,7 +35,15 @@ export default async function PinterestPage() {
           </Link>
         </EmptyState>
       ) : (
-        <PinForm projects={list} boards={boards ?? []} />
+        <>
+          <PinForm projects={list} boards={boards ?? []} />
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Already have the article on WordPress?{' '}
+            <Link href="/pinterest/from-wordpress" className="font-medium text-primary hover:underline">
+              Generate Pins from an existing WordPress post
+            </Link>
+          </p>
+        </>
       )}
     </PageContainer>
   );

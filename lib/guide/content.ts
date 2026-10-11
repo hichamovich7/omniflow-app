@@ -173,6 +173,7 @@ export const guideSections: GuideSection[] = [
       'Results are paginated 20 at a time — use Previous / Next at the bottom of the list.',
       'From here you can revisit results, export CSV, or delete a generation.',
       'Generations created from a WordPress article (Social Content Studio) show a "From WordPress" badge with the article title — click it to open the article. If that article is no longer available to you, the badge reads "WordPress article unavailable". Keyword generations have no such badge.',
+      'Generations created from an existing WordPress post show a "From WordPress post" badge — click it to reopen that post in "Pinterest from a WordPress post".',
     ],
   },
   {
@@ -257,8 +258,24 @@ export const guideSections: GuideSection[] = [
       'No destination link is ever added: no link field, no article URL sent to the AI, no link in titles, descriptions or keywords. Add your URLs yourself in the CSV, as you usually do.',
       'The Pins are saved like any other Pinterest generation (you find them in your history, CSV export included). Each generation is new — earlier ones are kept. The Pins stay faithful to the article: a number or claim the article does not contain is refused, and you are asked to try again.',
       'Each Pin card lets you copy the title, description, keywords or the full Pin, edit the text, regenerate just that Pin (same angle) and generate its image. "Generate all images" asks for confirmation first, because it uses AI image credits and Storage. The article and its featured image are never changed, and nothing is published to Pinterest.',
+      'Every Pin shows something the article really presents. Before writing, OmniFlow reads the article section by section and gives each Pin one real subject of it — in a list article, one pattern or project per Pin (5 Pins from a list of 10 use five different ones). Each Pin card shows its source section, and the source card lists the subjects found.',
+      'Images follow the article too: each Pin\'s image is described from its section only — its materials, colors, techniques, shape and details as written, plus what the article\'s own photo shows (read from its alt text, or described by AI). Anything the article does not mention — another project such as a cowl, a chunky yarn, invented colors — is refused and you are asked to try again. The article\'s photos are never copied into the Pins.',
       'Facebook is coming soon; Instagram, Reels, TikTok and Medium are planned. Their buttons are disabled for now and clicking them does nothing.',
       'Each Pinterest generation or single-Pin regeneration counts toward your hourly limit and your free-trial generations, like the other generators.',
+    ],
+  },
+  {
+    id: 'pinterest-from-wordpress-post',
+    title: 'Pinterest from a WordPress post',
+    icon: Share2,
+    summary: 'Turn an article that is already on your WordPress site — even one OmniFlow did not write — into Pinterest Pins.',
+    points: [
+      'Open Pinterest and click "Generate Pins from an existing WordPress post" under the form. You need a WordPress site connected to a project (see Connecting WordPress).',
+      'Choose the site, search by title or keyword and pick a post. Each result shows its title, date, status, category and featured image. Published posts are listed by default; drafts appear only if the connected WordPress account is allowed to edit posts.',
+      'Selecting a post shows a summary — title, excerpt, status, date, categories and the subjects found in the article — above the usual Pinterest form: number of Pins, language, keyword, Content Stream and board, generation mode and options. Nothing is generated until you click "Generate Pins".',
+      'The post is only read from WordPress, never modified, and nothing is published to Pinterest. No destination link is added: add your URLs yourself in the CSV.',
+      'The Pins follow the article exactly as for OmniFlow articles: one real subject of the post per Pin, images described from that section and its photo, nothing invented. They are saved in your history like any other generation.',
+      'If a post cannot be used — not found, your WordPress credentials were rejected, a draft you may not read, a site that is too slow, or an empty / password-protected post — you see the reason and can choose another post.',
     ],
   },
 ];

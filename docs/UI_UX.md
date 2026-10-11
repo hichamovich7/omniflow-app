@@ -633,6 +633,17 @@ The page reuses the Pinterest Generator form (`PinForm` with an `articleSource` 
 
 Result cards (`components/social/article-pin-results.tsx`): header "N Pins saved — Saved in your Pinterest generations. No link added automatically — add your destination URL manually in the CSV.", "Generate all images (N)" and "Open in Pinterest workspace (CSV)" (→ `/pinterest/[id]`, CSV export and scheduling unchanged). One card per Pin: number, readable angle badge (Curiosity, Problem → Solution, Listicle, Discovery, Article Promise), "Saved" badge, image thumbnail when generated, title, description, keyword chips, board (with section, or "(suggested — no board created)"), collapsible "Image prompt", the no-link notice, and the actions Copy title / Copy description / Copy keywords / Copy full Pin (title, description, keywords, board — never a link), Edit (inline title / description / keywords → `PATCH /api/pinterest/pins/[id]`), Regenerate this Pin (`POST /api/pinterest/pins/[id]/regenerate`, same angle; an existing image is kept) and Generate image / New image version (`POST /api/pinterest/generate-images` for that Pin). "Generate all images" opens a confirmation dialog ("This consumes AI image credits and Storage space… The article's featured image is never changed.") before calling the same endpoint for every Pin without an image. No image is generated automatically.
 
+Article-grounded Pins (TASK-051): the "Source article" card also lists the subjects detected in the article ("N subjects in the article — each Pin shows one of them: …"), and each result card shows the Pin's source section as a badge next to its angle.
+
+## Pinterest from an existing WordPress post (`/pinterest/from-wordpress`, TASK-051)
+
+Entry: "Generate Pins from an existing WordPress post" under the form on `/pinterest`; history badges "From WordPress post" link back here. `app/(dashboard)/pinterest/from-wordpress/page.tsx`:
+
+* No connected site → empty state "No WordPress site connected" + "Go to WordPress".
+* Without `siteId` + `postId` → title "Pinterest from a WordPress post" and the picker (`components/social/wordpress-post-picker.tsx`): WordPress site select (project name — domain), "Title or keyword" input, Status select (Published / Drafts), Search. Results list: featured image thumbnail (or a file icon), title, date, status badge, up to two category badges, "Select". "Load more" pages by 10. Error messages from WordPress are shown inline (`role="alert"`); "No post matches this search." when empty. Note: "Posts are only read from WordPress — never modified. Drafts are listed only when the connected account can edit posts."
+* With `siteId` + `postId` → the post is read (GET) and the same form as "Pinterest from an article" is shown: summary card titled "Existing WordPress post" (featured image, title, excerpt, language, keyword = the post title by default, status, date, categories, detected subjects, "Choose another post"), project fixed to the site's project, language / Pins (default 5) / Content Stream + real boards only / generation mode and options unchanged, no Destination URL field. Nothing is generated before "Generate Pins"; then the saved Pins appear below (`&generationId=`), with the same result cards (Regenerate this Pin re-reads the post).
+* A post that cannot be used (not found, credentials rejected, not allowed, timeout, empty or password-protected) → "This post can't be used" + the reason + "Choose another post".
+
 # Loading State
 
 While generating:

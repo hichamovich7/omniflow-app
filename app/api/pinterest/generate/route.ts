@@ -33,6 +33,16 @@ import {
   withoutUrls,
   type ArticlePinterestSource,
 } from '@/lib/social/pinterest-from-article';
+import {
+  attachArticleSourceMetadata,
+  buildArticleGrounding,
+  planArticlePinSections,
+  validateArticleGroundedPins,
+  type ArticleGrounding,
+} from '@/lib/pinterest/article-briefs';
+import { describeSectionImages, referenceImageHosts } from '@/lib/pinterest/article-vision';
+import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
+import { WordPressReadError } from '@/lib/wordpress/post-reader';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import type { ApiResponse } from '@/types/api';
 import {
@@ -141,6 +151,7 @@ export async function POST(request: Request) {
     analysisId,
     generationMode,
     wordpressArticleId,
+    wordpressPost,
   } = parsed.data;
   // The schema already rejects a reference for the other modes; this is a
   // second guard so the Vision step below can only ever run for Legacy
@@ -179,15 +190,21 @@ export async function POST(request: Request) {
   // this same project becomes the prompt context. Read-only; its permalink
   // and every other URL stay out of the context (the schema already rejects
   // websiteUrl / pinterestUrl / analysisId alongside it).
+  // Existing WordPress post (Volet A): same checks (owned connection of
+  // this project), then one GET of the post — WordPress is never written.
   let articleSource: ArticlePinterestSource | null = null;
-  if (wordpressArticleId) {
+  if (wordpressArticleId || wordpressPost) {
     try {
-      articleSource = await loadArticlePinterestSource(supabase, user.id, wordpressArticleId);
-      if (articleSource.projectId !== projectId) {
+      if (wordpressArticleId) {
+        articleSource = await loadArticlePinterestSource(supabase, user.id, wordpressArticleId);
+      } else if (wordpressPost) {
+        articleSource = await loadWordPressPostPinterestSource(supabase, user.id, wordpressPost);
+      }
+      if (articleSource && articleSource.projectId !== projectId) {
         throw new SocialGenerationError('project_mismatch', 'The article does not belong to this project');
       }
     } catch (err) {
-      if (!(err instanceof SocialGenerationError)) throw err;
+      if (!(err instanceof SocialGenerationError) && !(err instanceof WordPressReadError)) throw err;
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: { message: err.message, code: err.code } },
         { status: err.status }
@@ -201,8 +218,24 @@ export async function POST(request: Request) {
     ? requestedLanguage
     : resolveEffectiveLanguage(generationMode, requestedLanguage, project.default_language);
 
+  // Article-grounded Pins: each Pin gets a real section of the article and a
+  // visual brief. Article photos only ever become text (alt text first, then
+  // VISION) — never an image-model reference. Best-effort: without Vision the
+  // brief uses the article text alone.
+  let articleGrounding: ArticleGrounding | null = null;
+  if (articleSource) {
+    const sectionPlan = planArticlePinSections(articleSource.context, pinsRequested);
+    const { descriptions, stats } = await describeSectionImages(articleSource.context, sectionPlan, {
+      analyzeImage,
+      allowedHosts: referenceImageHosts(articleSource.siteUrl ?? null),
+    });
+    // Counts only: no URL, no article content.
+    console.log(`[${PROMPT_ID}] Article image descriptions: ${JSON.stringify(stats)}`);
+    articleGrounding = buildArticleGrounding(articleSource.context, pinsRequested, descriptions);
+  }
+
   let analysisContext: string | null = articleSource
-    ? buildArticlePinterestContext(articleSource, keyword)
+    ? buildArticlePinterestContext(articleSource, keyword, articleGrounding)
     : null;
 
   if (analysisId) {
@@ -308,6 +341,7 @@ export async function POST(request: Request) {
       brandProfile: buildBrandProfileContext(project.description),
       analysisContext: analysisContext ?? undefined,
       referenceStyleGuidance,
+      articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
     });
 
     const content = await generateText({
@@ -318,6 +352,7 @@ export async function POST(request: Request) {
       ],
       maxTokens: estimateMaxTokens(pinsRequested, {
         integratedText: generationMode === 'ai-integrated',
+        articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
       }),
     });
 
@@ -367,6 +402,9 @@ export async function POST(request: Request) {
             code: 'angle-coverage' as const,
             message,
           }))
+        : []),
+      ...(articleGrounding?.sectionPlan.length
+        ? validateArticleGroundedPins(resolvedPins, articleGrounding)
         : []),
     ];
     if (strategyIssues.length > 0) {
@@ -430,13 +468,23 @@ export async function POST(request: Request) {
           ? 'photo-only'
           : legacyVisualFormat;
       const strategyMetadata = attachPinterestStrategyMetadata(imageAnalysisJson, pin.angle);
-      const persistedAnalysis = aiIntegrated
+      const integratedAnalysis = aiIntegrated
         ? attachAiIntegratedMetadata(strategyMetadata, {
             language,
             settings: aiIntegrated,
             text: resolveAiIntegratedText(aiIntegrated, pin.integratedText),
           })
         : strategyMetadata;
+      // Article flow: the Pin keeps its source section and visual brief — the
+      // image step appends the brief to the image prompt.
+      const sourceBrief = pin.sourceSectionId ? articleGrounding?.briefs[pin.sourceSectionId] : undefined;
+      const persistedAnalysis = articleGrounding && sourceBrief
+        ? attachArticleSourceMetadata(integratedAnalysis, {
+            sourceType: articleGrounding.sourceType,
+            sectionId: sourceBrief.sectionId,
+            brief: sourceBrief,
+          })
+        : integratedAnalysis;
 
       return {
         generation_id: generation.id,
@@ -487,7 +535,7 @@ export async function POST(request: Request) {
 
     await supabase.from('generations').update({ status: 'completed' }).eq('id', generation.id);
 
-    if (articleSource) {
+    if (articleSource?.articleId) {
       // Traceability only (migration 040). Best-effort and separate from the
       // insert above, so the generation still succeeds before the migration
       // is applied. An internal id — never a destination URL.
@@ -497,6 +545,17 @@ export async function POST(request: Request) {
         .eq('id', generation.id);
       if (sourceError) {
         console.warn('Could not record the source article on the generation (migration 040 applied?):', sourceError.message);
+      }
+    }
+    if (articleSource) {
+      // Source kind + existing post reference (migration 044). Same
+      // best-effort rule; ids only — never the post's permalink.
+      const { error: sourceTypeError } = await supabase
+        .from('generations')
+        .update(generationSourceColumns(articleSource))
+        .eq('id', generation.id);
+      if (sourceTypeError) {
+        console.warn('Could not record the generation source type (migration 044 applied?):', sourceTypeError.message);
       }
     }
 

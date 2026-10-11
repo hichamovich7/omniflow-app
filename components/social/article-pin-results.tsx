@@ -19,13 +19,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
-import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText } from '@/lib/social/pin-display';
+import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection } from '@/lib/social/pin-display';
 import type { Pin } from '@/types/database';
 
 interface ArticlePinResultsProps {
   pins: Pin[];
   generationId: string;
-  articleId: string;
+  /** Source sent back on "Regenerate this Pin": the OmniFlow article or the existing WordPress post. */
+  regenerateSource: ArticleRegenerateSource;
   /** Real board name per Pin id (null = AI-suggested name only, no board). */
   boardNames: Record<string, string | null>;
   imagesProcessing: boolean;
@@ -54,7 +55,9 @@ async function copy(text: string, label: string) {
  * (edit, single-Pin regeneration, existing image generation). No action adds
  * a link; images are never generated without a click.
  */
-export function ArticlePinResults({ pins, generationId, articleId, boardNames, imagesProcessing }: ArticlePinResultsProps) {
+export type ArticleRegenerateSource = { wordpressArticleId: string } | { wordpressPost: { siteId: string; postId: number } };
+
+export function ArticlePinResults({ pins, generationId, regenerateSource, boardNames, imagesProcessing }: ArticlePinResultsProps) {
   const router = useRouter();
   const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const [allImagesLoading, setAllImagesLoading] = useState(false);
@@ -121,7 +124,7 @@ export function ArticlePinResults({ pins, generationId, articleId, boardNames, i
             pin={pin}
             index={index}
             generationId={generationId}
-            articleId={articleId}
+            regenerateSource={regenerateSource}
             boardName={boardNames[pin.id] ?? null}
             imagesProcessing={imagesProcessing}
           />
@@ -155,19 +158,20 @@ function ArticlePinCard({
   pin,
   index,
   generationId,
-  articleId,
+  regenerateSource,
   boardName,
   imagesProcessing,
 }: {
   pin: Pin;
   index: number;
   generationId: string;
-  articleId: string;
+  regenerateSource: ArticleRegenerateSource;
   boardName: string | null;
   imagesProcessing: boolean;
 }) {
   const router = useRouter();
   const angle = readPinterestStrategyAngle(pin.image_analysis);
+  const sourceSection = readPinSourceSection(pin.image_analysis);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(pin.title);
   const [description, setDescription] = useState(pin.description);
@@ -213,7 +217,7 @@ function ArticlePinCard({
       const res = await fetch(`/api/pinterest/pins/${pin.id}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wordpressArticleId: articleId }),
+        body: JSON.stringify(regenerateSource),
       });
       const json = await readJson(res);
       if (!res.ok || json.error) {
@@ -259,6 +263,11 @@ function ArticlePinCard({
             {index + 1}
           </span>
           <Badge variant="outline">{angle ? ANGLE_LABELS[angle] : 'Angle unavailable'}</Badge>
+          {sourceSection && (
+            <Badge variant="secondary" className="max-w-56 truncate" title={`Source section: ${sourceSection}`}>
+              {sourceSection}
+            </Badge>
+          )}
         </div>
         <Badge variant="success">
           <CheckCircle2 className="h-3 w-3" aria-hidden="true" />

@@ -17,6 +17,7 @@ import {
   type ArticlePinterestSource,
 } from '@/lib/social/pinterest-from-article';
 import { getGenerationWithPins } from '@/lib/queries/generations';
+import { subjectSections } from '@/lib/wordpress/article-context';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
 
@@ -99,7 +100,9 @@ export default async function PinterestCreatePage({
 
   const suggestion = suggestBoardForArticle(boardList, article);
   const formSource: ArticleFormSource = {
-    articleId: article.articleId,
+    articleId,
+    externalPost: null,
+    subjects: subjectSections(article.context).map((section) => section.subject),
     projectId: article.projectId,
     title: article.title,
     metaTitle: article.metaTitle,
@@ -134,7 +137,7 @@ export default async function PinterestCreatePage({
         <ArticlePinResults
           pins={result.pins}
           generationId={result.generation.id}
-          articleId={article.articleId}
+          regenerateSource={{ wordpressArticleId: articleId }}
           boardNames={result.boardNames}
           imagesProcessing={result.generation.image_status === 'processing'}
         />

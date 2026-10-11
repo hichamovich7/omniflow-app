@@ -129,7 +129,7 @@ test.describe('Pinterest history — source WordPress article (getGenerationsWor
     expect(byTable.wordpress_generations).toContain('eq:user_id');
   });
 
-  test('no N+1: at most 3 grouped queries whatever the page size', async () => {
+  test('no N+1: at most 4 grouped queries whatever the page size', async () => {
     const tables = fixture();
     const ids: string[] = [];
     for (let i = 0; i < 20; i++) {
@@ -139,14 +139,37 @@ test.describe('Pinterest history — source WordPress article (getGenerationsWor
     const { client, ops } = fakeSupabase(tables);
     const map = await getGenerationsWordPressSource(client, USER_A, [...ALL_A, ...ids]);
     expect(map.size).toBe(24);
-    expect(ops.map((o) => o.table)).toEqual(['generations', 'wordpress_generations', 'wordpress_articles']);
+    // External WordPress posts (migration 044), then OmniFlow articles (040).
+    expect(ops.map((o) => o.table)).toEqual(['generations', 'generations', 'wordpress_generations', 'wordpress_articles']);
   });
 
-  test('no linked generation: a single query, no article lookup', async () => {
+  test('no linked generation: two grouped queries, no article lookup', async () => {
     const { client, ops } = fakeSupabase(fixture());
     const map = await getGenerationsWordPressSource(client, USER_A, ['gen-keyword', 'gen-legacy']);
     expect(map.size).toBe(0);
-    expect(ops).toHaveLength(1);
+    expect(ops).toHaveLength(2);
+  });
+
+  test('existing WordPress post (migration 044): linked to its post page, never to a URL of the post', async () => {
+    const tables = fixture();
+    tables.generations.push(
+      { id: 'gen-external', user_id: USER_A, keyword: 'Colorful crochet scarves', source_type: 'external_wordpress_post', source_wordpress_site_id: 'site-1', source_wordpress_post_id: 1527 } as never,
+      { id: 'gen-external-deleted-site', user_id: USER_A, keyword: 'x', source_type: 'external_wordpress_post', source_wordpress_site_id: null, source_wordpress_post_id: 9 } as never,
+      { id: 'gen-external-of-b', user_id: USER_B, keyword: 'secret', source_type: 'external_wordpress_post', source_wordpress_site_id: 'site-b', source_wordpress_post_id: 1 } as never
+    );
+    const { client } = fakeSupabase(tables);
+    const map = await getGenerationsWordPressSource(client, USER_A, [...ALL_A, 'gen-external', 'gen-external-deleted-site', 'gen-external-of-b']);
+    expect(map.get('gen-external')).toEqual({ status: 'external', siteId: 'site-1', postId: 1527, title: 'Colorful crochet scarves' });
+    expect(map.get('gen-external-deleted-site')).toEqual({ status: 'unavailable' });
+    expect(map.has('gen-external-of-b')).toBe(false);
+    expect(describeWordPressSource(map.get('gen-external')!)).toEqual({
+      kind: 'link',
+      href: '/pinterest/from-wordpress?siteId=site-1&postId=1527',
+      label: 'From WordPress post',
+      title: 'Colorful crochet scarves',
+    });
+    // OmniFlow article sources are unchanged.
+    expect(map.get('gen-from-article')).toMatchObject({ status: 'available', generationId: 'wp-1' });
   });
 
   test('empty page: no query at all', async () => {

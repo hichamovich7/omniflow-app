@@ -4,6 +4,7 @@ import { generateText } from '@/lib/ai/engine';
 import { regeneratePinSchema } from '@/lib/validations/pinterest';
 import { prepareArticlePinRegeneration, regenerateAndSavePin } from '@/lib/pinterest/pin-text';
 import { SocialGenerationError } from '@/lib/social/pinterest-from-article';
+import { WordPressReadError } from '@/lib/wordpress/post-reader';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
@@ -63,7 +64,8 @@ export async function POST(
   try {
     // Ownership, completion and project checks run before the rate limit so
     // a rejected request never consumes trial budget.
-    const prepared = await prepareArticlePinRegeneration(supabase, user.id, id, parsed.data.wordpressArticleId);
+    const source = 'wordpressArticleId' in parsed.data ? parsed.data.wordpressArticleId : { wordpressPost: parsed.data.wordpressPost };
+    const prepared = await prepareArticlePinRegeneration(supabase, user.id, id, source);
 
     const rateLimit = await checkRateLimit(user.id, user.email ?? '', 'pinterest/regenerate-pin', 30, 3600, {
       enforceTrialLimit: true,
@@ -75,7 +77,7 @@ export async function POST(
     const pin = await regenerateAndSavePin(supabase, prepared, { generateText });
     return NextResponse.json<ApiResponse<Pin>>({ data: pin, error: null });
   } catch (err) {
-    if (err instanceof SocialGenerationError) {
+    if (err instanceof SocialGenerationError || err instanceof WordPressReadError) {
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: { message: err.message, code: err.code } },
         { status: err.status }

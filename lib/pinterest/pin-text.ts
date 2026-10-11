@@ -6,6 +6,9 @@ import {
   type ArticlePinterestSource,
   type GenerateTextFn,
 } from '@/lib/social/pinterest-from-article';
+import { loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
+import type { ReadDeps } from '@/lib/wordpress/post-reader';
+import type { WordPressPostSource } from '@/lib/validations/wordpress-post-source';
 import type { UpdatePinTextInput } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -80,10 +83,15 @@ export async function prepareArticlePinRegeneration(
   supabase: SupabaseClient,
   userId: string,
   pinId: string,
-  wordpressArticleId: string
+  articleSource: string | { wordpressPost: WordPressPostSource },
+  deps: ReadDeps = {}
 ): Promise<{ pin: Pin; generation: OwnedGeneration; source: ArticlePinterestSource }> {
   const { pin, generation } = await loadOwnedPin(supabase, userId, pinId);
-  const source = await loadArticlePinterestSource(supabase, userId, wordpressArticleId);
+  // An OmniFlow article id, or an existing WordPress post (read again, GET only).
+  const source =
+    typeof articleSource === 'string'
+      ? await loadArticlePinterestSource(supabase, userId, articleSource)
+      : await loadWordPressPostPinterestSource(supabase, userId, articleSource.wordpressPost, deps);
   if (source.projectId !== generation.project_id) {
     throw new SocialGenerationError('project_mismatch', "The article does not belong to this Pin's project");
   }

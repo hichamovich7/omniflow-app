@@ -27,6 +27,34 @@ export function pinAsText(pin: PinTextFields): string {
   return `Title: ${pin.title}\nDescription: ${pin.description}\nKeywords: ${pin.keywords}\nBoard: ${pin.board}`;
 }
 
+/** Pinterest from an existing WordPress post: the picker (no post) or the post's form. */
+export function wordpressPostPinterestHref(
+  source: { siteId: string; postId?: number | null },
+  generationId?: string
+): string {
+  const params = new URLSearchParams({ siteId: source.siteId });
+  if (source.postId) params.set('postId', String(source.postId));
+  if (generationId) params.set('generationId', generationId);
+  return `/pinterest/from-wordpress?${params.toString()}`;
+}
+
+/** Key of the article-grounded Pin metadata in pins.image_analysis (lib/pinterest/article-briefs.ts). */
+export const ARTICLE_SOURCE_METADATA_KEY = '_articleSource';
+
+/** The article section a Pin was built from, for display only (null for other Pins). */
+export function readPinSourceSection(imageAnalysisJson: string | null): string | null {
+  if (!imageAnalysisJson) return null;
+  try {
+    const value = (JSON.parse(imageAnalysisJson) as Record<string, unknown>)?.[ARTICLE_SOURCE_METADATA_KEY] as
+      | { brief?: { sourceSection?: unknown } }
+      | undefined;
+    const section = value?.brief?.sourceSection;
+    return typeof section === 'string' && section.trim() ? section : null;
+  } catch {
+    return null;
+  }
+}
+
 export function articlePinterestCreateHref(articleId: string, generationId?: string): string {
   const params = new URLSearchParams({ source: 'wordpress', articleId });
   if (generationId) params.set('generationId', generationId);

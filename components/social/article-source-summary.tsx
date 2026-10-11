@@ -2,11 +2,19 @@ import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
+import { wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import type { SupportedLanguage } from '@/types/pinterest';
 
 /** What the Pinterest form shows and pre-fills from a WordPress article (TASK-044 phase 2). No URL. */
 export interface ArticleFormSource {
-  articleId: string;
+  /** OmniFlow article (wordpress_generations.id); null for an existing WordPress post. */
+  articleId: string | null;
+  /** Existing WordPress post — null for an OmniFlow article. */
+  externalPost: { siteId: string; postId: number } | null;
+  /** Shown for an existing post: publication date, status and categories. */
+  postMeta?: { date: string; status: string; categories: string[] } | null;
+  /** Subjects (patterns / projects) detected in the article — what Pins are built from. */
+  subjects?: string[];
   projectId: string;
   title: string;
   metaTitle: string;
@@ -42,7 +50,9 @@ export function ArticleSourceSummary({ source }: { source: ArticleFormSource }) 
         </div>
       )}
       <div className="min-w-0 space-y-1.5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source article</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {source.externalPost ? 'Existing WordPress post' : 'Source article'}
+        </p>
         <h2 id="article-source-heading" className="text-sm font-semibold leading-snug">
           {source.title}
         </h2>
@@ -58,13 +68,38 @@ export function ArticleSourceSummary({ source }: { source: ArticleFormSource }) 
             </Badge>
           ))}
           <Badge variant="outline">{source.hasBrandProfile ? 'Brand Profile used' : 'No Brand Profile'}</Badge>
+          {source.postMeta && (
+            <>
+              <Badge variant="outline">{source.postMeta.status === 'publish' ? 'Published' : source.postMeta.status}</Badge>
+              {source.postMeta.date && <Badge variant="outline">{source.postMeta.date.slice(0, 10)}</Badge>}
+              {source.postMeta.categories.slice(0, 3).map((category) => (
+                <Badge key={category} variant="secondary">
+                  {category}
+                </Badge>
+              ))}
+            </>
+          )}
         </div>
+        {source.subjects && source.subjects.length > 0 && (
+          <p className="line-clamp-3 text-xs text-muted-foreground" data-testid="article-source-subjects">
+            <span className="font-medium">
+              {source.subjects.length} subject{source.subjects.length > 1 ? 's' : ''} in the article — each Pin shows one of them:
+            </span>{' '}
+            {source.subjects.join(' · ')}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           The article is only read, never modified. No destination link is added to the Pins — add your URLs
           manually in the CSV.{' '}
-          <Link href={`/wordpress/${source.articleId}`} className="text-primary hover:underline">
-            Back to article
-          </Link>
+          {source.articleId ? (
+            <Link href={`/wordpress/${source.articleId}`} className="text-primary hover:underline">
+              Back to article
+            </Link>
+          ) : source.externalPost ? (
+            <Link href={wordpressPostPinterestHref({ siteId: source.externalPost.siteId })} className="text-primary hover:underline">
+              Choose another post
+            </Link>
+          ) : null}
         </p>
       </div>
     </section>

@@ -174,6 +174,9 @@ Represents one Pinterest generation request.
 | image_status        | text                  | none / processing / completed / partial / failed |
 | error_message       | text nullable         | Human-readable reason when status = failed |
 | source_wordpress_generation_id | uuid nullable FK → wordpress_generations.id | Source article when the generation was made from a WordPress article on `/pinterest/create?source=wordpress` (migration 040, TASK-044 phase 2). ON DELETE SET NULL. Traceability only — an internal id, never a destination URL (`pins.link_url` stays empty in that flow; links are added manually in the CSV). Written best-effort after completion, so generating still works before 040 is applied. `NULL` for keyword generations and every row before 040. Partial index where not null |
+| source_type | text nullable | What the generation was made from (migration 044, TASK-051): `omniflow_article` (an article of the WordPress generator — `source_wordpress_generation_id` points at it) or `external_wordpress_post` (a post that already existed on a connected site). `NULL` for keyword generations and every row before 044. CHECK on the two values |
+| source_wordpress_site_id | uuid nullable FK → wordpress_sites.id | Connection of the existing post (migration 044). ON DELETE SET NULL |
+| source_wordpress_post_id | bigint nullable | WordPress post id on that site (migration 044), > 0, only with `source_type = 'external_wordpress_post'`. Ids only: the post permalink is never stored and never becomes `pins.link_url`. All three written best-effort after completion — generating works before 044 is applied |
 | created_at          | timestamptz           |                                           |
 | updated_at          | timestamptz           |                                           |
 
@@ -195,6 +198,7 @@ user_id = auth.uid()
 (status)
 (created_at DESC)
 (source_wordpress_generation_id) WHERE NOT NULL  -- migration 040
+(source_wordpress_site_id, source_wordpress_post_id) WHERE source_wordpress_post_id IS NOT NULL  -- migration 044
 ```
 
 ---
