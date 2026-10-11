@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Cloudflare R2 media storage behind a feature flag — TASK-049 (2026-10-11)
+
+* New `lib/storage/`: common `MediaStorage` interface (upload, read, remove, list, public URL), Supabase provider (exact historical calls), Cloudflare R2 provider, provider detection and config validation. R2 client = dependency-free AWS SigV4 over `fetch` + `node:crypto` (no new package).
+* `MEDIA_STORAGE_PROVIDER` = `supabase` (default — behavior unchanged) | `r2`. R2 variables server-only (`R2_ENDPOINT`, `R2_BUCKET`, `R2_PUBLIC_URL`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`); placeholders added to `.env.example`.
+* With `r2`: new Pinterest images → `images/pinterest/<user>/<generation>/<pin>/<version>.<ext>`, new WordPress images → `images/wordpress/<user>/<generation>/<MARKER>.png`, public URLs on `https://media.n8nflow.org`. Prefixes reserved for `images/facebook/`, `videos/reels/`, `videos/facebook/`, `videos/tiktok/`.
+* Misconfigured R2 or failed upload → explicit error before any paid AI call / no URL saved; never a silent fallback to Supabase.
+* Pinterest `.source` photos stay in Supabase. Deletes clean R2 folders best-effort; rewrite copies R2 images inside R2; WordPress media reuse keys R2 URLs by bucket + key. `next.config.ts` allows `media.n8nflow.org` for `next/image`.
+* Unchanged: existing Supabase URLs and paths, schema (no migration, no backfill), prompts, image quality / format, reference images. No AI call. New offline spec `media-storage-r2.spec.ts` (27); real R2 smoke test OK.
+
 ## WordPress publish: media reused instead of re-uploaded — TASK-FIX-060 (2026-10-11)
 
 * P1 after TASK-FIX-059: every publish attempt re-uploaded the featured and internal images, filling the WordPress Media Library with copies on each retry / republish.

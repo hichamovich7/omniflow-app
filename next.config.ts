@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/**",
       },
+      // Cloudflare R2 public media domain (TASK-049, R2_PUBLIC_URL).
+      {
+        protocol: "https",
+        hostname: "media.n8nflow.org",
+        pathname: "/images/**",
+      },
     ],
   },
 };

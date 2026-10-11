@@ -1,4 +1,5 @@
 import { obtainReusableMedia, type MediaAssetStore, type MediaOutcome } from '@/lib/wordpress/media-reuse';
+import { mediaSourceOptions } from '@/lib/storage';
 import { mapWithConcurrency } from '@/lib/wordpress/publish-budget';
 import { silentPublishLogger, type PublishLogger } from '@/lib/wordpress/publish-log';
 import {
@@ -127,6 +128,8 @@ export async function uploadPublishMedia(
             limit: options.limit,
             log,
             state: reuseState,
+            // TASK-049: R2 public URLs keyed by bucket + object key, like Supabase ones.
+            sourceOptions: mediaSourceOptions(),
             plainUpload: (job) => uploadMedia(site, job.url, job.filename, job.altText, options.limit),
           },
           request

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { updateArticleCategorySchema } from '@/lib/validations/wordpress-article';
+import { r2MediaFolder, removeR2Folder } from '@/lib/storage';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 import type { WordPressArticle } from '@/types/wordpress';
@@ -182,6 +183,13 @@ export async function DELETE(
     }
   } catch (err) {
     console.error(`[wordpress delete] Unexpected storage cleanup error for ${id}:`, err);
+  }
+
+  // TASK-049: images written to R2 for this generation (same best-effort rule).
+  try {
+    await removeR2Folder(r2MediaFolder('wordpress', user.id, id));
+  } catch (err) {
+    console.error(`[wordpress delete] R2 cleanup failed for ${id}:`, err instanceof Error ? err.message : err);
   }
 
   // wordpress_articles and wordpress_article_images both have ON DELETE CASCADE

@@ -16,6 +16,13 @@ import {
   TEXT_ROLE,
   logWordPressTextModel,
 } from '@/lib/wordpress/generate-article';
+import {
+  createR2StorageFromEnv,
+  r2KeyFromPublicUrl,
+  r2MediaFolder,
+  r2MediaKey,
+  type MediaStorage,
+} from '@/lib/storage';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { WordPressArticle, WordPressArticleImage, WordPressGeneration } from '@/types/wordpress';
 
@@ -378,16 +385,41 @@ const PUBLIC_PATH_SEGMENT = `/object/public/${WORDPRESS_IMAGES_BUCKET}/`;
  * into the new version's folder, so deleting either version never breaks
  * the other. Other URLs (e.g. reused Pin images) are kept as they are. A
  * failed copy keeps the original URL and is reported as a warning.
+ * TASK-049: an image stored in R2 (`images/wordpress/<user>/<generation>/…`)
+ * is copied inside R2, whatever the active provider.
  */
 export async function copyArticleImages(
   supabase: SupabaseClient,
-  params: { userId: string; fromGenerationId: string; toGenerationId: string; urls: string[] }
+  params: { userId: string; fromGenerationId: string; toGenerationId: string; urls: string[] },
+  deps: { r2?: () => MediaStorage; r2KeyFromUrl?: (url: string) => string | null } = {}
 ): Promise<{ urlMap: Map<string, string>; warnings: string[] }> {
   const urlMap = new Map<string, string>();
   const warnings: string[] = [];
   const fromPrefix = `${params.userId}/${params.fromGenerationId}/`;
+  const keyFromUrl = deps.r2KeyFromUrl ?? ((url: string) => r2KeyFromPublicUrl(url));
+  const r2FromPrefix = `${r2MediaFolder('wordpress', params.userId, params.fromGenerationId)}/`;
+  const copyFailed = (err: unknown) => {
+    console.warn('[wordpress-rewrite] image copy failed:', err instanceof Error ? err.message : err);
+    warnings.push('An image could not be copied to the new version; it still points to the previous version, so keep that version if you delete anything.');
+  };
 
   for (const url of new Set(params.urls)) {
+    const r2Key = keyFromUrl(url);
+    if (r2Key !== null) {
+      if (!r2Key.startsWith(r2FromPrefix)) continue;
+      try {
+        const r2 = (deps.r2 ?? createR2StorageFromEnv)();
+        const fileName = r2Key.slice(r2FromPrefix.length);
+        const target = r2MediaKey('wordpress', params.userId, params.toGenerationId, fileName);
+        const body = await r2.read(r2Key);
+        const contentType = /\.jpe?g$/i.test(fileName) ? 'image/jpeg' : /\.webp$/i.test(fileName) ? 'image/webp' : 'image/png';
+        urlMap.set(url, (await r2.upload({ key: target, body, contentType })).publicUrl);
+      } catch (err) {
+        copyFailed(err);
+      }
+      continue;
+    }
+
     const index = url.indexOf(PUBLIC_PATH_SEGMENT);
     if (index === -1) continue;
     const path = decodeURIComponent(url.slice(index + PUBLIC_PATH_SEGMENT.length).split('?')[0]);
@@ -399,8 +431,7 @@ export async function copyArticleImages(
       if (error) throw new Error(error.message);
       urlMap.set(url, supabase.storage.from(WORDPRESS_IMAGES_BUCKET).getPublicUrl(target).data.publicUrl);
     } catch (err) {
-      console.warn('[wordpress-rewrite] image copy failed:', err instanceof Error ? err.message : err);
-      warnings.push('An image could not be copied to the new version; it still points to the previous version, so keep that version if you delete anything.');
+      copyFailed(err);
     }
   }
   return { urlMap, warnings: [...new Set(warnings)] };

@@ -13,12 +13,13 @@ import {
   recomposeExistingPin,
 } from '@/lib/pinterest/manual-recomposition';
 import {
-  getPinImageStoragePath,
+  getPinImageObjectKey,
   getPinSourceStoragePath,
 } from '@/lib/pinterest/pin-image-storage';
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { attachPinterestCreativeDiagnostics } from '@/lib/pinterest/creative-diagnostics';
 import { BANNER_TEMPLATES, type BannerTemplate } from '@/lib/validations/pinterest';
+import { createMediaStorage, type MediaStorage, type StoredMedia } from '@/lib/storage';
 import type { ApiResponse } from '@/types/api';
 import type { Pin, PinImage } from '@/types/database';
 
@@ -184,9 +185,32 @@ export async function POST(request: Request) {
   }
 
   const nextVersion = (versions[0]?.version ?? 0) + 1;
-  const imagePath = getPinImageStoragePath(user.id, pin.id, nextVersion);
+  // TASK-049: the image goes to the active media storage, the private source
+  // photo always stays in the Supabase bucket.
+  let mediaStorage: MediaStorage;
+  try {
+    mediaStorage = createMediaStorage(supabase, 'generated-images');
+  } catch (error) {
+    console.error('[pinterest recompose] media storage unavailable:', error instanceof Error ? error.message : error);
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Media storage is not available', code: 'storage_unavailable' } },
+      { status: 500 }
+    );
+  }
+  const imagePath = getPinImageObjectKey(mediaStorage.provider, {
+    userId: user.id,
+    generationId: pin.generation_id,
+    pinId: pin.id,
+    version: nextVersion,
+  });
   const newSourcePath = getPinSourceStoragePath(imagePath);
   const bucket = supabase.storage.from('generated-images');
+  const removeStored = async () => {
+    await bucket.remove([newSourcePath]);
+    await mediaStorage.remove([imagePath]).catch((error: unknown) => {
+      console.error('[pinterest recompose] image cleanup failed:', error instanceof Error ? error.message : error);
+    });
+  };
   const { error: sourceUploadError } = await bucket.upload(newSourcePath, sourceImageBuffer, {
     contentType: 'image/png',
     upsert: true,
@@ -198,11 +222,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: imageUploadError } = await bucket.upload(imagePath, composition.imageBuffer, {
-    contentType: 'image/png',
-    upsert: true,
-  });
-  if (imageUploadError) {
+  let stored: StoredMedia;
+  try {
+    stored = await mediaStorage.upload({
+      key: imagePath,
+      body: composition.imageBuffer,
+      contentType: 'image/png',
+      upsert: true,
+    });
+  } catch (imageUploadError) {
+    console.error(
+      '[pinterest recompose] image upload failed:',
+      imageUploadError instanceof Error ? imageUploadError.message : imageUploadError
+    );
     await bucket.remove([newSourcePath]);
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Could not store the recomposed image', code: 'storage_error' } },
@@ -210,13 +242,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: publicUrl } = bucket.getPublicUrl(imagePath);
   const { data: insertedData, error: insertError } = await supabase
     .from('pin_images')
     .insert({
       pin_id: pin.id,
       storage_path: imagePath,
-      url: publicUrl.publicUrl,
+      url: stored.publicUrl,
       is_active: false,
       version: nextVersion,
       image_model: activeVersion.image_model,
@@ -225,7 +256,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError || !insertedData) {
-    await bucket.remove([newSourcePath, imagePath]);
+    await removeStored();
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Could not create the new image version', code: 'database_error' } },
       { status: 500 }
@@ -246,7 +277,7 @@ export async function POST(request: Request) {
     : await supabase
         .from('pins')
         .update({
-          media_url: publicUrl.publicUrl,
+          media_url: stored.publicUrl,
           title_banner_template: composition.template,
           image_analysis: attachPinterestCreativeDiagnostics(pin.image_analysis, {
             status: composition.quality.status,
@@ -261,7 +292,7 @@ export async function POST(request: Request) {
     await supabase.from('pin_images').update({ is_active: false }).eq('id', inserted.id);
     await supabase.from('pin_images').update({ is_active: true }).eq('id', activeVersion.id);
     await supabase.from('pin_images').delete().eq('id', inserted.id);
-    await bucket.remove([newSourcePath, imagePath]);
+    await removeStored();
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'Could not activate the new image version', code: 'database_error' } },
       { status: 500 }

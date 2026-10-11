@@ -1101,3 +1101,19 @@ Validation (2026-10-04): see TASKS.md TASK-048 — TypeScript, ESLint (touched f
 2. Export the CSV: the "Publish date" cell must be `YYYY-MM-DDT11:00:00` (summer) / `T12:00:00` (winter).
 3. Controlled import with two rows of a future day, same Pin data otherwise: row A `…T11:00:00` (UTC, new format), row B `…T13:00:00` (local, as the former export would write the typed time). Expected if Pinterest reads UTC: A shows 13:00, B shows 15:00.
 4. Record which row shows 13:00 in TASKS.md TASK-048 ("CSV format"). If row B shows 13:00 instead, Pinterest reads local time and the CSV must be switched back to local wall time in the planning zone.
+
+---
+
+# Cloudflare R2 media storage (TASK-049, 2026-10-11)
+
+```bash
+npx playwright test tests/renderer/media-storage-r2.spec.ts --project=renderer --reporter=list
+```
+
+Offline (27 cases; the S3 client, `fetch` and Supabase are fakes — no network, no bucket, no AI call; fake credentials checked never to be printed): provider selection (unset / empty / `supabase` → Supabase, `r2`, invalid value refused), R2 config (missing / non-https variables named, values never echoed, region default `auto`), `r2` without config throws — no fallback, no Supabase call; no `NEXT_PUBLIC_` R2 variable and no `components/` import of `lib/storage`; key layout and separation (`images/pinterest/`, `images/wordpress/`, `images/facebook/`, `videos/reels/`, `videos/facebook/`, `videos/tiktok/`), unsafe / `..` segments refused, Supabase paths unchanged; R2 provider upload (key, content type, public URL on `https://media.n8nflow.org`), read, list, delete, failure → `MediaStorageError` without URL; SigV4 against the AWS S3 reference vectors; path-style signed PUT (content type signed, payload hash), 403 / network errors without secrets; ListObjectsV2 continuation; Supabase provider = exact historical calls (bucket, path, options, `upsert` only when given); Pinterest keys (Supabase unchanged, R2 grouped by generation), `.source` always on Supabase, storage resolved before any paid image call and before the DB rows; WordPress image keys for both providers, generators create the storage before any AI call; media reuse keys (`storage:omniflow-media/<key>`, Supabase keys unchanged); rewrite copies R2 → R2 and Supabase → Supabase, never reused Pin images; delete routes (R2 folder cleanup after the unchanged Supabase cleanup, no-op without config); `next/image` pattern.
+
+Non-regression: the full renderer suite (`npx playwright test --project=renderer`) — Pinterest generation, WordPress generation / publish / media reuse / rewrite specs unchanged and passing.
+
+Controlled real smoke test (optional, only when the R2 variables are set locally; no AI): upload a small temporary text file under `healthcheck/`, check it is listed, read it through S3 and through `https://media.n8nflow.org/…` (200, same bytes, content type kept), delete only that file, check it is gone (404). Never print the keys. Run 2026-10-11: all steps OK.
+
+Manual (costs AI credits — founder): set `MEDIA_STORAGE_PROVIDER=r2`, generate Pinterest images and a WordPress article, check the URLs start with `https://media.n8nflow.org/images/`, thumbnails display, recomposition works (source on Supabase), publish the article to WordPress, then delete the generations and check the R2 folders are emptied. Switch back to `supabase` → old and new images still display.

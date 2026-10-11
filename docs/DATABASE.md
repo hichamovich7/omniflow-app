@@ -1202,6 +1202,27 @@ Path pattern: `{user_id}/{generation_id}/{marker}.png`. Unlike `generated-images
 
 ---
 
+## Cloudflare R2 — omniflow-media (external, TASK-049)
+
+Status: Available behind `MEDIA_STORAGE_PROVIDER=r2` (default `supabase`). Not a Supabase bucket: no migration, no table, no column added.
+
+Purpose:
+
+Public storage of **new** Pinterest and WordPress images when the flag is `r2`, served from `https://media.n8nflow.org` (`R2_PUBLIC_URL`). Existing Supabase objects and URLs are never migrated.
+
+Examples:
+
+```txt
+images/pinterest/user-id/generation-id/pin-id/1.png
+images/wordpress/user-id/generation-id/FEATURED.png
+```
+
+Reserved prefixes (no pipeline yet): `images/facebook/`, `videos/reels/`, `videos/facebook/`, `videos/tiktok/` — all `{user_id}/{content_id}/…`.
+
+Existing columns reused unchanged: `pin_images.storage_path` holds the R2 key (starts with `images/`) instead of a Supabase path, `pin_images.url` / `pins.media_url` / `wordpress_articles.featured_image_url` / `wordpress_article_images.url` hold the R2 public URL. Pinterest `.source` photos are private and stay in `generated-images` (`{user_id}/{pin_id}/{version}.source.{ext}`), never in R2. Access is server-side only (S3 keys never reach the browser).
+
+---
+
 ## exports
 
 Status: Not yet used. CSV export is currently client-side.

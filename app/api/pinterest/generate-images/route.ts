@@ -19,7 +19,8 @@ import {
   composeHeadlineWithQualityGate,
   type PinQualityHistoryItem,
 } from '@/lib/pinterest/quality-gate';
-import { getPinSourceStoragePath } from '@/lib/pinterest/pin-image-storage';
+import { getPinImageObjectKey, getPinSourceStoragePath } from '@/lib/pinterest/pin-image-storage';
+import { createMediaStorage, type MediaStorage, type StoredMedia } from '@/lib/storage';
 import {
   DEFAULT_NICHE_CONVENTION,
   getNicheVisualConvention,
@@ -143,6 +144,19 @@ export async function POST(request: Request) {
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: 'No pins need images', code: 'invalid_request' } },
       { status: 400 }
+    );
+  }
+
+  // TASK-049: resolved before any paid image call — a misconfigured R2 fails
+  // here, explicitly, never after generation and never by falling back.
+  let mediaStorage: MediaStorage;
+  try {
+    mediaStorage = createMediaStorage(supabase, 'generated-images');
+  } catch (error) {
+    console.error('[pinterest images] media storage unavailable:', error instanceof Error ? error.message : error);
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Media storage is not available', code: 'storage_unavailable' } },
+      { status: 500 }
     );
   }
 
@@ -290,7 +304,13 @@ export async function POST(request: Request) {
           }
         }
 
-        const filePath = `${user.id}/${pin.id}/${nextVersion}.${outputFormat}`;
+        const filePath = getPinImageObjectKey(mediaStorage.provider, {
+          userId: user.id,
+          generationId,
+          pinId: pin.id,
+          version: nextVersion,
+          extension: outputFormat,
+        });
         const sourcePath = getPinSourceStoragePath(filePath);
         const storesRecompositionSource =
           pin.visual_format === 'text-overlay' && Boolean(pin.overlay_text && angle);
@@ -304,20 +324,17 @@ export async function POST(request: Request) {
           }
         }
 
-        const { error: uploadError } = await supabase.storage
-          .from('generated-images')
-          .upload(filePath, imageBuffer, { contentType: outputContentType });
-
-        if (uploadError) {
+        let stored: StoredMedia;
+        try {
+          stored = await mediaStorage.upload({ key: filePath, body: imageBuffer, contentType: outputContentType });
+        } catch (uploadError) {
           if (storesRecompositionSource) {
             await supabase.storage.from('generated-images').remove([sourcePath]);
           }
-          throw new Error(`Storage upload failed: ${uploadError.message}`);
+          throw new Error(
+            `Storage upload failed: ${uploadError instanceof Error ? uploadError.message : 'unknown error'}`
+          );
         }
-
-        const { data: publicUrl } = supabase.storage
-          .from('generated-images')
-          .getPublicUrl(filePath);
 
         await supabase
           .from('pin_images')
@@ -328,7 +345,7 @@ export async function POST(request: Request) {
         await supabase.from('pin_images').insert({
           pin_id: pin.id,
           storage_path: filePath,
-          url: publicUrl.publicUrl,
+          url: stored.publicUrl,
           is_active: true,
           version: nextVersion,
           image_model: imageModel,
@@ -337,7 +354,7 @@ export async function POST(request: Request) {
         await supabase
           .from('pins')
           .update({
-            media_url: publicUrl.publicUrl,
+            media_url: stored.publicUrl,
             ...(angle && pin.visual_format === 'text-overlay'
               ? { title_banner_template: selectedHeadlineTemplate }
               : {}),

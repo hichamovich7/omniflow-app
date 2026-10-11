@@ -26,6 +26,7 @@ import {
   applyOutlineTextLimits,
 } from '@/lib/wordpress/generate-article';
 import type { GenerateArticleResult, GeneratedArticleImage } from '@/lib/wordpress/generate-article';
+import { createArticleImageStorage, storeArticleImage } from '@/lib/wordpress/article-image-storage';
 import { promisePool } from '@/lib/utils/promise-pool';
 import type { SupportedLanguage } from '@/types/pinterest';
 
@@ -97,6 +98,7 @@ export async function generateArticleFromUrl(
   params: GenerateArticleFromUrlParams
 ): Promise<GenerateArticleFromUrlResult> {
   const { supabase, userId, generationId, sourceUrl, pastedContent, language, brandProfileDescription, siteUrl, niche } = params;
+  const mediaStorage = createArticleImageStorage(supabase);
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
 
   // Step 0: get the source content — scrape (link, via the same Firecrawl
@@ -247,19 +249,9 @@ export async function generateArticleFromUrl(
     imageTasks,
     async (task) => {
       const imageBuffer = await generateImage({ prompt: task.prompt, size: WORDPRESS_IMAGE_CONFIG.size });
-      const filePath = `${userId}/${generationId}/${task.marker}.png`;
+      const url = await storeArticleImage(mediaStorage, { userId, generationId, marker: task.marker, body: imageBuffer });
 
-      const { error: uploadError } = await supabase.storage
-        .from('wordpress-images')
-        .upload(filePath, imageBuffer, { contentType: 'image/png' });
-
-      if (uploadError) {
-        throw new Error(`Storage upload failed for ${task.marker}: ${uploadError.message}`);
-      }
-
-      const { data: publicUrl } = supabase.storage.from('wordpress-images').getPublicUrl(filePath);
-
-      return { marker: task.marker, url: publicUrl.publicUrl };
+      return { marker: task.marker, url };
     },
     WORDPRESS_IMAGE_CONFIG.concurrency
   );

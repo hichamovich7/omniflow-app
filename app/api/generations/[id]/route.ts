@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getGenerationWithPins } from '@/lib/queries/generations';
+import { r2MediaFolder, removeR2Folder } from '@/lib/storage';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 
@@ -138,6 +139,14 @@ export async function DELETE(
     }
   } catch (err) {
     console.error(`[generation delete] Unexpected storage cleanup error for ${id}:`, err);
+  }
+
+  // TASK-049: Pin images written to R2 live under one folder per generation
+  // (their `.source` photos are in the Supabase folders cleaned above).
+  try {
+    await removeR2Folder(r2MediaFolder('pinterest', user.id, id));
+  } catch (err) {
+    console.error(`[generation delete] R2 cleanup failed for ${id}:`, err instanceof Error ? err.message : err);
   }
 
   // pins and pin_images both have ON DELETE CASCADE to generations/pins

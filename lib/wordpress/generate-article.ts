@@ -24,6 +24,7 @@ import {
   type TONES_OF_VOICE,
   type POINTS_OF_VIEW,
 } from '@/lib/validations/wordpress';
+import { createArticleImageStorage, storeArticleImage } from '@/lib/wordpress/article-image-storage';
 import { promisePool } from '@/lib/utils/promise-pool';
 import { truncateAtWordBoundary } from '@/lib/utils/text-truncate';
 import type { SupportedLanguage } from '@/types/pinterest';
@@ -245,6 +246,7 @@ export async function generateWordPressArticle(
     siteUrl,
     niche,
   } = params;
+  const mediaStorage = createArticleImageStorage(supabase);
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const sizeConfig = articleSize ? ARTICLE_SIZE_CONFIG[articleSize] : undefined;
   // Only an explicit "Non" (false) shrinks these to a hard 0-length — "Oui"
@@ -380,19 +382,9 @@ export async function generateWordPressArticle(
     imageTasks,
     async (task) => {
       const imageBuffer = await generateImage({ prompt: task.prompt, size: WORDPRESS_IMAGE_CONFIG.size });
-      const filePath = `${userId}/${generationId}/${task.marker}.png`;
+      const url = await storeArticleImage(mediaStorage, { userId, generationId, marker: task.marker, body: imageBuffer });
 
-      const { error: uploadError } = await supabase.storage
-        .from('wordpress-images')
-        .upload(filePath, imageBuffer, { contentType: 'image/png' });
-
-      if (uploadError) {
-        throw new Error(`Storage upload failed for ${task.marker}: ${uploadError.message}`);
-      }
-
-      const { data: publicUrl } = supabase.storage.from('wordpress-images').getPublicUrl(filePath);
-
-      return { marker: task.marker, url: publicUrl.publicUrl };
+      return { marker: task.marker, url };
     },
     WORDPRESS_IMAGE_CONFIG.concurrency
   );
@@ -521,6 +513,7 @@ export async function generateArticleFromPins(
     siteUrl,
     niche,
   } = params;
+  const mediaStorage = createArticleImageStorage(supabase);
   const brandProfileContext = buildBrandProfileContext(brandProfileDescription);
   const imageCount = internalImageUrls.length;
   const primaryKeyword = resolvePinsPrimaryKeyword(generationKeyword, pins);
@@ -647,18 +640,9 @@ export async function generateArticleFromPins(
     );
     throw err;
   }
-  const filePath = `${userId}/${generationId}/FEATURED.png`;
-
   let featuredImageUrl: string | null = null;
   try {
-    const { error: uploadError } = await supabase.storage
-      .from('wordpress-images')
-      .upload(filePath, imageBuffer, { contentType: 'image/png' });
-
-    if (uploadError) throw new Error(`Storage upload failed for FEATURED: ${uploadError.message}`);
-
-    const { data: publicUrl } = supabase.storage.from('wordpress-images').getPublicUrl(filePath);
-    featuredImageUrl = publicUrl.publicUrl;
+    featuredImageUrl = await storeArticleImage(mediaStorage, { userId, generationId, marker: 'FEATURED', body: imageBuffer });
   } catch (err) {
     console.error(
       '[wordpress-from-pins] featured image upload failed:',

@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-049 (Cloudflare R2 media storage behind a feature flag) is implemented locally, not committed. New `lib/storage/` (common `MediaStorage` interface, Supabase provider = the exact historical calls, R2 provider over a dependency-free SigV4 S3 client), selected by `MEDIA_STORAGE_PROVIDER` (`supabase` default, `r2`). With `r2`, new Pinterest images go to `images/pinterest/<user>/<generation>/<pin>/<version>.<ext>` and new WordPress images to `images/wordpress/<user>/<generation>/<MARKER>.png`, served from `https://media.n8nflow.org`; `.source` photos stay in Supabase; no migration, no backfill, old Supabase URLs untouched; a missing R2 config or failed upload is an explicit error (no fallback, no URL saved). New spec `media-storage-r2.spec.ts` (27); full renderer 958/959 (same pre-existing `pinterest-text-importance-none.spec.ts` failure); real R2 smoke test OK. See TASK-049 below.
+
 TASK-FIX-060 (P1 — WordPress media reuse) is implemented locally, not committed. Goal: never upload the same image again to the same WordPress site — on a retry, a republish, another article or a rewritten version using it. New table `wordpress_media_assets` (migration 043 — **apply manually in Supabase**; next free number after 042): one row per `(wordpress_site_id, source_asset_key)` (unique), with `source_hash`, `wp_media_id`, `wp_media_url`, `wordpress_site_url` and a claim column `upload_started_at`. Key from `lib/wordpress/media-source.ts` (`storage:<bucket>/<path>`, Supabase or CDN, never the public URL or the file name). `lib/wordpress/media-reuse.ts`: lookup → `GET /wp/v2/media/<id>` → reuse; 404 / not an image / other site URL → one new upload, mapping updated, nothing deleted; not mapped → claim inserted before uploading (concurrent publishes wait instead of duplicating, collision re-read, stale claim taken over), identical bytes reused via hash, mapping saved before the post. Featured and internal images, Keyword / Pins / URL / rewritten articles. Without 043: uploads as before + one log warning. No `.env` change, no AI call, prompts / content / Quality Gate / Rank Math untouched, no WordPress media deleted. TypeScript, ESLint (touched files), new spec 24/24, WordPress suites 403/403, full renderer 931/932 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build and `git diff --check` pass. **Real test to do by the founder:** see TESTING.md "WordPress media reuse". See CHANGELOG.md "TASK-FIX-060".
 
 TASK-FIX-059 (P0.1 — WordPress publish time budget) is implemented and committed. Cause (audit 2026-10-09): after TASK-FIX-058 the publish route ran sequential media uploads (featured image up to 48 s and fatal on timeout), tags and internal links before the post with no global ceiling, exceeding Vercel's 60 s — 504 "uncertain", then 409 for 90 s, every retry re-uploading everything. Fix: global budget from `maxDuration` (unchanged 60 s; preparation ≤ 25 s, post ≤ 45 s, secondary ≤ 51 s), media uploads 3 at a time and never blocking (featured image failed → post without `featured_media` + warning), tags 3 at a time, internal links in parallel with media, FAQ re-send / Rank Math only with time left, explicit warnings, status unchanged on success with warnings, `failed` only when the post was neither created nor updated, lock freed in `finally`, distinct client messages. Reconciliation / idempotency of TASK-FIX-058 kept. No migration, no `.env` change, no AI call. TypeScript, ESLint (touched files), new spec 20/20, full renderer 907/908 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build and `git diff --check` pass. Not done (out of scope): media are still re-uploaded on each retry (no media id cache without a migration); the lock still overwrites `published` with `publishing` during a publish. **Real test to do by the founder:** see TESTING.md "WordPress publish — time budget". See CHANGELOG.md "TASK-FIX-059".
@@ -731,6 +733,59 @@ Not modified: no migration, no backfill. Pins scheduled before the fix keep `pub
 ### Success Criteria
 
 13:00 chosen → 13:00 in OmniFlow, `11:00:00` (summer) in the CSV, 13:00 on Pinterest. Offline: `tests/renderer/pinterest-schedule-timezone.spec.ts` (24). Manual: choose 13:00, confirm, check OmniFlow, download the CSV, import a test line in Pinterest, check 13:00.
+
+---
+
+## [TASK-049] Cloudflare R2 media storage behind a feature flag
+
+### Status: IMPLEMENTED (2026-10-11 — offline tests pass, real R2 smoke test OK; not committed; flag still `supabase` by default)
+
+### Goal
+
+Store new public media on Cloudflare R2 (bucket `omniflow-media`, public domain `https://media.n8nflow.org`) progressively, without a global migration and without breaking existing Supabase URLs.
+
+### Allowed scope
+
+* New `lib/storage/` (interface, Supabase provider, R2 provider, S3 client, config, keys).
+* Upload / read / delete call sites of public Pinterest and WordPress images.
+* `next.config.ts` (`next/image` remote pattern), `.env.example` placeholders, docs.
+* Out of scope: migration / backfill, schema change, prompts, image quality / format, reference images, a private R2 bucket for `.source`, video pipelines (only their key prefixes exist).
+
+### Design
+
+* `MEDIA_STORAGE_PROVIDER` = `supabase` (default, unset or empty) | `r2`; any other value is a configuration error.
+* R2 settings are server-only: `R2_ENDPOINT`, `R2_BUCKET`, `R2_PUBLIC_URL`, `R2_REGION` (default `auto`), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Errors name missing variables, never values.
+* `createMediaStorage(supabase, bucket)` returns the active provider; with `r2` and an incomplete config it **throws** — no silent fallback to Supabase. It is built before any paid AI call (Pinterest image route before `processing`; WordPress generators at their first line).
+* R2 client: `lib/storage/s3-client.ts`, AWS Signature V4 over `fetch` + `node:crypto` (PutObject, GetObject, DeleteObject, ListObjectsV2, path-style). No new dependency; `@aws-sdk/client-s3` can replace it later behind the same `S3ObjectClient` interface. Errors carry only the HTTP status and S3 error code.
+* Object keys (`lib/storage/keys.ts`), folders are virtual:
+
+```txt
+images/pinterest/{userId}/{generationId}/{pinId}/{version}.{ext}
+images/wordpress/{userId}/{generationId}/{MARKER}.png
+images/facebook/{userId}/{contentId}/        (prefix only)
+videos/reels/{userId}/{contentId}/           (prefix only)
+videos/facebook/{userId}/{contentId}/        (prefix only)
+videos/tiktok/{userId}/{contentId}/          (prefix only)
+```
+
+* Supabase paths are unchanged (`<user>/<pin>/<version>.<ext>`, `<user>/<generation>/<MARKER>.png`). A stored key starting with `images/` or `videos/` is an R2 key (`isR2MediaKey`) — the location of an object is read from its key / URL, never from the current flag.
+* `.source` recomposition photos are private and always stay in the Supabase `generated-images` bucket; an R2 image key maps back to `<user>/<pin>/<version>.source.<ext>` (`getPinSourceStoragePath`).
+* Pinterest: generation and manual recomposition upload through the storage; `pin_images.storage_path` = the key, `url` / `pins.media_url` = the provider's public URL, written only after a successful upload. Deleting a version / generation removes R2 objects (best-effort) and Supabase sources.
+* WordPress: Keyword, Pins (featured) and URL methods upload through `storeArticleImage()`; deleting an article removes `images/wordpress/<user>/<generation>/` from R2 (best-effort); "Rewrite article" copies R2 images inside R2. Media reuse keys R2 URLs as `storage:omniflow-media/<key>` (`mediaSourceOptions()`), Supabase keys unchanged.
+* Reference images (user uploads) stay on Supabase (not in the requested prefixes).
+
+### Success Criteria
+
+* Default behavior identical (Supabase provider makes the exact historical calls; existing specs pass).
+* `MEDIA_STORAGE_PROVIDER=r2` → new Pinterest / WordPress images on `https://media.n8nflow.org/images/...`.
+* R2 misconfigured or upload failing → explicit error, no URL saved, no fallback.
+* No secret in logs or in the browser bundle; no `NEXT_PUBLIC_` R2 variable.
+* Offline: `tests/renderer/media-storage-r2.spec.ts` (27). Real smoke test (no AI): temp file uploaded, read via the public domain, deleted.
+
+### Remaining
+
+* Manual end-to-end check with `MEDIA_STORAGE_PROVIDER=r2` (one Pinterest generation and one WordPress article + publish) — costs AI credits, not run by the agent.
+* Set the R2 variables in Vercel before switching the flag in production.
 
 ---
 

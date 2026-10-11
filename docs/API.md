@@ -2109,7 +2109,19 @@ provider_error
 ```txt
 upload_failed
 csv_generation_failed
+storage_unavailable
 ```
+
+`storage_unavailable` (500, TASK-049): `MEDIA_STORAGE_PROVIDER=r2` with an incomplete / invalid R2 configuration, or an invalid `MEDIA_STORAGE_PROVIDER` value. Returned by `POST /api/pinterest/generate-images` (before any image is generated) and `POST /api/pinterest/pin-images/recompose`. WordPress generations fail with their usual error before any AI call. Never a fallback to Supabase.
+
+## Media storage (TASK-049)
+
+No new endpoint and no public upload route: every upload stays server-side in the existing routes, through `lib/storage/` (`createMediaStorage()`).
+
+* `MEDIA_STORAGE_PROVIDER=supabase` (default): unchanged buckets, paths and public URLs.
+* `MEDIA_STORAGE_PROVIDER=r2`: new images are written to Cloudflare R2 and their URLs start with `https://media.n8nflow.org/images/…` (`pinterest/<user>/<generation>/<pin>/<version>.<ext>`, `wordpress/<user>/<generation>/<MARKER>.png`). Response shapes are unchanged — only the URL host differs.
+* Affected routes: `POST /api/pinterest/generate-images`, `POST /api/pinterest/pin-images/recompose` (image to the active storage, `.source` photo always Supabase), `DELETE /api/pinterest/pin-images/[id]`, `DELETE /api/generations/[id]`, `DELETE /api/wordpress/[id]` (R2 cleanup best-effort, whatever the flag, when R2 is configured), WordPress generation (Keyword / Pins / URL), `POST /api/wordpress/[id]/rewrite` (R2 images copied inside R2), `POST /api/wordpress/[id]/publish` (R2 URLs keyed `storage:<R2_BUCKET>/<key>` for media reuse).
+* A failed R2 upload fails that image like a failed Supabase upload did (no URL saved).
 
 ---
 

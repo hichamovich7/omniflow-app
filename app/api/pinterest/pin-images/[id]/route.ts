@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPinOwnerUserId } from '@/lib/queries/pin-images';
 import { getPinSourceStoragePath } from '@/lib/pinterest/pin-image-storage';
+import { createR2StorageFromEnv, isR2MediaKey } from '@/lib/storage';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 import type { PinImage } from '@/types/database';
@@ -169,9 +170,20 @@ export async function DELETE(
 
   await supabase.from('pin_images').delete().eq('id', id);
 
-  await supabase.storage
-    .from('generated-images')
-    .remove([image.storage_path, getPinSourceStoragePath(image.storage_path)]);
+  // TASK-049: an R2 image (`images/pinterest/…`) is removed from R2; its
+  // private source photo always lives in the Supabase bucket.
+  if (isR2MediaKey(image.storage_path)) {
+    try {
+      await createR2StorageFromEnv().remove([image.storage_path]);
+    } catch (error) {
+      console.error('[pin image delete] R2 cleanup failed:', error instanceof Error ? error.message : error);
+    }
+    await supabase.storage.from('generated-images').remove([getPinSourceStoragePath(image.storage_path)]);
+  } else {
+    await supabase.storage
+      .from('generated-images')
+      .remove([image.storage_path, getPinSourceStoragePath(image.storage_path)]);
+  }
 
   return NextResponse.json<ApiResponse<{ deleted: true }>>({
     data: { deleted: true },
