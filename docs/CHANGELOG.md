@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Docs: TASKS.md status audit, TASK-061 planned (2026-10-11)
+
+* `docs/TASKS.md`: new ACTIVE TASK **TASK-061** (P0 — real WordPress validation on R2, then production R2 activation), a Status board (Ready to test / Planned / Blocked / Obsolete, P0-P2 roadmap) and a Task numbering section (one counter for `TASK-` and `TASK-FIX-`, next 061; collisions TASK-045…051 / TASK-FIX-045…051 kept and listed; commit `964bcc7` "TASK-038" = TASK-FIX-015; next migration 045).
+* Former ACTIVE TASK entries moved to "Recent implementation log", each with its verified commit and status; stale "not committed", "Do not commit automatically" and "apply by hand" mentions corrected — every entry is committed and pushed, and every table / column / bucket of migrations 001-044 is present in the live database (read-only check).
+* TASK-051 marked completed (committed, pushed, real test passed); TASK-027 obsolete; TASK-047 blocked; TASK-044 history migration renumbered 038 → 045.
+* `TESTING.md` (TASK-061 checklist), `DATABASE.md` (migration status), `DEPLOYMENT.md` (R2 variables, buckets), `PROJECT.md` (WordPress implemented, Reference Image implemented, Pinterest URL input obsolete, platform roadmap), migration notes below and in `DECISIONS.md` marked applied.
+* Guide (`lib/guide/content.ts`, text only): Command Center — Credits are shown for information, generations do not consume them yet (free-trial generations are the limit); Generate — reference images for AI Integrated are planned, not "soon".
+* Documentation only: no code logic, `.env`, migration or data change.
+
 ## Pinterest source chooser — access to "existing WordPress article" (TASK-051 UX, 2026-10-11)
 
 * `/pinterest`, `/pinterest/create` and `/pinterest/from-wordpress` show a "Pin source" choice under the header: From keyword, From OmniFlow WordPress article, From existing WordPress article (→ `/pinterest/from-wordpress`).
@@ -54,7 +63,7 @@ No registrar cambios menores de formato o comentarios.
 ## WordPress publish: media reused instead of re-uploaded — TASK-FIX-060 (2026-10-11)
 
 * P1 after TASK-FIX-059: every publish attempt re-uploaded the featured and internal images, filling the WordPress Media Library with copies on each retry / republish.
-* Migration `043_add_wordpress_media_assets.sql` (apply manually): `wordpress_media_assets` — `user_id`, `wordpress_site_id`, `wordpress_site_url`, `source_asset_key`, `source_hash`, `wp_media_id`, `wp_media_url`, `upload_started_at`, `created_at`, `updated_at`; unique `(wordpress_site_id, source_asset_key)`; RLS on user + site ownership. No backfill, nothing existing modified.
+* Migration `043_add_wordpress_media_assets.sql` (apply manually — applied (verified 2026-10-11)): `wordpress_media_assets` — `user_id`, `wordpress_site_id`, `wordpress_site_url`, `source_asset_key`, `source_hash`, `wp_media_id`, `wp_media_url`, `upload_started_at`, `created_at`, `updated_at`; unique `(wordpress_site_id, source_asset_key)`; RLS on user + site ownership. No backfill, nothing existing modified.
 * New `lib/wordpress/media-source.ts`: storage-independent key (`storage:<bucket>/<path>`) for Supabase Storage URLs and declared CDN origins, `url:<host><path>` fallback — a provider switch keeps every mapping.
 * New `lib/wordpress/media-reuse.ts` + `lib/queries/wordpress-media-assets.ts`: lookup → `GET /wp/v2/media/<id>` → reuse (no `POST /wp/v2/media`); missing / not an image / other site URL → one new upload, mapping updated, the old attachment never deleted; claim row inserted before uploading so concurrent publishes never upload twice (collision re-read, bounded wait, stale claim takeover); identical bytes reused through `source_hash` (rewritten versions); mapping saved before the post. Missing table or database error → plain upload as before + one log warning.
 * `rest-client.ts`: `downloadSourceImage()`, `uploadMediaBytes()`, `getMedia()`, `updateMediaAltText()` (`uploadMedia()` unchanged for callers); `publish-media.ts` / `publish-post.ts` take an optional `mediaStore`; the publish route passes the site's store.
@@ -79,7 +88,7 @@ No registrar cambios menores de formato o comentarios.
 * `rest-client.ts`: explicit timeouts on media, tags, post write, lookup and Rank Math calls; error `kind` (`http` / `timeout` / `network` / `invalid_response`); guarded JSON parsing; new `findPostsBySlug()`.
 * Lock: migration **042** `wordpress_articles.publish_started_at` + `publish_status = 'publishing'` set by one conditional UPDATE; `409 publish_in_progress` for a concurrent publish; stale after 90 s; released on every end. Works without 042 (lock skipped and logged).
 * New statuses `publishing` / `uncertain`; `504 publish_uncertain`. Publish control: `try/catch/finally`, non-JSON and network errors shown as uncertain, double-click guard, confirmation before retrying an unconfirmed publish; badges "Publishing…" / "Unconfirmed — check WordPress". Disconnecting a site also resets `uncertain` / `publishing` rows.
-* Unchanged: prompts, article content, Rank Math meta, FAQ schema rules, internal links, Quality Gate, tags. Existing duplicates are never deleted. No parallel uploads yet (P1). Guide updated. New offline spec `wordpress-publish-idempotency.spec.ts` (34). **Migration 042 must be applied by hand in Supabase.**
+* Unchanged: prompts, article content, Rank Math meta, FAQ schema rules, internal links, Quality Gate, tags. Existing duplicates are never deleted. No parallel uploads yet (P1). Guide updated. New offline spec `wordpress-publish-idempotency.spec.ts` (34). **Migration 042 must be applied by hand in Supabase** (applied — verified 2026-10-11).
 
 ## Pinterest: Fix scheduling timezone conversion — TASK-048 (2026-10-04)
 
@@ -104,7 +113,7 @@ Only these two improvements; third improvement TBD; no other feature.
 
 ## AI / Projects: Per-project niche settings — Niche Profiles Phase 2, TASK-045 (2026-09-28)
 
-* Migration `041_add_project_niche_settings.sql`: nullable `projects.niche_settings jsonb` (NULL = OmniFlow recommended values; no RLS change, no backfill). **Apply manually in Supabase.**
+* Migration `041_add_project_niche_settings.sql`: nullable `projects.niche_settings jsonb` (NULL = OmniFlow recommended values; no RLS change, no backfill). **Apply manually in Supabase — applied (verified 2026-10-11).**
 * `lib/niche/settings.ts`: versioned Zod schema `{ version: 1, fields: { tone, audience, keywords, pinterestAngles, visualStyle, cta: { custom, disabled }, subNiches: { disabled } } }` — only customizations are stored; parse (invalid / future version → defaults), normalize, Recommended / Custom / Disabled resolution, editing helpers. Custom values: ≤ 20 per field, 1-200 chars, no links or domain names.
 * `resolveNicheContext()` gains `settings`, applied after the Content Stream sub-niche and the niche profile; disabled sub-niches no longer match streams. Priority text in the prompts: safety → explicit options → source facts → project settings → Content Stream → niche → Brand Profile → generic; a "Project settings: customized" line when applied.
 * Settings read best-effort (`lib/queries/niche-settings.ts`) in WordPress keyword / Pins / URL, Pinterest normal, Pinterest from article and Pin regeneration. Tone, audience, keywords shared; angles and CTA Pinterest-only; visual style in image prompts.
@@ -167,7 +176,7 @@ Only these two improvements; third improvement TBD; no other feature.
 * **No destination URL, ever**: no field, no permalink sent to the AI, no link in the Pin text, `pins.link_url` / `generations.website_url` stay empty. CSV exporter unchanged (the Link column stays as stored — empty here, filled manually by the user).
 * Result cards (`components/social/article-pin-results.tsx`): readable angle, title, description, keywords, board, image prompt, "Saved" status, no-link notice; Copy title / description / keywords / full Pin, Edit, Regenerate this Pin, Generate image, "Generate all images" behind a credits + Storage confirmation. "not saved — copy what you need" removed.
 * New `PATCH /api/pinterest/pins/[id]` (manual text edit) and `POST /api/pinterest/pins/[id]/regenerate` (one Pin, same angle, same prompt and article context, rate limit `pinterest/regenerate-pin` 30/h + trial cap after the checks) — `lib/pinterest/pin-text.ts`. Board, link, image and schedule never touched.
-* Migration `040_add_generations_source_wordpress.sql`: nullable `generations.source_wordpress_generation_id` (FK `wordpress_generations`, ON DELETE SET NULL) + partial index. Apply by hand in the Supabase SQL Editor; generation works before it (warning logged).
+* Migration `040_add_generations_source_wordpress.sql`: nullable `generations.source_wordpress_generation_id` (FK `wordpress_generations`, ON DELETE SET NULL) + partial index. Apply by hand in the Supabase SQL Editor — applied (verified 2026-10-11); generation works before it (warning logged).
 * Removed the phase 1 parallel generator: `POST /api/wordpress/[id]/social` and `lib/validations/social.ts`. Facebook / Instagram / Reels / TikTok / Medium unchanged (disabled, no request). WordPress article never modified; nothing published to Pinterest.
 * Tests: `tests/renderer/social-content-studio.spec.ts` rewritten (45 cases, stubbed AI + recording in-memory Supabase); gated browser spec updated. No real AI call.
 
@@ -198,7 +207,7 @@ Only these two improvements; third improvement TBD; no other feature.
 
 ## Feature: WordPress — structured FAQ and FAQPage schema (TASK-FIX-055, 2026-09-26)
 
-* Migration `039_add_wordpress_article_faq.sql`: nullable `wordpress_articles.faq jsonb` (`[{ question, answer }]`). No backfill, no RLS change. Apply by hand in the Supabase SQL Editor.
+* Migration `039_add_wordpress_article_faq.sql`: nullable `wordpress_articles.faq jsonb` (`[{ question, answer }]`). No backfill, no RLS change. Apply by hand in the Supabase SQL Editor — applied (verified 2026-10-11).
 * `applyFaqSection()` (`lib/wordpress/faq-section.ts`) renders the FAQ as before and returns the items it rendered; the three generate routes save them with `saveArticleFaq()` (`lib/wordpress/faq-data.ts`, Zod-validated, best-effort after the insert). Older articles keep NULL and fall back to a read-only parse of their H3 FAQ section.
 * Publish: new `lib/wordpress/faq-schema.ts` decides and builds one FAQPage JSON-LD (saved Q/A only, plain text, `<` `>` `&` escaped, no URL but `@context`), appended after the body once internal links are inserted. Skipped when FAQ is disabled / empty / invalid / not visible, or when the HTML already carries a Rank Math / Yoast FAQ block or FAQPage. `sendArticleToWordPress()` checks the saved `content.raw` and re-sends the post without the script if WordPress filtered it (warning + log with no content). The response gains `faqSchema`: `added` / `not_added` / `removed`.
 * Rank Math strategy: Rank Math only outputs FAQPage for its own FAQ block or a hand-added schema, which OmniFlow never sends — so OmniFlow provides the only FAQPage. Rank Math meta, tags, focus keyword, slug and internal links unchanged; a Rank Math failure still never blocks the publish.
@@ -217,7 +226,7 @@ Only these two improvements; third improvement TBD; no other feature.
 * Every cell of the 14-day Publishing coverage grid is now clickable. A future cell opens "Expected publishing" (Pins expected, Scheduled with, Note, Save as expected): the entry is `expected` — hollow dashed marker, "Expected externally: N (not confirmed)" — and is never shown or counted as published.
 * Once the day has come, today's cell opens "Confirm external publishing": Confirm as published, Keep as expected, or Delete. Every existing entry can be edited or deleted from its cell. Today / past entries keep the "Published externally" behavior.
 * Counters kept apart: "Confirmed externally" (today) and "Expected externally" (next 14 days, not confirmed). Expected Pins improve their own day's forecast (level, days covered, This week to-create, buffer credit capped at the day's gap) but never change the Created / Planned counts, `plannedPins` or any Pin.
-* Migration `038_add_publishing_activity_status.sql`: `status text NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'expected'))`. Existing rows stay `published`; RLS, grants and `UNIQUE (user_id, content_stream_id, activity_date)` unchanged. Apply by hand in the Supabase SQL Editor.
+* Migration `038_add_publishing_activity_status.sql`: `status text NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'expected'))`. Existing rows stay `published`; RLS, grants and `UNIQUE (user_id, content_stream_id, activity_date)` unchanged. Apply by hand in the Supabase SQL Editor — applied (verified 2026-10-11).
 * API: `PUT /api/content-streams/[id]/publishing-activity` takes an optional `status` (omitted → future = expected, today or earlier = published; `published` on a future day → `400 future_date`). New `DELETE /api/content-streams/[id]/publishing-activity?activityDate=YYYY-MM-DD` (auth, UUID, date, ownership, 404 when nothing to delete).
 * Tests: new offline `tests/renderer/publishing-coverage-expected.spec.ts` (26 cases), `stream-planned-and-activity.spec.ts` updated to the new future-day rule, a gated browser case for the future cell in `tests/playwright/dashboard.spec.ts`; `wordpress-quality-report.spec.ts` no longer requires 037 to be the last migration.
 
@@ -271,7 +280,7 @@ Only these two improvements; third improvement TBD; no other feature.
 
 ## Add: WordPress Quality Report V1 on the review page (TASK-FIX-046, 2026-09-26)
 
-* Migration `037_add_wordpress_quality_report.sql`: nullable `wordpress_generations.quality_report jsonb` (additive, no backfill, no RLS change). **Apply by hand in the Supabase SQL Editor.**
+* Migration `037_add_wordpress_quality_report.sql`: nullable `wordpress_generations.quality_report jsonb` (additive, no backfill, no RLS change). **Apply by hand in the Supabase SQL Editor — applied (verified 2026-10-11).**
 * The three generation routes save the Quality Gate V1 report best-effort after marking the generation completed (`saveQualityReport()`, `lib/wordpress/quality-report.ts`) — a missing column or failed write is logged, never fails the generation.
 * `getWordPressArticleByGenerationId()` returns `qualityReport`, validated with Zod (`articleQualityReportSchema`), `null` for older or malformed rows.
 * `/wordpress/[id]` shows a read-only Quality report card (status badge, summary, issues, warnings, collapsible list of all checks); older articles show "No quality report for this article". Informational only — export and publishing unchanged.
@@ -1442,7 +1451,7 @@ The visual finish above still left the page background, the form area, and each 
 
 ### Not applied by the agent
 
-* Migration 022 — no DDL access, apply manually (same constraint as every prior migration in this project).
+* Migration 022 — no DDL access, apply manually — applied (verified 2026-10-11) (same constraint as every prior migration in this project).
 
 ---
 
@@ -1459,7 +1468,7 @@ The visual finish above still left the page background, the form area, and each 
 * `lib/prompts/pinterest-pins.ts`: new optional `referenceStyleGuidance` on `PromptContext`, concatenated right next to the niche's `styleGuidanceInstruction` — additive, never a replacement; both can be present on the same generation.
 * Orchestration in `app/api/pinterest/generate/route.ts`, at the same spot `analysisContext` (TASK-024) is already built: when `referenceImageUrl` is present, calls `analyzeImage()` (VISION role), validates against `imageStyleAnalysisSchema`, builds `referenceStyleGuidance`, passes it into the prompt. Best-effort — a VISION failure or invalid response is logged and generation continues without it, never blocks the request.
 * Traceability via the columns that already existed for this, unused since migration 001: `generations.reference_image_url` (the uploaded URL) and `pins.image_analysis` (the validated JSON, replicated on every pin of the generation).
-* Migration 021 (`reference-images` bucket + storage policies, same shape as `generated-images`/`wordpress-images`) — not applied by the agent (no DDL access), apply manually.
+* Migration 021 (`reference-images` bucket + storage policies, same shape as `generated-images`/`wordpress-images`) — not applied by the agent (no DDL access), apply manually — applied (verified 2026-10-11).
 
 ### Fixed (found during verification)
 

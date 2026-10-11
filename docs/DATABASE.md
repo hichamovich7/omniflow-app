@@ -17,6 +17,18 @@ Principles:
 
 ---
 
+# Migration Status
+
+Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no write):
+
+* `supabase/migrations/001` → `044` — numbered without gap or duplicate.
+* Every table, column and storage bucket they create is present in the live database (`generated-images`, `wordpress-images`, `reference-images`), including the migrations once marked "apply manually" (029, 032-044).
+* Grants, RLS policies, triggers and SQL functions (e.g. 003, 010, 023, 031) are not visible through this check — they are assumed applied with their migration.
+* **Next free migration: 045** (proposed for the Social Content Studio history, TASK-044 later phases).
+* Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
+
+---
+
 # Entity Relationship Diagram
 
 auth.users

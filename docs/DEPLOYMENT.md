@@ -127,15 +127,31 @@ Anonymous Auth
 
 ## Storage Buckets
 
-Required:
+Required (Supabase Storage, public):
 
 ```txt id="q0s4mr"
-reference-images
-
-generated-images
-
-exports
+generated-images     Pinterest images + private `.source` recomposition photos
+wordpress-images     WordPress article images
+reference-images     user reference images
 ```
+
+`exports` is reserved for future server-side CSV storage and is not used (CSV export is client-side).
+
+## Cloudflare R2 (TASK-049, optional)
+
+New public media go to R2 only when `MEDIA_STORAGE_PROVIDER=r2`; the default `supabase` keeps the buckets above. Server-side only — never `NEXT_PUBLIC_`.
+
+```env
+MEDIA_STORAGE_PROVIDER=supabase   # or r2
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_BUCKET=omniflow-media
+R2_PUBLIC_URL=https://media.n8nflow.org
+R2_REGION=auto
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+```
+
+Production rollout (TASK-061): add the six `R2_*` variables on Vercel with the flag still `supabase`, redeploy; switch the flag to `r2` only after the real WordPress validation passes. Rollback: flag back to `supabase` + redeploy (R2 URLs already stored keep working, nothing is migrated). `.source` photos always stay in Supabase.
 
 ---
 

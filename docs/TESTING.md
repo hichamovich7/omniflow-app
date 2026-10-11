@@ -1184,3 +1184,25 @@ Offline (9): three sources and their targets, exactly one current, disabled exis
 Browser (4 cases × chromium + mobile-chrome, real session, 2026-10-11: 8/8): `/pinterest` shows the chooser and "From existing WordPress article" opens the post picker; search + select a real post shows the summary and "Generate Pins" only; a connection that is not the user's → "This post can't be used"; dashboard quick action → picker. Each case fails if `/api/pinterest/generate*`, a regenerate route, a non-GET `/api/wordpress` route or OpenRouter / OpenAI is called. The disabled no-site state is covered offline (the test account has connected sites).
 
 Same run: `dashboard.spec.ts` "every section renders" ("Publishing coverage" is a `CardTitle`, not a heading) and "all seven KPIs…" (the `credits` text matches two elements) fail on assertions unrelated to this change; "quick actions are kept" passes. Full renderer 1047/1047.
+
+---
+
+# TASK-061 — Real WordPress validation on R2 + production R2 activation (planned 2026-10-11)
+
+Manual, founder-run, in this order. Costs one WordPress article generation (featured + internal images); everything else makes no AI call. Prerequisites: local `MEDIA_STORAGE_PROVIDER=r2` + the six `R2_*` variables; migrations 042 / 043 applied (verified 2026-10-11); a connected **test** WordPress site (≥ 5.8) with Media Library access. Background: Pinterest already runs on R2 locally (25 optimized Pins under `images/pinterest/`, 1000×1500 JPEG ≈ 280-330 KB, read-only check 2026-10-11); `images/wordpress/` is still empty.
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | Generate an article (Keyword method, with internal images) with R2 enabled | Generation completes; article page shows every image | ☐ |
+| 2 | Check the files under `images/wordpress/` in bucket `omniflow-media` | `images/wordpress/<user>/<generation>/FEATURED.webp` (+ `IMAGE_N.webp`); each URL `https://media.n8nflow.org/images/wordpress/...` answers 200 with `Content-Type: image/webp`, longest side ≤ 1600 px; stored URLs start with `https://media.n8nflow.org/` | ☐ |
+| 3 | Save as Draft on WordPress; note the Media Library count | One post, `wp_post_id` saved; media named `<slug>-featured.webp` / `<slug>-<n>.webp`; `wordpress_media_assets` rows keyed `storage:omniflow-media/images/wordpress/...` | ☐ |
+| 4 | Publish / save the same article again | Same `wp_post_id` updated; Media Library count unchanged — **no new media** (logs: `media_featured … result=reused`) | ☐ |
+| 5 | Start a publish, interrupt it (close the tab / cut the network), then publish again | "Publication status is uncertain…" or the final status; the retry updates the **same** post; no duplicate post, no duplicate media | ☐ |
+| 6 | Two simultaneous publishes (two tabs, Publish within a few seconds) | One runs, the other gets `409 publish_in_progress` ("wait and refresh"); one post, no duplicate media | ☐ |
+| 7 | Check WordPress | Exactly one post for the article (by slug), content / date updated, featured image set, no duplicate attachments | ☐ |
+| 8 | Vercel: add `R2_ENDPOINT`, `R2_BUCKET`, `R2_PUBLIC_URL`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (Production, server-side), flag still `supabase`; redeploy | App unchanged (Supabase URLs); no `NEXT_PUBLIC_` R2 variable | ☐ |
+| 9 | Only if 1-7 passed: set `MEDIA_STORAGE_PROVIDER=r2` on Vercel, redeploy, generate one Pin | Pin URL starts with `https://media.n8nflow.org/images/pinterest/`, thumbnail displays; old Supabase images still display | ☐ |
+
+Failure handling: WebP refused or not displayed by the WordPress host → switch the `wordpress-article` profile to its JPEG fallback (`lib/media/media-profiles.ts`, separate small fix) and redo steps 1-4. Duplicate post or media → stop, keep the flag on `supabase` in production, open a fix task with the publish logs (`[wordpress publish]` lines, no secrets). Rollback after step 9: flag back to `supabase` + redeploy (R2 URLs already stored keep working, nothing is migrated).
+
+Record the date, the article / post ids and each step's result in this table and in TASKS.md (TASK-061).

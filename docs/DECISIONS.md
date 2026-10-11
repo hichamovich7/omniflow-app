@@ -1766,7 +1766,7 @@ Phase 1 (same day) made niche profiles reach every WordPress and Pinterest promp
 
 ### Consequences
 
-* Migration 041 must be applied manually in the Supabase SQL Editor before settings can be saved.
+* Migration 041 must be applied manually in the Supabase SQL Editor before settings can be saved (applied — verified 2026-10-11).
 * One extra read query per generation (the settings).
 * A disabled recommended value re-appears if its profile wording changes later (disabled values are matched by text); custom values are never affected.
 

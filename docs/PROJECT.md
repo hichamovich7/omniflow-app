@@ -68,15 +68,15 @@ Ejemplo:
 * small bathroom ideas
 * recettes healthy faciles
 
-### Website URL Input (Planned)
+### Website URL Input (Planned — field only; use case covered by other flows)
 
-URL de una pagina o articulo para generar contenido Pinterest relacionado. El campo existe en el formulario y la base de datos pero no se utiliza en la generacion actual.
+URL de una pagina o articulo para generar contenido Pinterest relacionado. El campo existe en el formulario y la base de datos pero no se utiliza en la generacion actual (se guarda solo como trazabilidad). En la practica, el caso de uso esta cubierto por Research con fuente `website` / `blog` (TASK-023) → Analyze → Generate, y por Pinterest desde un articulo de OmniFlow o un post WordPress existente (TASK-044, TASK-051). Estado verificado en la auditoria del 2026-10-11.
 
-### Pinterest URL Input (Planned)
+### Pinterest URL Input (Obsolete)
 
-URL de un pin existente para utilizarlo como inspiracion. El campo existe en la base de datos pero no se utiliza en la generacion actual.
+URL de un pin existente para utilizarlo como inspiracion. El campo existe en la base de datos pero no se utiliza en la generacion actual. Retirado de Research en TASK-FIX-003 (pinterest.com no se puede scrapear con Firecrawl); la columna se conserva solo por historial.
 
-### Reference Image Input (Deferred — TASK-013)
+### Reference Image Input (Implemented — TASK-013, Legacy Composite only; AI Integrated reference planned — TASK-042)
 
 Imagen subida por el usuario para analizar estilo visual y generar nuevos prompts de imagen.
 
@@ -358,9 +358,9 @@ El roadmap de OmniFlow sigue un modelo de expansión modular:
 ```txt
 Pinterest (Implemented)
 ↓
-WordPress (Planned — TASK-028)
+WordPress (Implemented — generator TASK-028 / TASK-037, publishing TASK-035, Social Content Studio TASK-044 / TASK-051)
 ↓
-Facebook, LinkedIn, Medium (Future)
+Facebook (Planned, next — P1), Instagram, Reels, TikTok, Medium export (Planned — Social Content Studio), LinkedIn (Future)
 ```
 
 WordPress y la generación de artículos SEO forman parte del roadmap oficial. Ver TASKS.md para detalle.
