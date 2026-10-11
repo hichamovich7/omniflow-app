@@ -177,7 +177,7 @@ function installFetchStub(
     if (!url.includes('openrouter.ai')) return new Response('ok', { status: 200 });
     if (url.endsWith('/images')) {
       record.imageCalls += 1;
-      return Response.json({ data: [{ b64_json: Buffer.from('png').toString('base64') }] });
+      return Response.json({ data: [{ b64_json: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' /* 1x1 PNG — optimized to WebP before storage (TASK-050) */ }] });
     }
     const body = JSON.parse(String(init?.body ?? '{}')) as {
       messages: { role: string; content: string }[];
@@ -407,7 +407,7 @@ test('Pinterest images are reused unchanged — only the featured image is gener
   const { result, record, storage } = await runPins({ rows: [pinRow(), pinRow({ title: 'Second pin' })], imageUrls: urls });
 
   expect(record.imageCalls).toBe(1);
-  expect(storage.uploads).toEqual(['wordpress-images/user-1/gen-1/FEATURED.png']);
+  expect(storage.uploads).toEqual(['wordpress-images/user-1/gen-1/FEATURED.webp']);
   expect(result.internalImages.map((img) => img.url)).toEqual(urls);
   expect(result.content).toContain(`![Crochet cat toy 1](${urls[0]})`);
   expect(result.content).toContain(`![Crochet cat toy 2](${urls[1]})`);

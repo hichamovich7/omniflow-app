@@ -99,7 +99,7 @@ function installFetchStub(outlineFixture: object = OUTLINE_FIXTURE): ChatCall[] 
     const body = JSON.parse(String(init?.body ?? '{}')) as { model: string; plugins?: unknown[] };
 
     if (url.endsWith('/images')) {
-      return Response.json({ data: [{ b64_json: Buffer.from('png').toString('base64') }] });
+      return Response.json({ data: [{ b64_json: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' /* 1x1 PNG — optimized to WebP before storage (TASK-050) */ }] });
     }
 
     const webSearch = Array.isArray(body.plugins) && body.plugins.length > 0;
@@ -211,8 +211,8 @@ test('keyword article: outline on AI_OUTLINE_MODEL, article and external link on
   expect(result.slug).toBe(OUTLINE_FIXTURE.slug);
   expect(result.metaDescription).toBe(OUTLINE_FIXTURE.metaDescription);
   expect(result.content).not.toContain('{{IMAGE_');
-  expect(result.content).toContain('![Cotton yarn](https://storage.test/user-1/gen-1/IMAGE_1.png)');
-  expect(result.featuredImageUrl).toBe('https://storage.test/user-1/gen-1/FEATURED.png');
+  expect(result.content).toContain('![Cotton yarn](https://storage.test/user-1/gen-1/IMAGE_1.webp)');
+  expect(result.featuredImageUrl).toBe('https://storage.test/user-1/gen-1/FEATURED.webp');
   expect(result.internalImages).toHaveLength(2);
 });
 

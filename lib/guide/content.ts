@@ -127,6 +127,7 @@ export const guideSections: GuideSection[] = [
       'Generate images for all pins at once, or just your selected pins.',
       'Regenerating a pin\'s image keeps every previous version — open "Versions" on a pin to compare and switch the active one.',
       'Regenerated images are intentionally varied (angle, props, lighting) so you never get the same shot twice.',
+      'New Pin images are saved as Pinterest-ready JPEG files at 1000 × 1500 (2:3), compressed for fast loading without cropping your image or its text. Images created before this change keep their original file and link.',
     ],
   },
   {
@@ -240,6 +241,7 @@ export const guideSections: GuideSection[] = [
       'If your site is slow and WordPress does not answer in time, OmniFlow does not call it a failure: it shows "Publication status is uncertain. Check WordPress before retrying." and the article is marked "Unconfirmed — check WordPress". Look at your WordPress posts first. When you publish again, OmniFlow first looks for the post it already sent (same slug and same title) and updates it instead of creating a second one. Duplicates that already exist are never deleted automatically — remove them yourself in WordPress if needed.',
       'Only one publish of the same article runs at a time: if you click Publish while another publish of that article is still running (for example in another tab), you are asked to wait and refresh the page — nothing is sent twice.',
       'A status badge at the top of every article page — and a compact version on each WordPress History row — always shows whether it has been sent yet: "Not sent to WordPress", "Sent as draft", "Published" (with a direct link to the live post), or "Scheduled for [date]". If you click Publish/Save as Draft/Schedule on an article that was already sent, a confirmation step reminds you when and warns that it will update the existing WordPress post rather than create a duplicate — informational, not a hard block.',
+      'New article images are saved as WebP files (longest side 1600 px at most), which WordPress 5.8 and later accepts in its media library; they reach WordPress with a matching .webp file name. Articles created earlier keep their PNG images.',
       'Changing an article\'s category from its own page never re-publishes it automatically — if it was already sent to WordPress, the new category only takes effect the next time you publish or update it there.',
     ],
   },

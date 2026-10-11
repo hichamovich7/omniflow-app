@@ -6,6 +6,8 @@
 
 # ACTIVE TASK
 
+TASK-050 (Image optimization before storage + media profiles) is implemented locally, not committed. New `lib/media/media-profiles.ts` (single source of dimensions / formats / quality) and `lib/media/optimize-image.ts` (sharp: EXIF orientation, resize without enlargement, format + quality, metadata stripped, size limit, explicit failure). Active: **Pinterest Pin** 1000×1500 JPEG q88 (`.jpg`, `image/jpeg`), **WordPress article** longest side ≤ 1600 WebP q85 (`.webp`, `image/webp`) with an explicit JPEG fallback profile. Facebook / Instagram / TikTok / Reels profiles configured as `planned` only (refused by the optimizer). One stored variant per use; `.source` photos stay raw on Supabase (always `.source.png`); old images untouched. WordPress upload filenames now follow the real format. New spec `media-optimization.spec.ts` (20); 6 assertions of older specs adapted. See TASK-050 below.
+
 TASK-049 (Cloudflare R2 media storage behind a feature flag) is implemented locally, not committed. New `lib/storage/` (common `MediaStorage` interface, Supabase provider = the exact historical calls, R2 provider over a dependency-free SigV4 S3 client), selected by `MEDIA_STORAGE_PROVIDER` (`supabase` default, `r2`). With `r2`, new Pinterest images go to `images/pinterest/<user>/<generation>/<pin>/<version>.<ext>` and new WordPress images to `images/wordpress/<user>/<generation>/<MARKER>.png`, served from `https://media.n8nflow.org`; `.source` photos stay in Supabase; no migration, no backfill, old Supabase URLs untouched; a missing R2 config or failed upload is an explicit error (no fallback, no URL saved). New spec `media-storage-r2.spec.ts` (27); full renderer 958/959 (same pre-existing `pinterest-text-importance-none.spec.ts` failure); real R2 smoke test OK. See TASK-049 below.
 
 TASK-FIX-060 (P1 — WordPress media reuse) is implemented locally, not committed. Goal: never upload the same image again to the same WordPress site — on a retry, a republish, another article or a rewritten version using it. New table `wordpress_media_assets` (migration 043 — **apply manually in Supabase**; next free number after 042): one row per `(wordpress_site_id, source_asset_key)` (unique), with `source_hash`, `wp_media_id`, `wp_media_url`, `wordpress_site_url` and a claim column `upload_started_at`. Key from `lib/wordpress/media-source.ts` (`storage:<bucket>/<path>`, Supabase or CDN, never the public URL or the file name). `lib/wordpress/media-reuse.ts`: lookup → `GET /wp/v2/media/<id>` → reuse; 404 / not an image / other site URL → one new upload, mapping updated, nothing deleted; not mapped → claim inserted before uploading (concurrent publishes wait instead of duplicating, collision re-read, stale claim taken over), identical bytes reused via hash, mapping saved before the post. Featured and internal images, Keyword / Pins / URL / rewritten articles. Without 043: uploads as before + one log warning. No `.env` change, no AI call, prompts / content / Quality Gate / Rank Math untouched, no WordPress media deleted. TypeScript, ESLint (touched files), new spec 24/24, WordPress suites 403/403, full renderer 931/932 (same pre-existing `pinterest-text-importance-none.spec.ts` failure), production build and `git diff --check` pass. **Real test to do by the founder:** see TESTING.md "WordPress media reuse". See CHANGELOG.md "TASK-FIX-060".
@@ -786,6 +788,59 @@ videos/tiktok/{userId}/{contentId}/          (prefix only)
 
 * Manual end-to-end check with `MEDIA_STORAGE_PROVIDER=r2` (one Pinterest generation and one WordPress article + publish) — costs AI credits, not run by the agent.
 * Set the R2 variables in Vercel before switching the flag in production.
+
+---
+
+## [TASK-050] Image optimization before storage + extensible media profiles
+
+### Status: IMPLEMENTED (2026-10-11 — offline tests pass, R2 smoke test OK; not committed)
+
+### Goal
+
+Convert, resize and compress every **new** public image before it is stored (Supabase or R2), with one central, per-platform configuration ready for future social formats.
+
+### Allowed scope
+
+* New `lib/media/media-profiles.ts`, `lib/media/optimize-image.ts`.
+* Image storage call sites: Pinterest generation and manual recomposition, WordPress article images (Keyword / Pins featured / URL), WordPress publish filenames.
+* `getPinSourceStoragePath()` naming, `R2_MEDIA_PREFIXES` (`images/instagram`), docs, Guide.
+* Out of scope: migrating / re-encoding existing images, converting `.source` photos, prompts, generated image size requested from the provider, producing any Facebook / Instagram / TikTok / Reels image, recomposition preview (not stored).
+
+### Profiles
+
+| Profile | Status | Size | Format | Quality | Max | Transparency | Ext / type |
+|---|---|---|---|---|---|---|---|
+| `pinterest-pin` | active | exactly 1000×1500, `cover`, refused if > 1 % off 2:3 | JPEG (mozjpeg, 4:4:4) | 88 (≥ 76) | 2 MB | flattened on white | `.jpg` / `image/jpeg` |
+| `wordpress-article` | active | longest side ≤ 1600, `inside` | WebP | 85 (≥ 70) | 1.5 MB | kept | `.webp` / `image/webp` |
+| `wordpress-article-jpeg` | active (fallback only) | same | JPEG | 85 (≥ 70) | 1.5 MB | flattened | `.jpg` / `image/jpeg` |
+| `facebook-feed-portrait` | planned | 1080×1359 | JPEG | 88 | 4 MB | flattened | `images/facebook/` |
+| `facebook-feed-square` | planned | 1080×1080 | JPEG | 88 | 4 MB | flattened | `images/facebook/` |
+| `facebook-story` | planned | 1080×1920 | JPEG | 88 | 4 MB | flattened | `images/facebook/` |
+| `facebook-cover` | planned | 851×315 | JPEG | 88 | 4 MB | flattened | `images/facebook/` |
+| `instagram-post-portrait` | planned | 1080×1350 | JPEG | 88 | 4 MB | flattened | `images/instagram/` |
+| `instagram-post-square` | planned | 1080×1080 | JPEG | 88 | 4 MB | flattened | `images/instagram/` |
+| `instagram-story-reel` | planned | 1080×1920 | JPEG | 88 | 4 MB | flattened | `images/instagram/` |
+| `tiktok-vertical` | planned | 1080×1920 | JPEG | 88 | 4 MB | flattened | `videos/tiktok/` |
+| `reels-vertical` | planned | 1080×1920 | JPEG | 88 | 4 MB | flattened | `videos/reels/` |
+
+### Rules
+
+* `optimizeImage(buffer, profileId)`: EXIF orientation applied, resized **down only** (a smaller image keeps its size), metadata (EXIF / XMP / ICC / C2PA) dropped, quality lowered in steps of 6 down to `minQuality` only to fit `maxBytes`, then an explicit error. Returns buffer, extension, content type, width, height, bytes. The input buffer is never modified.
+* Failure → the image fails (Pin marked failed, article image skipped / featured missing as before, recomposition 500 `storage_error`). The raw PNG is **never** stored instead. The WebP → JPEG fallback is used only when WebP encoding itself fails, and is logged.
+* `planned` profiles are refused by the optimizer: no variant is produced until a feature explicitly asks for one. Exactly one stored variant per use (Pinterest Pin, WordPress image).
+* Keys stay immutable and carry the real extension: `<user>/<pin>/<version>.jpg` (Supabase) / `images/pinterest/<user>/<generation>/<pin>/<version>.jpg` (R2); `<user>/<generation>/<MARKER>.webp` / `images/wordpress/<user>/<generation>/<MARKER>.webp`.
+* `.source` photos: unchanged bytes on Supabase, always named `<user>/<pin>/<version>.source.png` (identical to every existing source, which all belonged to `.png` images).
+* WordPress publish: upload filename extension read from the image URL (`mediaFilename()`) — `.webp` / `.jpg` for new images, `.png` for old ones — so name and Content-Type match. Media reuse is keyed by object (bucket + path) and content hash: an existing object never changes extension, so no duplicate is created; old PNG mappings stay valid.
+* Logs: one technical line per image (profile, sizes, format, quality) — never keys or secrets.
+
+### Success Criteria
+
+Offline `tests/renderer/media-optimization.spec.ts` (20) + adapted older specs; full renderer suite; TypeScript, ESLint, build, `git diff --check`; R2 smoke test with an optimized fixture (1000×1500 `image/jpeg` read from `https://media.n8nflow.org`, then deleted).
+
+### Remaining
+
+* Manual check on real generated images (costs AI credits): Pin legibility at 1000×1500 JPEG, WebP featured image in a real WordPress Media Library (WordPress ≥ 5.8; some hosts lack WebP thumbnail support — switch `wordpress-article` to the JPEG profile if needed).
+* Pinterest CSV / bulk upload with `.jpg` URLs to confirm on the founder's account.
 
 ---
 

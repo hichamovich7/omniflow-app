@@ -29,12 +29,17 @@ const R2_PIN_KEY = /^images\/pinterest\/([^/]+)\/[^/]+\/([^/]+)\/([^/]+)$/;
 /**
  * Private recomposition source of a Pin image — always in the Supabase
  * `generated-images` bucket, never in the public R2 bucket. An R2 image key
- * maps back to the historical Supabase layout `<user>/<pin>/<version>.source.<ext>`.
+ * maps back to the historical Supabase layout `<user>/<pin>/<version>.source.png`.
+ *
+ * TASK-050: the source keeps the provider's unconverted bytes, uploaded as
+ * PNG, so its name always ends in `.source.png` — even when the stored Pin is
+ * an optimized `.jpg`. Every source written before TASK-050 belongs to a
+ * `.png` image, so its path is unchanged.
  */
 export function getPinSourceStoragePath(storagePath: string): string {
   const r2 = R2_PIN_KEY.exec(storagePath);
   const path = r2 ? `${r2[1]}/${r2[2]}/${r2[3]}` : storagePath;
   const extensionIndex = path.lastIndexOf('.');
   if (extensionIndex === -1) return `${path}.source`;
-  return `${path.slice(0, extensionIndex)}.source${path.slice(extensionIndex)}`;
+  return `${path.slice(0, extensionIndex)}.source.png`;
 }

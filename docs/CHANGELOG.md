@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Image optimization before storage + media profiles — TASK-050 (2026-10-11)
+
+* New `lib/media/media-profiles.ts`: the single configuration of output size, fit, format, quality, size limit, transparency, extension, content type and R2 prefix per platform / use. Active: `pinterest-pin` (exactly 1000×1500, JPEG q88), `wordpress-article` (longest side ≤ 1600, WebP q85) and its explicit JPEG fallback. Planned (configuration only, refused by the optimizer): Facebook feed 1080×1359 / 1080×1080, story 1080×1920, cover 851×315; Instagram post 1080×1350 / 1080×1080, story / reel 1080×1920; TikTok and Reels 1080×1920.
+* New `lib/media/optimize-image.ts` (sharp, already installed): EXIF orientation, downscale only, format + quality, metadata stripped, quality stepped down to fit the size limit, explicit `ImageOptimizationError` — never a silent upload of the original PNG.
+* New Pins (generation and manual recomposition) stored as `.jpg` / `image/jpeg` 1000×1500; new WordPress images as `.webp` / `image/webp`, on Supabase and R2 alike. One stored variant per use.
+* `.source` photos unchanged (raw bytes, Supabase), now always named `.source.png` (same as every existing source). New R2 prefix `images/instagram/`.
+* WordPress publish: upload filenames take the image's real extension (`mediaFilename()`), `.png` kept for old images; media reuse unchanged.
+* Unchanged: existing images and URLs (no migration), prompts, provider image size, schema. No AI call. Guide updated (AI Images, WordPress Publishing). New offline spec `media-optimization.spec.ts` (20); assertions of `pinterest-image-metadata`, `media-storage-r2`, `wordpress-outline-model`, `wordpress-pins-coherence`, `wordpress-pipeline-quality` and `wordpress-seo-alt-outbound` specs adapted (PNG → JPEG / WebP paths, fake image bytes replaced by a valid 1×1 PNG).
+
 ## Cloudflare R2 media storage behind a feature flag — TASK-049 (2026-10-11)
 
 * New `lib/storage/`: common `MediaStorage` interface (upload, read, remove, list, public URL), Supabase provider (exact historical calls), Cloudflare R2 provider, provider detection and config validation. R2 client = dependency-free AWS SigV4 over `fetch` + `node:crypto` (no new package).

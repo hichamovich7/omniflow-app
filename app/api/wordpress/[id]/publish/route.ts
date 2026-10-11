@@ -16,7 +16,7 @@ import {
 } from '@/lib/wordpress/publish-post';
 import { acquirePublishLock, publishLockRelease } from '@/lib/wordpress/publish-lock';
 import { createPublishBudget } from '@/lib/wordpress/publish-budget';
-import { planInternalMedia, type PublishMediaPlan } from '@/lib/wordpress/publish-media';
+import { mediaFilename, planInternalMedia, type PublishMediaPlan } from '@/lib/wordpress/publish-media';
 import { createPublishLogger } from '@/lib/wordpress/publish-log';
 import type { InternalLinksReport } from '@/lib/wordpress/internal-links';
 import { buildFeaturedImageAltText, resolveInternalImageAltText } from '@/lib/wordpress/image-alt-text';
@@ -248,13 +248,13 @@ export async function POST(
       article.content,
       images.map((image) => ({
         url: image.url,
-        filename: `${article.slug}-${image.position}.png`,
+        filename: mediaFilename(`${article.slug}-${image.position}`, image.url),
         altText: resolveInternalImageAltText(image.alt_text, altSource),
       }))
     );
     const media: PublishMediaPlan = {
       featured: article.featured_image_url
-        ? { url: article.featured_image_url, filename: `${article.slug}-featured.png`, altText: featuredAltText }
+        ? { url: article.featured_image_url, filename: mediaFilename(`${article.slug}-featured`, article.featured_image_url), altText: featuredAltText }
         : null,
       internal: internalMedia.internal,
     };

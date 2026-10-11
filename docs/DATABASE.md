@@ -1202,6 +1202,12 @@ Path pattern: `{user_id}/{generation_id}/{marker}.png`. Unlike `generated-images
 
 ---
 
+## Image formats of new objects (TASK-050)
+
+No schema change. Since TASK-050, new objects in `generated-images`, `wordpress-images` and R2 are optimized before upload: Pins are `{version}.jpg` (1000×1500 JPEG), WordPress images `{MARKER}.webp` (≤ 1600 px WebP). `.source` photos keep the raw provider bytes and are always `{user_id}/{pin_id}/{version}.source.png`. Objects written before TASK-050 (`.png`) are never re-encoded, renamed or moved; their URLs stay valid.
+
+---
+
 ## Cloudflare R2 — omniflow-media (external, TASK-049)
 
 Status: Available behind `MEDIA_STORAGE_PROVIDER=r2` (default `supabase`). Not a Supabase bucket: no migration, no table, no column added.

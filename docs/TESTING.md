@@ -1117,3 +1117,21 @@ Non-regression: the full renderer suite (`npx playwright test --project=renderer
 Controlled real smoke test (optional, only when the R2 variables are set locally; no AI): upload a small temporary text file under `healthcheck/`, check it is listed, read it through S3 and through `https://media.n8nflow.org/…` (200, same bytes, content type kept), delete only that file, check it is gone (404). Never print the keys. Run 2026-10-11: all steps OK.
 
 Manual (costs AI credits — founder): set `MEDIA_STORAGE_PROVIDER=r2`, generate Pinterest images and a WordPress article, check the URLs start with `https://media.n8nflow.org/images/`, thumbnails display, recomposition works (source on Supabase), publish the article to WordPress, then delete the generations and check the R2 folders are emptied. Switch back to `supabase` → old and new images still display.
+
+---
+
+# Image optimization + media profiles (TASK-050, 2026-10-11)
+
+```bash
+npx playwright test tests/renderer/media-optimization.spec.ts --project=renderer --reporter=list
+```
+
+Offline (20 cases; fixtures generated with sharp — photo-like gradients with grain and a headline band —, storage faked, no network, no AI call): active profiles (Pinterest 1000×1500 JPEG q88, WordPress ≤ 1600 WebP q85 + JPEG fallback with the same resize), the nine planned profiles (dimensions, platform, R2 prefix incl. `images/instagram/`), planned profiles refused by the optimizer and only `pinterest-pin` (×2) / `wordpress-article` (×1) used in the code; Pinterest 1024×1536 PNG → exactly 1000×1500 JPEG, < ½ the PNG, no EXIF / XMP / orientation, input buffer untouched; WordPress 2400×1600 → 1600×1067 WebP, 1024×1024 kept; no enlargement (600×900 Pin, 500×300 article); EXIF orientation 6 corrected before resizing; a square image refused for a Pin (no aggressive crop); transparency flattened on white for JPEG, kept in WebP; empty / corrupt input → `ImageOptimizationError`; route wiring (optimization before key / source / upload, real extension + content type, raw `.source` upload); `.source.png` naming (old paths unchanged); Pinterest vs WordPress keys; Supabase default provider with `.webp` path + `image/webp`; R2 `media.n8nflow.org` URL, `.webp` key, smaller than the PNG; a corrupt image is never uploaded; WordPress filenames follow the real format, old PNG URLs keep `.png`; media reuse keys (old PNG key unchanged, new `.webp` key, query ignored); optimized download keeps `image/webp` and a stable hash; logs carry sizes / formats only.
+
+Fixture sizes (synthetic, smoother than real generated photos): Pin 1024×1536 PNG 3562 KB → 1000×1500 JPEG q88 140 KB; article 2400×1600 PNG 9613 KB → 1600×1067 WebP 32 KB; article 1024×1024 PNG 2630 KB → WebP 20 KB.
+
+Adapted older specs: `pinterest-image-metadata.spec.ts` (stored Pin is now `.jpg` / `image/jpeg`, no metadata, not enlarged — pixels no longer byte-identical by design), `media-storage-r2.spec.ts` (`.source.png`, `.webp` article images, valid PNG input), `wordpress-outline-model`, `wordpress-pins-coherence`, `wordpress-pipeline-quality` (fake provider returns a valid 1×1 PNG, expected paths `.webp`), `wordpress-seo-alt-outbound` (publish filename via `mediaFilename()`).
+
+R2 smoke test (no AI, 2026-10-11): 1024×1536 PNG fixture optimized with `pinterest-pin` (42 KB → 19 KB), uploaded to `healthcheck/task-050-smoke-<ts>.jpg`, read from `https://media.n8nflow.org/…` (200, `image/jpeg`, 1000×1500, same bytes), deleted (404).
+
+Manual (costs AI credits — founder): generate Pins and check text legibility on the 1000×1500 JPEG; generate a WordPress article, publish it, check the `.webp` featured image in the Media Library; republish → no new media item.

@@ -75,6 +75,23 @@ const TOKEN_PREFIX = 'https://omniflow-media.invalid/pending/';
  * token. Images whose URL is not in the content are not uploaded (nothing
  * would show them); the same URL is planned once.
  */
+/**
+ * WordPress filename of a stored image (TASK-050): the extension follows the
+ * image's real format, read from its URL (`.webp` / `.jpg` for optimized
+ * images, `.png` for images stored before), so the name always matches the
+ * Content-Type sent to `/wp/v2/media`.
+ */
+export function mediaFilename(base: string, imageUrl: string | null): string {
+  let extension = 'png';
+  try {
+    const match = /\.(png|jpe?g|webp|gif)$/i.exec(new URL(imageUrl ?? '').pathname);
+    if (match) extension = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+  } catch {
+    // Not a URL: keep the historical .png name.
+  }
+  return `${base}.${extension}`;
+}
+
 export function planInternalMedia(
   content: string,
   images: { url: string | null; filename: string; altText: string | null }[]

@@ -147,7 +147,7 @@ function installFetchStub(outline: object, article: object, externalLinkAnswer: 
     }
     if (url.endsWith('/images')) {
       record.imageCalls += 1;
-      return Response.json({ data: [{ b64_json: Buffer.from('png').toString('base64') }] });
+      return Response.json({ data: [{ b64_json: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' /* 1x1 PNG — optimized to WebP before storage (TASK-050) */ }] });
     }
 
     const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -508,11 +508,11 @@ test('pins method: Pinterest images reused unchanged — only the featured image
   const { result, storage } = await runPins(record, 'washable cat toys');
 
   expect(record.imageCalls).toBe(1);
-  expect(storage.uploads).toEqual(['user-1/gen-2/FEATURED.png']);
+  expect(storage.uploads).toEqual(['user-1/gen-2/FEATURED.webp']);
   expect(result.internalImages.map((img) => img.url)).toEqual(PIN_IMAGE_URLS);
   expect(result.content).toContain('![Cotton yarn](https://pins.test/a.png)');
   expect(result.content).toContain('![Cat playing with a toy](https://pins.test/b.png)');
-  expect(result.featuredImageUrl).toBe('https://storage.test/user-1/gen-2/FEATURED.png');
+  expect(result.featuredImageUrl).toBe('https://storage.test/user-1/gen-2/FEATURED.webp');
   // Pins keep their visible FAQ too (outline always plans 4-6 questions).
   expect(result.content.match(/## Frequently Asked Questions/g)).toHaveLength(1);
 });
@@ -522,10 +522,10 @@ test('keyword method: no regression on images and outline fields', async () => {
   const { result, storage } = await runKeyword(record);
 
   expect(record.imageCalls).toBe(3);
-  expect(storage.uploads.sort()).toEqual(['user-1/gen-1/FEATURED.png', 'user-1/gen-1/IMAGE_1.png', 'user-1/gen-1/IMAGE_2.png']);
+  expect(storage.uploads.sort()).toEqual(['user-1/gen-1/FEATURED.webp', 'user-1/gen-1/IMAGE_1.webp', 'user-1/gen-1/IMAGE_2.webp']);
   expect(result.title).toBe(TITLE);
   expect(result.slug).toBe('handmade-guide-playful-felines');
-  expect(result.content).toContain('![Cotton yarn](https://storage.test/user-1/gen-1/IMAGE_1.png)');
+  expect(result.content).toContain('![Cotton yarn](https://storage.test/user-1/gen-1/IMAGE_1.webp)');
   expect(result.content).not.toContain('{{IMAGE_');
 });
 

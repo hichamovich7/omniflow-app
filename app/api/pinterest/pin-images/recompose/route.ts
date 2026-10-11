@@ -20,6 +20,7 @@ import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { attachPinterestCreativeDiagnostics } from '@/lib/pinterest/creative-diagnostics';
 import { BANNER_TEMPLATES, type BannerTemplate } from '@/lib/validations/pinterest';
 import { createMediaStorage, type MediaStorage, type StoredMedia } from '@/lib/storage';
+import { describeOptimization, optimizeImage, type OptimizedImage } from '@/lib/media/optimize-image';
 import type { ApiResponse } from '@/types/api';
 import type { Pin, PinImage } from '@/types/database';
 
@@ -197,11 +198,25 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+  // TASK-050: the recomposed Pin is stored with the pinterest-pin profile,
+  // like a generated one; the source photo is re-uploaded unconverted.
+  let optimized: OptimizedImage;
+  try {
+    optimized = await optimizeImage(composition.imageBuffer, 'pinterest-pin');
+    console.log(`[pinterest recompose] pin ${pin.id} ${describeOptimization(optimized)}`);
+  } catch (error) {
+    console.error('[pinterest recompose] image optimization failed:', error instanceof Error ? error.message : error);
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Could not prepare the recomposed image', code: 'storage_error' } },
+      { status: 500 }
+    );
+  }
   const imagePath = getPinImageObjectKey(mediaStorage.provider, {
     userId: user.id,
     generationId: pin.generation_id,
     pinId: pin.id,
     version: nextVersion,
+    extension: optimized.extension,
   });
   const newSourcePath = getPinSourceStoragePath(imagePath);
   const bucket = supabase.storage.from('generated-images');
@@ -226,8 +241,8 @@ export async function POST(request: Request) {
   try {
     stored = await mediaStorage.upload({
       key: imagePath,
-      body: composition.imageBuffer,
-      contentType: 'image/png',
+      body: optimized.buffer,
+      contentType: optimized.contentType,
       upsert: true,
     });
   } catch (imageUploadError) {

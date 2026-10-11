@@ -2114,6 +2114,15 @@ storage_unavailable
 
 `storage_unavailable` (500, TASK-049): `MEDIA_STORAGE_PROVIDER=r2` with an incomplete / invalid R2 configuration, or an invalid `MEDIA_STORAGE_PROVIDER` value. Returned by `POST /api/pinterest/generate-images` (before any image is generated) and `POST /api/pinterest/pin-images/recompose`. WordPress generations fail with their usual error before any AI call. Never a fallback to Supabase.
 
+## Image optimization (TASK-050)
+
+Every new public image is optimized server-side before storage (`lib/media/optimize-image.ts`, profiles in `lib/media/media-profiles.ts`). No endpoint and no response shape change; only the stored file differs:
+
+* `POST /api/pinterest/generate-images`, `POST /api/pinterest/pin-images/recompose`: `pin_images.url` / `pins.media_url` / `storage_path` end in `.jpg` (JPEG 1000×1500, smaller images kept at their size). An image that cannot be optimized fails that Pin (generation) or returns 500 `storage_error` (recomposition) — the original PNG is never stored.
+* WordPress generation (Keyword / Pins / URL): featured and internal image URLs end in `.webp` (longest side ≤ 1600).
+* `POST /api/wordpress/[id]/publish`: media upload filenames use the image's real extension (`<slug>-featured.webp`, `<slug>-1.jpg` for a reused Pin image, `.png` for older images).
+* `POST /api/pinterest/pin-images/recompose/preview` is unchanged (PNG preview, never stored).
+
 ## Media storage (TASK-049)
 
 No new endpoint and no public upload route: every upload stays server-side in the existing routes, through `lib/storage/` (`createMediaStorage()`).

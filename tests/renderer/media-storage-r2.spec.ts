@@ -55,6 +55,8 @@ const R2_ENV = {
   R2_SECRET_ACCESS_KEY: SECRET_KEY,
 };
 const PUBLIC = 'https://media.n8nflow.org';
+// Valid 1x1 PNG: article images are optimized (TASK-050) before they reach storage.
+const TINY_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const SUPABASE_PUBLIC = 'https://abcd.supabase.co/storage/v1/object/public';
 
 // ------------------------------------------------------------------ fakes
@@ -380,7 +382,7 @@ test('a full failing R2 flow never prints the access key or the secret', async (
     },
   });
   const output = await captureConsole(async () => {
-    await storeArticleImage(storage, { userId: USER, generationId: GEN, marker: 'FEATURED', body: Buffer.from('x') });
+    await storeArticleImage(storage, { userId: USER, generationId: GEN, marker: 'FEATURED', body: TINY_PNG });
   });
   expect(output).toContain('Storage upload failed for FEATURED: R2 upload failed (network error)');
   expect(output).not.toContain(SECRET_KEY);
@@ -421,7 +423,7 @@ test('Pinterest image keys: Supabase unchanged, R2 grouped by generation', () =>
 
 test('.source photos never go to R2: R2 image keys map to the Supabase source path', () => {
   expect(getPinSourceStoragePath(`${USER}/${PIN}/3.png`)).toBe(`${USER}/${PIN}/3.source.png`);
-  expect(getPinSourceStoragePath(`images/pinterest/${USER}/${GEN}/${PIN}/3.jpg`)).toBe(`${USER}/${PIN}/3.source.jpg`);
+  expect(getPinSourceStoragePath(`images/pinterest/${USER}/${GEN}/${PIN}/3.jpg`)).toBe(`${USER}/${PIN}/3.source.png`);
   expect(isR2MediaKey(getPinSourceStoragePath(`images/pinterest/${USER}/${GEN}/${PIN}/3.jpg`))).toBe(false);
 
   const route = read('app/api/pinterest/generate-images/route.ts');
@@ -450,18 +452,18 @@ test('WordPress article images: Supabase path unchanged, R2 under images/wordpre
     userId: USER,
     generationId: GEN,
     marker: 'IMAGE_1',
-    body: Buffer.from('x'),
+    body: TINY_PNG,
   });
-  expect(supaUrl).toBe(`${SUPABASE_PUBLIC}/wordpress-images/${USER}/${GEN}/IMAGE_1.png`);
+  expect(supaUrl).toBe(`${SUPABASE_PUBLIC}/wordpress-images/${USER}/${GEN}/IMAGE_1.webp`);
   expect(supa.calls[0]).toMatchObject({ bucket: 'wordpress-images', op: 'upload' });
-  expect(supa.calls[0].args[0]).toBe(`${USER}/${GEN}/IMAGE_1.png`);
-  expect(supa.calls[0].args[2]).toEqual({ contentType: 'image/png' });
+  expect(supa.calls[0].args[0]).toBe(`${USER}/${GEN}/IMAGE_1.webp`);
+  expect(supa.calls[0].args[2]).toEqual({ contentType: 'image/webp' });
 
   const { client, calls } = fakeS3();
   const r2 = createR2MediaStorage({ publicUrl: PUBLIC }, client);
-  const r2Url = await storeArticleImage(r2, { userId: USER, generationId: GEN, marker: 'FEATURED', body: Buffer.from('x') });
-  expect(r2Url).toBe(`${PUBLIC}/images/wordpress/${USER}/${GEN}/FEATURED.png`);
-  expect(calls[0]).toMatchObject({ op: 'put', contentType: 'image/png' });
+  const r2Url = await storeArticleImage(r2, { userId: USER, generationId: GEN, marker: 'FEATURED', body: TINY_PNG });
+  expect(r2Url).toBe(`${PUBLIC}/images/wordpress/${USER}/${GEN}/FEATURED.webp`);
+  expect(calls[0]).toMatchObject({ op: 'put', contentType: 'image/webp' });
 });
 
 test('WordPress generators create the storage before any AI call and no longer write to Supabase directly', () => {

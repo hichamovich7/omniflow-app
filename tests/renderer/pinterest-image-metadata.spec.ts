@@ -347,7 +347,7 @@ async function runImageRoute(
 }
 
 for (const visualFormat of ['ai-integrated', 'photo-only'] as const) {
-  test(`${visualFormat}: the stored image has no C2PA, XMP or other metadata, and the same pixels`, async () => {
+  test(`${visualFormat}: the stored image has no C2PA, XMP or other metadata, and is never enlarged`, async () => {
     const providerImage = withProvenance(await basePng());
     expect(containsProvenance(providerImage)).toBe(true);
 
@@ -361,14 +361,18 @@ for (const visualFormat of ['ai-integrated', 'photo-only'] as const) {
     expect(result.uploads).toHaveLength(1);
     const [upload] = result.uploads;
     expect(upload.bucket).toBe('generated-images');
-    expect(upload.path).toMatch(/\/1\.png$/);
-    expect(upload.contentType).toBe('image/png');
+    // TASK-050: stored with the pinterest-pin profile (JPEG). A 200x300
+    // provider image is below 1000x1500, so it keeps its size (no enlargement);
+    // lossy JPEG means pixels are no longer byte-identical.
+    expect(upload.path).toMatch(/\/1\.jpg$/);
+    expect(upload.contentType).toBe('image/jpeg');
 
-    expect(chunkTypes(upload.buffer)).not.toContain('caBX');
-    expect(chunkTypes(upload.buffer)).not.toContain('iTXt');
     expect(containsProvenance(upload.buffer)).toBe(false);
-    expect((await pixels(upload.buffer)).equals(await pixels(providerImage))).toBe(true);
-    expect((await sharp(upload.buffer).metadata())).toMatchObject({ width: 200, height: 300 });
+    const stored = await sharp(upload.buffer).metadata();
+    expect(stored).toMatchObject({ format: 'jpeg', width: 200, height: 300 });
+    expect(stored.exif).toBeUndefined();
+    expect(stored.xmp).toBeUndefined();
+    expect(stored.icc).toBeUndefined();
   });
 }
 

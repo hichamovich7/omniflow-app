@@ -10,6 +10,7 @@ export const R2_MEDIA_PREFIXES = {
   pinterest: 'images/pinterest',
   wordpress: 'images/wordpress',
   facebookImage: 'images/facebook',
+  instagramImage: 'images/instagram',
   reels: 'videos/reels',
   facebookVideo: 'videos/facebook',
   tiktok: 'videos/tiktok',

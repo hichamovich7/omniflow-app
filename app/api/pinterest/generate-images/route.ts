@@ -21,6 +21,7 @@ import {
 } from '@/lib/pinterest/quality-gate';
 import { getPinImageObjectKey, getPinSourceStoragePath } from '@/lib/pinterest/pin-image-storage';
 import { createMediaStorage, type MediaStorage, type StoredMedia } from '@/lib/storage';
+import { describeOptimization, optimizeImage } from '@/lib/media/optimize-image';
 import {
   DEFAULT_NICHE_CONVENTION,
   getNicheVisualConvention,
@@ -219,8 +220,6 @@ export async function POST(request: Request) {
         let selectedHeadlinePosition: 'top' | 'bottom' | undefined;
         let creativeDiagnostics: PersistedCreativeDiagnostics | null = null;
         const angle = readPinterestStrategyAngle(pin.image_analysis);
-        let outputFormat = 'png';
-        let outputContentType = 'image/png';
 
         if (generationMode !== 'legacy-composite') {
           // Strip embedded metadata (EXIF, XMP, C2PA content credentials —
@@ -228,11 +227,6 @@ export async function POST(request: Request) {
           // No pixel changes and no text or banner is ever drawn on this path.
           const sanitized = await sanitizeFinalPinterestImage(rawImageBuffer);
           imageBuffer = sanitized.buffer;
-          const technical = sanitized.technical;
-          outputFormat = technical.format === 'jpeg' ? 'jpg' : technical.format;
-          outputContentType = technical.format === 'jpeg'
-            ? 'image/jpeg'
-            : `image/${technical.format}`;
           releaseSelection();
         } else {
           const { accentColor, textColor } = await extractAccentColor(rawImageBuffer);
@@ -304,12 +298,17 @@ export async function POST(request: Request) {
           }
         }
 
+        // TASK-050: one stored variant per Pin — the pinterest-pin profile
+        // (1000x1500 JPEG). Fails the Pin rather than storing the raw PNG.
+        const optimized = await optimizeImage(imageBuffer, 'pinterest-pin');
+        console.log(`[pinterest images] pin ${pin.id} ${describeOptimization(optimized)}`);
+
         const filePath = getPinImageObjectKey(mediaStorage.provider, {
           userId: user.id,
           generationId,
           pinId: pin.id,
           version: nextVersion,
-          extension: outputFormat,
+          extension: optimized.extension,
         });
         const sourcePath = getPinSourceStoragePath(filePath);
         const storesRecompositionSource =
@@ -326,7 +325,7 @@ export async function POST(request: Request) {
 
         let stored: StoredMedia;
         try {
-          stored = await mediaStorage.upload({ key: filePath, body: imageBuffer, contentType: outputContentType });
+          stored = await mediaStorage.upload({ key: filePath, body: optimized.buffer, contentType: optimized.contentType });
         } catch (uploadError) {
           if (storesRecompositionSource) {
             await supabase.storage.from('generated-images').remove([sourcePath]);
