@@ -637,7 +637,11 @@ Article-grounded Pins (TASK-051): the "Source article" card also lists the subje
 
 ## Pinterest from an existing WordPress post (`/pinterest/from-wordpress`, TASK-051)
 
-Entry: "Generate Pins from an existing WordPress post" under the form on `/pinterest`; history badges "From WordPress post" link back here. `app/(dashboard)/pinterest/from-wordpress/page.tsx`:
+Entry points:
+
+* **Pin source chooser** (`components/pinterest/pinterest-source-chooser.tsx`, `nav` "Pin source") under the header of `/pinterest` ("From keyword" current), `/pinterest/create` ("From OmniFlow WordPress article" current) and `/pinterest/from-wordpress` ("From existing WordPress article" current): three cards — From keyword → `/pinterest`, From OmniFlow WordPress article → `/wordpress/history` (open an article, then "Generate Pinterest content"), From existing WordPress article → `/pinterest/from-wordpress`. The current one has `aria-current="page"`. Without any connected WordPress site the third card is disabled (dashed, `aria-disabled`, no link) with "No WordPress site connected yet. Connect one in a project to turn your existing articles into Pins." and a "Connect a WordPress site" link to `/projects`. Links only: no request, no AI call.
+* **Dashboard quick action** "Generate from existing WordPress article" (`/dashboard`, quick actions now 3 per row on large screens) → `/pinterest/from-wordpress`; disabled with the same message and "Connect a WordPress site" when no site is connected.
+* History badges "From WordPress post" link back here. `app/(dashboard)/pinterest/from-wordpress/page.tsx`:
 
 * No connected site → empty state "No WordPress site connected" + "Go to WordPress".
 * Without `siteId` + `postId` → title "Pinterest from a WordPress post" and the picker (`components/social/wordpress-post-picker.tsx`): WordPress site select (project name — domain), "Title or keyword" input, Status select (Published / Drafts), Search. Results list: featured image thumbnail (or a file icon), title, date, status badge, up to two category badges, "Select". "Load more" pages by 10. Error messages from WordPress are shown inline (`role="alert"`); "No post matches this search." when empty. Note: "Posts are only read from WordPress — never modified. Drafts are listed only when the connected account can edit posts."

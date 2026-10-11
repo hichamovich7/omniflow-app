@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Check, Info, Sparkles, Sparkle } from 'lucide-react';
@@ -219,10 +219,12 @@ interface PinFormProps {
    * /pinterest/create instead of redirecting.
    */
   articleSource?: ArticleFormSource;
+  /** Pin source choice (keyword / OmniFlow article / existing WordPress post), shown under the header. */
+  sourceChooser?: ReactNode;
   contentStreams?: ContentStreamOption[];
 }
 
-export function PinForm({ projects, boards, articleSource, contentStreams = [] }: PinFormProps) {
+export function PinForm({ projects, boards, articleSource, contentStreams = [], sourceChooser }: PinFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
@@ -459,6 +461,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [] }
         }
         className="mb-6"
       />
+
+      {sourceChooser}
 
       {articleSource && <ArticleSourceSummary source={articleSource} />}
 

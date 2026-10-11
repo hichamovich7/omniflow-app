@@ -26,6 +26,7 @@ import { wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import { getGenerationWithPins } from '@/lib/queries/generations';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
+import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
 
 /**
  * Pinterest from an existing WordPress post (Volet A):
@@ -71,8 +72,8 @@ export default async function PinterestFromWordPressPage({
           description="Connect a WordPress site to a project first. Its existing posts can then be turned into Pins."
           icon={Globe}
         >
-          <Link href="/wordpress" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-            Go to WordPress
+          <Link href="/projects" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+            Connect a WordPress site
           </Link>
         </EmptyState>
       </PageContainer>
@@ -90,6 +91,7 @@ export default async function PinterestFromWordPressPage({
             destination link is added to the Pins.
           </p>
         </div>
+        <PinterestSourceChooser active="existing-post" hasWordPressSite />
         <WordPressPostPicker sites={sites} initialSiteId={siteId && isValidUuid(siteId) ? siteId : null} />
       </PageContainer>
     );
@@ -176,7 +178,13 @@ export default async function PinterestFromWordPressPage({
 
   return (
     <PageContainer narrow>
-      <PinForm projects={[project]} boards={boardList} articleSource={formSource} contentStreams={contentStreams} />
+      <PinForm
+        projects={[project]}
+        boards={boardList}
+        articleSource={formSource}
+        contentStreams={contentStreams}
+        sourceChooser={<PinterestSourceChooser active="existing-post" hasWordPressSite />}
+      />
       {result?.generation && result.pins.length > 0 && (
         <ArticlePinResults
           pins={result.pins}

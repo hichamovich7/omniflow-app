@@ -3,6 +3,15 @@ import type { WordPressSite, WordPressSitePublic } from '@/types/wordpress';
 
 const PUBLIC_COLUMNS = 'id, project_id, user_id, site_url, wp_username, created_at';
 
+/** Whether the user has at least one WordPress connection (public column only). */
+export async function hasWordPressSite(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('wordpress_sites')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  return !error && (count ?? 0) > 0;
+}
+
 export async function getWordPressSiteByProjectId(
   supabase: SupabaseClient,
   projectId: string

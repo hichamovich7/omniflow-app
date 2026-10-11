@@ -40,7 +40,9 @@ import {
   loadWeeklyReview,
 } from '@/lib/queries/command-center';
 import { cn } from '@/lib/utils';
-import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Wand2, FilePlus2, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, FolderOpen, FileText, Globe, Wand2, FilePlus2, Sparkles, TriangleAlert } from 'lucide-react';
+import { hasWordPressSite } from '@/lib/queries/wordpress-sites';
+import { NO_WORDPRESS_SITE_MESSAGE } from '@/components/pinterest/pinterest-source-chooser';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import { timeAgo } from '@/lib/utils/format-date';
@@ -225,9 +227,19 @@ export default async function DashboardPage() {
     day: 'numeric',
   });
 
+  const wordpressConnected = user ? await hasWordPressSite(supabase, user.id) : false;
+
   const quickActions = [
     { href: '/projects/new', icon: FolderOpen, label: 'New Project', description: 'Organize your content' },
     { href: '/pinterest', icon: Wand2, label: 'Generate Pinterest Pins', description: 'Create a new pin batch' },
+    {
+      href: '/pinterest/from-wordpress',
+      icon: Globe,
+      label: 'Generate from existing WordPress article',
+      description: 'Turn a post of your site into Pins',
+      // No connected site: shown disabled with a way to connect one.
+      disabled: !wordpressConnected,
+    },
     { href: '/wordpress/blog-post', icon: FilePlus2, label: 'Generate WordPress Article', description: 'Write a full SEO article' },
     { href: '/history', icon: Sparkles, label: 'Pinterest History', description: 'Browse past pin generations' },
     { href: '/wordpress/history', icon: FileText, label: 'WordPress History', description: 'Browse past articles' },
@@ -320,8 +332,29 @@ export default async function DashboardPage() {
       <WeeklyProgress stats={weeklyProgress} />
 
       {/* Quick Actions */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {quickActions.map((action) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {quickActions.map((action) =>
+          'disabled' in action && action.disabled ? (
+            <div
+              key={action.href}
+              aria-disabled="true"
+              data-testid="quick-action-disabled"
+              className="rounded-xl border border-dashed border-border bg-muted/40 p-5 text-muted-foreground"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <action.icon className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{action.label}</p>
+                  <p className="text-xs">{NO_WORDPRESS_SITE_MESSAGE}</p>
+                  <Link href="/projects" className="mt-1 inline-block text-xs font-medium text-primary hover:underline">
+                    Connect a WordPress site
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
           <Link
             key={action.href}
             href={action.href}
@@ -338,7 +371,8 @@ export default async function DashboardPage() {
             </div>
             <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </Link>
-        ))}
+          )
+        )}
       </div>
 
       {/* Recent Activity */}

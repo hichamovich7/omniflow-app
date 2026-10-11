@@ -5,6 +5,8 @@ import { PinForm } from '@/components/pinterest/pin-form';
 import { EmptyState } from '@/components/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
+import { hasWordPressSite } from '@/lib/queries/wordpress-sites';
 import { Plus, Sparkles } from 'lucide-react';
 
 export default async function PinterestPage() {
@@ -20,6 +22,10 @@ export default async function PinterestPage() {
     .order('name', { ascending: true });
 
   const list = projects ?? [];
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const wordpressConnected = user ? await hasWordPressSite(supabase, user.id) : false;
 
   return (
     <PageContainer narrow>
@@ -35,15 +41,11 @@ export default async function PinterestPage() {
           </Link>
         </EmptyState>
       ) : (
-        <>
-          <PinForm projects={list} boards={boards ?? []} />
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have the article on WordPress?{' '}
-            <Link href="/pinterest/from-wordpress" className="font-medium text-primary hover:underline">
-              Generate Pins from an existing WordPress post
-            </Link>
-          </p>
-        </>
+        <PinForm
+          projects={list}
+          boards={boards ?? []}
+          sourceChooser={<PinterestSourceChooser active="keyword" hasWordPressSite={wordpressConnected} />}
+        />
       )}
     </PageContainer>
   );

@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest source chooser — access to "existing WordPress article" (TASK-051 UX, 2026-10-11)
+
+* `/pinterest`, `/pinterest/create` and `/pinterest/from-wordpress` show a "Pin source" choice under the header: From keyword, From OmniFlow WordPress article, From existing WordPress article (→ `/pinterest/from-wordpress`).
+* Dashboard quick action "Generate from existing WordPress article".
+* Without a connected WordPress site the option is disabled with an explanation and a "Connect a WordPress site" link. Navigation only: no AI call, no WordPress write; existing flows, prompts and rules unchanged; no migration. New specs `tests/renderer/pinterest-source-chooser.spec.ts` (9) and `tests/playwright/pinterest-source-chooser.spec.ts` (4 per browser project).
+
 ## Pinterest from WordPress articles — shared WordPressArticleContext — TASK-051 (2026-10-11)
 
 * **Existing WordPress posts → Pinterest (new source):** `/pinterest/from-wordpress` — pick a connected site, search posts by title or keyword (published, or drafts when the account can edit posts), see title / date / status / category / featured image, select, review the summary, then the existing Pinterest form. New `GET /api/wordpress/sites/[id]/posts`; `POST /api/pinterest/generate` and Pin regeneration accept `wordpressPost: { siteId, postId }`. WordPress is only read (GET); 401 / 403 / 404 / timeout / empty / password-protected posts give clear errors.

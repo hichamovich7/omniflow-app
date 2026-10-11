@@ -270,7 +270,7 @@ export const guideSections: GuideSection[] = [
     icon: Share2,
     summary: 'Turn an article that is already on your WordPress site — even one OmniFlow did not write — into Pinterest Pins.',
     points: [
-      'Open Pinterest and click "Generate Pins from an existing WordPress post" under the form. You need a WordPress site connected to a project (see Connecting WordPress).',
+      'Open Pinterest and choose "From existing WordPress article" at the top of the generator (or "Generate from existing WordPress article" in the dashboard quick actions). The three sources are always shown there: From keyword, From OmniFlow WordPress article and From existing WordPress article. You need a WordPress site connected to a project (see Connecting WordPress) — until then the option is greyed out with a "Connect a WordPress site" link.',
       'Choose the site, search by title or keyword and pick a post. Each result shows its title, date, status, category and featured image. Published posts are listed by default; drafts appear only if the connected WordPress account is allowed to edit posts.',
       'Selecting a post shows a summary — title, excerpt, status, date, categories and the subjects found in the article — above the usual Pinterest form: number of Pins, language, keyword, Content Stream and board, generation mode and options. Nothing is generated until you click "Generate Pins".',
       'The post is only read from WordPress, never modified, and nothing is published to Pinterest. No destination link is added: add your URLs yourself in the CSV.',

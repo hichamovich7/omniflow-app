@@ -20,6 +20,8 @@ import { getGenerationWithPins } from '@/lib/queries/generations';
 import { subjectSections } from '@/lib/wordpress/article-context';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
+import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
+import { hasWordPressSite } from '@/lib/queries/wordpress-sites';
 
 /**
  * Social Content Studio phase 2 (TASK-044): the Pinterest form pre-filled
@@ -132,6 +134,9 @@ export default async function PinterestCreatePage({
         boards={boardList}
         articleSource={formSource}
         contentStreams={contentStreams}
+        sourceChooser={
+          <PinterestSourceChooser active="omniflow-article" hasWordPressSite={await hasWordPressSite(supabase, user.id)} />
+        }
       />
       {result?.generation && result.pins.length > 0 && (
         <ArticlePinResults

@@ -1170,3 +1170,17 @@ Status: **done 2026-10-11** (founder session saved with a Playwright helper — 
 * Visual check (each Pin next to its section's original photo): five different scarves, each matching its section's construction and palette (shaded triangles, diagonal bands, gradient with sparkle, diagonal shaded yarn, Caron bias bands); no cowl, no chunky scarf, no generic image. Observed: Pin 1 shows fringe the Shaded Triangles original does not have (invented by the image model, not in the prompt); the Gradient Sparkle Pin shows a horizontal gradient while the original is worked on the bias; AI Integrated headlines can carry the pattern's brand name ("Caron On the Bias Scarf").
 
 Board pre-selection fix found by this test: `suggestBoardForArticle()` picked "Free Crochet Cat Patterns" (shared "free" / "patterns") over "crochet scarf pattern"; generic words (free, easy, ideas…) are now ignored and simple plurals folded. New case in `pinterest-wordpress-post-source.spec.ts` (29 cases). The script stopped before any AI call on that first attempt.
+
+# Pinterest source chooser (TASK-051 UX, 2026-10-11)
+
+```bash
+npx playwright test tests/renderer/pinterest-source-chooser.spec.ts --project=renderer --reporter=list
+set PLAYWRIGHT_STORAGE_STATE=path\\to\\authenticated-state.json
+npx playwright test tests/playwright/pinterest-source-chooser.spec.ts --project=chromium --project=mobile-chrome
+```
+
+Offline (9): three sources and their targets, exactly one current, disabled existing-post option without a site (no link, explicit message, connect link), navigation-only component (no fetch / client state / AI), `hasWordPressSite()` head count on `wordpress_sites` filtered by user (error → false), wiring in `/pinterest`, `/pinterest/create`, `/pinterest/from-wordpress` and the dashboard, no AI on load, keyword and OmniFlow-article entry points unchanged.
+
+Browser (4 cases × chromium + mobile-chrome, real session, 2026-10-11: 8/8): `/pinterest` shows the chooser and "From existing WordPress article" opens the post picker; search + select a real post shows the summary and "Generate Pins" only; a connection that is not the user's → "This post can't be used"; dashboard quick action → picker. Each case fails if `/api/pinterest/generate*`, a regenerate route, a non-GET `/api/wordpress` route or OpenRouter / OpenAI is called. The disabled no-site state is covered offline (the test account has connected sites).
+
+Same run: `dashboard.spec.ts` "every section renders" ("Publishing coverage" is a `CardTitle`, not a heading) and "all seven KPIs…" (the `credits` text matches two elements) fail on assertions unrelated to this change; "quick actions are kept" passes. Full renderer 1047/1047.
