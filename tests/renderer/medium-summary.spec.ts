@@ -481,41 +481,55 @@ test.describe('Medium summary — API, UI and safety', () => {
     expect(mediumSummaryRequestSchema.safeParse({ wordpressArticleId: GEN_ID, url: PERMALINK }).success).toBe(false);
   });
 
-  test('route: auth, validation, rate limit + trial cap, centralized AI wrapper, nothing saved', () => {
+  test('route: auth, validation, rate limit + trial cap, centralized AI wrapper; saving goes through the history helper only', () => {
     const route = read('app/api/social/medium-summary/route.ts');
     expect(route).toContain('supabase.auth.getUser()');
     expect(route).toContain('mediumSummaryRequestSchema.safeParse');
     expect(route).toMatch(/checkRateLimit\([^)]*'social\/medium-summary'[\s\S]*enforceTrialLimit: true/);
     expect(route).toContain("from '@/lib/ai/engine'");
     expect(route).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(|openrouter\.ai/i);
+    expect(route).toContain('saveMediumSummary(supabase, user.id, source, result)');
   });
 
   test('no Medium API and no WordPress write anywhere in the feature', () => {
-    for (const path of ['lib/social/medium-summary.ts', 'app/api/social/medium-summary/route.ts', 'components/social/medium-summary-panel.tsx']) {
+    for (const path of [
+      'lib/social/medium-summary.ts',
+      'app/api/social/medium-summary/route.ts',
+      'components/social/medium-summary-panel.tsx',
+      'components/social/medium-summary-result.tsx',
+      'components/social/medium-export.ts',
+    ]) {
       const code = read(path);
       expect(code).not.toMatch(/api\.medium\.com|medium\.com\/v1|integrationToken/i);
       expect(code).not.toMatch(/method:\s*'(POST|PUT|PATCH|DELETE)'[\s\S]*wp-json/);
       expect(code).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
     }
-    // The panel's only request is the summary endpoint.
-    const panel = read('components/social/medium-summary-panel.tsx');
-    expect(panel.match(/fetch\(/g)).toHaveLength(1);
-    expect(panel).toContain("fetch('/api/social/medium-summary'");
+    // The generator's only request is the summary endpoint (shared helper); the panel and result view do not fetch.
+    const helper = read('components/social/medium-export.ts');
+    expect(helper.match(/fetch\(/g)).toHaveLength(1);
+    expect(helper).toContain("fetch('/api/social/medium-summary'");
+    expect(read('components/social/medium-summary-panel.tsx')).not.toContain('fetch(');
+    expect(read('components/social/medium-summary-result.tsx')).not.toContain('fetch(');
   });
 
   test('panel: Copy Markdown, Copy HTML, Download Markdown, Regenerate, word count, CTA URL, warnings', () => {
     const panel = read('components/social/medium-summary-panel.tsx');
-    for (const label of ['Generate Medium summary', 'Copy Markdown', 'Copy HTML', 'Download Markdown', 'Regenerate summary']) {
-      expect(panel).toContain(label);
+    const view = read('components/social/medium-summary-result.tsx');
+    const helper = read('components/social/medium-export.ts');
+    expect(panel).toContain('Generate Medium summary');
+    expect(panel).toContain('<MediumSummaryResultView result={result} onRegenerate={generate} regenerating={loading} />');
+    for (const label of ['Copy Markdown', 'Copy HTML', 'Download Markdown', 'Regenerate summary']) {
+      expect(view).toContain(label);
     }
-    expect(panel).toContain("copy('Markdown', result.markdown)");
-    expect(panel).toContain("copy('HTML', result.html)");
-    expect(panel).toContain('navigator.clipboard.writeText(content)');
-    expect(panel).toMatch(/new Blob\(\[summary\.markdown\], \{ type: 'text\/markdown/);
-    expect(panel).toContain('mediumSummaryFilename(summary.title)');
-    expect(panel).toContain('{result.wordCount} words');
-    expect(panel).toContain("result.ctaUrl ?? 'none'");
-    expect(panel).toContain('result.warnings.map');
+    expect(view).toContain("copyMediumContent('Markdown', result.markdown)");
+    expect(view).toContain("copyMediumContent('HTML', result.html)");
+    expect(view).toContain('downloadMediumMarkdown(result.title, result.markdown)');
+    expect(helper).toContain('navigator.clipboard.writeText(content)');
+    expect(helper).toMatch(/new Blob\(\[markdown\], \{ type: 'text\/markdown/);
+    expect(helper).toContain('mediumSummaryFilename(title)');
+    expect(view).toContain('{result.wordCount} words');
+    expect(view).toContain("result.ctaUrl ?? 'none'");
+    expect(view).toContain('result.warnings.map');
   });
 
   test('entry points: Studio Medium card and the existing-post page; Pinterest flows unchanged', () => {
@@ -716,9 +730,9 @@ test.describe('Medium summary — image', () => {
   });
 
   test('panel shows the exact image URL; the preview renders the result HTML (with its image); nothing generated or re-hosted', () => {
-    const panel = read('components/social/medium-summary-panel.tsx');
-    expect(panel).toContain("Image: {result.imageUrl ?? 'none'}");
-    expect(panel).toContain('<ArticleContent html={result.html} />');
+    const view = read('components/social/medium-summary-result.tsx');
+    expect(view).toContain("Image: {result.imageUrl ?? 'none'}");
+    expect(view).toContain('<ArticleContent html={result.html} />');
     for (const path of ['lib/social/medium-image.ts', 'lib/social/medium-summary.ts']) {
       const code = read(path);
       expect(code).not.toMatch(/generateImage|uploadMedia|getMediaStorage|\.storage\.from\(/);

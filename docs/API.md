@@ -1103,7 +1103,7 @@ Social Content Studio phase 1 (TASK-044) generated 5 unsaved Pins here. Removed 
 
 # POST /api/social/medium-summary
 
-Medium summary from a WordPress article (TASK-062): a Medium-ready title, subtitle, 300-600-word summary and a CTA to the original article, returned for copy / download. **Not saved** (no table, no migration), **never published**: no Medium API call, no Medium token, no WordPress write.
+Medium summary from a WordPress article (TASK-062): a Medium-ready title, subtitle, 300-600-word summary and a CTA to the original article, returned for copy / download and **saved to the Medium history** (`social_content_generations`, migration 045, TASK-063). **Never published**: no Medium API call, no Medium token, no WordPress write.
 
 ## Request
 
@@ -1117,6 +1117,12 @@ Exactly one source (`mediumSummaryRequestSchema`, strict):
 { "wordpressPost": { "siteId": "<wordpress_sites.id>", "postId": 1527 } }
 ```
 
+```json
+{ "pinterestGenerationId": "<generations.id>" }
+```
+
+The third form (TASK-063, used by Regenerate in the Medium history) summarizes the article a Pinterest generation was made from.
+
 ## Description
 
 1. Auth, JSON, Zod.
@@ -1124,12 +1130,14 @@ Exactly one source (`mediumSummaryRequestSchema`, strict):
 3. Source (`lib/social/medium-summary.ts`, read-only):
    * **OmniFlow article** — `loadOmniflowArticleMediumSource()`: generation and project owned by the caller (404 / 403), article `completed` (409). If the article has a `wp_post_id`, the connection of its project (owned) is read with one `GET /wp-json/wp/v2/posts/<wp_post_id>` to get its `link`; a failed read only removes the link.
    * **Existing post** — `loadWordPressPostMediumSource()`: connection then its project owned by the caller (same checks as TASK-051), one `GET /wp-json/wp/v2/posts/<postId>` (`getWordPressPost()`; 401 / 403 / 404 / timeout / empty / password-protected → `WordPressReadError`). Language: detected from the post text (stopwords en / fr / es / de), else the project's default language.
+   * **Pinterest generation** — `loadPinterestGenerationMediumSource()`: the generation must be the caller's (404 / 403); its article is loaded with one of the two loaders above — `source_wordpress_generation_id` (OmniFlow article) or `source_type = external_wordpress_post` + site + post id — else `422 no_article_source` (keyword generation: nothing to summarize). The article's project must be the generation's (`400 project_mismatch`). Pins and their destination URLs are never read.
    * The shared `WordPressArticleContext` (TASK-051) is built from the article; every text is URL-free and neutralized.
 4. **Permalink** (`validateMediumPermalink()`): WordPress's own `link`, kept only when the post `status` is `publish` and the link points into the connected site (`toAllowedInternalUrl()` — same host, port, base path, http(s), no credentials). Never rebuilt from a slug. Otherwise the summary has no link and `warnings` explains it.
 5. Generation (`generateText`, role `FAST`, prompt `medium-summary-v1`): the article as data between `<article>` tags, its language, the rules (summary of the key ideas, no invention, no URL / link / hashtag / HTML / CTA / Pinterest mention, natural tone, no copying). The model never receives a URL.
 6. Checks (`checkMediumSummary()`): subtitle + summary 300-600 words; every number present in the article (ordered-list markers ignored); on English articles, no project detail absent from the article (TASK-051 checked vocabulary: cowl, merino, chunky, colors…); detected language = source language; at most 30 % of 10-word sequences copied verbatim. A refused or unreadable answer gets **one** corrective retry naming the problems, then `422 invalid_summary`. An article under 350 words is refused before any AI call (`422 article_too_short`).
 7. Assembly (`assembleMediumSummary()`): any link / URL / HTML written by the model is removed; the CTA is added by code in the article language — EN "Want to explore the complete article? / Read the full guide on our blog →" (FR / ES / DE translated) — with the exact permalink as the **only** link.
 8. **Image** (`lib/social/medium-image.ts`, `selectMediumImage()`): one image already in the article, placed after the subtitle — Markdown `![alt](url)`, HTML `<img src="url" alt="alt">`. Order: the featured image (OmniFlow article: the WordPress post's featured image when the post was read, then `featured_image_url`), else the most relevant internal image (descriptive alt, `subject` section, words of the title; ties → document order). The URL is used **exactly as found** and only if `isPublicArticleImageUrl()` accepts it: `https:`, no credentials, no IP / local host, no signed URL (`token`, `signature`, `X-Amz-*`, `X-Goog-*`, `expires`), host = the connected site (www-insensitive, subdomains accepted) — plus, for an OmniFlow article only, OmniFlow's public storage (`NEXT_PUBLIC_SUPABASE_URL` under `/storage/v1/object/public/`, `R2_PUBLIC_URL`). Alt: the image's own alt or caption when not generic (`isGenericAltText`), else built from the verified section heading / article title (`buildFeaturedImageAltText`, no AI). No image is generated, downloaded, copied to R2 / Supabase, or re-hosted; no extra request. No valid image → no image + a warning.
+9. **Save** (`saveMediumSummary()` → `lib/queries/social-content.ts`, TASK-063): one insert into `social_content_generations` — user, project of the source, `platform = medium`, `status = completed`, `source_type` + source ids (OmniFlow generation; site + WordPress post id; Pinterest generation + its article's ids), source title, language, title, subtitle, Markdown, HTML, word count, image URL / alt, CTA URL. RLS also checks project and sources ownership. **A failed save never loses the summary**: it is returned with `id: null` and a warning ("could not be saved…", or "Medium history is not available yet (database migration 045 not applied)…" when the table is missing).
 
 ## Response
 
@@ -1145,7 +1153,8 @@ Exactly one source (`mediumSummaryRequestSchema`, strict):
     "imageUrl": "https://site.example/wp-content/uploads/2026/10/featured.jpg",
     "imageAlt": "Five colorful crochet scarves on a wooden bench",
     "language": "en",
-    "warnings": []
+    "warnings": [],
+    "id": "<social_content_generations.id or null>"
   },
   "error": null
 }
@@ -1160,9 +1169,37 @@ unauthorized / invalid_json / invalid_request                      401 / 400 / 4
 not_found / forbidden / article_not_completed                      404 / 403 / 409
 WordPress read (existing post): unauthorized / network / http      502
 WordPress read: forbidden / not_found / timeout / empty_content     403 / 404 / 504 / 422
-article_too_short / invalid_summary                                 422
+article_too_short / invalid_summary / no_article_source            422
+project_mismatch (Pinterest generation and article projects differ) 400
 generation_failed                                                   500
 rate_limited / trial_limit
+```
+
+A save failure is not an error: `200` with `id: null` and a warning.
+
+---
+
+# DELETE /api/social/generations/[id]
+
+Deletes one saved social content item — today a Medium summary of `/medium` (TASK-063). The UI always asks for confirmation first.
+
+## Description
+
+1. Auth (`401 unauthorized`), UUID (`400 invalid_id`).
+2. `deleteSocialContentGeneration()`: `DELETE … WHERE id = :id AND user_id = :caller` (+ RLS). Nothing else is touched: the source article, WordPress post, Pinterest generation and Pins stay as they are; nothing is sent to WordPress or Medium.
+
+## Response
+
+```json
+{ "data": { "id": "<id>" }, "error": null }
+```
+
+## Possible Errors
+
+```txt
+unauthorized / invalid_id                                           401 / 400
+not_found (does not exist or is not the caller's)                   404
+delete_failed                                                       500
 ```
 
 ---

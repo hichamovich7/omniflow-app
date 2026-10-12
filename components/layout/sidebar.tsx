@@ -59,7 +59,8 @@ const platformsGroup: NavGroup = {
   items: [
     { href: '/facebook', label: 'Facebook', icon: ThumbsUp, disabled: true },
     { href: '/linkedin', label: 'LinkedIn', icon: Briefcase, disabled: true },
-    { href: '/medium', label: 'Medium', icon: PenSquare, disabled: true },
+    // Medium history (TASK-063). Facebook / LinkedIn stay disabled until their generators exist.
+    { href: '/medium', label: 'Medium', icon: PenSquare },
   ],
 };
 

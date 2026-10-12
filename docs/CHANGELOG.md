@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Medium in the sidebar with saved history — TASK-063 (2026-10-12)
+
+* **Sidebar → Platforms → Medium** is now active (Facebook and LinkedIn stay disabled).
+* **`/medium`**: every saved Medium summary, newest first, filtered by project, source (OmniFlow article / WordPress post / Pinterest generation), date (7 / 30 / 90 days) and status; each card shows the title, a preview, project, platform, source, date, status, image and CTA URL, with Open, Copy Markdown, Copy HTML, Download Markdown, Regenerate (new entry, the old one kept) and Delete (confirmation dialog). **`/medium/[id]`**: the full summary with the same actions.
+* **Saved automatically**: each Medium summary that passes its checks is stored with its project and source in the new table `social_content_generations` (**migration 045 — to apply by hand**), and the generator links to it. If saving fails (or 045 is not applied), the summary is still shown with a warning — nothing is lost.
+* New source for `POST /api/social/medium-summary`: `{ pinterestGenerationId }` (the article the Pinterest generation was made from). New `DELETE /api/social/generations/[id]`.
+* The table already accepts Facebook, Instagram, Reels and TikTok for later; no content is generated for them. No Medium API, no WordPress write, Pinterest unchanged. TASK-044's own migration is now 046 (reserved).
+* Tests: new `tests/renderer/social-content-history.spec.ts` (22); `medium-summary.spec.ts` adapted (41). Full renderer 1110/1110, TypeScript, ESLint, build pass.
+
 ## Medium summary from WordPress articles — TASK-062 (2026-10-11)
 
 * **Generate Medium summary** in the Social Content Studio (Medium card, now available) of `/wordpress/[id]`, and on `/pinterest/from-wordpress` for a selected existing post. Result: Medium title, subtitle, 300-600-word summary in the article language, CTA "Want to explore the complete article? / Read the full guide on our blog →" with the article's **exact** permalink (FR / ES / DE translated).

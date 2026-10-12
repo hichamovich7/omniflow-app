@@ -6,11 +6,13 @@ import { mediumSummaryRequestSchema } from '@/lib/validations/medium-summary';
 import {
   generateMediumSummary,
   loadOmniflowArticleMediumSource,
+  loadPinterestGenerationMediumSource,
   loadWordPressPostMediumSource,
   MediumSummaryError,
   MEDIUM_SUMMARY_PROMPT_ID,
-  type MediumSummaryResult,
+  saveMediumSummary,
   type MediumSummarySource,
+  type SavedMediumSummary,
 } from '@/lib/social/medium-summary';
 import { SocialGenerationError } from '@/lib/social/pinterest-from-article';
 import { WordPressReadError } from '@/lib/wordpress/post-reader';
@@ -20,9 +22,11 @@ import type { ApiResponse } from '@/types/api';
 export const maxDuration = 60;
 
 /**
- * Medium summary from a WordPress article (TASK-062). Read-only: the article
- * is read (Supabase select / WordPress GET), the summary is returned and not
- * saved, nothing is written to WordPress and Medium is never called.
+ * Medium summary from a WordPress article (TASK-062). The article is only
+ * read (Supabase select / WordPress GET); the summary is saved to the
+ * caller's Medium history (social_content_generations, TASK-063) and
+ * returned with its id — or with id null and a warning when the save fails.
+ * Nothing is written to WordPress and Medium is never called.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -65,12 +69,15 @@ export async function POST(request: Request) {
 
   let source: MediumSummarySource;
   try {
+    const input = parsed.data;
     source =
-      'wordpressArticleId' in parsed.data
-        ? await loadOmniflowArticleMediumSource(supabase, user.id, parsed.data.wordpressArticleId)
-        : await loadWordPressPostMediumSource(supabase, user.id, parsed.data.wordpressPost);
+      'wordpressArticleId' in input
+        ? await loadOmniflowArticleMediumSource(supabase, user.id, input.wordpressArticleId)
+        : 'pinterestGenerationId' in input
+          ? await loadPinterestGenerationMediumSource(supabase, user.id, input.pinterestGenerationId)
+          : await loadWordPressPostMediumSource(supabase, user.id, input.wordpressPost);
   } catch (err) {
-    if (!(err instanceof SocialGenerationError) && !(err instanceof WordPressReadError)) throw err;
+    if (!(err instanceof SocialGenerationError) && !(err instanceof WordPressReadError) && !(err instanceof MediumSummaryError)) throw err;
     return NextResponse.json<ApiResponse<null>>(
       { data: null, error: { message: err.message, code: err.code } },
       { status: err.status }
@@ -79,7 +86,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateMediumSummary(source, generateText);
-    return NextResponse.json<ApiResponse<MediumSummaryResult>>({ data: result, error: null });
+    const saved = await saveMediumSummary(supabase, user.id, source, result);
+    return NextResponse.json<ApiResponse<SavedMediumSummary>>({ data: saved, error: null });
   } catch (err) {
     if (err instanceof MediumSummaryError) {
       return NextResponse.json<ApiResponse<null>>(

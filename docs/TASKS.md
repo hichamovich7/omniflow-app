@@ -55,12 +55,13 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 * **TASK-061 scope:** TASK-049 (R2 — WordPress side), TASK-050 (WebP on WordPress), TASK-FIX-058, TASK-FIX-059, TASK-FIX-060.
 * **TASK-062** — Medium summary from WordPress articles: offline tests pass, committed and pushed (commit "feat(medium): generate summaries with source images"); optional real test in TESTING.md.
+* **TASK-063** — Medium in the sidebar + saved history (`/medium`, migration 045): offline tests pass, committed and pushed (commit "feat(medium): add project-linked content history"); **migration 045 to apply by hand**, then the real test in TESTING.md.
 * **TASK-048** — real Pinterest CSV import (two-line test, see TESTING.md).
 * **TASK-046** — founder manual check (6 / 7 Pins, two rewrites).
 
 ### Planned
 
-* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook content (TASK-044 later phase, text only, migration 045); TASK-043 (edit Board section on existing Pins); TASK-011 Credits System (before any public opening).
+* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook content (TASK-044 later phase, text only — saved in `social_content_generations` (045); migration 046 reserved if it needs a schema change); TASK-043 (edit Board section on existing Pins); TASK-011 Credits System (before any public opening).
 * **P2:** storage audit / archiving (read-only orphan audit first); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
@@ -81,16 +82,18 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-11: 062 (TASK-062, Medium summary) → **next task: 063**.
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-12: 063 (TASK-063, Medium history) → **next task: 064**.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
-* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **next free migration: 045**.
+* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **next free migration: 046** (reserved for the TASK-044 later phases if they need one).
 
 ---
 
 # RECENT IMPLEMENTATION LOG
 
-Former content of the ACTIVE TASK list, kept for history. Every entry below is **committed and pushed to `main`** (commit noted) unless it says otherwise; statuses corrected by the 2026-10-11 audit. Migrations mentioned as "to apply by hand" are all applied.
+Former content of the ACTIVE TASK list, kept for history. Every entry below is **committed and pushed to `main`** (commit noted) unless it says otherwise; statuses corrected by the 2026-10-11 audit. Migrations mentioned as "to apply by hand" are all applied, except 045 (TASK-063).
+
+**[Ready to test — committed and pushed (commit "feat(medium): add project-linked content history"); migration 045 not applied yet]** TASK-063 (Medium in the sidebar with project-linked history). New generic table `social_content_generations` (migration **045**: user, project, platform `medium` + `facebook` / `instagram` / `reels` / `tiktok` prepared, status, source type, OmniFlow generation / site / WordPress post id / Pinterest generation sources `ON DELETE SET NULL`, source title, language, title, subtitle, Markdown, HTML, word count, image, CTA; RLS on user + project + sources; no secret column). Every Medium summary that passes its checks is saved by `POST /api/social/medium-summary` and returned with its `id`; a failed save (or the missing table) returns the summary anyway with `id: null` and a warning. New source `{ pinterestGenerationId }` (the article of a Pinterest generation made from one; keyword generations refused). Sidebar **Medium** enabled; `/medium` (filters project / source / date / status, cards with preview, project, platform, source, date, status, image, CTA, actions Open / Copy Markdown / Copy HTML / Download Markdown / Regenerate / Delete with confirmation) and `/medium/[id]`; `DELETE /api/social/generations/[id]`. Facebook / LinkedIn stay disabled; no content generated for the other platforms. No Medium API, no WordPress write, Pinterest unchanged. New spec `social-content-history.spec.ts` (22); full renderer 1110/1110; TypeScript, ESLint, build, `git diff --check` pass. See TASK-063 below.
 
 **[Ready to test — committed and pushed ("feat(medium): generate summaries with source images")]** TASK-062 (Medium summary from WordPress articles). "Generate Medium summary" in the Social Content Studio's Medium card (now `available`) and on `/pinterest/from-wordpress` once a post is selected. New `POST /api/social/medium-summary` (`{ wordpressArticleId }` or `{ wordpressPost: { siteId, postId } }`; auth, Zod, rate limit `social/medium-summary` 30/h + trial cap) and `lib/social/medium-summary.ts`: same ownership checks as TASK-051, the shared `WordPressArticleContext`, WordPress read with GET only; `generateText` FAST (`medium-summary-v1`) → title, subtitle, 300-600-word summary in the article language; checks (word range, numbers and — English — project details present in the article, language, verbatim copy) with one corrective retry; URLs written by the model removed; CTA added by code with the post's **exact** permalink, only when WordPress reports it `publish` on the connected site — otherwise no link + warning, never a guessed URL. **Image (2026-10-12):** the article's featured image, else its most relevant internal image, by its exact public HTTPS URL on the source site (OmniFlow article: also OmniFlow's public storage) — never generated, downloaded or re-hosted; alt from the image or the verified heading; none valid → no image + warning (`lib/social/medium-image.ts`). Result card: preview, word count, CTA URL, image URL, Copy Markdown / Copy HTML / Download Markdown / Regenerate summary. **Storage audit:** no social-history table exists (Pinterest history = `generations` + `pins`, Pin-shaped) → result not persisted, **no migration** (045 stays reserved for the TASK-044 social history). No Medium API, no Medium token, no WordPress write, no publication. New spec `medium-summary.spec.ts` (41 with the image); full renderer 1088/1088; TypeScript, ESLint, build, `git diff --check` pass. See TASK-062 below.
 
@@ -611,7 +614,7 @@ Platform multi-select + bounded number of variants
 Article title, content, keywords, images and URL pulled server-side
 Per-platform format/tone/length; article language
 Reel/TikTok v1: hook, short script, scenes, on-screen text, voice-over, caption, hashtags, CTA — no video generation
-Review, edit, copy, export; history persisted (new table(s) + RLS, migration **045** proposed — the next free number; 037-044 are used)
+Review, edit, copy, export; history persisted — in `social_content_generations` (migration 045, created by TASK-063 for Medium, platforms `facebook` / `instagram` / `reels` / `tiktok` already accepted); **migration 046 reserved** for any schema change these phases need
 Reuses lib/ai (generateText), rate limit/trial cap, Pinterest content rules and CSV contract
 Read-only access to wordpress_articles / wordpress_article_images / wordpress-images
 ```
@@ -1006,7 +1009,7 @@ Turn a WordPress article — an OmniFlow article or an existing post of a connec
 
 ### Decisions
 
-* **No persistence, no migration:** the existing history (`generations` / `pins`) is Pinterest-specific; a Medium summary is a temporary, copyable result. 045 remains the proposed migration for the TASK-044 social history if it is ever needed.
+* **No persistence, no migration (2026-10-11):** the existing history (`generations` / `pins`) is Pinterest-specific; a Medium summary was a temporary, copyable result. **Superseded by TASK-063** (2026-10-12): summaries are now saved in `social_content_generations` (migration 045).
 * **Permalink:** only WordPress's own `link` of a published post on the connected site; an OmniFlow article gets it through one GET of its `wp_post_id`. Unavailable → summary without link + warning.
 * **Language:** OmniFlow article = generation language; existing post = detected from its text (en / fr / es / de stopwords), else the project's default language.
 * **Image:** only an image already in the article, by its exact URL — no AI image, no copy to R2 / Supabase (first version). Existing post: its own site only (a Jetpack `i0.wp.com` or other CDN copy is refused). OmniFlow article: the WordPress post's images when it was read, else OmniFlow's public storage.
@@ -1016,6 +1019,37 @@ Turn a WordPress article — an OmniFlow article or an existing post of a connec
 
 * Real test with one published and one unpublished article, and one existing post (TESTING.md "Medium summary").
 * The fact check covers numbers in every language and project details on English articles only (English lexicon, as TASK-051); other claims rely on the prompt.
+
+---
+
+## [TASK-063] Medium in the sidebar with project-linked history
+
+### Status: READY TO TEST (2026-10-12 — offline tests pass; committed and pushed (commit "feat(medium): add project-linked content history"); **migration 045 to apply by hand** in the Supabase SQL Editor, then the real test in TESTING.md)
+
+### Goal
+
+Give Medium its own section: a sidebar entry, a history page `/medium` and a detail page `/medium/[id]`, with every generated summary saved with its project and source — on a generic table ready for Facebook, Instagram, Reels and TikTok (not activated).
+
+### What ships
+
+* `supabase/migrations/045_add_social_content_generations.sql` — table `social_content_generations` (see DATABASE.md), RLS (`USING user_id`, `WITH CHECK` project + sources owned), indexes, `updated_at` trigger.
+* `lib/social/social-content.ts` — platforms (`medium` active; `facebook`, `instagram`, `reels`, `tiktok` prepared), source types, row type, `mediumSummaryRow`, `regenerateRequestFor`, `sourceHref`, `contentPreview`, filters (`parseSocialContentFilters`, `periodStart`).
+* `lib/queries/social-content.ts` — insert (missing table detected), list (user + platform + filters, 20 per page), get, delete (user-scoped).
+* `lib/social/medium-summary.ts` — each source carries a `ref` (project + source ids); `loadPinterestGenerationMediumSource`; `saveMediumSummary` (failure → summary kept, `id: null`, warning). `lib/validations/medium-summary.ts` — `{ pinterestGenerationId }`.
+* `POST /api/social/medium-summary` saves and returns `id`; new `DELETE /api/social/generations/[id]`.
+* UI: sidebar Medium enabled; `/medium` + `loading.tsx`, `/medium/[id]`; `components/social/` — `medium-history-filters`, `social-content-meta`, `social-content-actions` (delete confirmation dialog), `medium-summary-result` (shared result view with the "Saved to your Medium history" link), `medium-export` (copy / download / request helpers); `medium-summary-panel` uses them.
+
+### Decisions
+
+* **Column `source_wordpress_article_id` = the WordPress post id (bigint)** on `source_wordpress_site_id`; the OmniFlow article is `source_wordpress_generation_id` (uuid, added to the requested columns). A published OmniFlow article also stores its site + post id.
+* **Pinterest source**: summarizes the article the Pinterest generation was made from (no article → refused). No entry point was added to the Pinterest pages ("do not modify Pinterest"): it is used by Regenerate and available to the API.
+* **Regenerate = a new history entry** (the previous one is kept), like Pinterest generations.
+* **Status** `completed` / `failed`: only validated summaries are saved (`completed`); `failed` is allowed by the schema for future use.
+* Deleting a source keeps the saved content (sources `SET NULL`, Regenerate disabled); deleting the project deletes it (CASCADE).
+
+### Remaining
+
+* Apply migration 045 (Supabase SQL Editor), then the real test (TESTING.md "Medium history").
 
 ---
 

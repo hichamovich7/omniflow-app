@@ -1214,6 +1214,28 @@ Results 2026-10-11: new spec 29/29; full renderer **1076/1076**; with the image 
 
 ---
 
+# Medium history — social_content_generations (TASK-063, 2026-10-12)
+
+```bash
+npx playwright test tests/renderer/social-content-history.spec.ts tests/renderer/medium-summary.spec.ts tests/renderer/social-content-studio.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/social-content-history.spec.ts` (22, fake Supabase recording every call + fake `fetch` — no network, no AI, no database):
+
+* **Save**: one insert with user, project, `platform = medium`, `status = completed`, title, subtitle, Markdown, HTML, word count, image URL / alt, exact CTA, language → `id` returned.
+* **Relations**: OmniFlow article (generation id, + site and WordPress post id when published; unpublished → no site / post / CTA); existing post (project of the connected site, site id, post id); Pinterest generation from an OmniFlow article (Pinterest id + article ids) and from an existing post (Pinterest id + site + post id); keyword generation → `no_article_source`; another user's generation → `forbidden`; other project → `project_mismatch`; missing → `not_found`; the Pinterest source never reads Pin URLs and the CTA stays the validated permalink; a post id is never saved without its site.
+* **Save failure**: insert error → summary returned unchanged, `id: null`, "could not be saved" warning; missing table (`PGRST205`) → "migration 045 not applied" warning.
+* **History**: list scoped to the user and to `medium` (rows of other users and Facebook rows excluded), filters project / source / date (30 days) / status, invalid filter values ignored, period bounds; detail only for the owner; delete only the owner's row and nothing else; Regenerate builds a valid request for each source type, null when the source is gone; source links stay inside OmniFlow; preview without URL / Markdown.
+* **Static**: migration 045 (table, platform CHECK incl. future platforms, nullable sources with `ON DELETE SET NULL`, RLS `USING user_id` + `WITH CHECK` on project and every source, no token / secret / password column); DELETE route (auth, UUID, user-scoped); actions (Open, Copy Markdown, Copy HTML, Download Markdown, Regenerate, Delete only from the confirm button of the dialog, unsaved regeneration kept on screen); `/medium` list + filters + meta + detail; sidebar (Medium enabled, Facebook / LinkedIn disabled); no Medium API, no `wp-json`, no credentials / service key in the new files; client components import no server module.
+
+Adapted: `medium-summary.spec.ts` (41 — the copy / download / request code moved to `medium-summary-result.tsx` and `medium-export.ts`; the route saves through `saveMediumSummary`).
+
+Results 2026-10-12: new spec 22/22; Medium spec 41/41; full renderer **1110/1110**; TypeScript, ESLint (touched files), `next build` and `git diff --check` pass. **Migration 045 not applied** (no DDL access) — the real checks below need it.
+
+**Real test (founder, after applying 045 in the Supabase SQL Editor):** (1) generate a Medium summary from an OmniFlow article → "Saved to your Medium history" link; (2) sidebar **Medium** → the summary is listed with project, source, date, status, image and CTA; (3) filters (project, source, date, status); (4) open it, Copy Markdown / Copy HTML / Download Markdown; (5) Regenerate → a new entry, the old one kept; (6) Delete → dialog, Cancel keeps it, Delete removes only it (the article is unchanged); (7) another account cannot open `/medium/<id>` (404). Nothing is published to Medium, WordPress posts unchanged.
+
+---
+
 # TASK-061 — Real WordPress validation on R2 + production R2 activation (planned 2026-10-11)
 
 Manual, founder-run, in this order. Costs one WordPress article generation (featured + internal images); everything else makes no AI call. Prerequisites: local `MEDIA_STORAGE_PROVIDER=r2` + the six `R2_*` variables; migrations 042 / 043 applied (verified 2026-10-11); a connected **test** WordPress site (≥ 5.8) with Media Library access. Background: Pinterest already runs on R2 locally (25 optimized Pins under `images/pinterest/`, 1000×1500 JPEG ≈ 280-330 KB, read-only check 2026-10-11); `images/wordpress/` is still empty.

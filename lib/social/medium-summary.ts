@@ -29,13 +29,16 @@ import {
 } from '@/lib/social/medium-image';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '@/types/pinterest';
 import type { WordPressPostSource } from '@/lib/validations/wordpress-post-source';
+import { mediumSummaryRow, type SocialContentSourceRef } from '@/lib/social/social-content';
+import { insertSocialContentGeneration } from '@/lib/queries/social-content';
 
 /**
  * Medium summary from a WordPress article (TASK-062). Turns an OmniFlow
  * article or an existing post of a connected site into a short Medium piece
  * (title, subtitle, 300-600-word summary, CTA). Read-only everywhere:
- * Supabase selects, WordPress GETs; nothing is saved, nothing is published,
- * Medium is never called. The model never sees or writes a URL — the only
+ * Supabase selects, WordPress GETs; the only write is the saved summary
+ * (social_content_generations, TASK-063); nothing is published, Medium is
+ * never called. The model never sees or writes a URL — the only
  * link of the result is the article's exact permalink, added by code in the
  * CTA, and only when WordPress reports the post as published on the
  * connected site. The only image is one already in the article, by its exact
@@ -69,6 +72,8 @@ export interface MediumSummarySource {
   imageCandidates: MediumImageCandidate[];
   /** Where an image may be hosted to be used. */
   imageHosts: MediumImageHosts;
+  /** Project + source ids saved with the summary (social_content_generations, TASK-063). */
+  ref: SocialContentSourceRef;
 }
 
 export interface MediumSummaryDraft {
@@ -93,7 +98,7 @@ export interface MediumSummaryResult {
   warnings: string[];
 }
 
-export type MediumSummaryErrorCode = 'article_too_short' | 'invalid_summary';
+export type MediumSummaryErrorCode = 'article_too_short' | 'invalid_summary' | 'no_article_source';
 
 export class MediumSummaryError extends Error {
   readonly code: MediumSummaryErrorCode;
@@ -222,6 +227,16 @@ export async function loadOmniflowArticleMediumSource(
       ...omniflowCandidates.filter((candidate) => candidate.origin === 'internal'),
     ],
     imageHosts: mediumImageHosts(site?.site_url ?? null, true),
+    ref: {
+      sourceType: 'omniflow_article',
+      projectId: generation.project_id,
+      wordpressGenerationId: generation.id,
+      // The published WordPress post, on the caller's own site only.
+      wordpressSiteId: article.wp_post_id && site ? site.id : null,
+      wordpressPostId: article.wp_post_id && site ? article.wp_post_id : null,
+      pinterestGenerationId: null,
+      sourceTitle: article.title,
+    },
   };
 }
 
@@ -273,7 +288,69 @@ export async function loadWordPressPostMediumSource(
     imageCandidates: imageCandidatesFromContext(context),
     // An existing post: only images hosted on its own site.
     imageHosts: mediumImageHosts(site.site_url, false),
+    ref: {
+      sourceType: 'external_wordpress_post',
+      projectId: site.project_id,
+      wordpressGenerationId: null,
+      wordpressSiteId: site.id,
+      wordpressPostId: post.id,
+      pinterestGenerationId: null,
+      sourceTitle: context.title,
+    },
   };
+}
+
+/**
+ * A Pinterest generation made from an article (TASK-063): the summary is
+ * written from that article — the OmniFlow article
+ * (source_wordpress_generation_id, migration 040) or the existing post
+ * (source_wordpress_site_id / source_wordpress_post_id, migration 044) —
+ * and keeps both links. A keyword generation has no article to summarize.
+ * Never reads or uses a Pin's destination URL.
+ */
+export async function loadPinterestGenerationMediumSource(
+  supabase: SupabaseClient,
+  userId: string,
+  pinterestGenerationId: string,
+  deps: ReadDeps = {}
+): Promise<MediumSummarySource> {
+  const { data } = await supabase
+    .from('generations')
+    .select('id, user_id, project_id, source_type, source_wordpress_generation_id, source_wordpress_site_id, source_wordpress_post_id')
+    .eq('id', pinterestGenerationId)
+    .single();
+  const generation = data as {
+    id: string;
+    user_id: string;
+    project_id: string;
+    source_type: string | null;
+    source_wordpress_generation_id: string | null;
+    source_wordpress_site_id: string | null;
+    source_wordpress_post_id: number | null;
+  } | null;
+  if (!generation) throw new SocialGenerationError('not_found', 'Pinterest generation not found');
+  if (generation.user_id !== userId) throw new SocialGenerationError('forbidden', 'You do not have access to this Pinterest generation');
+
+  let source: MediumSummarySource;
+  if (generation.source_wordpress_generation_id) {
+    source = await loadOmniflowArticleMediumSource(supabase, userId, generation.source_wordpress_generation_id, deps);
+  } else if (generation.source_type === 'external_wordpress_post' && generation.source_wordpress_site_id && generation.source_wordpress_post_id) {
+    source = await loadWordPressPostMediumSource(
+      supabase,
+      userId,
+      { siteId: generation.source_wordpress_site_id, postId: generation.source_wordpress_post_id },
+      deps
+    );
+  } else {
+    throw new MediumSummaryError(
+      'no_article_source',
+      'This Pinterest generation was not made from a WordPress article, so there is no article to summarize.'
+    );
+  }
+  if (source.ref.projectId !== generation.project_id) {
+    throw new SocialGenerationError('project_mismatch', 'The article of this Pinterest generation belongs to another project');
+  }
+  return { ...source, ref: { ...source.ref, sourceType: 'pinterest_generation', pinterestGenerationId: generation.id } };
 }
 
 // ---------------------------------------------------------------------------
@@ -547,4 +624,37 @@ export async function generateMediumSummary(
     feedback = issues;
   }
   throw new MediumSummaryError('invalid_summary', 'The summary could not be generated. Try again.');
+}
+
+// ---------------------------------------------------------------------------
+// History (TASK-063)
+
+export const SAVE_FAILED_WARNING =
+  'This summary could not be saved to your Medium history. It is shown below: copy or download it before leaving the page.';
+export const SAVE_UNAVAILABLE_WARNING =
+  'Medium history is not available yet (database migration 045 not applied). The summary is shown below but not saved: copy or download it before leaving the page.';
+
+export interface SavedMediumSummary extends MediumSummaryResult {
+  /** social_content_generations.id — null when the save failed (the summary is still returned). */
+  id: string | null;
+}
+
+/**
+ * Saves a summary that passed its checks, with its project and source.
+ * A failed save never loses the summary: it is returned with id null and a
+ * warning.
+ */
+export async function saveMediumSummary(
+  supabase: SupabaseClient,
+  userId: string,
+  source: Pick<MediumSummarySource, 'ref'>,
+  result: MediumSummaryResult
+): Promise<SavedMediumSummary> {
+  const saved = await insertSocialContentGeneration(supabase, mediumSummaryRow(userId, source.ref, result));
+  if (saved.ok) return { ...result, id: saved.id };
+  return {
+    ...result,
+    id: null,
+    warnings: [...result.warnings, saved.reason === 'migration_required' ? SAVE_UNAVAILABLE_WARNING : SAVE_FAILED_WARNING],
+  };
 }

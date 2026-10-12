@@ -24,7 +24,8 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * `supabase/migrations/001` → `044` — numbered without gap or duplicate.
 * Every table, column and storage bucket they create is present in the live database (`generated-images`, `wordpress-images`, `reference-images`), including the migrations once marked "apply manually" (029, 032-044).
 * Grants, RLS policies, triggers and SQL functions (e.g. 003, 010, 023, 031) are not visible through this check — they are assumed applied with their migration.
-* **Next free migration: 045** (proposed for the Social Content Studio history, TASK-044 later phases).
+* **Migration 045** (`045_add_social_content_generations.sql`, TASK-063) — written 2026-10-12, **not applied yet**: to apply by hand in the Supabase SQL Editor. Before it, Medium summaries are generated but not saved (warning), and `/medium` shows a "not available yet" notice.
+* **Next free migration: 046** (reserved for the TASK-044 later phases — e.g. Facebook — if they need a schema change beyond `social_content_generations`).
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -69,6 +70,12 @@ auth.users
         │
         ├── content_stream_boards (join table) → boards
         └── content_stream_publishing_activity (TASK-FIX-043, one row per stream + local day; status published/expected — TASK-FIX-053)
+```
+
+```
+profiles
+  └── social_content_generations (TASK-063, migration 045; project_id required; optional sources →
+        wordpress_generations / wordpress_sites / generations, ON DELETE SET NULL)
 ```
 
 ```
@@ -1009,6 +1016,52 @@ Grants: `SELECT, INSERT, UPDATE, DELETE` to `authenticated` (DELETE only removes
 unique (wordpress_site_id, source_asset_key)
 (wordpress_site_id, source_hash) where source_hash is not null
 ```
+
+---
+
+# social_content_generations
+
+Saved social content (TASK-063, migration 045). Only **Medium** summaries are written today (`POST /api/social/medium-summary`, after the summary passed its checks); `facebook`, `instagram`, `reels` and `tiktok` are already accepted by the `platform` CHECK so their future generators share the table and the history UI.
+
+## Columns
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | `gen_random_uuid()` |
+| user_id | uuid NOT NULL → profiles(id) ON DELETE CASCADE | owner |
+| project_id | uuid NOT NULL → projects(id) ON DELETE CASCADE | project of the source (OmniFlow article's project, connected site's project, Pinterest generation's project) |
+| platform | text NOT NULL | CHECK `medium` / `facebook` / `instagram` / `reels` / `tiktok` |
+| status | text NOT NULL DEFAULT `completed` | CHECK `completed` / `failed` (only `completed` is written today) |
+| source_type | text NOT NULL | CHECK `omniflow_article` / `external_wordpress_post` / `pinterest_generation` |
+| source_wordpress_generation_id | uuid nullable → wordpress_generations(id) ON DELETE SET NULL | OmniFlow article (also kept for a Pinterest generation made from one) |
+| source_wordpress_site_id | uuid nullable → wordpress_sites(id) ON DELETE SET NULL | connected site of the post (external post; published OmniFlow article) |
+| source_wordpress_article_id | bigint nullable, > 0 | **WordPress post id** on that site; CHECK requires `source_wordpress_site_id` |
+| source_pinterest_generation_id | uuid nullable → generations(id) ON DELETE SET NULL | Pinterest generation the summary was requested from |
+| source_title | text nullable | title of the source article at generation time (shown in the history, kept if the source is deleted) |
+| language | text nullable | `en` / `fr` / `es` / `de` |
+| title | text NOT NULL | |
+| subtitle | text nullable | |
+| content_markdown | text NOT NULL | full Markdown (title, subtitle, image, summary, CTA) |
+| content_html | text NOT NULL | same content as HTML |
+| word_count | integer nullable, ≥ 0 | subtitle + summary |
+| image_url | text nullable | CHECK `https://` — an image already in the source article, exact URL (never generated, never re-hosted) |
+| image_alt | text nullable | |
+| cta_url | text nullable | CHECK `http(s)://` — only the exact validated permalink of the published post; never built, never a Pinterest URL |
+| created_at / updated_at | timestamptz NOT NULL DEFAULT now() | `updated_at` trigger (`update_updated_at_column`) |
+
+No secret, token or credential of any external service is stored (no Medium token — there is no Medium integration).
+
+## RLS
+
+`Users access own social content generations` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` additionally requires the project and every non-null source (`wordpress_generations`, `wordpress_sites`, `generations`) to belong to the caller — same hardened shape as `tasks` (033). `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`. Queries (`lib/queries/social-content.ts`) also filter on `user_id`.
+
+## Indexes
+
+`(user_id, platform, created_at DESC)` (history list), `project_id`, partial `source_wordpress_generation_id`, partial `source_pinterest_generation_id`.
+
+## Deletion
+
+Deleting a saved item (`DELETE /api/social/generations/[id]`) deletes only that row. Deleting a source article / site / Pinterest generation keeps the saved content (sources set to NULL; Regenerate is then disabled). Deleting the project deletes its saved content (CASCADE, like `generations`).
 
 ---
 
