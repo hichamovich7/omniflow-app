@@ -9,6 +9,7 @@ import { ExportCsvButton } from '@/components/pinterest/export-csv-button';
 import { GenerateImagesButton } from '@/components/pinterest/generate-images-button';
 import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
 import { GenerateWordPressButton } from '@/components/pinterest/generate-wordpress-button';
+import { GenerateMediumButton } from '@/components/pinterest/generate-medium-button';
 import type { Pin, ImageStatus } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
@@ -24,6 +25,8 @@ interface EditorialWorkspaceProps {
   pinsWordPressUsage: Record<string, WordPressUsageArticle[]>;
   activeImageModels: Record<string, string | null>;
   boardNames: Record<string, string | null>;
+  /** The generation was made from a WordPress article (TASK-064: Medium summary available). */
+  hasSourceArticle: boolean;
 }
 
 export function EditorialWorkspace(props: EditorialWorkspaceProps) {
@@ -46,6 +49,7 @@ function EditorialWorkspaceContent({
   pinsWordPressUsage,
   activeImageModels,
   boardNames,
+  hasSourceArticle,
 }: EditorialWorkspaceProps) {
   const { selectedIds, selectedCount } = useSelection();
   const allIds = useMemo(() => pins.map(p => p.id), [pins]);
@@ -76,6 +80,7 @@ function EditorialWorkspaceContent({
                 hasSchedule={hasSchedule}
               />
               <ExportCsvButton pins={pins} keyword={keyword} />
+              <GenerateMediumButton generationId={generationId} hasArticle={hasSourceArticle} />
             </div>
           )}
 
@@ -100,6 +105,7 @@ function EditorialWorkspaceContent({
               selectedPinIds={selectedIds}
             />
             <GenerateWordPressButton selectedPinIds={selectedIds} />
+            <GenerateMediumButton generationId={generationId} hasArticle={hasSourceArticle} />
           </SelectionActionBar>
         </>
       )}

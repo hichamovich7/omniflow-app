@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Medium from Pins and from the Medium page — TASK-064 (2026-10-12)
+
+* **Pinterest generation → "Generate Medium summary"**: new button in the action bar and in the selection bar of a Pinterest generation. It summarizes the WordPress article the Pins were made from (the article stays the source of truth), saves it and opens it in `/medium`. Pins created from a keyword have no article: the button is disabled with an explanation.
+* **`/medium` → "New Medium summary"**: choose From OmniFlow WordPress article, From existing WordPress article or From Pinterest Pins, pick the source in place (lists of completed articles and of Pins made from an article, or the WordPress post search), then "Generate Medium summary"; the history below refreshes.
+* No new endpoint (uses `POST /api/social/medium-summary` with `{ pinterestGenerationId }` from TASK-063), no migration, no prompt change, no Medium API, no WordPress write.
+* Tests: new `tests/renderer/medium-sources.spec.ts` (9). Full renderer 1119/1119, TypeScript, ESLint, build pass.
+
 ## Medium in the sidebar with saved history — TASK-063 (2026-10-12)
 
 * **Sidebar → Platforms → Medium** is now active (Facebook and LinkedIn stay disabled).

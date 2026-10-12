@@ -11,7 +11,13 @@ import { Pagination } from '@/components/shared/pagination';
 import { MediumHistoryFilters } from '@/components/social/medium-history-filters';
 import { SocialContentMeta } from '@/components/social/social-content-meta';
 import { SocialContentActions } from '@/components/social/social-content-actions';
-import { listSocialContentGenerations } from '@/lib/queries/social-content';
+import { NewMediumSummary } from '@/components/social/new-medium-summary';
+import {
+  listMediumArticleOptions,
+  listMediumPinterestOptions,
+  listMediumSiteOptions,
+  listSocialContentGenerations,
+} from '@/lib/queries/social-content';
 import {
   contentPreview,
   parseSocialContentFilters,
@@ -21,9 +27,11 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * Medium history (TASK-063): every saved Medium summary of the user, newest
- * first, filtered by project / source / date / status. The page only reads;
- * copy, download, regenerate and delete are client actions.
+ * Medium (TASK-063, TASK-064): "New Medium summary" (choose an OmniFlow
+ * article, an existing WordPress post or Pins made from an article, then
+ * generate) above the history of saved summaries, newest first, filtered by
+ * project / source / date / status. The page only reads; generation, copy,
+ * download, regenerate and delete are client actions.
  */
 export default async function MediumHistoryPage({
   searchParams,
@@ -38,9 +46,12 @@ export default async function MediumHistoryPage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const [{ data: projects }, { items, total, unavailable }] = await Promise.all([
+  const [{ data: projects }, { items, total, unavailable }, articleOptions, siteOptions, pinterestOptions] = await Promise.all([
     supabase.from('projects').select('id, name').eq('user_id', user.id).order('name'),
     listSocialContentGenerations(supabase, user.id, 'medium', filters),
+    listMediumArticleOptions(supabase, user.id),
+    listMediumSiteOptions(supabase, user.id),
+    listMediumPinterestOptions(supabase, user.id),
   ]);
   const totalPages = Math.max(1, Math.ceil(total / SOCIAL_CONTENT_PAGE_SIZE));
   const hasFilters = Boolean(filters.project || filters.source || filters.period || filters.status);
@@ -60,6 +71,9 @@ export default async function MediumHistoryPage({
         </Alert>
       )}
 
+      <NewMediumSummary articles={articleOptions} sites={siteOptions} pinterest={pinterestOptions} />
+
+      <h2 className="text-base font-semibold">History</h2>
       <MediumHistoryFilters projects={projects ?? []} />
 
       {items.length === 0 ? (
@@ -68,17 +82,14 @@ export default async function MediumHistoryPage({
           description={
             hasFilters
               ? 'Try adjusting your filters to find what you are looking for.'
-              : 'Open a completed WordPress article and use "Generate Medium summary" in its Social Content Studio, or select an existing WordPress post.'
+              : 'Use "New Medium summary" above, or "Generate Medium summary" on an article or on Pins made from an article.'
           }
           icon={hasFilters ? Search : Clock}
+          headingLevel={3}
         >
-          {hasFilters ? (
+          {hasFilters && (
             <Link href="/medium" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
               Clear filters
-            </Link>
-          ) : (
-            <Link href="/wordpress/history" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-              Go to WordPress articles
             </Link>
           )}
         </EmptyState>
@@ -98,11 +109,11 @@ export default async function MediumHistoryPage({
                     />
                   )}
                   <div className="min-w-0 flex-1 space-y-2">
-                    <h2 className="text-base font-semibold">
+                    <h3 className="text-base font-semibold">
                       <Link href={`/medium/${item.id}`} className="hover:underline">
                         {item.title}
                       </Link>
-                    </h2>
+                    </h3>
                     <p className="text-sm text-muted-foreground">{contentPreview(item.content_markdown)}</p>
                     <SocialContentMeta item={item} />
                   </div>

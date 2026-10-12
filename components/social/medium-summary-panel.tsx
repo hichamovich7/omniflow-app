@@ -12,6 +12,8 @@ import type { MediumSummaryRequest } from '@/lib/validations/medium-summary';
 interface MediumSummaryPanelProps {
   /** Exactly the POST /api/social/medium-summary body: an OmniFlow article or an existing WordPress post. */
   source: MediumSummaryRequest;
+  /** Called after each successful generation (the /medium page refreshes its list). */
+  onGenerated?: (result: SavedMediumSummary) => void;
 }
 
 /**
@@ -20,7 +22,7 @@ interface MediumSummaryPanelProps {
  * fails the result is still shown here with a warning. Nothing is
  * published, and the WordPress article is never modified.
  */
-export function MediumSummaryPanel({ source }: MediumSummaryPanelProps) {
+export function MediumSummaryPanel({ source, onGenerated }: MediumSummaryPanelProps) {
   const [result, setResult] = useState<SavedMediumSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +32,12 @@ export function MediumSummaryPanel({ source }: MediumSummaryPanelProps) {
     setLoading(true);
     setError(null);
     const response = await requestMediumSummary<SavedMediumSummary>(source);
-    if (response.data) setResult(response.data);
-    else setError(response.error);
+    if (response.data) {
+      setResult(response.data);
+      onGenerated?.(response.data);
+    } else {
+      setError(response.error);
+    }
     setLoading(false);
   }
 

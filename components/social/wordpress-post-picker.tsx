@@ -39,7 +39,22 @@ function formatDate(value: string): string {
  * WordPress (GET); choosing a post opens the summary + form, nothing is
  * generated until "Generate Pins".
  */
-export function WordPressPostPicker({ sites, initialSiteId }: { sites: PickerSite[]; initialSiteId: string | null }) {
+export interface PickedWordPressPost {
+  siteId: string;
+  postId: number;
+  title: string;
+}
+
+export function WordPressPostPicker({
+  sites,
+  initialSiteId,
+  onSelectPost,
+}: {
+  sites: PickerSite[];
+  initialSiteId: string | null;
+  /** Medium page (TASK-064): handle the choice in place instead of opening the Pinterest page. */
+  onSelectPost?: (post: PickedWordPressPost) => void;
+}) {
   const [siteId, setSiteId] = useState(initialSiteId && sites.some((s) => s.id === initialSiteId) ? initialSiteId : sites[0]?.id ?? '');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('publish');
@@ -177,12 +192,24 @@ export function WordPressPostPicker({ sites, initialSiteId }: { sites: PickerSit
                   ))}
                 </div>
               </div>
-              <Link
-                href={wordpressPostPinterestHref({ siteId, postId: post.id })}
-                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'shrink-0')}
-              >
-                Select
-              </Link>
+              {onSelectPost ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => onSelectPost({ siteId, postId: post.id, title: post.title })}
+                >
+                  Select
+                </Button>
+              ) : (
+                <Link
+                  href={wordpressPostPinterestHref({ siteId, postId: post.id })}
+                  className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'shrink-0')}
+                >
+                  Select
+                </Link>
+              )}
             </li>
           ))}
         </ul>

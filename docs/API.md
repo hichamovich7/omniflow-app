@@ -1121,7 +1121,7 @@ Exactly one source (`mediumSummaryRequestSchema`, strict):
 { "pinterestGenerationId": "<generations.id>" }
 ```
 
-The third form (TASK-063, used by Regenerate in the Medium history) summarizes the article a Pinterest generation was made from.
+The third form (TASK-063) summarizes the article a Pinterest generation was made from. Used by Regenerate in the Medium history, by "Generate Medium summary" on a Pinterest generation (TASK-064) and by "From Pinterest Pins" on `/medium`.
 
 ## Description
 

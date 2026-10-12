@@ -1214,6 +1214,20 @@ Results 2026-10-11: new spec 29/29; full renderer **1076/1076**; with the image 
 
 ---
 
+# Medium from Pins + New Medium summary on /medium (TASK-064, 2026-10-12)
+
+```bash
+npx playwright test tests/renderer/medium-sources.spec.ts tests/renderer/social-content-history.spec.ts tests/renderer/medium-summary.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/medium-sources.spec.ts` (9): `pinterestGenerationHasArticle` (OmniFlow article, existing post with site + post id, keyword → false); the Pins button (request `{ pinterestGenerationId }`, disabled with the keyword explanation, saved → `/medium/<id>`, unsaved → dialog, no own fetch, selection ignored); button in both Pin bars and wired by `/pinterest/[id]`; source lists (completed OmniFlow articles of the user with the published flag, limit 50; Pinterest generations of the user made from an article — `or(...)` filter — and none on a query error; sites with public columns only); chooser (three sources, the three request bodies, post picker in place, panel keyed by source, history refreshed, existing-post disabled without a site, no own request); post picker keeps the Pinterest link by default; `/medium` loads the lists read-only, no AI on load.
+
+Results 2026-10-12: 9/9; full renderer **1119/1119**; TypeScript, ESLint (touched files), `next build` and `git diff --check` pass.
+
+**Real test (founder, migration 045 applied, one AI text call each):** (1) open a Pinterest generation made from an article → "Generate Medium summary" (default bar, and with Pins selected) → opens the saved summary; (2) a keyword generation → the button is disabled with its explanation; (3) `/medium` → New Medium summary → each of the three sources → Select → Generate → the summary appears in the history below.
+
+---
+
 # Medium history — social_content_generations (TASK-063, 2026-10-12)
 
 ```bash

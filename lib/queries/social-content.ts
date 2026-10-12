@@ -101,3 +101,92 @@ export async function deleteSocialContentGeneration(
   if (error) return 'error';
   return (data ?? []).length > 0 ? 'deleted' : 'not_found';
 }
+
+// ---------------------------------------------------------------------------
+// Sources offered on /medium (TASK-064) — read-only selects of the caller's rows
+
+export const MEDIUM_SOURCE_OPTIONS_LIMIT = 50;
+
+export interface MediumArticleOption {
+  id: string;
+  title: string;
+  projectName: string;
+  createdAt: string;
+  published: boolean;
+}
+
+export interface MediumPinterestOption {
+  id: string;
+  keyword: string;
+  projectName: string;
+  pins: number;
+  createdAt: string;
+}
+
+export interface MediumSiteOption {
+  id: string;
+  siteUrl: string;
+  projectName: string;
+}
+
+/** Completed OmniFlow articles, newest first. */
+export async function listMediumArticleOptions(supabase: SupabaseClient, userId: string): Promise<MediumArticleOption[]> {
+  const { data } = await supabase
+    .from('wordpress_generations')
+    .select('id, keyword, created_at, projects(name), wordpress_articles(title, status, wp_post_id, publish_status)')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+    .limit(MEDIUM_SOURCE_OPTIONS_LIMIT);
+  type Row = {
+    id: string;
+    keyword: string;
+    created_at: string;
+    projects: { name: string } | null;
+    wordpress_articles:
+      | { title: string; status: string; wp_post_id: number | null; publish_status: string }
+      | Array<{ title: string; status: string; wp_post_id: number | null; publish_status: string }>
+      | null;
+  };
+  return ((data ?? []) as unknown as Row[]).flatMap((row) => {
+    const article = Array.isArray(row.wordpress_articles) ? row.wordpress_articles[0] : row.wordpress_articles;
+    if (!article || article.status !== 'completed') return [];
+    return [
+      {
+        id: row.id,
+        title: article.title || row.keyword,
+        projectName: row.projects?.name ?? 'Project',
+        createdAt: row.created_at,
+        published: Boolean(article.wp_post_id) && article.publish_status === 'published',
+      },
+    ];
+  });
+}
+
+/** Completed Pinterest generations made from an article (OmniFlow article or existing WordPress post). */
+export async function listMediumPinterestOptions(supabase: SupabaseClient, userId: string): Promise<MediumPinterestOption[]> {
+  const { data, error } = await supabase
+    .from('generations')
+    .select('id, keyword, pins_requested, created_at, projects(name)')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .or('source_wordpress_generation_id.not.is.null,source_type.eq.external_wordpress_post')
+    .order('created_at', { ascending: false })
+    .limit(MEDIUM_SOURCE_OPTIONS_LIMIT);
+  if (error) return [];
+  type Row = { id: string; keyword: string; pins_requested: number; created_at: string; projects: { name: string } | null };
+  return ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
+    keyword: row.keyword,
+    projectName: row.projects?.name ?? 'Project',
+    pins: row.pins_requested,
+    createdAt: row.created_at,
+  }));
+}
+
+/** Connected WordPress sites — public columns only (never the encrypted password). */
+export async function listMediumSiteOptions(supabase: SupabaseClient, userId: string): Promise<MediumSiteOption[]> {
+  const { data } = await supabase.from('wordpress_sites').select('id, site_url, projects(name)').eq('user_id', userId);
+  type Row = { id: string; site_url: string; projects: { name: string } | null };
+  return ((data ?? []) as unknown as Row[]).map((row) => ({ id: row.id, siteUrl: row.site_url, projectName: row.projects?.name ?? 'Project' }));
+}

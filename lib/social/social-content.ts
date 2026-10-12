@@ -202,3 +202,28 @@ export function periodStart(period: SocialContentPeriod | undefined, now: Date =
   if (!period) return null;
   return new Date(now.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000).toISOString();
 }
+
+// ---------------------------------------------------------------------------
+// Medium from a Pinterest generation (TASK-064)
+
+export const NO_ARTICLE_FOR_MEDIUM_MESSAGE =
+  'These Pins were created from a keyword, not from a WordPress article: there is no article to summarize for Medium.';
+
+/**
+ * True when a Pinterest generation was made from an article — an OmniFlow
+ * article (migration 040) or an existing WordPress post (migration 044) —
+ * so a Medium summary of that article can be generated from it.
+ */
+export function pinterestGenerationHasArticle(generation: {
+  source_wordpress_generation_id?: string | null;
+  source_type?: string | null;
+  source_wordpress_site_id?: string | null;
+  source_wordpress_post_id?: number | null;
+}): boolean {
+  if (generation.source_wordpress_generation_id) return true;
+  return (
+    generation.source_type === 'external_wordpress_post' &&
+    Boolean(generation.source_wordpress_site_id) &&
+    Boolean(generation.source_wordpress_post_id)
+  );
+}

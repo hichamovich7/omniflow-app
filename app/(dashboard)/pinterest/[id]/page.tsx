@@ -12,6 +12,7 @@ import type { ImageStatus } from '@/types/database';
 import { Sparkles } from 'lucide-react';
 import { timeAgo } from '@/lib/utils/format-date';
 import { StatusBadge } from '@/components/shared/status';
+import { pinterestGenerationHasArticle } from '@/lib/social/social-content';
 
 export default async function GenerationResultsPage({
   params,
@@ -77,6 +78,7 @@ export default async function GenerationResultsPage({
           pinsWordPressUsage={pinsWordPressUsage}
           activeImageModels={activeImageModels}
           boardNames={boardNames}
+          hasSourceArticle={pinterestGenerationHasArticle(generation)}
         />
       ) : (
         <div className="rounded-xl border border-dashed border-border/60 py-20 text-center">
