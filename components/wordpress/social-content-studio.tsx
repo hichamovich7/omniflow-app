@@ -9,6 +9,7 @@ import {
   type SocialPlatform,
 } from '@/lib/social/platforms';
 import { articlePinterestCreateHref } from '@/lib/social/pin-display';
+import { MediumSummaryPanel } from '@/components/social/medium-summary-panel';
 import { cn } from '@/lib/utils';
 
 interface SocialContentStudioProps {
@@ -17,8 +18,9 @@ interface SocialContentStudioProps {
 
 /**
  * Social Content Studio (TASK-044). Pinterest opens the Pinterest form
- * pre-filled from this article (/pinterest/create?source=wordpress, phase 2)
- * — nothing is generated from this page. The other platforms are shown as
+ * pre-filled from this article (/pinterest/create?source=wordpress, phase 2).
+ * Medium generates a summary on click, shown full width in its card
+ * (TASK-062 — not saved, never published). The other platforms are shown as
  * Coming soon / Planned and their buttons are disabled with no handler — a
  * click does nothing (no API call, no AI call, no database write).
  */
@@ -45,8 +47,13 @@ export function SocialContentStudio({ generationId }: SocialContentStudioProps) 
 
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {SOCIAL_PLATFORMS.map((platform) => (
-          <li key={platform.id}>
-            {platform.status === 'available' ? (
+          <li key={platform.id} className={cn(platform.id === 'medium' && platform.status === 'available' && 'sm:col-span-2 lg:col-span-3')}>
+            {platform.id === 'medium' && platform.status === 'available' ? (
+              <div className="flex h-full flex-col gap-3 rounded-xl border border-border bg-background p-4" data-platform="medium">
+                <PlatformHeader platform={platform} />
+                <MediumSummaryPanel source={{ wordpressArticleId: generationId }} />
+              </div>
+            ) : platform.status === 'available' ? (
               <div className="flex h-full flex-col gap-3 rounded-xl border border-border bg-background p-4">
                 <PlatformHeader platform={platform} />
                 <Link

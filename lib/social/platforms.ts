@@ -2,8 +2,9 @@
  * Social Content Studio platforms (TASK-044). Single source of truth for
  * which platforms exist on the article review page and which one can
  * actually generate. Only `available` platforms get an action (Pinterest
- * opens /pinterest/create?source=wordpress) — the others are display-only:
- * no API call, no AI call, no database write.
+ * opens /pinterest/create?source=wordpress; Medium generates a summary on
+ * the page, TASK-062) — the others are display-only: no API call, no AI
+ * call, no database write.
  */
 export const SOCIAL_PLATFORM_IDS = ['pinterest', 'facebook', 'instagram', 'reels', 'tiktok', 'medium'] as const;
 export type SocialPlatformId = (typeof SOCIAL_PLATFORM_IDS)[number];
@@ -28,7 +29,12 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
   { id: 'instagram', label: 'Instagram', status: 'planned', description: 'Caption, hashtags and alt text.' },
   { id: 'reels', label: 'Reels', status: 'planned', description: 'Short video script: hook, scenes, voice-over.' },
   { id: 'tiktok', label: 'TikTok', status: 'planned', description: 'Short video script: hook, scenes, caption.' },
-  { id: 'medium', label: 'Medium', status: 'planned', description: 'Adapted article with a canonical link.' },
+  {
+    id: 'medium',
+    label: 'Medium',
+    status: 'available',
+    description: 'A 300-600-word summary with a link to the published article, to copy or download (never published).',
+  },
 ];
 
 export const SOCIAL_PLATFORM_STATUS_LABELS: Record<SocialPlatformStatus, string> = {

@@ -17,14 +17,15 @@ test.describe('Social Content Studio (TASK-044)', () => {
 
   const studio = (page: Page) => page.getByTestId('social-content-studio');
 
-  test('shows six platforms, Pinterest active and the others disabled', async ({ page }) => {
+  test('shows six platforms, Pinterest and Medium active, the others disabled', async ({ page }) => {
     await page.goto(`/wordpress/${articleId}`);
     await expect(studio(page).getByRole('heading', { name: 'Social Content Studio' })).toBeVisible();
     for (const label of ['Pinterest', 'Facebook', 'Instagram', 'Reels', 'TikTok', 'Medium']) {
       await expect(studio(page).getByText(label, { exact: true })).toBeVisible();
     }
     await expect(studio(page).getByRole('link', { name: 'Generate Pinterest content' })).toBeVisible();
-    await expect(studio(page).getByRole('button', { name: /^(Coming soon|Planned)$/ })).toHaveCount(5);
+    await expect(studio(page).getByRole('button', { name: 'Generate Medium summary' })).toBeEnabled();
+    await expect(studio(page).getByRole('button', { name: /^(Coming soon|Planned)$/ })).toHaveCount(4);
     for (const button of await studio(page).getByRole('button', { name: /^(Coming soon|Planned)$/ }).all()) {
       await expect(button).toBeDisabled();
     }
@@ -36,11 +37,50 @@ test.describe('Social Content Studio (TASK-044)', () => {
     page.on('request', (request) => {
       if (request.url().includes('/api/')) requests.push(request.url());
     });
-    for (const id of ['facebook', 'instagram', 'reels', 'tiktok', 'medium']) {
+    for (const id of ['facebook', 'instagram', 'reels', 'tiktok']) {
       await page.locator(`[data-platform="${id}"] button`).click({ force: true });
     }
     await page.waitForTimeout(300);
     expect(requests).toEqual([]);
+  });
+
+  test('Medium summary: one request, preview, word count, CTA link and copy actions (API mocked)', async ({ page }) => {
+    const permalink = 'https://blog.example.test/full-article/';
+    const bodies: unknown[] = [];
+    await page.route('**/api/social/medium-summary', async (route) => {
+      bodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        json: {
+          data: {
+            title: 'Mocked Medium title',
+            subtitle: 'Mocked subtitle.',
+            markdown: `# Mocked Medium title
+
+[Read the full guide on our blog →](${permalink})
+`,
+            html: `<h1>Mocked Medium title</h1><p><a href="${permalink}">Read the full guide on our blog →</a></p>`,
+            wordCount: 420,
+            ctaUrl: permalink,
+            imageUrl: `${new URL(permalink).origin}/wp-content/uploads/featured.jpg`,
+            imageAlt: 'Featured image',
+            language: 'en',
+            warnings: [],
+          },
+          error: null,
+        },
+      });
+    });
+    await page.goto(`/wordpress/${articleId}`);
+    await studio(page).getByRole('button', { name: 'Generate Medium summary' }).click();
+    const result = page.getByTestId('medium-summary-result');
+    await expect(result).toBeVisible();
+    expect(bodies).toEqual([{ wordpressArticleId: articleId }]);
+    await expect(page.getByTestId('medium-summary-word-count')).toHaveText('420 words');
+    await expect(page.getByTestId('medium-summary-cta-url')).toContainText(permalink);
+    await expect(page.getByTestId('medium-summary-image-url')).toContainText('/wp-content/uploads/featured.jpg');
+    for (const name of ['Copy Markdown', 'Copy HTML', 'Download Markdown', 'Regenerate summary']) {
+      await expect(result.getByRole('button', { name })).toBeVisible();
+    }
   });
 
   test('Pinterest redirects to the pre-filled page without any generation request', async ({ page }) => {

@@ -54,13 +54,14 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 ### Ready to test (code shipped, real-condition check pending)
 
 * **TASK-061 scope:** TASK-049 (R2 — WordPress side), TASK-050 (WebP on WordPress), TASK-FIX-058, TASK-FIX-059, TASK-FIX-060.
+* **TASK-062** — Medium summary from WordPress articles: offline tests pass, committed and pushed (commit "feat(medium): generate summaries with source images"); optional real test in TESTING.md.
 * **TASK-048** — real Pinterest CSV import (two-line test, see TESTING.md).
 * **TASK-046** — founder manual check (6 / 7 Pins, two rewrites).
 
 ### Planned
 
 * **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook content (TASK-044 later phase, text only, migration 045); TASK-043 (edit Board section on existing Pins); TASK-011 Credits System (before any public opening).
-* **P2:** Medium export (deterministic Markdown + canonical link — Medium's API no longer issues integration tokens, so no API publishing); storage audit / archiving (read-only orphan audit first); TASK-042; TASK-030; TASK-028 Option 2.
+* **P2:** storage audit / archiving (read-only orphan audit first); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
 
@@ -80,7 +81,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-11: 060 (TASK-FIX-060) → **next task: 061** (TASK-061), then 062, …
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-11: 062 (TASK-062, Medium summary) → **next task: 063**.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
 * **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **next free migration: 045**.
@@ -89,7 +90,9 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # RECENT IMPLEMENTATION LOG
 
-Former content of the ACTIVE TASK list, kept for history. Every entry below is **committed and pushed to `main`** (commit noted); statuses corrected by the 2026-10-11 audit. Migrations mentioned as "to apply by hand" are all applied.
+Former content of the ACTIVE TASK list, kept for history. Every entry below is **committed and pushed to `main`** (commit noted) unless it says otherwise; statuses corrected by the 2026-10-11 audit. Migrations mentioned as "to apply by hand" are all applied.
+
+**[Ready to test — committed and pushed ("feat(medium): generate summaries with source images")]** TASK-062 (Medium summary from WordPress articles). "Generate Medium summary" in the Social Content Studio's Medium card (now `available`) and on `/pinterest/from-wordpress` once a post is selected. New `POST /api/social/medium-summary` (`{ wordpressArticleId }` or `{ wordpressPost: { siteId, postId } }`; auth, Zod, rate limit `social/medium-summary` 30/h + trial cap) and `lib/social/medium-summary.ts`: same ownership checks as TASK-051, the shared `WordPressArticleContext`, WordPress read with GET only; `generateText` FAST (`medium-summary-v1`) → title, subtitle, 300-600-word summary in the article language; checks (word range, numbers and — English — project details present in the article, language, verbatim copy) with one corrective retry; URLs written by the model removed; CTA added by code with the post's **exact** permalink, only when WordPress reports it `publish` on the connected site — otherwise no link + warning, never a guessed URL. **Image (2026-10-12):** the article's featured image, else its most relevant internal image, by its exact public HTTPS URL on the source site (OmniFlow article: also OmniFlow's public storage) — never generated, downloaded or re-hosted; alt from the image or the verified heading; none valid → no image + warning (`lib/social/medium-image.ts`). Result card: preview, word count, CTA URL, image URL, Copy Markdown / Copy HTML / Download Markdown / Regenerate summary. **Storage audit:** no social-history table exists (Pinterest history = `generations` + `pins`, Pin-shaped) → result not persisted, **no migration** (045 stays reserved for the TASK-044 social history). No Medium API, no Medium token, no WordPress write, no publication. New spec `medium-summary.spec.ts` (41 with the image); full renderer 1088/1088; TypeScript, ESLint, build, `git diff --check` pass. See TASK-062 below.
 
 **[Completed — `7a86e2c`, `7b636d8`; migration 044 applied; real controlled test passed 2026-10-11]** TASK-051 (Pinterest from WordPress articles — shared `WordPressArticleContext`, Volet A + Volet B) is implemented, committed and pushed. **Volet B** (OmniFlow article → Pinterest): the article is now the source of truth — a shared, dependency-free extractor (`lib/wordpress/article-context/`) turns the body into sections (H1/H2/H3 + their own text, images, alt / captions), drops scripts / menus / ads / share / related-post blocks / hidden text, neutralizes instruction-like text and keeps only visual terms really present (materials, colors, techniques, patterns, shapes, textures, projects). Each Pin is assigned a real subject section before the AI call (5 of 10 → spread), gets a visual brief (Article subject … Forbidden elements) passed to the text prompt (`pinterest-pins-v13`, article flow only), stored on the Pin (`pins.image_analysis._articleSource`, no migration) and appended to the image prompt; a validator refuses Pins without a planned section, duplicated sections, an image that does not show its section's project, or project elements absent from the article (cowl, chunky, knit, wool, invented colors… — English articles). Article photos only become text (descriptive alt / caption first, else VISION, best-effort) — never an image-model reference. **Volet A** (existing WordPress post → Pinterest): new `/pinterest/from-wordpress` (site → search title / keyword → results with title, date, status, category, featured image → summary → existing form) and `GET /api/wordpress/sites/[id]/posts`; `POST /api/pinterest/generate` and Pin regeneration accept `wordpressPost: { siteId, postId }`; WordPress is read with GET only (401 / 403 / 404 / timeout / empty / protected handled). Traceability: **migration 044 (`generations.source_type`, `source_wordpress_site_id`, `source_wordpress_post_id`) — applied in Supabase by the founder on 2026-10-11**; written best-effort, `source_wordpress_generation_id` kept for OmniFlow articles. No destination URL, no board created, no WordPress write, no automatic Pinterest publication, images stay 1000×1500. New specs `pinterest-article-grounding.spec.ts` (29) and `pinterest-wordpress-post-source.spec.ts` (29); full renderer 1036/1037 (same pre-existing `pinterest-text-importance-none.spec.ts` failure). Access: a "Pin source" chooser (keyword / OmniFlow article / existing WordPress article) on the Pinterest generator pages and a dashboard quick action, disabled with a "Connect a WordPress site" link when no site is connected (committed and pushed `7b636d8`). **Real controlled test done 2026-10-11** (5 Pins on article 1527, board "crochet scarf pattern": five different scarves of the article, no cowl / chunky scarf, 1000×1500, no link, no WordPress write, ≈ 0.23 USD) — see TESTING.md. See TASK-051 below.
 
@@ -982,6 +985,37 @@ Niche rules, Content Streams (board stream + article category stream), the five 
 * The image model can still add a small finishing detail absent from the brief (fringe on one Pin): the checks cover the prompts, not the pixels.
 * The service-role keys of `.env.local` are refused by the database (`permission denied for table`) — scripts must use a user session.
 * The vocabulary check runs on English articles only (English lexicon); other languages keep the section checks and the brief.
+
+---
+
+## [TASK-062] Medium summary from WordPress articles
+
+### Status: READY TO TEST (2026-10-12 — offline tests pass; committed and pushed, commit "feat(medium): generate summaries with source images"; optional real test in TESTING.md)
+
+### Goal
+
+Turn a WordPress article — an OmniFlow article or an existing post of a connected site — into a short Medium piece (title, subtitle, 300-600-word summary, CTA to the original article) to copy or download. Never published automatically, never a Medium API call, never a change to the source article.
+
+### What ships
+
+* `lib/social/medium-summary.ts` — loaders (`loadOmniflowArticleMediumSource`, `loadWordPressPostMediumSource`: ownership of generation / connection / project, GET only), `validateMediumPermalink` (post `publish` + link inside the connected site, via `toAllowedInternalUrl`), prompt `medium-summary-v1` (article as data, no URL), output cleaning (links / URLs / HTML removed), `checkMediumSummary` (300-600 words, numbers present in the article, TASK-051 checked vocabulary on English articles, language, ≤ 30 % verbatim 10-word sequences), one corrective retry, `assembleMediumSummary` (Markdown + HTML, CTA in the article language with the exact permalink as the only link).
+* `lib/social/medium-image.ts` (2026-10-12) — image candidates (featured, then internal with their section), `isPublicArticleImageUrl` (HTTPS, allowed host, no IP / local host / signed URL / credentials, Supabase only under `/object/public/`), `selectMediumImage` (featured first, else relevance), alt from the image or the verified heading / title. The image is placed after the subtitle (`![alt](url)` / `<img src alt>`), its URL shown in the result card.
+* `POST /api/social/medium-summary` (`lib/validations/medium-summary.ts`).
+* `components/social/medium-summary-panel.tsx` (+ `lib/social/medium-summary-filename.ts`) — in the Studio's Medium card (`lib/social/platforms.ts`: Medium `available`) and on `/pinterest/from-wordpress` (selected post).
+* Docs: API, UI_UX, TESTING, PROJECT, CHANGELOG, in-app Guide.
+
+### Decisions
+
+* **No persistence, no migration:** the existing history (`generations` / `pins`) is Pinterest-specific; a Medium summary is a temporary, copyable result. 045 remains the proposed migration for the TASK-044 social history if it is ever needed.
+* **Permalink:** only WordPress's own `link` of a published post on the connected site; an OmniFlow article gets it through one GET of its `wp_post_id`. Unavailable → summary without link + warning.
+* **Language:** OmniFlow article = generation language; existing post = detected from its text (en / fr / es / de stopwords), else the project's default language.
+* **Image:** only an image already in the article, by its exact URL — no AI image, no copy to R2 / Supabase (first version). Existing post: its own site only (a Jetpack `i0.wp.com` or other CDN copy is refused). OmniFlow article: the WordPress post's images when it was read, else OmniFlow's public storage.
+* **Credits:** like the other generators before TASK-011 — hourly rate limit + lifetime trial cap, no credit transaction.
+
+### Remaining
+
+* Real test with one published and one unpublished article, and one existing post (TESTING.md "Medium summary").
+* The fact check covers numbers in every language and project details on English articles only (English lexicon, as TASK-051); other claims rely on the prompt.
 
 ---
 

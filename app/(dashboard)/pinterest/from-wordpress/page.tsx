@@ -27,13 +27,15 @@ import { getGenerationWithPins } from '@/lib/queries/generations';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
 import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
+import { MediumSummaryPanel } from '@/components/social/medium-summary-panel';
 
 /**
  * Pinterest from an existing WordPress post (Volet A):
  * /pinterest/from-wordpress                    → pick a site, search, select
  * /pinterest/from-wordpress?siteId=&postId=    → summary + the existing form
  * …&generationId=                              → the saved Pins below the form
- * Loading reads WordPress (GET) only; nothing is generated before "Generate Pins".
+ * Loading reads WordPress (GET) only; nothing is generated before "Generate Pins"
+ * (or "Generate Medium summary", TASK-062 — same post, not saved, never published).
  */
 export default async function PinterestFromWordPressPage({
   searchParams,
@@ -194,6 +196,20 @@ export default async function PinterestFromWordPressPage({
           imagesProcessing={result.generation.image_status === 'processing'}
         />
       )}
+      <section
+        aria-labelledby="medium-summary-title"
+        className="mt-6 rounded-2xl border border-border/60 bg-card p-6 shadow-sm"
+        data-testid="medium-summary-section"
+      >
+        <h2 id="medium-summary-title" className="text-base font-semibold">
+          Medium summary
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          A short summary of this post for Medium, ending with a link to it. Nothing is saved or published, and the post is
+          never modified.
+        </p>
+        <MediumSummaryPanel source={{ wordpressPost: parsedSource.data }} />
+      </section>
     </PageContainer>
   );
 }

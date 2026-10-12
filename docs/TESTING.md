@@ -1187,6 +1187,33 @@ Same run: `dashboard.spec.ts` "every section renders" ("Publishing coverage" is 
 
 ---
 
+# Medium summary from WordPress articles (TASK-062, 2026-10-11)
+
+```bash
+npx playwright test tests/renderer/medium-summary.spec.ts --project=renderer --reporter=list
+npx playwright test tests/renderer/medium-summary.spec.ts tests/renderer/social-content-studio.spec.ts tests/renderer/pinterest-wordpress-post-source.spec.ts tests/renderer/pinterest-article-grounding.spec.ts --project=renderer --reporter=list
+set PLAYWRIGHT_STORAGE_STATE=path\\to\\authenticated-state.json
+set PLAYWRIGHT_WP_ARTICLE_ID=<completed wordpress_generations.id>
+npx playwright test tests/playwright/wordpress-social-content.spec.ts --project=chromium
+```
+
+Offline, `tests/renderer/medium-summary.spec.ts` (41, fake Supabase + fake `fetch` + stubbed model — no network, no AI):
+
+* **OmniFlow article**: ownership (generation, project, connection used for the permalink), not found, not completed; published article → exactly one `GET /wp-json/wp/v2/posts/<wp_post_id>`, CTA with the exact permalink; unpublished (no `wp_post_id`) → no WordPress call, no link, warning; WordPress draft (`?p=` link) or 404 → no link.
+* **Existing post**: one GET only, exact permalink; ownership of connection and project, missing connection; 404 / 401 / empty / password-protected → explicit read errors; draft, off-site link or empty link → no CTA link; French post → `language: fr`, prompt "Write in French".
+* **Content rules**: prompt carries the article as data and no URL (never the permalink); URLs written by the model (Pinterest Pin, shop link, bare `www.` destination) removed — the permalink is the only URL / `href`; 300-600 words (too short / too long → one retry naming the issue, then `invalid_summary`); invented number (75 %, 3 hours) or detail (cowl, merino) refused and retried; numbers of the article and list markers accepted; summary in the wrong language refused; FR CTA; verbatim copy refused; article < 350 words refused before any AI call; unreadable JSON retried then refused.
+* **Export**: Markdown (title, italic subtitle, subheadings, CTA last, no model HTML), HTML (escaped title, rendered body, exact `href`), permalink with parentheses, download file name, permalink validation (published + connected site only, `javascript:` refused).
+* **Image** (12): featured image first (exact URL, alt, after the subtitle, no extra request); without it the most relevant internal image (descriptive alt in a subject section beats a generic intro image); alt built from the section heading when missing; off-site / Jetpack CDN images refused even with a better alt; exact URL with query string in Markdown and in the decoded HTML attribute; every URL of the result is the permalink or a real article image; all images invalid → no image + warning; URL checks (http, other host, look-alike host, IP, localhost, `.internal`, credentials, signed URLs, `data:`, relative, OmniFlow storage refused for an existing post; public Supabase / R2 accepted for an OmniFlow article, signed / authenticated Supabase objects refused); OmniFlow article: WordPress featured image first when published, else `featured_image_url`, else an internal Markdown image; no image generation / upload / storage call.
+* **API / UI / safety**: strict request schema (exactly one source); route has auth, Zod, rate limit + trial cap, `lib/ai/engine`, no DB write; no Medium API / token, no WordPress write in the feature files; the panel's single `fetch` is the summary endpoint; Copy Markdown / Copy HTML (`clipboard.writeText`) / Download Markdown (`text/markdown` Blob) / Regenerate / word count / CTA URL / warnings; entry points on the Studio and `/pinterest/from-wordpress`, Pinterest flows unchanged.
+
+Adapted: `social-content-studio.spec.ts` (Medium `available`; the studio stays a Server Component, Medium panel wired); browser `wordpress-social-content.spec.ts` (4 disabled platforms, Medium button enabled, new case with `/api/social/medium-summary` **mocked by `page.route`** — one request with `{ wordpressArticleId }`, preview, "420 words", CTA URL, the four buttons; no real AI call).
+
+Results 2026-10-11: new spec 29/29; full renderer **1076/1076**; with the image (2026-10-12): 41/41, full renderer **1088/1088**; TypeScript, ESLint (touched files), `next build` and `git diff --check` pass. Browser spec not run (needs an authenticated storage state).
+
+**Real test (founder, one AI text call each, optional):** (1) open a completed **published** OmniFlow article → Social Content Studio → Medium → "Generate Medium summary": 300-600 words, article language, nothing absent from the article, CTA = the post's exact URL, image = the post's featured image (exact URL shown, visible in the preview and after pasting into Medium), Copy Markdown / Copy HTML / Download Markdown work; (2) same on an **unpublished** article → no link + warning; (3) `/pinterest/from-wordpress`, select an existing post → "Medium summary" card → same checks; (4) WordPress post unchanged (modified date), nothing in Medium.
+
+---
+
 # TASK-061 — Real WordPress validation on R2 + production R2 activation (planned 2026-10-11)
 
 Manual, founder-run, in this order. Costs one WordPress article generation (featured + internal images); everything else makes no AI call. Prerequisites: local `MEDIA_STORAGE_PROVIDER=r2` + the six `R2_*` variables; migrations 042 / 043 applied (verified 2026-10-11); a connected **test** WordPress site (≥ 5.8) with Media Library access. Background: Pinterest already runs on R2 locally (25 optimized Pins under `images/pinterest/`, 1000×1500 JPEG ≈ 280-330 KB, read-only check 2026-10-11); `images/wordpress/` is still empty.

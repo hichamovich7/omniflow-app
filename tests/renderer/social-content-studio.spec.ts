@@ -322,15 +322,15 @@ test.describe('Social platforms configuration', () => {
       ['instagram', 'planned'],
       ['reels', 'planned'],
       ['tiktok', 'planned'],
-      ['medium', 'planned'],
+      ['medium', 'available'],
     ]);
     expect(SOCIAL_PLATFORM_IDS).toHaveLength(6);
-    expect(SOCIAL_PLATFORM_IDS.filter(isSocialPlatformAvailable)).toEqual(['pinterest']);
+    expect(SOCIAL_PLATFORM_IDS.filter(isSocialPlatformAvailable)).toEqual(['pinterest', 'medium']);
   });
 
   test('unavailable platforms have an explanatory message', () => {
     expect(unavailablePlatformMessage({ label: 'Facebook', status: 'coming_soon' })).toMatch(/coming soon/i);
-    expect(unavailablePlatformMessage({ label: 'Medium', status: 'planned' })).toMatch(/planned/i);
+    expect(unavailablePlatformMessage({ label: 'TikTok', status: 'planned' })).toMatch(/planned/i);
   });
 });
 
@@ -343,7 +343,9 @@ test.describe('Social Content Studio on /wordpress/[id]', () => {
   test('Pinterest redirects to the pre-filled Pinterest page, nothing is generated here', () => {
     expect(component).toContain('Generate Pinterest content');
     expect(component).toContain('href={articlePinterestCreateHref(generationId)}');
-    expect(component).not.toMatch(/fetch\(|useState|onClick=/);
+    // The studio itself stays a Server Component: the only client part is the Medium panel (TASK-062).
+    expect(component).not.toMatch(/fetch\(|useState|onClick=|'use client'/);
+    expect(component).toContain("<MediumSummaryPanel source={{ wordpressArticleId: generationId }} />");
     expect(articlePinterestCreateHref(ARTICLE_GEN_ID)).toBe(`/pinterest/create?source=wordpress&articleId=${ARTICLE_GEN_ID}`);
     expect(articlePinterestCreateHref(ARTICLE_GEN_ID, PIN_GEN_ID)).toBe(
       `/pinterest/create?source=wordpress&articleId=${ARTICLE_GEN_ID}&generationId=${PIN_GEN_ID}`

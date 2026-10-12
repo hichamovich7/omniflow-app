@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Medium summary from WordPress articles — TASK-062 (2026-10-11)
+
+* **Generate Medium summary** in the Social Content Studio (Medium card, now available) of `/wordpress/[id]`, and on `/pinterest/from-wordpress` for a selected existing post. Result: Medium title, subtitle, 300-600-word summary in the article language, CTA "Want to explore the complete article? / Read the full guide on our blog →" with the article's **exact** permalink (FR / ES / DE translated).
+* New `POST /api/social/medium-summary` and `lib/social/medium-summary.ts`: ownership of the article / connection / project (as TASK-051), shared `WordPressArticleContext`, WordPress read with GET only; `generateText` (FAST, `medium-summary-v1`); checks for the word range, numbers and (English) project details absent from the article, language and verbatim copying, with one corrective retry; any URL written by the model removed — the permalink is the only link, and only when WordPress reports the post published on the connected site; otherwise no link and a warning.
+* **Image:** the article's featured image, else its most relevant internal image (descriptive alt, subject section), placed after the subtitle as `![alt](url)` / `<img src="url" alt="alt">` with the exact public HTTPS URL found in the article — only on the source site (plus OmniFlow's public storage for OmniFlow articles); never generated, downloaded or copied to R2 / Supabase; alt from the image or built from the verified heading; none valid → no image + warning (`lib/social/medium-image.ts`).
+* Result card: preview (with the image), word count, CTA URL, image URL, Copy Markdown, Copy HTML, Download Markdown, Regenerate summary.
+* Not saved (storage audit: no compatible social history — no migration), no Medium API or token, no WordPress write, nothing published. Rate limit `social/medium-summary` (30/h) + trial cap.
+* Tests: new `tests/renderer/medium-summary.spec.ts` (41, of which 12 for the image); `social-content-studio.spec.ts` and browser `wordpress-social-content.spec.ts` adapted (API mocked). Full renderer 1088/1088, TypeScript, ESLint, build pass. Guide: Social Content Studio updated, new "Medium summary" section.
+
 ## Docs: TASKS.md status audit, TASK-061 planned (2026-10-11)
 
 * `docs/TASKS.md`: new ACTIVE TASK **TASK-061** (P0 — real WordPress validation on R2, then production R2 activation), a Status board (Ready to test / Planned / Blocked / Obsolete, P0-P2 roadmap) and a Task numbering section (one counter for `TASK-` and `TASK-FIX-`, next 061; collisions TASK-045…051 / TASK-FIX-045…051 kept and listed; commit `964bcc7` "TASK-038" = TASK-FIX-015; next migration 045).
