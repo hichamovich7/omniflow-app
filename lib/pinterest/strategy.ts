@@ -24,10 +24,36 @@ export type PinterestStrategyIssueCode =
   | 'near-duplicate-variant'
   | 'unsupported-claim';
 
+/**
+ * The exact safeguard that rejected a batch — shown to the user (see
+ * lib/pinterest/strategy-errors.ts). `code` above stays the coarse family.
+ */
+export type PinterestSafeguardReason =
+  | 'UNBALANCED_ANGLES'
+  | 'DUPLICATE_ANGLE'
+  | 'ANGLE_MISMATCH'
+  | 'DUPLICATE_TITLE'
+  | 'DUPLICATE_PIN'
+  | 'UNSUPPORTED_NUMBER'
+  | 'UNSUPPORTED_CLAIM'
+  | 'MISSING_SOURCE_SECTION'
+  | 'DUPLICATE_SOURCE_SECTION'
+  | 'IMAGE_SUBJECT_MISMATCH'
+  | 'UNGROUNDED_IMAGE_ELEMENTS';
+
+export type PinterestSafeguardField = 'angle' | 'title' | 'description' | 'image_prompt' | 'sourceSectionId';
+
 export interface PinterestStrategyIssue {
   code: PinterestStrategyIssueCode;
+  /** Internal, server-log-free detail (may quote model output — never sent to the browser). */
   message: string;
   pinIndexes?: [number, number];
+  reason?: PinterestSafeguardReason;
+  /** 0-based index of the Pin at fault (the later one of a pair). */
+  pinIndex?: number;
+  field?: PinterestSafeguardField;
+  /** Safe tokens only: angle names, counts, digits, fixed-vocabulary terms. */
+  details?: string[];
 }
 
 const TITLE_SIMILARITY_LIMIT = 0.8;
@@ -122,11 +148,15 @@ function validateAngleCoverage(
   if (invalid.length === 0) return [];
 
   const expected = min === max ? `${min}` : `${min}-${max}`;
+  const found = invalid.map((angle) => `${angle}=${counts.get(angle) ?? 0}`);
   return [{
     code: 'angle-coverage',
     message:
       `Expected ${expected} pin(s) per Pinterest angle for a batch of ${pinsRequested}; ` +
-      invalid.map((angle) => `${angle}=${counts.get(angle) ?? 0}`).join(', '),
+      found.join(', '),
+    reason: 'UNBALANCED_ANGLES',
+    field: 'angle',
+    details: [expected, ...found],
   }];
 }
 
@@ -140,6 +170,9 @@ function validateTitleDiversity(pins: PinterestStrategyPin[]): PinterestStrategy
         code: 'near-duplicate-title',
         message: `Titles ${left + 1} and ${right + 1} are too similar (${similarity.toFixed(2)})`,
         pinIndexes: [left, right],
+        reason: 'DUPLICATE_TITLE',
+        pinIndex: right,
+        field: 'title',
       });
     }
   }
@@ -174,6 +207,10 @@ function validateRepeatedAngleVariants(pins: PinterestStrategyPin[]): PinterestS
             `${angle} variants ${first.index + 1} and ${second.index + 1} need different ` +
             `promises and scenes (description=${descriptionSimilarity.toFixed(2)}, image=${imageSimilarity.toFixed(2)})`,
           pinIndexes: [first.index, second.index],
+          reason: 'DUPLICATE_PIN',
+          pinIndex: second.index,
+          field: descriptionSimilarity >= VARIANT_SIMILARITY_LIMIT ? 'description' : 'image_prompt',
+          details: [angle],
         });
       }
     }
@@ -203,9 +240,14 @@ function validateGroundedClaims(
       (number) => !evidenceNumbers.has(number)
     );
     if (unsupportedNumbers.length > 0) {
+      const titleNumbers = extractNumbers(pin.title);
       issues.push({
         code: 'unsupported-claim',
         message: `Pin ${index + 1} invents unsupported number(s): ${unsupportedNumbers.join(', ')}`,
+        reason: 'UNSUPPORTED_NUMBER',
+        pinIndex: index,
+        field: unsupportedNumbers.some((number) => titleNumbers.has(number)) ? 'title' : 'description',
+        details: unsupportedNumbers,
       });
     }
 
@@ -217,6 +259,10 @@ function validateGroundedClaims(
         issues.push({
           code: 'unsupported-claim',
           message: `Pin ${index + 1} uses an unsupported ${group.label} claim`,
+          reason: 'UNSUPPORTED_CLAIM',
+          pinIndex: index,
+          field: includesClaimToken(pin.title, group.tokens) ? 'title' : 'description',
+          details: [group.label],
         });
       }
     }

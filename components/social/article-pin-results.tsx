@@ -19,8 +19,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
+import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
 import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection } from '@/lib/social/pin-display';
 import type { Pin } from '@/types/database';
+import type { ApiError } from '@/types/api';
 
 interface ArticlePinResultsProps {
   pins: Pin[];
@@ -32,9 +34,9 @@ interface ArticlePinResultsProps {
   imagesProcessing: boolean;
 }
 
-async function readJson(res: Response): Promise<{ data: unknown; error: { message: string } | null }> {
+async function readJson(res: Response): Promise<{ data: unknown; error: ApiError | null }> {
   try {
-    return (await res.json()) as { data: unknown; error: { message: string } | null };
+    return (await res.json()) as { data: unknown; error: ApiError | null };
   } catch {
     return { data: null, error: null };
   }
@@ -221,7 +223,8 @@ function ArticlePinCard({
       });
       const json = await readJson(res);
       if (!res.ok || json.error) {
-        toast.error(json.error?.message ?? 'Pin regeneration failed');
+        // A safeguard rejection explains what failed; "Try again" only when retryable.
+        toastApiError(json.error, 'Pin regeneration failed', () => void regenerate());
         return;
       }
       toast.success(pin.media_url ? 'Pin regenerated — its image was kept, regenerate it if needed' : 'Pin regenerated');

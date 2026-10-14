@@ -619,6 +619,14 @@ Generate Pins
 
 ---
 
+## Strategy-safeguard errors (TASK-066)
+
+When `POST /api/pinterest/generate` returns 422 `strategy_safeguard_failed` (see API.md), the generator form (`PinForm` — keyword, OmniFlow article and existing WordPress post flows) shows `StrategySafeguardAlert` (`components/pinterest/strategy-safeguard-alert.tsx`) instead of the plain inline alert: danger `Alert` with the general message ("The AI's Pins were rejected by N quality checks. Nothing was saved."), the count ("N problems found"), then one line per issue — location in bold ("Pin 2 · Title", or the field alone for a batch-wide problem such as "Angle"), the explanation, and the recommended action in small text; "…and N more." when the list is capped. A secondary **Try again** button (outline, `RefreshCw`) appears only when `retryable` is true; it resubmits the same form (`requestSubmit`), never automatically. Any other error keeps the existing plain alert and toast. A toast with the general message is still shown.
+
+Single-Pin regeneration (`ArticlePinResults` "Regenerate this Pin") and the history "Regenerate" button use `toastApiError()`: error toast with the general message, the first problem + its action as description ("(+N more)"), and a "Try again" toast action only when retryable. Field labels: Angle, Title, Description, Image description, Article section. No prompt, secret or raw model text is ever displayed.
+
+---
+
 ## Pinterest from an article (`/pinterest/create`, TASK-044 phase 2)
 
 `app/(dashboard)/pinterest/create/page.tsx` — reached from the Social Content Studio of `/wordpress/[id]` with `?source=wordpress&articleId=<wordpress_generations.id>`. Without `source=wordpress` or with an invalid id it redirects to `/pinterest`. The article is loaded server-side with ownership (article + project) and completion checks; another user's, unknown or unfinished article shows an error state ("This article can't be used" + the reason + "Back to WordPress"). No AI call happens on load.

@@ -316,23 +316,50 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
   pins.forEach((pin, index) => {
     const sectionId = pin.sourceSectionId?.trim();
     if (!sectionId || !planned.has(sectionId)) {
-      issues.push({ code: 'unsupported-claim', message: `Pin ${index + 1} has no planned source section (got ${JSON.stringify(sectionId ?? null)})` });
+      issues.push({
+        code: 'unsupported-claim',
+        message: `Pin ${index + 1} has no planned source section (got ${JSON.stringify(sectionId ?? null)})`,
+        reason: 'MISSING_SOURCE_SECTION',
+        pinIndex: index,
+        field: 'sourceSectionId',
+      });
       return;
     }
     const previous = used.get(sectionId);
     if (distinctExpected && previous !== undefined) {
-      issues.push({ code: 'unsupported-claim', message: `Pins ${previous + 1} and ${index + 1} use the same source section "${sectionId}"`, pinIndexes: [previous, index] });
+      issues.push({
+        code: 'unsupported-claim',
+        message: `Pins ${previous + 1} and ${index + 1} use the same source section "${sectionId}"`,
+        pinIndexes: [previous, index],
+        reason: 'DUPLICATE_SOURCE_SECTION',
+        pinIndex: index,
+        field: 'sourceSectionId',
+      });
     }
     used.set(sectionId, index);
 
     const brief = grounding.briefs[sectionId];
     if (brief && !mentionsSubject(pin.image_prompt, brief)) {
-      issues.push({ code: 'unsupported-claim', message: `Pin ${index + 1} image does not show its source section's project` });
+      issues.push({
+        code: 'unsupported-claim',
+        message: `Pin ${index + 1} image does not show its source section's project`,
+        reason: 'IMAGE_SUBJECT_MISMATCH',
+        pinIndex: index,
+        field: 'image_prompt',
+      });
     }
     if (grounding.enforceVocabulary) {
       const ungrounded = findUngroundedVisualTerms(pin.image_prompt, grounding.evidence);
       if (ungrounded.length > 0) {
-        issues.push({ code: 'unsupported-claim', message: `Pin ${index + 1} image adds elements absent from the article: ${ungrounded.join(', ')}` });
+        issues.push({
+          code: 'unsupported-claim',
+          message: `Pin ${index + 1} image adds elements absent from the article: ${ungrounded.join(', ')}`,
+          reason: 'UNGROUNDED_IMAGE_ELEMENTS',
+          pinIndex: index,
+          field: 'image_prompt',
+          // Fixed-vocabulary terms (CHECKED_TERMS), never free model text.
+          details: ungrounded,
+        });
       }
     }
   });

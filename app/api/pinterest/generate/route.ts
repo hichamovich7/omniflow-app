@@ -19,6 +19,11 @@ import {
   validatePinterestStrategyBatch,
 } from '@/lib/pinterest/strategy';
 import {
+  buildStrategySafeguardError,
+  strategySafeguardLogLine,
+  strategySafeguardSummary,
+} from '@/lib/pinterest/strategy-errors';
+import {
   PIN_PLAN_FAILURE_MESSAGE,
   PinterestPlanError,
   parsePinterestGenerationPlan,
@@ -63,9 +68,6 @@ function clampBannerTemplate(
   if (chosen && allowed.includes(chosen)) return chosen;
   return allowed[0];
 }
-
-// Bounded so a pathological batch never grows the log line unreasonably.
-const MAX_LOGGED_STRATEGY_ISSUES = 10;
 
 function classifyGenerationError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
@@ -398,10 +400,7 @@ export async function POST(request: Request) {
         { enforceBalancedAngles }
       ),
       ...(articleSource && enforceBalancedAngles
-        ? validateDistinctAngles(resolvedPins, pinsRequested).map((message) => ({
-            code: 'angle-coverage' as const,
-            message,
-          }))
+        ? validateDistinctAngles(resolvedPins, pinsRequested)
         : []),
       ...(articleGrounding?.sectionPlan.length
         ? validateArticleGroundedPins(resolvedPins, articleGrounding)
@@ -412,22 +411,25 @@ export async function POST(request: Request) {
       // issue codes stay legible in log viewers that summarize/collapse
       // non-primitive console.error arguments (they were previously opaque
       // in production, e.g. Vercel Runtime Logs rendering an untruncated
-      // object preview as an unreadable placeholder).
+      // object preview as an unreadable placeholder). Codes, Pin indexes,
+      // fields, model and role only — no Pin text.
       console.error(
-        `[${PROMPT_ID}] Strategy validation failed: ${JSON.stringify(
-          strategyIssues.slice(0, MAX_LOGGED_STRATEGY_ISSUES)
-        )}`
+        `[${PROMPT_ID}] Strategy validation failed: ${strategySafeguardLogLine(strategyIssues, {
+          step: 'generate',
+          model,
+          role: 'FAST',
+        })}`
       );
       // A controlled content-validation failure, not a server bug: same
       // family as invalid_pin_plan above. No board, pin or image work has
       // happened yet, and no credits were ever debited (credits_used: 0).
-      const errorMessage = 'AI returned Pinterest content that failed strategy safeguards. Try again.';
+      const safeguardError = buildStrategySafeguardError(strategyIssues);
       await supabase
         .from('generations')
-        .update({ status: 'failed', error_message: errorMessage })
+        .update({ status: 'failed', error_message: strategySafeguardSummary(safeguardError) })
         .eq('id', generation.id);
       return NextResponse.json<ApiResponse<null>>(
-        { data: null, error: { message: errorMessage, code: 'invalid_strategy_plan' } },
+        { data: null, error: safeguardError },
         { status: 422 }
       );
     }

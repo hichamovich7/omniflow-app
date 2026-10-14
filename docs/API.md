@@ -112,7 +112,7 @@ Creates one generation request and produces Pinterest content using AI.
 }
 ```
 
-`pinsRequested` is required: any whole number from 1 to 30 (custom number of Pins, TASK-046 — `pinsRequestedSchema`, `lib/validations/pinterest.ts`). A number or a numeric string is accepted; 0, negatives, decimals, values above 30, empty / non-numeric values and booleans are rejected with HTTP 400 `invalid_request` (`Choose between 1 and 30 Pins.` / `The number of Pins must be a whole number.`) — never rounded or clamped. The form's presets (1, 3, 5, 7, 8, 10, 20, 30) are shortcuts only; defaults are unchanged (10, or 5 with `wordpressArticleId`). With balanced angles (Legacy Composite, Photo Only, AI Integrated `balanced`) the prompt gives each pin its angle from the round-robin plan (`buildPinterestAnglePlan()`: every angle once before any repeats) and the strategy check refuses a complete batch whose per-angle count is outside `floor(n/5)`–`ceil(n/5)`; Pins sharing an angle (any batch above 5) are compared pairwise and near-copies are refused (`near-duplicate-variant`, HTTP 422 `invalid_strategy_plan`, nothing saved). No destination URL is ever added: `website_url` only stores the request's `websiteUrl`, and `link_url` is never written by this route.
+`pinsRequested` is required: any whole number from 1 to 30 (custom number of Pins, TASK-046 — `pinsRequestedSchema`, `lib/validations/pinterest.ts`). A number or a numeric string is accepted; 0, negatives, decimals, values above 30, empty / non-numeric values and booleans are rejected with HTTP 400 `invalid_request` (`Choose between 1 and 30 Pins.` / `The number of Pins must be a whole number.`) — never rounded or clamped. The form's presets (1, 3, 5, 7, 8, 10, 20, 30) are shortcuts only; defaults are unchanged (10, or 5 with `wordpressArticleId`). With balanced angles (Legacy Composite, Photo Only, AI Integrated `balanced`) the prompt gives each pin its angle from the round-robin plan (`buildPinterestAnglePlan()`: every angle once before any repeats) and the strategy check refuses a complete batch whose per-angle count is outside `floor(n/5)`–`ceil(n/5)`; Pins sharing an angle (any batch above 5) are compared pairwise and near-copies are refused (`near-duplicate-variant`, HTTP 422 `strategy_safeguard_failed`, nothing saved). No destination URL is ever added: `website_url` only stores the request's `websiteUrl`, and `link_url` is never written by this route.
 
 `board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
 
@@ -152,14 +152,14 @@ Creates one generation request and produces Pinterest content using AI.
 * After the project ownership check, `loadArticlePinterestSource()` (`lib/social/pinterest-from-article.ts`, selects only) requires the article and its generation to be the caller's (403 `forbidden`), both `completed` (409 `article_not_completed`), unknown → 404 `not_found`, and the article's project must be `projectId` (400 `project_mismatch`).
 * The article becomes the prompt's existing `analysisContext` slot (`buildArticlePinterestContext(article, keyword)`): H1, meta title, meta description, the submitted keyword as primary keyword, SEO keywords, featured image described (never linked), a content excerpt (≤ 6 000 chars; images, links and every bare URL / domain removed) and the instruction never to write a URL. The permalink, `source_url`, image URLs and any other URL are never sent. Same prompt (`pinterest-pins-v10`), model role, parser, strategy safeguards (the article is the evidence for numbers) and every generation mode / option as the keyword flow.
 * `language` is the submitted one in every mode (the article's by default in the form) — the AI Integrated project-language inheritance does not apply.
-* Below 5 Pins, a balanced batch (legacy / Photo Only / AI Integrated `balanced`) must use distinct angles, else 422 `invalid_strategy_plan`. `pinsRequested` keeps the existing options (max 30).
+* Below 5 Pins, a balanced batch (legacy / Photo Only / AI Integrated `balanced`) must use distinct angles, else 422 `strategy_safeguard_failed` (`DUPLICATE_ANGLE`). `pinsRequested` keeps the existing options (max 30).
 * Any URL the model writes anyway is removed from `title`, `description` and `keywords` before saving. `pins.link_url` and `generations.website_url` / `pinterest_url` stay `null`.
 * Boards are only matched, never created (`findOrCreateBoardIds(..., { create: false })`): a board name without a real board stays free text on the Pin with `board_id = null`.
 * After completion, `generations.source_wordpress_generation_id` is set best-effort (migration 040); if the migration is not applied the generation still succeeds and a warning is logged. The article is never modified.
 
 `wordpressPost` is optional (TASK-051, Volet A) — `{ "siteId": "uuid", "postId": 1527 }`, an existing post of a connected WordPress site (never generated by OmniFlow), sent by `/pinterest/from-wordpress`. Same rules as `wordpressArticleId` (no `websiteUrl` / `pinterestUrl` / `analysisId`); both together → 400 `invalid_request` (`Choose either an OmniFlow article or an existing WordPress post, not both.`). `loadWordPressPostPinterestSource()` checks the connection (404 `not_found` / 403 `forbidden`) and its project (403), then reads the post with **one GET** (`/wp-json/wp/v2/posts/<id>?_embed=wp:featuredmedia,wp:term`); WordPress errors map to `unauthorized` 502 (credentials rejected), `forbidden` 403 (e.g. a draft the account cannot read), `not_found` 404, `timeout` 504, `network` / `invalid_response` / `http` 502 and `empty_content` 422 (empty or password-protected post). The post's project must be `projectId` (400 `project_mismatch`). Content Streams come from the post's WordPress categories mapped to OmniFlow categories. Nothing is ever written to WordPress.
 
-**Article-grounded Pins (TASK-051, both article sources).** The article is parsed into a `WordPressArticleContext` (`lib/wordpress/article-context/`: sections, visual attributes really present, images, no URL, instruction-like text neutralized). Before the AI call each Pin is assigned a subject section (`planArticlePinSections()`, spread over the article) and gets a visual brief; the section photo is described in text — descriptive alt / caption, else one VISION call per planned section (≤ 5, best-effort, images of the connected site / OmniFlow storage only; never sent to the image model). The prompt (`pinterest-pins-v13`, `articleGrounded`) receives the structured sections and a `<pin_plan>` with every brief and asks for `sourceSectionId` per Pin. Extra 422 `invalid_strategy_plan` reasons: a Pin without a planned section, two Pins on the same section, an image_prompt that does not show its section's project, or (English articles) project elements absent from the article (other projects such as a cowl, yarn weights such as chunky, techniques, motifs, fibers, chromatic colors; negated mentions and neutral backdrops are ignored). Each Pin stores its section and brief in `pins.image_analysis._articleSource`. After completion `generations.source_type` / `source_wordpress_site_id` / `source_wordpress_post_id` are set best-effort (migration 044). Only counts are logged for image descriptions.
+**Article-grounded Pins (TASK-051, both article sources).** The article is parsed into a `WordPressArticleContext` (`lib/wordpress/article-context/`: sections, visual attributes really present, images, no URL, instruction-like text neutralized). Before the AI call each Pin is assigned a subject section (`planArticlePinSections()`, spread over the article) and gets a visual brief; the section photo is described in text — descriptive alt / caption, else one VISION call per planned section (≤ 5, best-effort, images of the connected site / OmniFlow storage only; never sent to the image model). The prompt (`pinterest-pins-v13`, `articleGrounded`) receives the structured sections and a `<pin_plan>` with every brief and asks for `sourceSectionId` per Pin. Extra 422 `strategy_safeguard_failed` reasons: a Pin without a planned section (`MISSING_SOURCE_SECTION`), two Pins on the same section (`DUPLICATE_SOURCE_SECTION`), an image_prompt that does not show its section's project (`IMAGE_SUBJECT_MISMATCH`), or (English articles, `UNGROUNDED_IMAGE_ELEMENTS`) project elements absent from the article (other projects such as a cowl, yarn weights such as chunky, techniques, motifs, fibers, chromatic colors; negated mentions and neutral backdrops are ignored). Each Pin stores its section and brief in `pins.image_analysis._articleSource`. After completion `generations.source_type` / `source_wordpress_site_id` / `source_wordpress_post_id` are set best-effort (migration 044). Only counts are logged for image descriptions.
 
 `generations.reference_image_url` exists in the database schema but has no corresponding request field yet — deferred to TASK-013 (Image Analysis).
 
@@ -195,10 +195,51 @@ insufficient_credits
 invalid_language
 invalid_analysis
 invalid_pin_plan
+strategy_safeguard_failed
 generation_failed
 ```
 
 `invalid_pin_plan` (HTTP **422**): the planning model's response was not a complete, valid Pin plan — truncated (for example cut off by the output-token limit), not JSON, ambiguous, or valid JSON that fails the existing Zod contract. The message is `The AI could not create a complete Pin plan. No images were generated. Please try again.` The plan is parsed by `parsePinterestGenerationPlan()` (`lib/pinterest/generation-plan.ts`), which accepts a complete JSON value optionally wrapped in a Markdown code fence or plain text, and **never repairs** a truncated response. When it fails, no board is created, no pin is written and no image request is made; the generation row is marked `failed`, and only bounded diagnostics (kind, length, short preview) are logged server-side — never the full response.
+
+`strategy_safeguard_failed` (HTTP **422**, formerly `invalid_strategy_plan` with the single message "AI returned Pinterest content that failed strategy safeguards. Try again."): the plan is valid but fails a strategy safeguard. The safeguards are unchanged (`validatePinterestStrategyBatch()`, `validateDistinctAngles()`, `validateArticleGroundedPins()`); the error now says which one failed. Body (`buildStrategySafeguardError()`, `lib/pinterest/strategy-errors.ts`; type `ApiError` in `types/api.ts`):
+
+```json
+{
+  "data": null,
+  "error": {
+    "code": "strategy_safeguard_failed",
+    "message": "The AI's Pins were rejected by 2 quality checks. Nothing was saved.",
+    "retryable": true,
+    "issueCount": 2,
+    "issues": [
+      { "code": "DUPLICATE_TITLE", "pinIndex": 2, "relatedPinIndex": 1, "field": "title",
+        "message": "Pin 2's title is too close to Pin 1's title.",
+        "action": "Try again so each Pin gets a distinct title." },
+      { "code": "UNBALANCED_ANGLES", "field": "angle",
+        "message": "The Pins do not cover the five Pinterest angles evenly (expected 1 per angle; got curiosity=2, listicle=0).",
+        "action": "Try again — a new attempt usually balances the angles." }
+    ]
+  }
+}
+```
+
+`pinIndex` / `relatedPinIndex` are 1-based and absent for a batch-wide problem; `field` ∈ `angle`, `title`, `description`, `image_prompt`, `sourceSectionId`; `issues` is capped at 20 (`issueCount` keeps the total). Issue codes — one per existing check:
+
+```txt
+UNBALANCED_ANGLES          per-angle count outside floor(n/5)–ceil(n/5) (balanced batches) — batch-wide
+DUPLICATE_ANGLE            article flow below 5 Pins: an angle used twice
+ANGLE_MISMATCH             single-Pin regeneration returned another angle
+DUPLICATE_TITLE            title similarity ≥ 0.8 (batch pair, or a sibling on regeneration)
+DUPLICATE_PIN              same-angle variants with description or image similarity ≥ 0.95
+UNSUPPORTED_NUMBER         number absent from the keyword / analysis / article evidence
+UNSUPPORTED_CLAIM          "free" or "beginner/easy" claim absent from the evidence
+MISSING_SOURCE_SECTION     article-grounded Pin without a planned sourceSectionId
+DUPLICATE_SOURCE_SECTION   two Pins on the same planned section
+IMAGE_SUBJECT_MISMATCH     image_prompt does not show the section's project
+UNGROUNDED_IMAGE_ELEMENTS  English article: checked-vocabulary terms absent from the article
+```
+
+`retryable` is true when every issue can pass on a new attempt (all current checks depend on the model's output — table `RETRYABLE`); other errors carry no `retryable` and get no retry button. Texts are fixed templates filled only with safe tokens (angle names, counts, digits, checked-vocabulary terms): never a prompt, a secret, a section id or raw model text. `generations.error_message` stores the message plus the first three issue messages. The server log line (`strategySafeguardLogLine()`) holds only `step`, `model`, `role`, `issueCount` and per issue `reason`, `code`, 0-based `pinIndex`, `field`.
 
 ---
 
@@ -1468,7 +1509,7 @@ Regenerates the text of one saved Pin from its source WordPress article (TASK-04
 1. Auth, UUID, Zod body (`regeneratePinSchema`, strict).
 2. `prepareArticlePinRegeneration()` (selects only): the Pin's generation is the caller's (403), the article is the caller's and completed (403 / 404 / 409), and the article's project is the Pin's project (400 `project_mismatch`).
 3. Rate limit `pinterest/regenerate-pin` (30/hour) with the trial cap — after the checks, so a rejected request never consumes budget.
-4. `regenerateArticlePin()` (`lib/social/pinterest-from-article.ts`): same `buildPinterestPinsPrompt()` with `pinsRequested: 1`, the generation's keyword and language, the Pin's mode (from `visual_format`), the article context (no URL) plus "rewrite one Pin with the `<angle>` angle" and the other Pins' titles to differ from. AI Integrated Pins reuse their stored settings with the existing Manual strategy set to the Pin's angle. The result must keep the angle and pass `validatePinterestStrategyBatch()` (grounded claims) and title diversity against the siblings, else 422 `invalid_strategy_plan`; URLs are removed from the text.
+4. `regenerateArticlePin()` (`lib/social/pinterest-from-article.ts`): same `buildPinterestPinsPrompt()` with `pinsRequested: 1`, the generation's keyword and language, the Pin's mode (from `visual_format`), the article context (no URL) plus "rewrite one Pin with the `<angle>` angle" and the other Pins' titles to differ from. AI Integrated Pins reuse their stored settings with the existing Manual strategy set to the Pin's angle. The result must keep the angle and pass `validatePinterestStrategyBatch()` (grounded claims) and title diversity against the siblings, else 422 `strategy_safeguard_failed` (same structured body, `scope` "pin": no `pinIndex`, message "The regenerated Pin was rejected by N quality check(s). The Pin was not changed."); URLs are removed from the text.
 5. One update of that Pin: `title`, `description`, `keywords`, `image_prompt`, `overlay_text` (text-overlay Pins only), `image_analysis` (angle / AI Integrated text). Board, section, link, image and schedule are kept — an existing image is not regenerated.
 
 ## Request
@@ -1499,7 +1540,7 @@ article_not_completed  409
 project_mismatch       400
 rate_limited / trial_limit_reached
 invalid_pin_plan       422
-invalid_strategy_plan  422
+strategy_safeguard_failed 422 (structured: retryable + issues)
 generation_failed      500
 ```
 

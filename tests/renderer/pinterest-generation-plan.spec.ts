@@ -547,8 +547,22 @@ test('Strategy validation failure returns 422 invalid_strategy_plan (not 500), b
     const response = await harness.post(aiIntegratedRequest);
     expect(response.status).toBe(422);
     const body = await response.json();
-    const expectedMessage = 'AI returned Pinterest content that failed strategy safeguards. Try again.';
-    expect(body.error).toEqual({ message: expectedMessage, code: 'invalid_strategy_plan' });
+    expect(body.error).toEqual({
+      code: 'strategy_safeguard_failed',
+      message: "The AI's Pins were rejected by 1 quality check. Nothing was saved.",
+      retryable: true,
+      issueCount: 1,
+      issues: [{
+        code: 'DUPLICATE_TITLE',
+        pinIndex: 2,
+        relatedPinIndex: 1,
+        field: 'title',
+        message: "Pin 2's title is too close to Pin 1's title.",
+        action: 'Try again so each Pin gets a distinct title.',
+      }],
+    });
+    const { error } = body as { error: { message: string; issues: Array<{ message: string }> } };
+    const expectedMessage = `${error.message} ${error.issues[0].message}`;
 
     // Same downstream guarantee as an invalid plan: nothing beyond the
     // generation row (created, then marked failed) ever happens.
@@ -573,6 +587,11 @@ test('Strategy validation failure returns 422 invalid_strategy_plan (not 500), b
     expect(typeof loggedLine).toBe('string');
     expect(loggedLine).toContain('Strategy validation failed');
     expect(loggedLine).toContain('"code":"near-duplicate-title"');
+    expect(loggedLine).toContain('"reason":"DUPLICATE_TITLE"');
+    expect(loggedLine).toContain('"step":"generate"');
+    expect(loggedLine).toContain('"role":"FAST"');
+    // Codes and indexes only: no Pin text reaches the log.
+    expect(loggedLine).not.toContain(duplicateTitlePlan.pins[1].title);
     expect(loggedLine).not.toContain('svg');
   });
 });

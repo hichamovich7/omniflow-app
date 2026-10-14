@@ -423,7 +423,10 @@ test.describe('Context reaches the text prompt and the image prompt', () => {
     expect(readArticleSourceMetadata(update.image_analysis)?.sectionId).toBe(brief.sectionId);
     await expect(
       regenerateArticlePin(params, { generateText: answer('A long diagonal scarf beside a chunky cowl, overhead.') as never })
-    ).rejects.toMatchObject({ code: 'invalid_strategy_plan' });
+    ).rejects.toMatchObject({
+      code: 'strategy_safeguard_failed',
+      safeguard: { retryable: true, issues: [expect.objectContaining({ code: 'UNGROUNDED_IMAGE_ELEMENTS', field: 'image_prompt' })] },
+    });
   });
 });
 

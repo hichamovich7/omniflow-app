@@ -1250,6 +1250,21 @@ Results 2026-10-12: new spec 22/22; Medium spec 41/41; full renderer **1110/1110
 
 ---
 
+# Pinterest strategy-safeguard errors (TASK-066, 2026-10-14)
+
+```bash
+npx playwright test tests/renderer/pinterest-strategy-errors.spec.ts tests/renderer/pinterest-generation-plan.spec.ts tests/renderer/social-content-studio.spec.ts tests/renderer/pinterest-article-grounding.spec.ts tests/renderer/pinterest-strategy.spec.ts tests/renderer/pinterest-custom-pin-count.spec.ts --project=renderer --reporter=list
+npx playwright test tests/playwright/pinterest-safeguard-error.spec.ts --project=chromium   # needs PLAYWRIGHT_STORAGE_STATE + PLAYWRIGHT_WP_ARTICLE_ID
+```
+
+Offline, `tests/renderer/pinterest-strategy-errors.spec.ts` (19), through the real validators where they exist: a clean batch still passes; `UNBALANCED_ANGLES` (batch-wide, no Pin number, counts), `DUPLICATE_ANGLE` (article flow below 5), `DUPLICATE_TITLE` (later Pin + related Pin), `DUPLICATE_PIN` (repeated-angle copy, field), `UNSUPPORTED_NUMBER` / `UNSUPPORTED_CLAIM` (Pin + field), the four article-grounding codes, family fallback; several problems in one batch (count, codes, retryable), cap at 20 with the total kept, single-Pin wording (no Pin number); retryable vs not (`isStrategySafeguardError`, `strategySafeguardView().showRetry`); readable view (message, count, "Pin 2 · Title", batch-wide "Angle", action); no secret / prompt / raw model text in the response, the stored message, the view or the log line; log line keys limited to step / model / role / issueCount and reason / code / pinIndex / field; one code path for Keyword, OmniFlow article, existing post (and articles from Pins), regeneration through `toApiError()`, UI wiring, unchanged thresholds. Updated: `pinterest-generation-plan.spec.ts` (exact structured 422 body, nothing written, log without Pin text), `social-content-studio.spec.ts` (regeneration: `ANGLE_MISMATCH`, `UNSUPPORTED_NUMBER`, `DUPLICATE_TITLE`), `pinterest-article-grounding.spec.ts` (`UNGROUNDED_IMAGE_ELEMENTS`). Browser spec `tests/playwright/pinterest-safeguard-error.spec.ts` (2, route mocked): issues displayed, "Try again" resends once and disappears on a non-retryable answer; another error keeps the plain message.
+
+Results 2026-10-14: 19/19; affected Pinterest / WordPress-to-Pinterest specs 118/118; full renderer **1137/1138** — the only failure is the timing benchmark `pinterest-local-contrast.spec.ts` "records the local-analysis rendering overhead" under full-suite load, which passes when run alone (12/12); TypeScript, ESLint (excluding the untracked `.claude/hooks/`), `next build` and `git diff --check` pass. The browser spec was **skipped** (no authenticated session locally). No AI call.
+
+**Manual check (founder, optional, no AI cost):** in DevTools, override the `/api/pinterest/generate` response with the JSON example of API.md → the form lists the problems; "Try again" resends the form.
+
+---
+
 # TASK-061 — Real WordPress validation on R2 + production R2 activation (planned 2026-10-11)
 
 Manual, founder-run, in this order. Costs one WordPress article generation (featured + internal images); everything else makes no AI call. Prerequisites: local `MEDIA_STORAGE_PROVIDER=r2` + the six `R2_*` variables; migrations 042 / 043 applied (verified 2026-10-11); a connected **test** WordPress site (≥ 5.8) with Media Library access. Background: Pinterest already runs on R2 locally (25 optimized Pins under `images/pinterest/`, 1000×1500 JPEG ≈ 280-330 KB, read-only check 2026-10-11); `images/wordpress/` is still empty.

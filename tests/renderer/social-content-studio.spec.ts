@@ -750,13 +750,18 @@ test.describe('Regenerate one Pin', () => {
   });
 
   test('a different angle, an invented number or a near-duplicate title is refused', async () => {
-    for (const bad of [
-      plannedPin({ angle: 'listicle' }),
-      plannedPin({ title: '17 Tiny Bathroom Tricks You Need' }),
-      plannedPin({ title: 'Cramped Vanity? Start Storing Upward Instead' }),
-    ]) {
+    for (const [bad, reason, field] of [
+      [plannedPin({ angle: 'listicle' }), 'ANGLE_MISMATCH', 'angle'],
+      [plannedPin({ title: '17 Tiny Bathroom Tricks You Need' }), 'UNSUPPORTED_NUMBER', 'title'],
+      [plannedPin({ title: 'Cramped Vanity? Start Storing Upward Instead' }), 'DUPLICATE_TITLE', 'title'],
+    ] as const) {
       const error = await regenerateArticlePin(regenerationParams(), { generateText: stub(plan(bad)).fn }).catch((e: unknown) => e);
-      expect((error as SocialGenerationError).code).toBe('invalid_strategy_plan');
+      expect((error as SocialGenerationError).code).toBe('strategy_safeguard_failed');
+      const apiError = (error as SocialGenerationError).toApiError();
+      expect(apiError).toMatchObject({ code: 'strategy_safeguard_failed', retryable: true });
+      // One Pin is being regenerated: the problem names its field, never a Pin number.
+      expect(apiError.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: reason, field })]));
+      expect(apiError.issues?.every((issue) => issue.pinIndex === undefined)).toBe(true);
     }
     const grounded = await regenerateArticlePin(regenerationParams(), {
       generateText: stub(plan(plannedPin({ title: 'Add 3 Levels of Storage to a Tiny Bathroom' }))).fn,

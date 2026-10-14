@@ -77,7 +77,14 @@ export async function POST(
     const pin = await regenerateAndSavePin(supabase, prepared, { generateText });
     return NextResponse.json<ApiResponse<Pin>>({ data: pin, error: null });
   } catch (err) {
-    if (err instanceof SocialGenerationError || err instanceof WordPressReadError) {
+    if (err instanceof SocialGenerationError) {
+      // Structured for a strategy-safeguard rejection, { message, code } otherwise.
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: err.toApiError() },
+        { status: err.status }
+      );
+    }
+    if (err instanceof WordPressReadError) {
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: { message: err.message, code: err.code } },
         { status: err.status }

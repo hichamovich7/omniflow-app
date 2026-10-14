@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Check, Info, Sparkles, Sparkle } from 'lucide-react';
@@ -33,6 +33,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { GeneratorHeader } from '@/components/shared/generator-header';
 import { Alert } from '@/components/ui/alert';
+import { StrategySafeguardAlert } from '@/components/pinterest/strategy-safeguard-alert';
+import { isStrategySafeguardError, type StrategySafeguardError } from '@/lib/pinterest/strategy-errors';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -272,7 +274,9 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   const [ctaImportance, setCtaImportance] = useState<PinterestTextImportance>('low');
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [safeguardError, setSafeguardError] = useState<StrategySafeguardError | null>(null);
   const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const selectedProject = projects.find((p) => p.id === projectId);
   const effectiveProjectLanguage = (
@@ -340,6 +344,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSafeguardError(null);
 
     // The inline alert already explains the problem; nothing is sent. The
     // server keeps the same rule as a second line of defense (400 invalid_request).
@@ -428,7 +433,9 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
 
     if (!res.ok || json.error) {
       const message = json.error?.message ?? 'Generation failed';
-      setError(message);
+      // A safeguard rejection is explained inline (which check, Pin, field, action).
+      if (isStrategySafeguardError(json.error)) setSafeguardError(json.error);
+      else setError(message);
       toast.error(message);
       setLoading(false);
       return;
@@ -475,6 +482,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
 
       {/* Form */}
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         className="space-y-4 rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-8"
       >
@@ -910,6 +918,15 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
 
         {error && (
           <Alert>{error}</Alert>
+        )}
+
+        {safeguardError && (
+          // Same form, same settings: a new attempt is a normal user submit.
+          <StrategySafeguardAlert
+            error={safeguardError}
+            retrying={loading}
+            onRetry={() => formRef.current?.requestSubmit()}
+          />
         )}
 
         <div className="flex justify-end">

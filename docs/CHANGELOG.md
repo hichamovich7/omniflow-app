@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Understandable Pinterest strategy-safeguard errors — TASK-066 (2026-10-14)
+
+* **Before:** any rejected batch showed only "AI returned Pinterest content that failed strategy safeguards. Try again." **Now:** 422 `strategy_safeguard_failed` (was `invalid_strategy_plan`) with `retryable`, `issueCount` and `issues[]` (`code`, `pinIndex`, `relatedPinIndex`, `field`, `message`, `action`) — 11 codes, one per existing check (`UNBALANCED_ANGLES`, `DUPLICATE_ANGLE`, `ANGLE_MISMATCH`, `DUPLICATE_TITLE`, `DUPLICATE_PIN`, `UNSUPPORTED_NUMBER`, `UNSUPPORTED_CLAIM`, `MISSING_SOURCE_SECTION`, `DUPLICATE_SOURCE_SECTION`, `IMAGE_SUBJECT_MISMATCH`, `UNGROUNDED_IMAGE_ELEMENTS`). Same for single-Pin regeneration.
+* Generator form: inline panel with the count, Pin, field, explanation and action; "Try again" only when retryable (user click, resends the same form). Regeneration buttons: toast with the first problem and a "Try again" action when retryable.
+* Safeguards, thresholds, Zod validation, niche / Content Stream rules, anti-invention and no-URL rules unchanged. Texts never contain a prompt, a secret or raw model output; server logs keep only codes, step, Pin index, field, model and role.
+* New `lib/pinterest/strategy-errors.ts`, `components/pinterest/strategy-safeguard-alert.tsx`; `ApiError` type in `types/api.ts`. No migration, no new endpoint, no AI call.
+* Tests: new `pinterest-strategy-errors.spec.ts` (19) and browser spec `pinterest-safeguard-error.spec.ts` (2, gated); three specs updated. Full renderer 1137/1138 (timing benchmark flaky under load, passes alone), TypeScript, ESLint, build pass.
+
 ## Medium from Pins and from the Medium page — TASK-064 (2026-10-12)
 
 * **Pinterest generation → "Generate Medium summary"**: new button in the action bar and in the selection bar of a Pinterest generation. It summarizes the WordPress article the Pins were made from (the article stays the source of truth), saves it and opens it in `/medium`. Pins created from a keyword have no article: the button is disabled with an explanation.

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
 
 interface RegenerateGenerationButtonProps {
   projectId: string;
@@ -34,7 +35,7 @@ export function RegenerateGenerationButton({
     const json = await res.json();
 
     if (!res.ok || json.error) {
-      toast.error(json.error?.message ?? 'Regeneration failed');
+      toastApiError(json.error, 'Regeneration failed', () => void handleRegenerate());
       setLoading(false);
       return;
     }

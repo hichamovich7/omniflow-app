@@ -10,7 +10,15 @@ import {
   attachPinterestStrategyMetadata,
   readPinterestStrategyAngle,
   validatePinterestStrategyBatch,
+  type PinterestStrategyIssue,
 } from '@/lib/pinterest/strategy';
+import {
+  buildStrategySafeguardError,
+  strategySafeguardLogLine,
+  STRATEGY_SAFEGUARD_ERROR_CODE,
+  type StrategySafeguardError,
+} from '@/lib/pinterest/strategy-errors';
+import { getRoleConfig } from '@/lib/ai/config';
 import {
   attachAiIntegratedMetadata,
   generationModeForVisualFormat,
@@ -29,6 +37,7 @@ import type { PinterestAngle, SupportedLanguage } from '@/types/pinterest';
 import type { Pin } from '@/types/database';
 import type { WordPressArticle, WordPressGeneration } from '@/types/wordpress';
 import type { ChatMessage } from '@/lib/ai/types';
+import type { ApiError } from '@/types/api';
 import {
   buildArticleContextFromMarkdown,
   formatArticleSectionsForPrompt,
@@ -96,7 +105,7 @@ export type SocialGenerationErrorCode =
   | 'article_not_completed'
   | 'project_mismatch'
   | 'invalid_pin_plan'
-  | 'invalid_strategy_plan'
+  | typeof STRATEGY_SAFEGUARD_ERROR_CODE
   | 'generation_failed';
 
 const ERROR_STATUS: Record<SocialGenerationErrorCode, number> = {
@@ -105,19 +114,27 @@ const ERROR_STATUS: Record<SocialGenerationErrorCode, number> = {
   article_not_completed: 409,
   project_mismatch: 400,
   invalid_pin_plan: 422,
-  invalid_strategy_plan: 422,
+  [STRATEGY_SAFEGUARD_ERROR_CODE]: 422,
   generation_failed: 500,
 };
 
 export class SocialGenerationError extends Error {
   readonly code: SocialGenerationErrorCode;
   readonly status: number;
+  /** Structured detail of a strategy-safeguard rejection (user-safe). */
+  readonly safeguard?: StrategySafeguardError;
 
-  constructor(code: SocialGenerationErrorCode, message: string) {
+  constructor(code: SocialGenerationErrorCode, message: string, safeguard?: StrategySafeguardError) {
     super(message);
     this.name = 'SocialGenerationError';
     this.code = code;
     this.status = ERROR_STATUS[code];
+    this.safeguard = safeguard;
+  }
+
+  /** The `error` object of the API response. */
+  toApiError(): ApiError {
+    return this.safeguard ?? { message: this.message, code: this.code };
   }
 }
 
@@ -307,15 +324,26 @@ export function buildArticlePinterestContext(
  * repeating"); the shared strategy validator only checks 5 and 10, so this
  * closes the gap for 1 and 3 Pins in the article flow.
  */
-export function validateDistinctAngles(pins: Array<{ angle: PinterestAngle }>, pinsRequested: number): string[] {
+export function validateDistinctAngles(
+  pins: Array<{ angle: PinterestAngle }>,
+  pinsRequested: number
+): PinterestStrategyIssue[] {
   if (pinsRequested >= PINTEREST_ANGLES.length) return [];
   const seen = new Set<PinterestAngle>();
-  const repeated = new Set<PinterestAngle>();
-  for (const pin of pins) {
-    if (seen.has(pin.angle)) repeated.add(pin.angle);
+  // Reported once per angle, on the first Pin that repeats it.
+  const firstRepeat = new Map<PinterestAngle, number>();
+  pins.forEach((pin, index) => {
+    if (seen.has(pin.angle) && !firstRepeat.has(pin.angle)) firstRepeat.set(pin.angle, index);
     seen.add(pin.angle);
-  }
-  return [...repeated].map((angle) => `Angle "${angle}" is used more than once in a batch of ${pinsRequested}`);
+  });
+  return [...firstRepeat].map(([angle, index]) => ({
+    code: 'angle-coverage',
+    message: `Angle "${angle}" is used more than once in a batch of ${pinsRequested}`,
+    reason: 'DUPLICATE_ANGLE',
+    pinIndex: index,
+    field: 'angle',
+    details: [angle],
+  }));
 }
 
 interface BoardCandidate {
@@ -477,10 +505,20 @@ export async function regenerateArticlePin(
 
   const next = withoutUrls({ ...planned, angle });
   const evidence = `${keyword}\n${regenerationContext}`;
-  const issues = [
-    ...(planned.angle !== angle ? [`Expected the "${angle}" angle, got "${planned.angle}"`] : []),
-    ...validatePinterestStrategyBatch([next], 1, evidence).map((issue) => issue.message),
-    ...(grounding ? validateArticleGroundedPins([next], grounding).map((issue) => issue.message) : []),
+  const issues: PinterestStrategyIssue[] = [
+    ...(planned.angle !== angle
+      ? [{
+          code: 'angle-coverage' as const,
+          message: `Expected the "${angle}" angle, got "${planned.angle}"`,
+          reason: 'ANGLE_MISMATCH' as const,
+          pinIndex: 0,
+          field: 'angle' as const,
+          // Both are angle enum values (Zod-validated), never free text.
+          details: [angle, planned.angle],
+        }]
+      : []),
+    ...validatePinterestStrategyBatch([next], 1, evidence),
+    ...(grounding ? validateArticleGroundedPins([next], grounding) : []),
     ...siblingTitles.flatMap((title) =>
       validatePinterestStrategyBatch(
         [
@@ -491,15 +529,26 @@ export async function regenerateArticlePin(
         `${title}\n${next.title}`
       )
         .filter((issue) => issue.code === 'near-duplicate-title')
-        .map((issue) => issue.message)
+        // The sibling is not part of this one-Pin batch: no pair indexes.
+        .map((issue): PinterestStrategyIssue => ({
+          code: issue.code,
+          message: issue.message,
+          reason: issue.reason,
+          pinIndex: 0,
+          field: issue.field,
+        }))
     ),
   ];
   if (issues.length > 0) {
-    console.error(`[${PROMPT_ID}] Regenerated Pin failed strategy safeguards: ${JSON.stringify(issues.slice(0, 10))}`);
-    throw new SocialGenerationError(
-      'invalid_strategy_plan',
-      'AI returned Pinterest content that failed strategy safeguards. Try again.'
+    console.error(
+      `[${PROMPT_ID}] Regenerated Pin failed strategy safeguards: ${strategySafeguardLogLine(issues, {
+        step: 'regenerate',
+        model: getRoleConfig('FAST').model,
+        role: 'FAST',
+      })}`
     );
+    const safeguard = buildStrategySafeguardError(issues, 'pin');
+    throw new SocialGenerationError(STRATEGY_SAFEGUARD_ERROR_CODE, safeguard.message, safeguard);
   }
 
   const strategyMetadata = attachPinterestStrategyMetadata(pin.image_analysis, angle);
