@@ -62,7 +62,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 ### Planned
 
-* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook content (TASK-044 later phase, text only — saved in `social_content_generations` (045); migration 046 reserved if it needs a schema change); TASK-043 (edit Board section on existing Pins); TASK-011 Credits System (before any public opening).
+* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook content (TASK-044 later phase, text only — saved in `social_content_generations` (045); migration 046 reserved if it needs a schema change); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
 * **P2:** storage audit / archiving (read-only orphan audit first); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
@@ -83,7 +83,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-12: 064 (TASK-064, Medium from Pins and from /medium) → **next task: 065**.
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-14: 065 (TASK-065, Pinterest CSV export tracking — planned) → **next task: 066**.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
 * **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **next free migration: 046** (reserved for the TASK-044 later phases if they need one).
@@ -1053,6 +1053,78 @@ Give Medium its own section: a sidebar entry, a history page `/medium` and a det
 ### Remaining
 
 * Apply migration 045 (Supabase SQL Editor), then the real test (TESTING.md "Medium history").
+
+---
+
+## [TASK-065] Pinterest CSV export tracking per Pin
+
+### Status: PLANNED (documented 2026-10-14 after a read-only audit — not started, no code, no migration)
+
+### Goal
+
+Make the Pinterest state of every Pin explicit, so a Pin scheduled in OmniFlow but never exported (or modified after its export) can no longer pass for "planned on Pinterest". The founder sometimes generates Pins and forgets to schedule them or to export the CSV, and the dashboard cannot tell the difference today. The states to distinguish are:
+
+* Pin generated;
+* Pin not scheduled;
+* Pin scheduled in OmniFlow;
+* Pin scheduled but CSV not exported;
+* Pin exported;
+* CSV outdated after a change to the Pin;
+* old Pin whose export state is unknown.
+
+### Audit findings (2026-10-14, read-only)
+
+* **The CSV export is not recorded anywhere.** It has no API route: it is built and downloaded in the browser (`lib/csv/pinterest.ts` `generatePinterestCsv` + `downloadCsv`) from three entry points:
+  * `components/pinterest/export-csv-button.tsx` — the generation page (whole generation or selection) and the board page;
+  * `components/history/history-actions.tsx` — the whole generation.
+* **"Scheduled" only means `pins.publish_date` is set.** `pins` has no `scheduled_at` column. `publish_date` is written only by `PATCH /api/pinterest/schedule`. The dashboard counters (`countPinLifecycle` in `lib/queries/command-center.ts`: Created / Planned / Planned date passed / Unscheduled) and the coverage grid (`lib/dashboard/build-content-coverage.ts`) read nothing else. So a Pin scheduled in OmniFlow counts as planned even when its CSV was never exported.
+* **An export can contain a whole generation, a selection of Pins or a whole board**, so one CSV can mix several generations. The export state must therefore be tracked **per Pin**, not per generation.
+* **`updated_at` cannot detect an outdated export.** Writing the export fields would itself bump it through the `pins_updated_at` trigger. Several paths change a Pin after an export:
+  * text edit (`lib/pinterest/pin-text.ts`);
+  * regeneration;
+  * image replacement / recomposition / generation;
+  * scheduling.
+
+  A content fingerprint compared with the stored one catches all of these without touching them.
+
+### Recommended solution (to confirm when the task starts)
+
+* **Reuse the `pins` table — no new table.** Add two nullable columns in a new migration:
+  * `last_exported_at timestamptz`;
+  * `last_export_hash text`.
+
+  Take the next free number when the task starts. 046 is reserved for TASK-044, so the number is probably 047 — check the "Task numbering" section first.
+* **On a successful CSV export**, store `last_exported_at` and `last_export_hash` for every exported Pin:
+  * the hash is a stable fingerprint of the values exactly as written in the CSV: title, description, keywords / tags, board (`Board/Section` cell), media URL, link URL, publish date (UTC, as formatted for the CSV);
+  * nothing is stored if building the CSV fails;
+  * CSV columns and format unchanged.
+* **Outdated export:** compare the fingerprint of the Pin's current content with `last_export_hash`. Different → "Export outdated", with an "Export again" recommendation.
+* **Old Pins** must never count as exported by default. The way to mark them ("Export status unknown") is to decide at implementation time: a sentinel `last_export_hash` set by the migration on existing rows, or a cut-off date.
+* **One shared status function** used by the history, the generation page and the dashboard, so the counters follow the same rules everywhere.
+
+### Planned statuses
+
+| Status | Rule |
+|---|---|
+| `Not scheduled` | no `publish_date` |
+| `Scheduled — CSV not exported` | `publish_date` set, no export recorded |
+| `Exported` | current content fingerprint = `last_export_hash` |
+| `Export outdated` | Pin changed after its last export (fingerprints differ) |
+| `Export status unknown` | old Pin created before export tracking, with no export information |
+
+### Dashboard
+
+* **The coverage grid keeps counting the Pins scheduled in OmniFlow** (`publish_date`). Scheduling and coverage rules do not change.
+* **A separate mention** shows how many scheduled Pins are not exported yet. It is never subtracted from the coverage.
+* Badges per status and filters (All / Not scheduled / Scheduled not exported / Exported / Export outdated / Export status unknown) in the Pinterest history and on the dashboard.
+
+### Limit (permanent)
+
+OmniFlow can only confirm that it **generated** the CSV, never that the CSV was actually imported into Pinterest, since OmniFlow does not connect to Pinterest. No status may ever read "Published on Pinterest".
+
+### Out of scope
+
+Pinterest prompts, Pin generation, scheduling rules, CSV columns / format, images, WordPress, Medium, any new table, any data deletion.
 
 ---
 

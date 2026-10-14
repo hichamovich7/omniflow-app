@@ -43,6 +43,17 @@ No registrar cambios menores de formato o comentarios.
 * Not saved (storage audit: no compatible social history — no migration), no Medium API or token, no WordPress write, nothing published. Rate limit `social/medium-summary` (30/h) + trial cap.
 * Tests: new `tests/renderer/medium-summary.spec.ts` (41, of which 12 for the image); `social-content-studio.spec.ts` and browser `wordpress-social-content.spec.ts` adapted (API mocked). Full renderer 1088/1088, TypeScript, ESLint, build pass. Guide: Social Content Studio updated, new "Medium summary" section.
 
+## Docs: TASK-065 planned — Pinterest CSV export tracking (2026-10-14)
+
+* `docs/TASKS.md`: new PLANNED task **TASK-065**. The read-only audit found that the CSV export is browser-only and never recorded, and that "planned" only means `pins.publish_date` is set.
+* Recommended solution:
+  * two nullable columns on `pins` (`last_exported_at`, `last_export_hash`), no new table;
+  * a content fingerprint compared with the last export;
+  * five statuses: Not scheduled / Scheduled — CSV not exported / Exported / Export outdated / Export status unknown.
+* The coverage grid keeps counting OmniFlow-scheduled Pins. A separate mention will show the scheduled Pins not exported yet.
+* OmniFlow can never confirm a Pinterest import.
+* Task numbering: next task 066. No code, migration or schema change.
+
 ## Docs: TASKS.md status audit, TASK-061 planned (2026-10-11)
 
 * `docs/TASKS.md`: new ACTIVE TASK **TASK-061** (P0 — real WordPress validation on R2, then production R2 activation), a Status board (Ready to test / Planned / Blocked / Obsolete, P0-P2 roadmap) and a Task numbering section (one counter for `TASK-` and `TASK-FIX-`, next 061; collisions TASK-045…051 / TASK-FIX-045…051 kept and listed; commit `964bcc7` "TASK-038" = TASK-FIX-015; next migration 045).
