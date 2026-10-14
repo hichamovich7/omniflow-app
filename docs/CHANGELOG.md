@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Home Decor Pins no longer rejected for "not showing the project" — TASK-067 (2026-10-14)
+
+* **Before:** Pins from a German Home Decor article failed with "Image description: the image description does not show the project of its article section." The check compared words of the (German) section heading with the (always English) image prompt, and was built for Crochet / Clay "projects". In English it also let a living room pass for a kitchen section, or a generic "cozy" interior.
+* **Now:** for Home Organization & Decor projects, each image must show its section's room and at least two of the section's anchors — furniture, palette, material, style — taken from a controlled English / German vocabulary (`lib/pinterest/home-decor-anchors.ts`: umlauts, ß, plurals, compounds such as Küchenschränke or Eichenholz; no free translation). A generic interior, the wrong room, or furniture / materials / colors absent from the article (German articles included) are refused. The Pin plan sent to the AI lists each section's anchors.
+* Error message: "Pin 1 does not clearly represent the article section. Expected: kitchen, green and orange palette. Detected: generic interior. Missing: …" with "Try again, or review the article section."
+* Crochet, Clay and other niches keep the project check unchanged. Anti-invention, 2:3, angles, boards and the no-destination-URL rule unchanged. No migration, no endpoint, no AI call in tests.
+* Tests: new `tests/renderer/pinterest-home-decor-grounding.spec.ts` (17). Full renderer 1155/1155, TypeScript, ESLint, build pass.
+
 ## Understandable Pinterest strategy-safeguard errors — TASK-066 (2026-10-14)
 
 * **Before:** any rejected batch showed only "AI returned Pinterest content that failed strategy safeguards. Try again." **Now:** 422 `strategy_safeguard_failed` (was `invalid_strategy_plan`) with `retryable`, `issueCount` and `issues[]` (`code`, `pinIndex`, `relatedPinIndex`, `field`, `message`, `action`) — 11 codes, one per existing check (`UNBALANCED_ANGLES`, `DUPLICATE_ANGLE`, `ANGLE_MISMATCH`, `DUPLICATE_TITLE`, `DUPLICATE_PIN`, `UNSUPPORTED_NUMBER`, `UNSUPPORTED_CLAIM`, `MISSING_SOURCE_SECTION`, `DUPLICATE_SOURCE_SECTION`, `IMAGE_SUBJECT_MISMATCH`, `UNGROUNDED_IMAGE_ELEMENTS`). Same for single-Pin regeneration.

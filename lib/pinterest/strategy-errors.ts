@@ -137,11 +137,18 @@ function describe(issue: PinterestStrategyIssue, scope: StrategySafeguardScope):
           : `${pin} reuses an article section already used by another Pin.`,
         action: 'Try again, or request fewer Pins than the article has sections.',
       };
-    case 'IMAGE_SUBJECT_MISMATCH':
+    case 'IMAGE_SUBJECT_MISMATCH': {
+      const subject = issue.subject;
+      const list = (label: string, terms: string[] | undefined) => (terms?.length ? ` ${label}: ${terms.join(', ')}.` : '');
       return {
-        message: `${pin}'s image description does not show the project of its article section.`,
-        action: 'Try again.',
+        message:
+          `${pin} does not clearly represent the article section.` +
+          list('Expected', subject?.expected) +
+          list('Detected', subject?.detected) +
+          list('Missing', subject?.missing),
+        action: 'Try again, or review the article section.',
       };
+    }
     case 'UNGROUNDED_IMAGE_ELEMENTS':
       return {
         message:

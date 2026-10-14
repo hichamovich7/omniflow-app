@@ -1265,6 +1265,21 @@ Results 2026-10-14: 19/19; affected Pinterest / WordPress-to-Pinterest specs 118
 
 ---
 
+# Home Decor image subject check (TASK-067, 2026-10-14)
+
+```bash
+npx playwright test tests/renderer/pinterest-home-decor-grounding.spec.ts --project=renderer --reporter=list
+npx playwright test tests/renderer/pinterest-*.spec.ts tests/renderer/wordpress-pins-coherence.spec.ts tests/renderer/niche-*.spec.ts tests/renderer/project-niche-clay-crafts.spec.ts tests/renderer/social-content-studio.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/pinterest-home-decor-grounding.spec.ts` (17) — `fetch` is trapped in every test (0 calls) and the article context is deep-frozen: German normalization (case, umlauts → ae/oe/ue, ß, inflections, compounds such as Küchenschränke / Eichenholz / salbeigrün; look-alikes Kuchen / Frost / Grundriss / -istisch create no anchor); niche selection (Home Decor aliases → `home-decor`, Crochet / Clay / unknown → `project`); (1) German Home Decor valid — the same Pins fail with the Crochet check, which reproduces the reported bug; (2) English Home Decor valid without the word "project"; (3) kitchen vs living room in both languages; (4) article colors accepted, palette in the expected anchors; (5) marble / fireplace / red / leather absent from the German article → `UNGROUNDED_IMAGE_ELEMENTS`, negations and neutral backdrops ignored; (6) generic interior rejected ("Detected: generic interior"); (7) off-topic images rejected; a section without a room still needs two of its own anchors; (8) Crochet and Clay keep the project check, its message and the vocabulary check, German Crochet unchanged; (9) the user message "Pin 1 does not clearly represent the article section. Expected: … Detected: generic interior. Missing: …" + action, retryable, no article / model text; (10) the Pin plan lists English anchors and no URL; (11-12) single-Pin regeneration from a stored German brief: faithful prompt passes, living room refused, stub model only, article unchanged.
+
+Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/472; full renderer **1155/1155**; TypeScript, ESLint (touched files), `next build` and `git diff --check` pass.
+
+**Manual check (founder, costs one text generation):** in a Home Organization & Decor project, generate 2-3 Pins from a German Home Decor article (the one that failed) → no "image description" rejection; open the image prompts — each shows the section's room and palette. Record the result in TASKS.md (TASK-067).
+
+---
+
 # TASK-061 — Real WordPress validation on R2 + production R2 activation (planned 2026-10-11)
 
 Manual, founder-run, in this order. Costs one WordPress article generation (featured + internal images); everything else makes no AI call. Prerequisites: local `MEDIA_STORAGE_PROVIDER=r2` + the six `R2_*` variables; migrations 042 / 043 applied (verified 2026-10-11); a connected **test** WordPress site (≥ 5.8) with Media Library access. Background: Pinterest already runs on R2 locally (25 optimized Pins under `images/pinterest/`, 1000×1500 JPEG ≈ 280-330 KB, read-only check 2026-10-11); `images/wordpress/` is still empty.

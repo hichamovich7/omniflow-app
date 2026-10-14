@@ -49,6 +49,7 @@ import {
 import {
   buildArticleEvidence,
   formatPinPlanForPrompt,
+  subjectCheckForNiche,
   readArticleSourceMetadata,
   validateArticleGroundedPins,
   type ArticleGrounding,
@@ -446,6 +447,8 @@ export async function regenerateArticlePin(
         briefs: { [stored.sectionId]: stored.brief },
         evidence: [buildArticleEvidence(source.context), ...stored.brief.visualDetails].join('\n'),
         enforceVocabulary: source.context.language === 'en',
+        subjectCheck: subjectCheckForNiche(source.niche),
+        language: source.context.language,
       }
     : null;
 

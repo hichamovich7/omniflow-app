@@ -12,7 +12,9 @@ import {
   type VisualAttributes,
   type WordPressArticleContext,
 } from '@/lib/wordpress/article-context';
-import type { PinterestStrategyIssue } from '@/lib/pinterest/strategy';
+import type { PinterestStrategyIssue, PinterestSubjectReport } from '@/lib/pinterest/strategy';
+import { checkHomeDecorSubject, describeHomeAnchors, findHomeAnchors, findUngroundedHomeTerms } from '@/lib/pinterest/home-decor-anchors';
+import { findNicheProfile } from '@/lib/niche/resolve';
 import { ARTICLE_SOURCE_METADATA_KEY } from '@/lib/social/pin-display';
 
 /**
@@ -48,6 +50,17 @@ export interface SectionImageDescription {
   text: string;
 }
 
+/**
+ * How a Pin's image is checked against its section: `project` (Crochet,
+ * Clay, any other niche — the section's project noun) or `home-decor`
+ * (Home Organization & Decor — room, furniture, palette, material, style).
+ */
+export type ArticleSubjectCheck = 'project' | 'home-decor';
+
+export function subjectCheckForNiche(niche: string | null | undefined): ArticleSubjectCheck {
+  return findNicheProfile(niche)?.slug === 'home-decor' ? 'home-decor' : 'project';
+}
+
 export interface ArticleGrounding {
   sourceType: ArticleSourceType;
   /** Section id per Pin, in Pin order. */
@@ -57,6 +70,11 @@ export interface ArticleGrounding {
   evidence: string;
   /** The vocabulary check only runs on English articles (the lexicon is English). */
   enforceVocabulary: boolean;
+  subjectCheck: ArticleSubjectCheck;
+  /** Article language — selects the German spellings of the Home Decor vocabulary. */
+  language: string;
+  /** Planned section text (heading, body, photo text) for the Home Decor check; the brief is used otherwise. */
+  sectionTexts?: Record<string, string>;
 }
 
 // What the image prompt check looks for. Only claims about the project:
@@ -227,17 +245,33 @@ export function formatVisualBrief(brief: PinVisualBrief): string {
   ].join('\n');
 }
 
+/** What a stored brief says about its section — the Home Decor check's input when the full section is not at hand. */
+export function briefSectionText(brief: PinVisualBrief): string {
+  return [brief.sourceSection, brief.represented, ...brief.visualDetails, ...brief.colors, ...brief.materials].join('\n');
+}
+
 export function buildArticleGrounding(
   context: WordPressArticleContext,
   pinsRequested: number,
-  imageDescriptions: Record<string, SectionImageDescription[]> = {}
+  imageDescriptions: Record<string, SectionImageDescription[]> = {},
+  options: { niche?: string | null } = {}
 ): ArticleGrounding {
   const sectionPlan = planArticlePinSections(context, pinsRequested);
   const evidence = buildArticleEvidence(context, imageDescriptions);
   const briefs: Record<string, PinVisualBrief> = {};
+  const sectionTexts: Record<string, string> = {};
   for (const sectionId of new Set(sectionPlan)) {
     const section = findSection(context, sectionId);
-    if (section) briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence);
+    if (!section) continue;
+    briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence);
+    sectionTexts[sectionId] = [
+      section.kind === 'intro' ? context.title : section.heading,
+      section.text,
+      ...section.images.flatMap((image) => [image.alt, image.caption]),
+      ...(imageDescriptions[sectionId] ?? []).map((item) => item.text),
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
   return {
     sourceType: context.sourceType,
@@ -245,7 +279,14 @@ export function buildArticleGrounding(
     briefs,
     evidence,
     enforceVocabulary: context.language === 'en',
+    subjectCheck: subjectCheckForNiche(options.niche),
+    language: context.language,
+    sectionTexts,
   };
+}
+
+function sectionTextOf(grounding: ArticleGrounding, sectionId: string, brief: PinVisualBrief): string {
+  return grounding.sectionTexts?.[sectionId] ?? briefSectionText(brief);
 }
 
 /** The <pin_plan> block of the text prompt: each Pin's section and visual brief. */
@@ -254,7 +295,14 @@ export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
     const brief = grounding.briefs[sectionId];
     return `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
   });
-  const briefs = Object.values(grounding.briefs).map((brief) => `Visual brief for section "${brief.sectionId}":\n${formatVisualBrief(brief)}`);
+  const briefs = Object.values(grounding.briefs).map((brief) => {
+    const block = `Visual brief for section "${brief.sectionId}":\n${formatVisualBrief(brief)}`;
+    if (grounding.subjectCheck !== 'home-decor') return block;
+    const anchors = describeHomeAnchors(findHomeAnchors(sectionTextOf(grounding, brief.sectionId, brief), grounding.language), 8);
+    return anchors.length
+      ? `${block}\nVisual anchors the image prompt must show (English terms taken from this section): ${anchors.join(', ')}`
+      : block;
+  });
   return [
     '<pin_plan>',
     'Each Pin is built from one real section of the article. Use exactly this assignment, in this order, and copy the id into sourceSectionId:',
@@ -296,6 +344,17 @@ function mentionsSubject(imagePrompt: string, brief: PinVisualBrief): boolean {
     .some((word) => prompt.includes(` ${word} `));
 }
 
+/** Fixed-vocabulary report for the project check (Crochet, Clay…): the section's project nouns. */
+function projectSubjectReport(imagePrompt: string, brief: PinVisualBrief): PinterestSubjectReport {
+  const expected = findTerms(`${brief.represented}\n${brief.sourceSection}`, 'objects');
+  const detected = findTerms(imagePrompt, 'objects');
+  return {
+    expected,
+    detected: detected.length ? detected : ['no recognizable project'],
+    missing: expected.filter((term) => !detected.includes(term)),
+  };
+}
+
 export interface GroundedPinCandidate {
   sourceSectionId?: string;
   image_prompt: string;
@@ -305,7 +364,9 @@ export interface GroundedPinCandidate {
  * Article flow safeguards: every Pin names a planned section, Pins do not
  * share a section when the article has enough of them, the image prompt
  * shows that section's project and makes no project claim (material, motif,
- * technique, color, other project) absent from the article.
+ * technique, color, other project) absent from the article. Home Decor
+ * (subjectCheck 'home-decor') checks the room, furniture, palette, material
+ * and style anchors instead, in English or German (home-decor-anchors.ts).
  */
 export function validateArticleGroundedPins(pins: GroundedPinCandidate[], grounding: ArticleGrounding): PinterestStrategyIssue[] {
   const issues: PinterestStrategyIssue[] = [];
@@ -339,28 +400,51 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
     used.set(sectionId, index);
 
     const brief = grounding.briefs[sectionId];
-    if (brief && !mentionsSubject(pin.image_prompt, brief)) {
+    const homeDecor = grounding.subjectCheck === 'home-decor';
+    // Negated mentions ("no sofa") are not something the image shows.
+    const shown = withoutNegatedClauses(pin.image_prompt);
+    if (brief && homeDecor) {
+      const check = checkHomeDecorSubject(shown, sectionTextOf(grounding, sectionId, brief), grounding.evidence, grounding.language);
+      if (!check.ok) {
+        const subject: PinterestSubjectReport = {
+          expected: describeHomeAnchors(check.expected),
+          detected: check.detected.length ? describeHomeAnchors(check.detected) : ['generic interior'],
+          missing: check.missing.slice(0, 6),
+        };
+        issues.push({
+          code: 'unsupported-claim',
+          message: `Pin ${index + 1} image does not clearly represent its source section (expected: ${subject.expected.join(', ') || 'n/a'}; detected: ${subject.detected.join(', ')})`,
+          reason: 'IMAGE_SUBJECT_MISMATCH',
+          pinIndex: index,
+          field: 'image_prompt',
+          subject,
+        });
+      }
+    } else if (brief && !mentionsSubject(pin.image_prompt, brief)) {
       issues.push({
         code: 'unsupported-claim',
         message: `Pin ${index + 1} image does not show its source section's project`,
         reason: 'IMAGE_SUBJECT_MISMATCH',
         pinIndex: index,
         field: 'image_prompt',
+        subject: projectSubjectReport(pin.image_prompt, brief),
       });
     }
-    if (grounding.enforceVocabulary) {
-      const ungrounded = findUngroundedVisualTerms(pin.image_prompt, grounding.evidence);
-      if (ungrounded.length > 0) {
-        issues.push({
-          code: 'unsupported-claim',
-          message: `Pin ${index + 1} image adds elements absent from the article: ${ungrounded.join(', ')}`,
-          reason: 'UNGROUNDED_IMAGE_ELEMENTS',
-          pinIndex: index,
-          field: 'image_prompt',
-          // Fixed-vocabulary terms (CHECKED_TERMS), never free model text.
-          details: ungrounded,
-        });
-      }
+    const ungrounded = uniq([
+      ...(grounding.enforceVocabulary ? findUngroundedVisualTerms(pin.image_prompt, grounding.evidence) : []),
+      // Home Decor: controlled English/German vocabulary, so German articles are checked too.
+      ...(homeDecor ? findUngroundedHomeTerms(shown, grounding.evidence, grounding.language) : []),
+    ]);
+    if (ungrounded.length > 0) {
+      issues.push({
+        code: 'unsupported-claim',
+        message: `Pin ${index + 1} image adds elements absent from the article: ${ungrounded.join(', ')}`,
+        reason: 'UNGROUNDED_IMAGE_ELEMENTS',
+        pinIndex: index,
+        field: 'image_prompt',
+        // Fixed-vocabulary terms (CHECKED_TERMS, Home Decor anchors), never free model text.
+        details: ungrounded,
+      });
     }
   });
 

@@ -235,9 +235,11 @@ UNSUPPORTED_NUMBER         number absent from the keyword / analysis / article e
 UNSUPPORTED_CLAIM          "free" or "beginner/easy" claim absent from the evidence
 MISSING_SOURCE_SECTION     article-grounded Pin without a planned sourceSectionId
 DUPLICATE_SOURCE_SECTION   two Pins on the same planned section
-IMAGE_SUBJECT_MISMATCH     image_prompt does not show the section's project
-UNGROUNDED_IMAGE_ELEMENTS  English article: checked-vocabulary terms absent from the article
+IMAGE_SUBJECT_MISMATCH     image_prompt does not show the section's project (Home Decor: its room + ≥ 2 visual anchors)
+UNGROUNDED_IMAGE_ELEMENTS  checked-vocabulary terms absent from the article (English articles; Home Decor anchors also for German)
 ```
+
+`IMAGE_SUBJECT_MISMATCH` message (TASK-067): "Pin 1 does not clearly represent the article section. Expected: kitchen, green and orange palette. Detected: generic interior. Missing: kitchen, green, orange." — action "Try again, or review the article section." Expected / Detected / Missing are fixed-vocabulary terms (`PinterestStrategyIssue.subject`), never article or model text; each part is left out when empty. The check depends on the project niche: Home Organization & Decor (and its aliases) uses the room / furniture / color / material / style / mood anchors of `lib/pinterest/home-decor-anchors.ts` (English + German spellings); every other niche (Crochet, Clay…) keeps the project-noun check.
 
 `retryable` is true when every issue can pass on a new attempt (all current checks depend on the model's output — table `RETRYABLE`); other errors carry no `retryable` and get no retry button. Texts are fixed templates filled only with safe tokens (angle names, counts, digits, checked-vocabulary terms): never a prompt, a secret, a section id or raw model text. `generations.error_message` stores the message plus the first three issue messages. The server log line (`strategySafeguardLogLine()`) holds only `step`, `model`, `role`, `issueCount` and per issue `reason`, `code`, 0-based `pinIndex`, `field`.
 

@@ -54,6 +54,17 @@ export interface PinterestStrategyIssue {
   field?: PinterestSafeguardField;
   /** Safe tokens only: angle names, counts, digits, fixed-vocabulary terms. */
   details?: string[];
+  /** IMAGE_SUBJECT_MISMATCH only — fixed-vocabulary terms, never free model text. */
+  subject?: PinterestSubjectReport;
+}
+
+export interface PinterestSubjectReport {
+  /** What the article section supports (e.g. "kitchen", "green and orange palette"). */
+  expected: string[];
+  /** What the image prompt shows (or "generic interior" / "no recognizable project"). */
+  detected: string[];
+  /** Expected anchors the image prompt does not show. */
+  missing: string[];
 }
 
 const TITLE_SIMILARITY_LIMIT = 0.8;

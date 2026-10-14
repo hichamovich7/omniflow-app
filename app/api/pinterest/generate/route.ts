@@ -233,7 +233,7 @@ export async function POST(request: Request) {
     });
     // Counts only: no URL, no article content.
     console.log(`[${PROMPT_ID}] Article image descriptions: ${JSON.stringify(stats)}`);
-    articleGrounding = buildArticleGrounding(articleSource.context, pinsRequested, descriptions);
+    articleGrounding = buildArticleGrounding(articleSource.context, pinsRequested, descriptions, { niche: articleSource.niche });
   }
 
   let analysisContext: string | null = articleSource
