@@ -1772,6 +1772,35 @@ Phase 1 (same day) made niche profiles reach every WordPress and Pinterest promp
 
 ---
 
+## 2026-10-15
+
+### Decision
+
+TASK-068 — **Facebook Pages: generation + manual publication.** TASK-044 decision D9 ("direct publishing out of scope v1") is lifted **for Facebook Pages only**, by founder decision on 2026-10-15 after the Phase 1 audit. Every other platform stays content-only.
+
+### Context
+
+Facebook was declared `coming_soon` in the Social Content Studio and already accepted by `social_content_generations` (migration 045); no OAuth, token storage or publication existed anywhere in the codebase. The founder asked for a Facebook post generated from the WordPress article (same rules as Medium: `WordPressArticleContext`, exact permalink, nothing invented), then published to a connected Facebook Page, with the article link optionally in the first comment.
+
+### Decision Taken (founder-validated choices)
+
+1. Facebook **Pages** only — never a personal profile or a group; no Instagram; no scheduling (separate task).
+2. Migration 046: generic `social_connections` (one Page per project, reusable for Instagram / TikTok later), `social_publications` (one row per content + Page, step states), Facebook columns on `social_content_generations`.
+3. Photo post with the article image (text post when there is no usable image); the link placement is **First comment / Main post / No link**; without a validated permalink only **No link**. The link is always the validated WordPress permalink, added by code — never written by the model, never typed by the user.
+4. Tokens: only the chosen **Page** token is stored, encrypted with a **separate** key `SOCIAL_TOKEN_ENCRYPTION_KEY` (never a hard-coded key). Postgres column privileges keep `encrypted_access_token` out of reach of the `authenticated` role; writes and the only read use the service-role client after the ownership check, always filtered on the owner. The long-lived user token lives only 10 minutes in an encrypted httpOnly cookie between the Facebook Login callback and the Page choice. Tokens never appear in a URL, a response, the browser or a log; Graph calls carry `appsecret_proof`.
+5. Strictly minimal permissions: `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `pages_manage_engagement`, `pages_read_user_content` (the last two for the first comment and its timeout check). `business_management` only on explicit request, when Meta lists no Page.
+6. Publication order: post → its id saved → only then the first comment. Comment failure = `partial`, only "Retry comment" (the post is never sent twice). Timeouts are `unknown` and settled by reading the Page's posts / the post's comments and matching the exact text before any new attempt. UNIQUE (content, Page) + conditional "claim" updates prevent concurrent duplicates.
+7. Same limits as Medium for generation (hourly + trial cap); a separate hourly limit for publication (no AI cost). Native `fetch`, no new dependency.
+
+### Consequences
+
+* Migration 046 must be applied by hand (after 045) before posts are saved and Pages connected.
+* The founder must create a Meta app (Business type, Facebook Login), declare the redirect URI and add `META_APP_ID`, `META_APP_SECRET`, `SOCIAL_TOKEN_ENCRYPTION_KEY` to the environment. In Standard Access only accounts with a role on the Meta app can connect; other users need Advanced Access (App Review + Business Verification).
+* Rotating `SOCIAL_TOKEN_ENCRYPTION_KEY` disconnects every Page (users reconnect).
+* The first-comment link is an editorial choice: OmniFlow never claims it improves reach.
+
+---
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

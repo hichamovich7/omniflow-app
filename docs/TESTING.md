@@ -1280,6 +1280,45 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Facebook Pages (TASK-068, 2026-10-15)
+
+```bash
+npx playwright test tests/renderer/facebook-content.spec.ts --project=renderer --reporter=list
+npx playwright test tests/renderer/social-content-studio.spec.ts tests/renderer/social-content-history.spec.ts tests/renderer/medium-summary.spec.ts tests/renderer/medium-sources.spec.ts --project=renderer --reporter=list
+npx playwright test tests/playwright/facebook.spec.ts tests/playwright/wordpress-social-content.spec.ts --project=chromium   # needs PLAYWRIGHT_STORAGE_STATE (+ PLAYWRIGHT_WP_ARTICLE_ID, PLAYWRIGHT_PROJECT_ID, PLAYWRIGHT_FACEBOOK_CONTENT_ID)
+```
+
+Offline, `tests/renderer/facebook-content.spec.ts` (31) — Supabase (fake client), WordPress (fake fetch, GET only) and the Meta Graph API (fake fetch behind the real `MetaGraphClient`, 50 ms timeout) are all simulated; no AI call, no Meta call:
+
+* Generation: (1) OmniFlow article — `WordPressArticleContext`, exact permalink, article image, default First comment, WordPress GETs only; (2) existing WordPress post — source ref, permalink, Content Stream through the mapped category; (3-5) prompt with the article sections, `<niche_context>` (niche, Content Stream), Brand Profile, no URL anywhere; (6) German article → "Write in German", an English post refused; (7) invented number refused, corrective retry with the feedback, `invalid_post` after two failures; (8/11) URLs and domains written by the model removed (scheme, `www.`, bare domains, any `host.tld/path`), only the permalink kept; no permalink → only No link, warnings; (12) saved row (platform, sources, language, post, CTA, comment text, link placement, Content Stream, image, `cta_url`); (13-14) another user → 403.
+* Link placement: (9-10) First comment → no URL in the post, comment = lead-in + exact permalink; Main post → permalink at the end, no comment; No link → nothing; (11) edits refuse any URL / domain in every field, unknown placement refused; (15) publish needs `connectionId` + `confirm: true`; Page id must be digits.
+* Meta client: token never in a URL (Bearer header, `appsecret_proof` = HMAC of the token), OAuth secret / tokens in the POST body; error mapping (190 → expired, 10 / 200 → permission, 100/33 → Page unavailable, 4 → rate limit, 506 → duplicate), Meta message never kept, `fbtrace_id` kept; (21) timeout → `timeout` + ambiguous; (22) OAuth answer without token → `oauth_failed`.
+* Publication: (17-18) photo post, id saved before the comment request, comment with lead-in + permalink, only `graph.facebook.com` called (26: no WordPress write); text post without image; (19-20) comment refused → `partial`, publish again refused, Retry comment calls `/comments` only; post refused → `failed`, no comment, Retry posts once (one row); (21) timeout → `unknown`, Retry adopts the post found on the Page by exact text (no second `/photos`), or posts once when the Page does not have it; (23-24) expired token / deleted Page → `failed`, clear message, one call; concurrent click while a fresh lock exists → `in_progress`, no call; (16) the Page token and App Secret never appear in any log line (errors and timeouts included); (14) every publication store query filters on the caller.
+* Tokens / OAuth: `SOCIAL_TOKEN_ENCRYPTION_KEY` only (missing key throws, a WordPress ciphertext cannot be opened); encrypted state and pending cookies bound to user + project, expiring after 10 min, tampered → null; constant-time state compare; exact minimal scope list, `business_management` only on request, no profile / group scope; config without secret → null.
+* Schema / routes / UI (source checks): token column absent from the `authenticated` grant, REVOKE ALL, UNIQUE constraints, Content Stream RLS check, link needs URL; routes check ownership + same project, separate publish limit (no trial cap), generation limit = Medium; no JSON response body mentions a token; Page must have `CREATE_CONTENT`; Facebook available, Instagram / Reels / TikTok Coming soon, sidebar entry, Studio panel; client components import no server module and never call Meta.
+
+Updated: `social-content-studio.spec.ts` (platform statuses), `social-content-history.spec.ts` (active platforms, sidebar), `tests/playwright/wordpress-social-content.spec.ts` (Facebook enabled, 3 Coming soon). Browser spec `tests/playwright/facebook.spec.ts` (7, every API mocked): Facebook page and sidebar; Page picker (lists, read-only Page disabled, select body); Studio generation (one request, link to the review page); First comment on/off preview without URL; publish success through the confirmation dialog; partial publication → only Retry comment, which calls `/retry-comment` only.
+
+Results 2026-10-15: 31/31; Social Content Studio + Medium specs 148/148 (with the new spec); full renderer **1186/1186**; TypeScript, ESLint (excluding the untracked `.claude/` and `.opencode/`), `next build` and `git diff --check` pass. Browser specs **skipped** (no authenticated session locally). No AI call, no Meta call.
+
+**Real test (founder approval required — one text generation, one post on a test Page):** prerequisites: migrations 045 + 046 applied; Meta app (Business, Facebook Login) with the redirect URI `<app URL>/api/social/connections/facebook/oauth/callback`; `META_APP_ID`, `META_APP_SECRET`, `SOCIAL_TOKEN_ENCRYPTION_KEY` set; a **test** Facebook Page you manage (your account has a role on the Meta app).
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | `/facebook` → Connect a Facebook Page (test project) → accept the five permissions | Page picker lists your Pages; Select → "Connected", Page name + ID; no token visible in the URL, the page or the network responses | ☐ |
+| 2 | Verify | "connected and reachable" toast | ☐ |
+| 3 | Studio of a **published** article → Generate Facebook post | Post in the article language, nothing invented, Link: First comment, article image | ☐ |
+| 4 | Open it → edit the text, try to add a URL → Save | URL refused with a clear message; a plain edit is saved | ☐ |
+| 5 | Publish to Facebook → Publish now | Photo post on the Page without link; first comment by the Page = lead-in + exact permalink; status "Published + comment"; "View on Facebook" opens it | ☐ |
+| 6 | Click Publish / Retry again | No button to publish again; no second post on the Page | ☐ |
+| 7 | Second post with Main post / No link | Link at the end of the post / no link anywhere, no comment | ☐ |
+| 8 | Disconnect Page | Row back to "No Facebook Page connected"; published posts still on Facebook | ☐ |
+| 9 | Check the WordPress article | Unchanged | ☐ |
+
+Record the date, the Page id and the results here and in TASKS.md (TASK-068). Delete the test posts on Facebook afterwards if wanted.
+
+---
+
 # TASK-061 — Real WordPress validation on R2 + production R2 activation (planned 2026-10-11)
 
 Manual, founder-run, in this order. Costs one WordPress article generation (featured + internal images); everything else makes no AI call. Prerequisites: local `MEDIA_STORAGE_PROVIDER=r2` + the six `R2_*` variables; migrations 042 / 043 applied (verified 2026-10-11); a connected **test** WordPress site (≥ 5.8) with Media Library access. Background: Pinterest already runs on R2 locally (25 optimized Pins under `images/pinterest/`, 1000×1500 JPEG ≈ 280-330 KB, read-only check 2026-10-11); `images/wordpress/` is still empty.

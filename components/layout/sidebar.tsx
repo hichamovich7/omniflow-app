@@ -57,9 +57,10 @@ const researchItem: NavItem = { href: '/research', label: 'Research', icon: Sear
 const platformsGroup: NavGroup = {
   label: 'Platforms',
   items: [
-    { href: '/facebook', label: 'Facebook', icon: ThumbsUp, disabled: true },
+    // Facebook Pages (TASK-068): posts history, Page connection, publication.
+    { href: '/facebook', label: 'Facebook', icon: ThumbsUp },
     { href: '/linkedin', label: 'LinkedIn', icon: Briefcase, disabled: true },
-    // Medium history (TASK-063). Facebook / LinkedIn stay disabled until their generators exist.
+    // Medium history (TASK-063). LinkedIn stays disabled until its generator exists.
     { href: '/medium', label: 'Medium', icon: PenSquare },
   ],
 };

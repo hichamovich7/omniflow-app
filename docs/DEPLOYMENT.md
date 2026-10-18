@@ -153,6 +153,27 @@ R2_SECRET_ACCESS_KEY=
 
 Production rollout (TASK-061): add the six `R2_*` variables on Vercel with the flag still `supabase`, redeploy; switch the flag to `r2` only after the real WordPress validation passes. Rollback: flag back to `supabase` + redeploy (R2 URLs already stored keep working, nothing is migrated). `.source` photos always stay in Supabase.
 
+## Meta app for Facebook Pages (TASK-068, optional)
+
+One-time setup by the OmniFlow operator. Without it, Facebook posts can still be generated and copied, but no Page can be connected (`/facebook` shows "not configured"). Meta's dashboard wording changes over time — the names below were checked against Meta's "Create an app" doc on 2026-10-15.
+
+1. **Database**: apply migrations 045 then 046 in the Supabase SQL Editor.
+2. **Create the app**: on https://developers.facebook.com/apps/creation/ (Meta developer account required) — app name + contact email → use case **"Manage everything on your Page"** → business portfolio: an unverified one or "skip for now" is enough while only the operator uses it → Go to dashboard. This use case adds `business_management`, `pages_show_list` and `public_profile` to the app automatically; OmniFlow still only requests its own scopes in the login dialog.
+3. **Permissions** (Use cases → Customize): make sure `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `pages_manage_engagement` and `pages_read_user_content` are added. No profile or group permission.
+4. **Redirect URI** (the use case's Facebook Login settings → Valid OAuth Redirect URIs): add exactly `https://<production domain>/api/social/connections/facebook/oauth/callback` and, for local tests, `http://localhost:3000/api/social/connections/facebook/oauth/callback`. The URI must match `NEXT_PUBLIC_APP_URL` (or the request origin when that variable is empty).
+5. **App ID / App Secret**: App settings → Basic.
+6. **Environment** (`.env.local` and Vercel, server-side only, never `NEXT_PUBLIC_`):
+
+```env
+META_APP_ID=
+META_APP_SECRET=
+META_GRAPH_API_VERSION=v25.0            # optional
+SOCIAL_TOKEN_ENCRYPTION_KEY=            # openssl rand -hex 32 — never commit, rotating it disconnects every Page
+```
+
+7. **Who can connect**: while the app only has Standard Access, only Facebook accounts with a role on the app (App roles → Administrator / Developer / Tester) can log in and connect their Pages. Letting other users connect requires Advanced Access for the five permissions: App Review + Business Verification (a verified business portfolio).
+8. Redeploy, open `/facebook`, "Connect a Facebook Page", then follow TESTING.md "Facebook Pages (TASK-068)" for the real test.
+
 ---
 
 ## Database

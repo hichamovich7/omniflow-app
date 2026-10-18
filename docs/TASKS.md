@@ -53,6 +53,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 ### Ready to test (code shipped, real-condition check pending)
 
+* **TASK-068** — Facebook Content Studio + publication on Facebook Pages: offline tests pass, **not committed**; **migration 046 to apply by hand** (after 045), Meta app + env variables to set up, then the real test in TESTING.md (founder approval).
 * **TASK-067** — Home Decor image subject check (no false "does not show the project" rejection on German / English Home Decor articles): offline tests pass, **not committed yet**; manual check with the German article in TESTING.md.
 * **TASK-066** — understandable Pinterest strategy-safeguard errors: offline tests pass, committed and pushed (commit "fix(pinterest): explain strategy safeguard failures"); gated browser spec + optional manual check in TESTING.md.
 * **TASK-061 scope:** TASK-049 (R2 — WordPress side), TASK-050 (WebP on WordPress), TASK-FIX-058, TASK-FIX-059, TASK-FIX-060.
@@ -64,7 +65,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 ### Planned
 
-* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook content (TASK-044 later phase, text only — saved in `social_content_generations` (045); migration 046 reserved if it needs a schema change); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
+* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook scheduling (after TASK-068 — separate task); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
 * **P2:** storage audit / archiving (read-only orphan audit first); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
@@ -85,16 +86,18 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-14: 067 (TASK-067, Home Decor image subject check) → **next task: 068**.
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-15: 068 (TASK-068, Facebook Pages) → **next task: 069**.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
-* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **next free migration: 046** (reserved for the TASK-044 later phases if they need one).
+* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **next free migration: 047**.
 
 ---
 
 # RECENT IMPLEMENTATION LOG
 
 Former content of the ACTIVE TASK list, kept for history. Every entry below is **committed and pushed to `main`** (commit noted) unless it says otherwise; statuses corrected by the 2026-10-11 audit. Migrations mentioned as "to apply by hand" are all applied, except 045 (TASK-063).
+
+**[Ready to test — not committed]** TASK-068 (Facebook Content Studio + publication on Facebook Pages, 2026-10-15). Phase 1 audit (no code): Facebook was `coming_soon`, already accepted by `social_content_generations`, no OAuth / token storage / publication anywhere; TASK-044 D9 forbade publishing. Founder validated the architecture and ten decisions (see the TASK-068 entry). Ships migration 046 (`social_connections` with the token column hidden from the session role, `social_publications`, Facebook columns), `lib/social/meta/*` (native fetch Graph client, Bearer + `appsecret_proof`, error mapping, `SOCIAL_TOKEN_ENCRYPTION_KEY`, encrypted OAuth cookies), generation `facebook-post-v1` from `WordPressArticleContext` + niche / Content Stream / Brand Profile, publication post → id saved → first comment with partial / unknown states and reconciliation, 12 endpoints, `/facebook` + `/facebook/[id]`, Studio card, sidebar entry, Guide section. New specs `facebook-content.spec.ts` (31) + browser `facebook.spec.ts` (7, gated); full renderer 1186/1186; TypeScript, ESLint, build, `git diff --check` pass. No AI call, no Meta call, no `.env` change, no commit.
 
 **[Ready to test — not committed]** TASK-067 (Home Decor image subject check, 2026-10-14). Reported: a German Home Decor article failed with "Pin X · Image description: the image description does not show the project of its article section." Audit: `validateArticleGroundedPins` → `mentionsSubject()` looked for a crochet / clay project noun of the section heading (English lexicon), else for any heading word of 4+ letters inside the image prompt — but image prompts are always English, so German headings ("Küchenschränke in Salbeigrün") could never match (false rejects; "orange" passed only because it is the same word); in English it accepted a living room for a kitchen section or a "cozy" generic interior (false accepts); `UNGROUNDED_IMAGE_ELEMENTS` skipped every non-English article. Fix: the check depends on the niche (`subjectCheckForNiche()` → `ArticleGrounding.subjectCheck`, passed from the route and from single-Pin regeneration). Home Organization & Decor: new controlled vocabulary `lib/pinterest/home-decor-anchors.ts` (rooms, furniture / objects, colors, materials, styles, moods; English + German spellings, German normalization ä→ae ö→oe ü→ue ß→ss, inflections, compounds, `=` exact-only stems against look-alikes) — the image must show the section's room and ≥ 2 of its core anchors (all when fewer; a section without anchors needs 2 article anchors), and furniture / materials / chromatic colors absent from the article are refused in English and German (wood, linen, neutral colors and decor props stay allowed). The Pin plan lists each section's English anchors. Crochet, Clay and every other niche keep the project check unchanged. `IMAGE_SUBJECT_MISMATCH` message now says Expected / Detected / Missing (fixed-vocabulary `subject` report) and "Try again, or review the article section." No free translation, no migration, no endpoint, no prompt-format change for other niches, no URL, 2:3 / angles / boards unchanged, no AI call in tests. New spec `pinterest-home-decor-grounding.spec.ts` (17); full renderer 1155/1155; TypeScript, ESLint, build, `git diff --check` pass. Known limit: German "samt" (velvet) is also the preposition "samt" — it can only make velvet count as present.
 
@@ -594,7 +597,7 @@ A user can open an existing Pin's detail, add or edit its Board section, and sav
 
 ## [TASK-044] Social Content Studio from WordPress Article
 
-### Status: PHASES 1-2 COMPLETED (2026-09-27, committed and pushed; extended by TASK-051 on 2026-10-11); later phases PLANNED (next: Facebook, P1)
+### Status: PHASES 1-2 COMPLETED (2026-09-27, committed and pushed; extended by TASK-051 on 2026-10-11); Medium shipped (TASK-062-064); Facebook shipped by TASK-068 (2026-10-15, D9 lifted for Facebook Pages only); Instagram / Reels / TikTok PLANNED
 
 Phase 2: the Pinterest card links to `/pinterest/create?source=wordpress&articleId=<id>` (existing `PinForm` + `POST /api/pinterest/generate` with `wordpressArticleId`), Pins saved in `generations` / `pins`, real boards only (no creation), Content Stream filter, result cards with copy / edit (`PATCH /api/pinterest/pins/[id]`) / single-Pin regeneration (`POST /api/pinterest/pins/[id]/regenerate`) / images on demand, migration 040 (`generations.source_wordpress_generation_id`). No destination URL anywhere (D11 decided: the user adds links manually in the CSV). Phase 1 endpoint `POST /api/wordpress/[id]/social` removed. Resolves D5 (storage via the existing Pinterest tables) and D7 (editing) for Pinterest.
 
@@ -1148,6 +1151,57 @@ Security Hardening              ✅
 Credits Working                 ⬚ TASK-011
 Stripe Working                  ⬚ TASK-012
 ```
+
+---
+
+## [TASK-068] Facebook Content Studio + publication on Facebook Pages
+
+### Status: READY TO TEST (2026-10-15 — offline tests pass; **not committed**; **migration 046 to apply by hand** after 045; Meta app + environment variables to set up by the founder; real Meta test only with founder approval)
+
+### Goal
+
+Generate a Facebook Page post from a WordPress article (OmniFlow article, existing WordPress post, or Pins made from an article), review and edit it, connect a Facebook Page per project through the official Meta API, and publish it manually — optionally with the article link as the Page's first comment. Facebook Pages only (no profile, no group, no Instagram), no scheduling, the WordPress article is never modified.
+
+### Founder decisions (2026-10-15, after the Phase 1 audit)
+
+1. TASK-044 D9 lifted for Facebook Pages only (DECISIONS.md 2026-10-15).
+2. Migration 046: `social_connections` + `social_publications` + Facebook columns on `social_content_generations`.
+3. Photo post with the article image, then optionally the exact permalink in the first comment.
+4. Link choices: First comment / Main post / No link; without a permalink, only No link.
+5. Separate `SOCIAL_TOKEN_ENCRYPTION_KEY`.
+6. One Facebook Page per project.
+7. Same generation limits as Medium; separate publication limit.
+8. `business_management` only if Meta requires it for the Page (on explicit request after an empty Page list).
+9. Native `fetch`, no new npm dependency.
+
+### What ships
+
+* **Migration 046** (`supabase/migrations/046_add_social_connections_and_publications.sql`) — see DATABASE.md. Token column not readable by the `authenticated` role (REVOKE ALL + column grants); UNIQUE (project, platform) and UNIQUE (content, Page).
+* **Meta client** (`lib/social/meta/`): `config.ts` (env, minimal scopes, redirect URI), `graph-client.ts` (native fetch, 15 s timeout, Bearer header + `appsecret_proof`, Page endpoints only), `errors.ts` (codes → kinds + plain messages, logs with codes only), `token-crypto.ts`, `oauth-session.ts` (encrypted httpOnly state / pending cookies).
+* **Generation** (`lib/social/facebook-post.ts`, prompt `facebook-post-v1`, `lib/social/facebook-text.ts`): Medium loaders + niche, niche settings, Content Stream, Brand Profile; checks (length, numbers, vocabulary, language, verbatim, link wording); one corrective retry; saved with `platform = facebook`.
+* **Publication** (`lib/social/facebook-publish.ts`, `lib/queries/social-publications.ts`, `lib/queries/social-connections.ts`, `lib/social/facebook-server.ts`, `lib/social/facebook-retry-route.ts`): post → id saved → comment; partial / unknown states; reconciliation by exact text before any retry.
+* **Endpoints**: `POST /api/social/facebook-post`, `PATCH /api/social/generations/[id]`, `POST /api/social/generations/[id]/publish`, `POST /api/social/publications/[id]/retry`, `…/retry-comment`, `GET /api/social/connections`, `DELETE /api/social/connections/[id]`, `POST /api/social/connections/[id]/verify`, `GET /api/social/connections/facebook/oauth/start`, `…/oauth/callback`, `GET …/facebook/pages`, `POST …/facebook/select` (API.md).
+* **UI**: sidebar Facebook enabled; Studio Facebook card (`facebook-post-panel`); `/facebook` (Page connections + picker, New Facebook post, history with publication status) and `/facebook/[id]` (`facebook-post-workspace`: edit, link option, preview, publish with confirmation, Retry, Retry comment, Delete); Instagram / Reels / TikTok "Coming soon". `NewMediumSummary` and `MediumHistoryFilters` gained optional props to be reused (Medium unchanged).
+* `.env.example`: `META_APP_ID`, `META_APP_SECRET`, `META_GRAPH_API_VERSION`, `SOCIAL_TOKEN_ENCRYPTION_KEY`. `lib/wordpress/crypto.ts`: optional key name (WordPress unchanged). `lib/supabase/admin.ts`: documented second use.
+* Docs: API, DATABASE, UI_UX, TESTING, DECISIONS, PROJECT, DEPLOYMENT (Meta app setup), CHANGELOG, in-app Guide ("Connecting Facebook" + "Facebook Pages").
+
+### Tests
+
+New `tests/renderer/facebook-content.spec.ts` (31, offline — Supabase, WordPress and Meta simulated) and `tests/playwright/facebook.spec.ts` (7, API mocked, gated on a session). Updated: `social-content-studio.spec.ts`, `social-content-history.spec.ts`, `wordpress-social-content.spec.ts` (Facebook now enabled). Full renderer **1186/1186**; TypeScript, ESLint, `next build`, `git diff --check` pass. Browser specs skipped locally (no session). No AI call, no Meta call.
+
+### Remaining (founder)
+
+1. Apply migration 045 (if not yet) then 046 in the Supabase SQL Editor.
+2. Create the Meta app (Business type), add Facebook Login, declare the redirect URI `<NEXT_PUBLIC_APP_URL>/api/social/connections/facebook/oauth/callback` (and the localhost one for local tests), request the five Page permissions; keep Standard Access for the founder's own Pages (Advanced Access + App Review + Business Verification before other users).
+3. Add `META_APP_ID`, `META_APP_SECRET`, `SOCIAL_TOKEN_ENCRYPTION_KEY` (`openssl rand -hex 32`) to `.env.local` / Vercel.
+4. With founder approval only: the real test of TESTING.md "Facebook Pages (TASK-068)" on a test Page (one text generation).
+
+### Known limits
+
+* Fact checks: numbers in every language; project vocabulary on English articles only (as Medium / TASK-051); other claims rely on the prompt.
+* `/me/accounts` reads the first 100 Pages.
+* A comment whose creation timed out is matched by exact text among the 50 latest comments.
+* Disconnecting deletes OmniFlow's token only; removing the app on Facebook's side is done by the person.
 
 ---
 

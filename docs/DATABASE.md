@@ -25,7 +25,8 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * Every table, column and storage bucket they create is present in the live database (`generated-images`, `wordpress-images`, `reference-images`), including the migrations once marked "apply manually" (029, 032-044).
 * Grants, RLS policies, triggers and SQL functions (e.g. 003, 010, 023, 031) are not visible through this check — they are assumed applied with their migration.
 * **Migration 045** (`045_add_social_content_generations.sql`, TASK-063) — written 2026-10-12, **not applied yet**: to apply by hand in the Supabase SQL Editor. Before it, Medium summaries are generated but not saved (warning), and `/medium` shows a "not available yet" notice.
-* **Next free migration: 046** (reserved for the TASK-044 later phases — e.g. Facebook — if they need a schema change beyond `social_content_generations`).
+* **Migration 046** (`046_add_social_connections_and_publications.sql`, TASK-068) — written 2026-10-15, **not applied yet** (needs 045 first): to apply by hand in the Supabase SQL Editor. Before it, Facebook posts are generated but not saved (warning), `/facebook` shows "not available yet" notices, and no Page can be connected.
+* **Next free migration: 047**.
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -75,7 +76,11 @@ auth.users
 ```
 profiles
   └── social_content_generations (TASK-063, migration 045; project_id required; optional sources →
-        wordpress_generations / wordpress_sites / generations, ON DELETE SET NULL)
+        wordpress_generations / wordpress_sites / generations, ON DELETE SET NULL;
+        content_stream_id → content_streams, migration 046)
+  │     └── social_publications (TASK-068, migration 046; UNIQUE content + Page; SET NULL on delete)
+  └── social_connections (TASK-068, migration 046; one Facebook Page per project; encrypted token,
+        not readable by the session role)
 ```
 
 ```
@@ -1021,7 +1026,7 @@ unique (wordpress_site_id, source_asset_key)
 
 # social_content_generations
 
-Saved social content (TASK-063, migration 045). Only **Medium** summaries are written today (`POST /api/social/medium-summary`, after the summary passed its checks); `facebook`, `instagram`, `reels` and `tiktok` are already accepted by the `platform` CHECK so their future generators share the table and the history UI.
+Saved social content (TASK-063, migration 045). **Medium** summaries (`POST /api/social/medium-summary`) and **Facebook** Page posts (`POST /api/social/facebook-post`, TASK-068) are written, after their checks passed; `instagram`, `reels` and `tiktok` are already accepted by the `platform` CHECK so their future generators share the table and the history UI.
 
 ## Columns
 
@@ -1047,13 +1052,19 @@ Saved social content (TASK-063, migration 045). Only **Medium** summaries are wr
 | image_url | text nullable | CHECK `https://` — an image already in the source article, exact URL (never generated, never re-hosted) |
 | image_alt | text nullable | |
 | cta_url | text nullable | CHECK `http(s)://` — only the exact validated permalink of the published post; never built, never a Pinterest URL |
+| call_to_action | text nullable | Facebook (046): call to action appended to the post — never a URL |
+| first_comment_text | text nullable | Facebook (046): lead-in of the first comment; the permalink is added after it by code — never a URL |
+| link_placement | text nullable | Facebook (046): CHECK `first_comment` / `main_post` / `none`; CHECK `social_content_link_needs_url` — anything but `none` needs `cta_url` |
+| content_stream_id | uuid nullable → content_streams(id) ON DELETE SET NULL | Facebook (046): Content Stream of the article's category used as context |
 | created_at / updated_at | timestamptz NOT NULL DEFAULT now() | `updated_at` trigger (`update_updated_at_column`) |
 
-No secret, token or credential of any external service is stored (no Medium token — there is no Medium integration).
+For Facebook, `content_markdown` holds the plain post text (no URL) and `content_html` a read-only HTML preview of it; `title` is the source article title. The published text is composed by code: post + call to action (+ permalink when `main_post`); the first comment is `first_comment_text` + permalink (`first_comment`).
+
+No secret, token or credential of any external service is stored here (no Medium token; Facebook tokens live encrypted in `social_connections`).
 
 ## RLS
 
-`Users access own social content generations` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` additionally requires the project and every non-null source (`wordpress_generations`, `wordpress_sites`, `generations`) to belong to the caller — same hardened shape as `tasks` (033). `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`. Queries (`lib/queries/social-content.ts`) also filter on `user_id`.
+`Users access own social content generations` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` additionally requires the project and every non-null source (`wordpress_generations`, `wordpress_sites`, `generations`) — and, since 046, the `content_stream_id` — to belong to the caller — same hardened shape as `tasks` (033). Migration 046 drops and re-creates this policy with the Content Stream check. `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`. Queries (`lib/queries/social-content.ts`) also filter on `user_id`.
 
 ## Indexes
 
@@ -1061,7 +1072,77 @@ No secret, token or credential of any external service is stored (no Medium toke
 
 ## Deletion
 
-Deleting a saved item (`DELETE /api/social/generations/[id]`) deletes only that row. Deleting a source article / site / Pinterest generation keeps the saved content (sources set to NULL; Regenerate is then disabled). Deleting the project deletes its saved content (CASCADE, like `generations`).
+Deleting a saved item (`DELETE /api/social/generations/[id]`) deletes only that row. Deleting a source article / site / Pinterest generation keeps the saved content (sources set to NULL; Regenerate is then disabled). Deleting the project deletes its saved content (CASCADE, like `generations`). A Facebook post already published stays on Facebook; its `social_publications` row is kept (content id set to NULL).
+
+---
+
+# social_connections
+
+Connected social accounts (TASK-068, migration 046). MVP: one **Facebook Page** per project (never a personal profile or a group). Generic on purpose — Instagram / TikTok / others reuse it later with a new `platform` value.
+
+## Columns
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id | uuid NOT NULL → profiles(id) ON DELETE CASCADE | owner |
+| project_id | uuid NOT NULL → projects(id) ON DELETE CASCADE | UNIQUE with `platform` — one Page per project |
+| platform | text NOT NULL | CHECK `facebook` |
+| account_type | text NOT NULL | CHECK `facebook_page` |
+| external_account_id | text NOT NULL | Facebook Page id (digits only, CHECK) |
+| external_account_name | text NOT NULL | Page name at connection time |
+| encrypted_access_token | text NOT NULL | **Page access token**, AES-256-GCM via `lib/social/meta/token-crypto.ts` (key `SOCIAL_TOKEN_ENCRYPTION_KEY`, separate from the WordPress key). Not readable by the `authenticated` role (column privileges) |
+| token_expires_at | timestamptz nullable | NULL — a Page token read with a long-lived user token has no fixed expiry; expiry is detected from Meta errors |
+| granted_scopes | text[] NOT NULL DEFAULT `{}` | permissions the person granted (without `pages_manage_engagement`, no first comment) |
+| status | text NOT NULL DEFAULT `active` | CHECK `active` / `expired` / `revoked` / `error` |
+| last_verified_at | timestamptz nullable | last successful connect / Verify |
+| last_error_code | text nullable | Meta code only (e.g. `190/463`), never a message |
+| created_at / updated_at | timestamptz | `updated_at` trigger |
+
+## Security model
+
+* `REVOKE ALL … FROM anon, authenticated`, then `GRANT SELECT (every column except encrypted_access_token)` and `GRANT DELETE` to `authenticated`: a session (or a direct PostgREST call from the browser) can list its own connections and disconnect them, but can never read, write or update the token. Column privileges only work without a table-wide grant — hence the REVOKE ALL (Supabase grants ALL on new public tables by default). App queries list columns explicitly (`SAFE_CONNECTION_COLUMNS`), never `select('*')`.
+* Writes and the only token read use the service-role client (`lib/supabase/admin.ts`) in `lib/queries/social-connections.ts`, called only after the route checked ownership with the caller's session, and always filtered on the connection / project **and** `user_id`.
+* RLS: `Users read own social connections` (SELECT) and `Users delete own social connections` (DELETE), both `user_id = auth.uid()`. No INSERT / UPDATE policy for `authenticated`.
+* Rotating `SOCIAL_TOKEN_ENCRYPTION_KEY` invalidates every stored token: users reconnect their Page.
+
+---
+
+# social_publications
+
+One row per (saved content, Facebook Page): the state of each publication step (TASK-068, migration 046). No secret is stored.
+
+## Columns
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id / project_id | uuid NOT NULL, CASCADE | owner, project |
+| social_content_generation_id | uuid nullable → social_content_generations(id) ON DELETE SET NULL | the published content |
+| connection_id | uuid nullable → social_connections(id) ON DELETE SET NULL | Page connection used |
+| platform | text NOT NULL | CHECK `facebook` |
+| external_account_id / external_account_name | text NOT NULL | Page id / name at publication time |
+| status | text NOT NULL DEFAULT `publishing` | CHECK `publishing` / `published` / `partial` (post on Facebook, comment not) / `failed` (Facebook refused, nothing posted) / `unknown` (timeout: may or may not be on Facebook) |
+| post_message | text NOT NULL | exact text sent (matched on the Page to settle an `unknown` result) |
+| post_image_url | text nullable | CHECK `https://` — article image sent with the photo post |
+| external_post_id / external_post_url | text nullable | Facebook post id (saved before any comment) / public link (`https://`) |
+| published_at | timestamptz nullable | |
+| comment_requested | boolean NOT NULL DEFAULT false | link placement = first comment |
+| comment_message | text nullable | exact comment text (lead-in + permalink) |
+| comment_status | text NOT NULL DEFAULT `not_requested` | CHECK `not_requested` / `pending` / `published` / `failed` / `unknown`; anything but `not_requested` needs `comment_requested` |
+| external_comment_id / comment_published_at | | |
+| error_code / error_message / fbtrace_id | text nullable | Meta code, OmniFlow's plain-language message (never Meta's text), Meta trace id |
+| attempt_count / comment_attempt_count | integer ≥ 0 | |
+| locked_at | timestamptz nullable | set while a step runs; older than 90 s = killed request |
+| created_at / updated_at | timestamptz | `updated_at` trigger |
+
+## Constraints
+
+`UNIQUE (social_content_generation_id, external_account_id)` — the same content can never be published twice on the same Page; retries reuse the row. Steps are claimed by conditional UPDATEs (`lib/queries/social-publications.ts`), so two clicks never run the same step.
+
+## RLS
+
+`Users access own social publications` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` also requires the project, the content and the connection to belong to the caller. `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`. Queries also filter on `user_id`.
 
 ---
 

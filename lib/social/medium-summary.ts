@@ -74,6 +74,8 @@ export interface MediumSummarySource {
   imageHosts: MediumImageHosts;
   /** Project + source ids saved with the summary (social_content_generations, TASK-063). */
   ref: SocialContentSourceRef;
+  /** WordPress category term ids of an existing post (Content Streams for Facebook, TASK-068). */
+  wordpressCategoryIds?: number[];
 }
 
 export interface MediumSummaryDraft {
@@ -297,6 +299,7 @@ export async function loadWordPressPostMediumSource(
       pinterestGenerationId: null,
       sourceTitle: context.title,
     },
+    wordpressCategoryIds: post.categoryIds,
   };
 }
 

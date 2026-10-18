@@ -13,8 +13,11 @@ import {
  * scoped to the caller (`user_id`) on top of RLS — defense in depth.
  */
 
-/** PostgREST / Postgres codes for a table that does not exist yet (migration 045 not applied). */
-const MISSING_TABLE_CODES = new Set(['PGRST205', '42P01']);
+/**
+ * PostgREST / Postgres codes for a table or column that does not exist yet
+ * (migration 045, or 046 for the Facebook columns, not applied).
+ */
+const MISSING_TABLE_CODES = new Set(['PGRST205', '42P01', 'PGRST204', '42703']);
 
 export type SaveSocialContentResult =
   | { ok: true; id: string }
@@ -100,6 +103,34 @@ export async function deleteSocialContentGeneration(
     .select('id');
   if (error) return 'error';
   return (data ?? []).length > 0 ? 'deleted' : 'not_found';
+}
+
+export interface FacebookContentPatch {
+  content_markdown: string;
+  content_html: string;
+  word_count: number;
+  call_to_action: string | null;
+  first_comment_text: string | null;
+  link_placement: string;
+}
+
+/** Saves an edited Facebook post (TASK-068) — only the caller's own Facebook row. */
+export async function updateFacebookContent(
+  supabase: SupabaseClient,
+  userId: string,
+  id: string,
+  patch: FacebookContentPatch
+): Promise<SocialContentListItem | null> {
+  const { data, error } = await supabase
+    .from('social_content_generations')
+    .update(patch)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('platform', 'facebook')
+    .select('*, projects(name)')
+    .maybeSingle();
+  if (error) console.error(`[social-content] facebook update failed: ${(error as { code?: string }).code ?? 'unknown'}`);
+  return (data as SocialContentListItem | null) ?? null;
 }
 
 // ---------------------------------------------------------------------------

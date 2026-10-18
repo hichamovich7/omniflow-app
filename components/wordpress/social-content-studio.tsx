@@ -10,6 +10,7 @@ import {
 } from '@/lib/social/platforms';
 import { articlePinterestCreateHref } from '@/lib/social/pin-display';
 import { MediumSummaryPanel } from '@/components/social/medium-summary-panel';
+import { FacebookPostPanel } from '@/components/social/facebook-post-panel';
 import { cn } from '@/lib/utils';
 
 interface SocialContentStudioProps {
@@ -20,9 +21,11 @@ interface SocialContentStudioProps {
  * Social Content Studio (TASK-044). Pinterest opens the Pinterest form
  * pre-filled from this article (/pinterest/create?source=wordpress, phase 2).
  * Medium generates a summary on click, shown full width in its card
- * (TASK-062 — not saved, never published). The other platforms are shown as
- * Coming soon / Planned and their buttons are disabled with no handler — a
- * click does nothing (no API call, no AI call, no database write).
+ * (TASK-062 — never published). Facebook generates a Page post on click
+ * (TASK-068), reviewed and published from its own page after an explicit
+ * confirmation. The other platforms are shown as Coming soon and their
+ * buttons are disabled with no handler — a click does nothing (no API call,
+ * no AI call, no database write).
  */
 export function SocialContentStudio({ generationId }: SocialContentStudioProps) {
   return (
@@ -40,18 +43,26 @@ export function SocialContentStudio({ generationId }: SocialContentStudioProps) 
             Social Content Studio
           </h2>
           <p className="text-sm text-muted-foreground">
-            Turn this article into social content. Nothing is published and the article is never modified.
+            Turn this article into social content. Nothing is published without your confirmation and the article is never modified.
           </p>
         </div>
       </div>
 
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {SOCIAL_PLATFORMS.map((platform) => (
-          <li key={platform.id} className={cn(platform.id === 'medium' && platform.status === 'available' && 'sm:col-span-2 lg:col-span-3')}>
+          <li
+            key={platform.id}
+            className={cn((platform.id === 'medium' || platform.id === 'facebook') && platform.status === 'available' && 'sm:col-span-2 lg:col-span-3')}
+          >
             {platform.id === 'medium' && platform.status === 'available' ? (
               <div className="flex h-full flex-col gap-3 rounded-xl border border-border bg-background p-4" data-platform="medium">
                 <PlatformHeader platform={platform} />
                 <MediumSummaryPanel source={{ wordpressArticleId: generationId }} />
+              </div>
+            ) : platform.id === 'facebook' && platform.status === 'available' ? (
+              <div className="flex h-full flex-col gap-3 rounded-xl border border-border bg-background p-4" data-platform="facebook">
+                <PlatformHeader platform={platform} />
+                <FacebookPostPanel source={{ wordpressArticleId: generationId }} />
               </div>
             ) : platform.status === 'available' ? (
               <div className="flex h-full flex-col gap-3 rounded-xl border border-border bg-background p-4">

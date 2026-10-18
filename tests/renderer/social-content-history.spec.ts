@@ -450,7 +450,8 @@ test.describe('Medium history — UI, routes, migration, safety', () => {
     const columns = sql.slice(sql.indexOf('CREATE TABLE'), sql.indexOf('CREATE INDEX'));
     expect(columns).not.toMatch(/token|secret|password|api_key/i);
     expect(SOCIAL_CONTENT_PLATFORMS).toEqual(['medium', 'facebook', 'instagram', 'reels', 'tiktok']);
-    expect(ACTIVE_SOCIAL_CONTENT_PLATFORMS).toEqual(['medium']);
+    // Facebook activated by TASK-068.
+    expect(ACTIVE_SOCIAL_CONTENT_PLATFORMS).toEqual(['medium', 'facebook']);
   });
 
   test('DELETE route: auth, UUID, user-scoped delete only', () => {
@@ -495,10 +496,10 @@ test.describe('Medium history — UI, routes, migration, safety', () => {
     expect(detail).toContain('<ArticleContent html={item.content_html} />');
   });
 
-  test('sidebar: Medium enabled; Facebook and LinkedIn still disabled', () => {
+  test('sidebar: Medium and Facebook (TASK-068) enabled; LinkedIn still disabled', () => {
     const sidebar = read('components/layout/sidebar.tsx');
     expect(sidebar).toContain("{ href: '/medium', label: 'Medium', icon: PenSquare },");
-    expect(sidebar).toContain("{ href: '/facebook', label: 'Facebook', icon: ThumbsUp, disabled: true },");
+    expect(sidebar).toContain("{ href: '/facebook', label: 'Facebook', icon: ThumbsUp },");
     expect(sidebar).toContain("{ href: '/linkedin', label: 'LinkedIn', icon: Briefcase, disabled: true },");
   });
 

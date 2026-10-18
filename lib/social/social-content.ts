@@ -6,15 +6,15 @@ import type { MediumSummaryRequest } from '@/lib/validations/medium-summary';
  * migration 045). Client-safe: types and pure helpers only.
  *
  * Every platform of the table is declared here so the next generators
- * (Facebook, Instagram, Reels, TikTok) plug into the same history; only
- * Medium has a generator and a page today.
+ * (Instagram, Reels, TikTok) plug into the same history; Medium (TASK-063)
+ * and Facebook (TASK-068) have a generator and a page today.
  */
 
 export const SOCIAL_CONTENT_PLATFORMS = ['medium', 'facebook', 'instagram', 'reels', 'tiktok'] as const;
 export type SocialContentPlatform = (typeof SOCIAL_CONTENT_PLATFORMS)[number];
 
 /** Platforms whose content can be generated and browsed today. */
-export const ACTIVE_SOCIAL_CONTENT_PLATFORMS: readonly SocialContentPlatform[] = ['medium'];
+export const ACTIVE_SOCIAL_CONTENT_PLATFORMS: readonly SocialContentPlatform[] = ['medium', 'facebook'];
 
 export const SOCIAL_CONTENT_PLATFORM_LABELS: Record<SocialContentPlatform, string> = {
   medium: 'Medium',
@@ -57,11 +57,87 @@ export interface SocialContentGeneration {
   image_url: string | null;
   image_alt: string | null;
   cta_url: string | null;
+  // Facebook fields (TASK-068, migration 046) — absent before the migration, null for Medium.
+  call_to_action?: string | null;
+  first_comment_text?: string | null;
+  link_placement?: FacebookLinkPlacement | null;
+  content_stream_id?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type SocialContentGenerationInsert = Omit<SocialContentGeneration, 'id' | 'created_at' | 'updated_at'>;
+
+// ---------------------------------------------------------------------------
+// Facebook (TASK-068) — client-safe composition rules
+
+/**
+ * Where the article link goes in a Facebook post:
+ * - first_comment: not in the post; posted as the Page's first comment.
+ * - main_post: at the end of the post text.
+ * - none: no link anywhere.
+ * The link is always the validated WordPress permalink (cta_url), added by
+ * code — never written by the model or typed by the user. Without a
+ * permalink only `none` is possible.
+ */
+export const FACEBOOK_LINK_PLACEMENTS = ['first_comment', 'main_post', 'none'] as const;
+export type FacebookLinkPlacement = (typeof FACEBOOK_LINK_PLACEMENTS)[number];
+
+export const FACEBOOK_LINK_PLACEMENT_LABELS: Record<FacebookLinkPlacement, string> = {
+  first_comment: 'First comment',
+  main_post: 'Main post',
+  none: 'No link',
+};
+
+export const FACEBOOK_LINK_PLACEMENT_HELP: Record<FacebookLinkPlacement, string> = {
+  first_comment:
+    'The post is published without a link, then the Page adds the article link as the first comment. This is an editorial choice: it does not guarantee more reach.',
+  main_post: 'The article link is added at the end of the post text.',
+  none: 'No link is published — neither in the post nor in a comment.',
+};
+
+/** Placements allowed for a piece of content: everything with a permalink, only `none` without. */
+export function allowedLinkPlacements(ctaUrl: string | null): readonly FacebookLinkPlacement[] {
+  return ctaUrl ? FACEBOOK_LINK_PLACEMENTS : ['none'];
+}
+
+export interface FacebookPostParts {
+  post: string;
+  callToAction: string | null;
+  firstCommentText: string | null;
+  linkPlacement: FacebookLinkPlacement;
+  /** Validated permalink — null when the article has none. */
+  url: string | null;
+}
+
+/** The exact text published as the Page post. */
+export function composeFacebookPostMessage(parts: FacebookPostParts): string {
+  const blocks = [parts.post.trim(), parts.callToAction?.trim() ?? ''];
+  if (parts.linkPlacement === 'main_post' && parts.url) blocks.push(parts.url);
+  return blocks.filter(Boolean).join('\n\n');
+}
+
+/** The exact first comment, or null when no comment is published. */
+export function composeFacebookFirstComment(parts: FacebookPostParts): string | null {
+  if (parts.linkPlacement !== 'first_comment' || !parts.url) return null;
+  const lead = parts.firstCommentText?.trim();
+  return lead ? `${lead}\n${parts.url}` : parts.url;
+}
+
+/** Composition parts of a saved Facebook row. */
+export function facebookPartsFromRow(
+  row: Pick<SocialContentGeneration, 'content_markdown' | 'call_to_action' | 'first_comment_text' | 'link_placement' | 'cta_url'>
+): FacebookPostParts {
+  const url = row.cta_url ?? null;
+  const placement = row.link_placement && allowedLinkPlacements(url).includes(row.link_placement) ? row.link_placement : 'none';
+  return {
+    post: row.content_markdown,
+    callToAction: row.call_to_action ?? null,
+    firstCommentText: row.first_comment_text ?? null,
+    linkPlacement: placement,
+    url,
+  };
+}
 
 /** Where a saved summary came from — enough to regenerate it and to show its source. */
 export interface SocialContentSourceRef {

@@ -15,12 +15,14 @@ import {
 
 interface MediumHistoryFiltersProps {
   projects: Array<{ id: string; name: string }>;
+  /** History page the filters apply to — /medium, or /facebook (TASK-068). */
+  basePath?: '/medium' | '/facebook';
 }
 
 const STATUS_LABELS: Record<string, string> = { completed: 'Completed', failed: 'Failed' };
 
 /** Project / source / date / status filters of /medium — query string only, the server does the filtering. */
-export function MediumHistoryFilters({ projects }: MediumHistoryFiltersProps) {
+export function MediumHistoryFilters({ projects, basePath = '/medium' }: MediumHistoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -31,7 +33,7 @@ export function MediumHistoryFilters({ projects }: MediumHistoryFiltersProps) {
     else params.set(key, value);
     params.delete('page');
     const query = params.toString();
-    router.replace(query ? `/medium?${query}` : '/medium');
+    router.replace(query ? `${basePath}?${query}` : basePath);
   }
 
   const project = searchParams.get('project');

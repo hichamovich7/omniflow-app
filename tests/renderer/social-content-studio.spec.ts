@@ -318,14 +318,15 @@ test.describe('Social platforms configuration', () => {
   test('six platforms with the documented statuses', () => {
     expect(SOCIAL_PLATFORMS.map((p) => [p.id, p.status])).toEqual([
       ['pinterest', 'available'],
-      ['facebook', 'coming_soon'],
-      ['instagram', 'planned'],
-      ['reels', 'planned'],
-      ['tiktok', 'planned'],
+      // TASK-068: Facebook available; Instagram, Reels and TikTok "Coming soon".
+      ['facebook', 'available'],
+      ['instagram', 'coming_soon'],
+      ['reels', 'coming_soon'],
+      ['tiktok', 'coming_soon'],
       ['medium', 'available'],
     ]);
     expect(SOCIAL_PLATFORM_IDS).toHaveLength(6);
-    expect(SOCIAL_PLATFORM_IDS.filter(isSocialPlatformAvailable)).toEqual(['pinterest', 'medium']);
+    expect(SOCIAL_PLATFORM_IDS.filter(isSocialPlatformAvailable)).toEqual(['pinterest', 'facebook', 'medium']);
   });
 
   test('unavailable platforms have an explanatory message', () => {

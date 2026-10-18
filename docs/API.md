@@ -1224,7 +1224,7 @@ A save failure is not an error: `200` with `id: null` and a warning.
 
 # DELETE /api/social/generations/[id]
 
-Deletes one saved social content item — today a Medium summary of `/medium` (TASK-063). The UI always asks for confirmation first.
+Deletes one saved social content item — a Medium summary of `/medium` (TASK-063) or a Facebook post of `/facebook` (TASK-068). The UI always asks for confirmation first. A Facebook post already published stays on the Page; its publication record is kept.
 
 ## Description
 
@@ -1244,6 +1244,86 @@ unauthorized / invalid_id                                           401 / 400
 not_found (does not exist or is not the caller's)                   404
 delete_failed                                                       500
 ```
+
+---
+
+# Facebook Pages (TASK-068)
+
+Facebook **Pages** only — never a personal profile, never a group. No scheduling (separate task). Every call to Meta is made by the server (`lib/social/meta/graph-client.ts`, native `fetch`, Graph API `META_GRAPH_API_VERSION`, default `v25.0`); the browser only talks to these OmniFlow routes and never receives a token. Tokens travel to Meta in the `Authorization` header or a POST body — never in a URL — with `appsecret_proof`. Logs carry Meta codes / `fbtrace_id` only. The WordPress article is only read (GET), never modified.
+
+Meta errors are mapped (`lib/social/meta/errors.ts`) to fixed kinds and plain-language messages: `token_expired` (190, 102, subcodes 458-467), `permission_denied` (10, 200-299, 1705), `rate_limited` (4, 17, 32, 341, 613), `temporarily_blocked` (368), `page_unavailable` (803, 100/33), `duplicate_post` (506), `invalid_link` (1609005), `invalid_image` (324), `timeout` / `network` (a write that may have been applied — `ambiguous`), `oauth_failed`, `unknown`. Meta's own message text is never returned or logged.
+
+Meta permissions requested (`META_PAGE_SCOPES`, strictly minimal): `pages_show_list` (list Pages), `pages_manage_posts` (post), `pages_read_engagement` (required by the previous one; reads recent Page posts to settle a timeout), `pages_manage_engagement` (first comment), `pages_read_user_content` (required by the previous one; reads the post's comments to settle a timeout). `business_management` only when the person asks for it after Meta returned no Page (Pages owned by a Business Portfolio). With Standard Access only people with a role on the Meta app can connect; other users need Advanced Access (App Review + Business Verification).
+
+Server configuration (`.env.example`): `META_APP_ID`, `META_APP_SECRET`, optional `META_GRAPH_API_VERSION`, `SOCIAL_TOKEN_ENCRYPTION_KEY`. Missing → generation still works; connection / publication routes answer `503 meta_not_configured` (or redirect with `reason=not_configured`).
+
+## POST /api/social/facebook-post
+
+Generates and saves one Facebook Page post from a WordPress article. Body — exactly one source, same schema as Medium (`mediumSummaryRequestSchema`): `{ "wordpressArticleId" }`, `{ "wordpressPost": { "siteId", "postId" } }` or `{ "pinterestGenerationId" }` (a Pinterest generation made from an article).
+
+1. Auth, JSON, Zod (`400`). Rate limit `social/facebook-post` 30 / hour + lifetime trial cap (same as Medium).
+2. `loadFacebookPostSource()`: the Medium loaders (ownership of article / connection / project / Pinterest generation, WordPress GET only, `WordPressArticleContext`, `validateMediumPermalink`, article images) + project niche, niche settings, Brand Profile and the live Content Streams of the article's category (OmniFlow category, or the project categories mapped to the post's WordPress terms).
+3. `generateFacebookPost()`: prompt `facebook-post-v1` (role FAST; article as data, URL-free; niche blocks + `<facebook_rules>`; Brand Profile), JSON `{ post, cta, firstComment }`, cleaned (Markdown, HTML, every URL / domain removed — `lib/social/facebook-text.ts`), checks: 30-180 words, every number present in the article, TASK-051 vocabulary on English articles, language, ≤ 30 % verbatim 10-word sequences, no "link in the comments / bio". One corrective retry, then `422 invalid_post`. Article under 120 words → `422 article_too_short`.
+4. Saved in `social_content_generations` (`platform = facebook`): post, CTA, first-comment lead-in, `link_placement` (`first_comment` when a permalink exists, else `none`), `cta_url` = validated permalink, article image, language, Content Stream.
+
+Response: `SavedFacebookPost` — `{ id, title, post, callToAction, firstCommentText, linkPlacement, ctaUrl, imageUrl, imageAlt, language, wordCount, contentStreamId, warnings[] }` (`id: null` + warning when the save failed — e.g. migration 046 not applied). Nothing is published.
+
+Errors: `unauthorized` 401 · `invalid_json` / `invalid_request` 400 · rate / trial limit 429 / 403 · `forbidden` 403 · `not_found` 404 · `article_not_completed` 409 · `article_too_short` / `invalid_post` / `no_article_source` 422 · WordPress read errors (as Medium) · `generation_failed` 500.
+
+## PATCH /api/social/generations/[id]
+
+Edits a saved Facebook post before publication. Body (strict): `{ "post": string 1-3000, "callToAction": string ≤ 160, "firstCommentText": string ≤ 160, "linkPlacement": "first_comment" | "main_post" | "none" }`. No field may contain a URL or domain (`400 invalid_request` — "OmniFlow adds the article link itself"). Without a permalink only `none` (`422 link_unavailable`). Refused once the post is on Facebook or while its result is being checked (`409 already_published` — editing is allowed only before any publication or after a failure that left no post). Only the caller's own Facebook row (`404 not_found`). Returns the updated row.
+
+## POST /api/social/generations/[id]/publish
+
+"Publish to Facebook" — manual, after a confirmation dialog. Body (strict): `{ "connectionId": uuid, "confirm": true }`. `maxDuration` 60 s.
+
+1. Auth, UUID, Zod (`400`). Rate limit `social/facebook-publish` 20 / hour (separate from generation; no trial cap — no AI cost).
+2. The content must be the caller's Facebook row, `completed` (`404` / `422 not_publishable`). The connection must be the caller's and belong to the content's project (`409 no_page_connected`), not `expired` / `revoked` (`409 connection_expired` / `connection_revoked`). Meta configured (`503 meta_not_configured`). Token decrypted on the server (`409 connection_expired` when unreadable).
+3. `publishFacebookContent()` (`lib/social/facebook-publish.ts`):
+   * a `social_publications` row `publishing` is inserted (UNIQUE content + Page — a concurrent click gets `409 in_progress`; an existing published / partial row `409 already_published`; an existing failed row is retried);
+   * the post: `POST /{page-id}/photos` (`url` = article image, `caption` = message) when there is an image, else `POST /{page-id}/feed` (`message`). Message = post + CTA (+ permalink when `main_post`). Its id (and `GET /{post-id}?fields=permalink_url`) is saved **before** anything else (`published`);
+   * when `first_comment`: `POST /{post-id}/comments` with lead-in + permalink. Failure → `partial` (`comment_status` failed / unknown) — the post stays published.
+   * Post refused → `failed`, no comment. Timeout / network on a write → `unknown`.
+4. A `token_expired` answer marks the connection `expired`; `page_unavailable` / `permission_denied` mark it `error`.
+
+Response: `{ "publication": SocialPublication (without locked_at), "warning": string | null }` — `warning` is the plain-language message of the step that failed (the request itself succeeded).
+
+## POST /api/social/publications/[id]/retry
+
+Retry of the post step (status `failed`, `unknown`, or `publishing` with a lock older than 90 s). Body `{ "confirm": true }`. Same auth, rate limit and connection checks (the publication's own connection, same Page). An `unknown` / interrupted attempt first reads `GET /{page-id}/published_posts` (since the attempt − 5 min) and adopts a post with the exact same text — it is **never posted twice**; if Facebook cannot be read the row stays `unknown`. A `failed` attempt is sent again (with the current, possibly edited, text). Errors: `409 already_published` / `in_progress`, as above.
+
+## POST /api/social/publications/[id]/retry-comment
+
+"Retry comment" — the first comment only (post already on Facebook, `comment_status` failed / unknown / stale pending). Body `{ "confirm": true }`. The post is never sent again. An `unknown` comment is first looked up in `GET /{post-id}/comments` (same text, written by the Page). Errors: `409 comment_not_retryable` / `in_progress`.
+
+## GET /api/social/connections
+
+The caller's connected Facebook Pages — safe columns only (Page id and name, status, granted permissions, dates); the token column is never selected (the session role cannot read it). `503 migration_required` before migration 046.
+
+## GET /api/social/connections/facebook/oauth/start?projectId=<uuid>[&business=1]
+
+Full-page navigation (never `fetch`). Checks the session and the project, rate limit `social/facebook-connect` 20 / hour, sets the encrypted httpOnly cookie `omniflow_meta_oauth` (anti-CSRF `state`, user, project; 10 min, path `/api/social/connections/facebook`) and redirects to the Facebook Login dialog with `META_PAGE_SCOPES` (+ `business_management` with `business=1`). On a problem: redirect to `/facebook?connect=error&reason=<code>` (`invalid_project`, `not_configured`, `rate_limited`).
+
+## GET /api/social/connections/facebook/oauth/callback
+
+Meta's redirect. Checks the `state` against the cookie (same user, not expired, constant-time compare), exchanges the code (`POST /oauth/access_token`, secret in the body) then for a long-lived user token (`fb_exchange_token`), reads `GET /me/permissions` and requires `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`. The user token is kept only in the encrypted httpOnly cookie `omniflow_meta_pending` (10 min) — nothing is written to the database. Redirects to `/facebook?connect=select&projectId=<id>`, or `connect=error&reason=` `state_mismatch` / `denied` / `oauth_failed` / `missing_permissions` / `not_configured`. No token, code or Meta message is ever put in the URL.
+
+## GET /api/social/connections/facebook/pages?projectId=<uuid>
+
+Pages the person manages (`GET /me/accounts`, with the pending cookie's user token): `{ pages: [{ id, name, canPublish }], canComment }` — `canPublish` = task `CREATE_CONTENT`; `canComment` = `pages_manage_engagement` granted. Never a token. `409 selection_expired` without a valid pending cookie for this user and project; Meta errors → `502 <kind>`.
+
+## POST /api/social/connections/facebook/select
+
+Body (strict): `{ "projectId": uuid, "pageId": digits }`. Project ownership (`404`), pending cookie (`409 selection_expired`). The Pages are read again on the server; the Page must be in the list (`404 page_not_found`) with `CREATE_CONTENT` (`403 page_not_publishable`). Only that Page's token is stored, encrypted (`SOCIAL_TOKEN_ENCRYPTION_KEY`), with the service-role client (upsert on project + platform — one Page per project; a new choice replaces the previous one). The pending cookie is cleared; the user token is discarded. Returns the safe connection row.
+
+## POST /api/social/connections/[id]/verify
+
+One read `GET /{page-id}?fields=id,name` with the stored Page token. Saves the status: `active`, `expired` (token error or unreadable token), `error` (Page unreachable / permission); a temporary Facebook problem keeps the previous status. Response `{ status, message }`.
+
+## DELETE /api/social/connections/[id]
+
+"Disconnect Page": deletes the caller's connection and its encrypted token (`404 not_found` otherwise). Posts already on Facebook stay there; publication records keep their history (`connection_id` set to NULL). Removing OmniFlow's access on Facebook's side is done by the person in their Facebook settings.
 
 ---
 

@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Facebook Pages: generate, review and publish — TASK-068 (2026-10-15)
+
+* **Facebook in OmniFlow**: Facebook is enabled in the sidebar and in the Social Content Studio. "Generate Facebook post" turns a WordPress article (OmniFlow article, existing WordPress post, or Pins made from an article) into a Facebook Page post: text, call to action and first-comment text, in the article's language, using the project niche, the article's Content Stream and the Brand Profile — nothing invented (numbers, materials, techniques, results checked against the article, one corrective retry). The image is a picture of the article. Saved in the Facebook history (`/facebook`).
+* **Link options**: First comment (no link in the post, the Page adds the exact article link as the first comment — an editorial choice, no reach guarantee), Main post, or No link. The link is always the validated WordPress permalink, added by OmniFlow; no URL is accepted in the text. Without a permalink, only No link.
+* **Facebook Page connection** (official Meta API, Facebook Login): one Page per project, Page picker, Verify, Reconnect, Disconnect Page. Facebook Pages only — never a personal profile or a group. Minimal permissions (`pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `pages_manage_engagement`, `pages_read_user_content`); `business_management` only on request. The Page token is stored encrypted (new `SOCIAL_TOKEN_ENCRYPTION_KEY`), unreadable by the browser session, never in a URL, a response or a log.
+* **Manual publication**: "Publish to Facebook" → confirmation → post published and saved, then the first comment. Comment failure → "Partially published" + "Retry comment" (the post is never published twice). A timeout is checked on the Page before any retry. Clear messages for expired connection, missing permission, deleted Page, rate limit. No scheduling yet.
+* Instagram, Reels and TikTok now show "Coming soon".
+* Migration **046** (`social_connections`, `social_publications`, Facebook columns on `social_content_generations`) — to apply by hand after 045. New env variables in `.env.example`: `META_APP_ID`, `META_APP_SECRET`, `META_GRAPH_API_VERSION`, `SOCIAL_TOKEN_ENCRYPTION_KEY`. No new dependency (native fetch). The WordPress article is never modified.
+* Tests: new `facebook-content.spec.ts` (31, offline) and browser `facebook.spec.ts` (7, gated); three specs updated. Full renderer 1186/1186, TypeScript, ESLint, build pass.
+
 ## Home Decor Pins no longer rejected for "not showing the project" — TASK-067 (2026-10-14)
 
 * **Before:** Pins from a German Home Decor article failed with "Image description: the image description does not show the project of its article section." The check compared words of the (German) section heading with the (always English) image prompt, and was built for Crochet / Clay "projects". In English it also let a living room pass for a kitchen section, or a generic "cozy" interior.

@@ -362,7 +362,9 @@ WordPress (Implemented — generator TASK-028 / TASK-037, publishing TASK-035, S
 ↓
 Medium summary (Implemented — TASK-062: copy / download only, no Medium API, no automatic publishing)
 ↓
-Facebook (Planned, next — P1), Instagram, Reels, TikTok (Planned — Social Content Studio), LinkedIn (Future)
+Facebook Pages (Implemented — TASK-068: Page post generated from the article, manual publication to a connected Facebook Page, optional first-comment link; no profile, no group, no scheduling)
+↓
+Instagram, Reels, TikTok (Coming soon — Social Content Studio), LinkedIn (Future)
 ```
 
 WordPress y la generación de artículos SEO forman parte del roadmap oficial. Ver TASKS.md para detalle.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileText, Globe, Pin, Search } from 'lucide-react';
@@ -47,6 +47,11 @@ interface NewMediumSummaryProps {
   articles: MediumArticleOption[];
   sites: MediumSiteOption[];
   pinterest: MediumPinterestOption[];
+  /** Reused by "New Facebook post" (TASK-068): same sources, another heading and panel. */
+  heading?: string;
+  intro?: string;
+  testId?: string;
+  renderPanel?: (source: MediumSummaryRequest) => ReactNode;
 }
 
 function formatDate(value: string): string {
@@ -61,7 +66,15 @@ function formatDate(value: string): string {
  * generated before "Generate Medium summary". The new summary is saved to
  * the history below, which refreshes.
  */
-export function NewMediumSummary({ articles, sites, pinterest }: NewMediumSummaryProps) {
+export function NewMediumSummary({
+  articles,
+  sites,
+  pinterest,
+  heading = 'New Medium summary',
+  intro = 'Choose the article to summarize. It is only read — never modified — and nothing is published to Medium.',
+  testId = 'new-medium-summary',
+  renderPanel,
+}: NewMediumSummaryProps) {
   const router = useRouter();
   const [kind, setKind] = useState<MediumSourceKind | null>(null);
   const [selected, setSelected] = useState<Selected | null>(null);
@@ -86,14 +99,12 @@ export function NewMediumSummary({ articles, sites, pinterest }: NewMediumSummar
     <section
       aria-labelledby="new-medium-summary-title"
       className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm"
-      data-testid="new-medium-summary"
+      data-testid={testId}
     >
       <h2 id="new-medium-summary-title" className="text-base font-semibold">
-        New Medium summary
+        {heading}
       </h2>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Choose the article to summarize. It is only read — never modified — and nothing is published to Medium.
-      </p>
+      <p className="mb-4 text-sm text-muted-foreground">{intro}</p>
 
       <ul className="grid gap-2 sm:grid-cols-3" aria-label="Medium source">
         {SOURCES.map((option) => {
@@ -143,7 +154,11 @@ export function NewMediumSummary({ articles, sites, pinterest }: NewMediumSummar
               Change
             </Button>
           </div>
-          <MediumSummaryPanel key={JSON.stringify(selected.source)} source={selected.source} onGenerated={() => router.refresh()} />
+          {renderPanel ? (
+            <div key={JSON.stringify(selected.source)}>{renderPanel(selected.source)}</div>
+          ) : (
+            <MediumSummaryPanel key={JSON.stringify(selected.source)} source={selected.source} onGenerated={() => router.refresh()} />
+          )}
         </div>
       ) : (
         <>

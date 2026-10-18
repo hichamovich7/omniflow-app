@@ -3,8 +3,8 @@
  * which platforms exist on the article review page and which one can
  * actually generate. Only `available` platforms get an action (Pinterest
  * opens /pinterest/create?source=wordpress; Medium generates a summary on
- * the page, TASK-062) — the others are display-only: no API call, no AI
- * call, no database write.
+ * the page, TASK-062; Facebook generates a Page post, TASK-068) — the
+ * others are display-only: no API call, no AI call, no database write.
  */
 export const SOCIAL_PLATFORM_IDS = ['pinterest', 'facebook', 'instagram', 'reels', 'tiktok', 'medium'] as const;
 export type SocialPlatformId = (typeof SOCIAL_PLATFORM_IDS)[number];
@@ -25,10 +25,15 @@ export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
     status: 'available',
     description: 'Saved Pins (title, description, keywords, board, image prompt) written from this article.',
   },
-  { id: 'facebook', label: 'Facebook', status: 'coming_soon', description: 'Post text with a hook and a call to action.' },
-  { id: 'instagram', label: 'Instagram', status: 'planned', description: 'Caption, hashtags and alt text.' },
-  { id: 'reels', label: 'Reels', status: 'planned', description: 'Short video script: hook, scenes, voice-over.' },
-  { id: 'tiktok', label: 'TikTok', status: 'planned', description: 'Short video script: hook, scenes, caption.' },
+  {
+    id: 'facebook',
+    label: 'Facebook',
+    status: 'available',
+    description: 'A Facebook Page post (text, call to action, article image), to review, edit and publish to your connected Page.',
+  },
+  { id: 'instagram', label: 'Instagram', status: 'coming_soon', description: 'Caption, hashtags and alt text.' },
+  { id: 'reels', label: 'Reels', status: 'coming_soon', description: 'Short video script: hook, scenes, voice-over.' },
+  { id: 'tiktok', label: 'TikTok', status: 'coming_soon', description: 'Short video script: hook, scenes, caption.' },
   {
     id: 'medium',
     label: 'Medium',
