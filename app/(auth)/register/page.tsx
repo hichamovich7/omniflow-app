@@ -146,6 +146,17 @@ export default function RegisterPage() {
             {loading ? 'Creating account...' : 'Create Account'}
           </Button>
         </form>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          By creating an account, you agree to the{' '}
+          <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+            Terms of Service
+          </Link>{' '}
+          and acknowledge the{' '}
+          <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+            Privacy Policy
+          </Link>
+          .
+        </p>
         <p className="text-label mt-6 text-center">
           Already have an account?{' '}
           <Link href="/login" className="font-semibold text-primary hover:underline">

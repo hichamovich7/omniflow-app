@@ -15,6 +15,7 @@ import {
   UploadCloud,
   Share2,
   ThumbsUp,
+  ShieldCheck,
 } from 'lucide-react';
 
 export interface GuideSection {
@@ -342,6 +343,18 @@ export const guideSections: GuideSection[] = [
       'OmniFlow publishes the post, saves it, and only then adds the first comment. If the comment fails, the post stays published and the status shows "Partially published": click "Retry comment" — the post is never published a second time. If Facebook refused the post, nothing else is sent: fix the problem shown and click "Retry". If Facebook did not answer in time, "Retry" first checks your Page so the same post is never published twice.',
       'Your Facebook history (Facebook in the sidebar) lists every post with its project, source, date and publication status: Not published, Published, Published + comment, Partially published, Publication failed or Result being checked. Deleting a post there removes it from OmniFlow only; a post already on Facebook stays on your Page.',
       'Your WordPress article is only read, never modified. Each generated post counts toward your hourly limit and your free-trial generations, like the other generators; publishing has its own hourly limit and uses no AI.',
+    ],
+  },
+  {
+    id: 'legal-privacy',
+    title: 'Privacy & Legal',
+    icon: ShieldCheck,
+    summary: 'Where to read the Terms of Service, the Privacy Policy and your GDPR rights, and how to delete your data.',
+    points: [
+      'The legal pages are linked at the bottom of the sidebar and on the sign-in and sign-up pages: Terms of Service, Privacy Policy, GDPR, Cookie Policy, Data Deletion and Legal Notice. They are public, so you can open them without signing in.',
+      'The Privacy Policy lists the data OmniFlow keeps, why, and the providers that process it (database, hosting, image storage, AI models, and Meta only if you connect a Facebook Page). OmniFlow does not sell your data and uses no advertising or analytics cookies.',
+      'To delete only your Facebook data, click "Disconnect Page" on the Facebook page, then remove OmniFlow in Facebook → Settings & privacy → Settings → Business integrations. To delete your whole account, follow the steps on the Data Deletion page.',
+      'Posts already published on your Facebook Page or WordPress site stay there when you delete them in OmniFlow — delete them on Facebook or WordPress if you want them gone.',
     ],
   },
 ];

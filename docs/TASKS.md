@@ -1205,6 +1205,39 @@ New `tests/renderer/facebook-content.spec.ts` (31, offline — Supabase, WordPre
 
 ---
 
+## [TASK-069] Legal pages (Terms, Privacy, GDPR, Cookies, Data Deletion, Legal Notice)
+
+### Status: READY TO TEST (2026-10-18 — offline tests pass; operator placeholders to fill by the founder)
+
+### Goal
+
+Give OmniFlow the legal pages a SaaS needs — and that Meta requires before the Facebook app can go Live — public, linked from a footer.
+
+### Founder decisions (2026-10-18)
+
+1. Operator: individual entrepreneur; name, address, registration, contact email as `[…]` placeholders for now.
+2. English pages.
+3. Pages: Terms of Service, Privacy Policy, GDPR, Cookie Policy, Data Deletion, Legal Notice.
+
+### What ships
+
+* `lib/legal/routes.ts` (route list + `isLegalPath`), `lib/legal/content.ts` (operator placeholders, `LEGAL_LAST_UPDATED`, the six pages as data), `components/legal/legal-document.tsx`, `components/layout/site-footer.tsx`.
+* `app/(legal)/` layout + six pages. `lib/supabase/middleware.ts`: legal paths pass through for everyone (no `/login` redirect when signed out, no `/dashboard` redirect when signed in).
+* Footer on the auth layout; legal links in the sidebar footer; consent line on `/register`.
+* Docs: UI_UX, TESTING, DEPLOYMENT (Meta legal URLs), CHANGELOG; Guide "Privacy & Legal".
+
+### Success Criteria
+
+* The six pages open signed out and signed in; links visible on `/login`, `/register`, legal pages and the sidebar.
+* Content matches the code (processors, Facebook scopes, cookies, storage keys) — `tests/renderer/legal-pages.spec.ts`.
+
+### Remaining (founder)
+
+1. Replace the `[…]` values of `legalOperator` in `lib/legal/content.ts` (name, address, registration, VAT, email, country) and check the host addresses in the Legal Notice.
+2. Have the texts reviewed by a legal professional if possible — they are a sound base, not legal advice.
+3. Enter the Privacy Policy, Terms and Data deletion instructions URLs in the Meta app (DEPLOYMENT.md step 8).
+4. Update the pages whenever a provider, payments or a new platform connection is added.
+
 # COMPLETED TASKS
 
 ## [TASK-FIX-050] WordPress publish — focus keyword and tags per method — 2026-09-26

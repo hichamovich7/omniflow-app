@@ -172,7 +172,8 @@ SOCIAL_TOKEN_ENCRYPTION_KEY=            # openssl rand -hex 32 — never commit,
 ```
 
 7. **Who can connect**: while the app only has Standard Access, only Facebook accounts with a role on the app (App roles → Administrator / Developer / Tester) can log in and connect their Pages. Letting other users connect requires Advanced Access for the five permissions: App Review + Business Verification (a verified business portfolio).
-8. Redeploy, open `/facebook`, "Connect a Facebook Page", then follow TESTING.md "Facebook Pages (TASK-068)" for the real test.
+8. **Legal URLs** (App settings → Basic, required before switching the app to Live / App Review): Privacy Policy URL `https://<production domain>/privacy`, Terms of Service URL `https://<production domain>/terms`, User data deletion → "Data deletion instructions URL" `https://<production domain>/data-deletion`. These pages are public (TASK-069); replace the `[…]` operator placeholders in `lib/legal/content.ts` first.
+9. Redeploy, open `/facebook`, "Connect a Facebook Page", then follow TESTING.md "Facebook Pages (TASK-068)" for the real test.
 
 ---
 

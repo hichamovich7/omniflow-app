@@ -1280,6 +1280,16 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Legal pages (TASK-069, 2026-10-18)
+
+```bash
+npx playwright test tests/renderer/legal-pages.spec.ts --project=renderer --reporter=list
+```
+
+Offline (7 tests): every footer route has content and an `app/(legal)/<slug>/page.tsx`; `isLegalPath` makes only those paths public; inline links point to existing legal pages; the Privacy Policy names the real processors and the five Facebook permissions; the Data Deletion page has the steps Meta requires; the Cookie Policy matches the cookie and localStorage names in the code; the GDPR page covers Art. 7, 15–18, 20, 21.
+
+Manual: signed out, open `/privacy`, `/terms`, `/gdpr`, `/cookies`, `/data-deletion`, `/legal-notice` (no redirect to `/login`); the footer shows on `/login` and `/register`; signed in, the same pages open (no redirect to `/dashboard`) and the sidebar footer lists them.
+
 # Facebook Pages (TASK-068, 2026-10-15)
 
 ```bash

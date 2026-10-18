@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from '@/components/ui/collapsible';
+import { legalRoutes } from '@/lib/legal/routes';
 
 interface NavItem {
   href: string;
@@ -347,13 +348,28 @@ export function SidebarContent() {
           </div>
         </div>
       </nav>
-      {process.env.NEXT_PUBLIC_APP_VERSION && (
-        <div className="shrink-0 border-t border-sidebar-border px-5 py-3">
+      {/* Sidebar footer: legal pages (TASK-069) + app version. */}
+      <div className="shrink-0 space-y-2 border-t border-sidebar-border px-5 py-3">
+        <nav aria-label="Legal" className="flex flex-wrap gap-x-3 gap-y-1">
+          {legalRoutes.map((route) => (
+            <Link
+              key={route.href}
+              href={route.href}
+              className={cn(
+                'rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground',
+                navFocusClass
+              )}
+            >
+              {route.label}
+            </Link>
+          ))}
+        </nav>
+        {process.env.NEXT_PUBLIC_APP_VERSION && (
           <p className="font-mono text-xs text-muted-foreground">
             v{process.env.NEXT_PUBLIC_APP_VERSION}
           </p>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }

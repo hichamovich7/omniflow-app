@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isLegalPath } from '@/lib/legal/routes';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -38,7 +39,9 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute = pathname === '/';
   const isApiRoute = pathname.startsWith('/api');
 
-  if (isCallbackRoute) {
+  // Legal pages (TASK-069) are public for everyone, signed in or not —
+  // Meta App Review must reach the Privacy Policy and Data Deletion pages.
+  if (isCallbackRoute || isLegalPath(pathname)) {
     return supabaseResponse;
   }
 

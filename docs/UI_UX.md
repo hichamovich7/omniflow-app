@@ -1402,6 +1402,16 @@ publish_date exported as `YYYY-MM-DDTHH:mm:ss` **in UTC** (no suffix), from UTC 
 
 ---
 
+# Legal pages (TASK-069)
+
+Public pages (no session needed, also reachable when signed in): `/terms`, `/privacy`, `/gdpr`, `/cookies`, `/data-deletion`, `/legal-notice`. Route group `app/(legal)/` — a minimal header (OmniFlow mark → `/`), a centered reading column (`max-w-3xl`), and `SiteFooter`. Content lives in `lib/legal/content.ts` (operator details as `[…]` placeholders until the founder fills them), rendered by `components/legal/legal-document.tsx`; the route list (`lib/legal/routes.ts`) feeds the footers and the session proxy.
+
+* `SiteFooter` (`components/layout/site-footer.tsx`): © year + legal links — on the auth pages (below the card) and the legal pages.
+* Dashboard: the sidebar footer lists the same links (small, muted), above the app version.
+* Register: "By creating an account, you agree to the Terms of Service and acknowledge the Privacy Policy" below the form.
+
+---
+
 # Responsive Rules
 
 Desktop First.

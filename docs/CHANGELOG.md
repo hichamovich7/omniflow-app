@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Legal pages — TASK-069 (2026-10-18)
+
+* New public pages: **Terms of Service** (`/terms`), **Privacy Policy** (`/privacy`), **GDPR rights** (`/gdpr`), **Cookie Policy** (`/cookies`), **Data Deletion** (`/data-deletion`, the instructions URL Meta requires for the Facebook app) and **Legal Notice** (`/legal-notice`). English, written from what OmniFlow actually does (processors, Facebook permissions, cookies, retention).
+* Readable signed in or out (`lib/legal/routes.ts`, used by the session proxy). Footer on the sign-in / sign-up pages and the legal pages; legal links in the sidebar footer; consent line on the sign-up form.
+* Operator details (name, address, registration, VAT, contact email, governing-law country) are `[…]` placeholders in `lib/legal/content.ts` — **to fill before production**.
+* In-app Guide: new "Privacy & Legal" section. DEPLOYMENT.md: the three Meta legal URLs.
+* Tests: new `legal-pages.spec.ts` (7, offline). No dependency, no migration.
+
 ## Facebook Pages: generate, review and publish — TASK-068 (2026-10-15)
 
 * **Facebook in OmniFlow**: Facebook is enabled in the sidebar and in the Social Content Studio. "Generate Facebook post" turns a WordPress article (OmniFlow article, existing WordPress post, or Pins made from an article) into a Facebook Page post: text, call to action and first-comment text, in the article's language, using the project niche, the article's Content Stream and the Brand Profile — nothing invented (numbers, materials, techniques, results checked against the article, one corrective retry). The image is a picture of the article. Saved in the Facebook history (`/facebook`).
