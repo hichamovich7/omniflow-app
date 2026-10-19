@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -27,6 +28,8 @@ export function HistoryActions({ generationId, keyword, wordpressArticles }: His
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // TASK-070: UTM parameters are added to the CSV "Link" cells only.
+  const [utmTracking, setUtmTracking] = useState(true);
 
   async function handleExportCsv() {
     setExporting(true);
@@ -45,7 +48,7 @@ export function HistoryActions({ generationId, keyword, wordpressArticles }: His
         return;
       }
 
-      const csv = generatePinterestCsv(pins);
+      const csv = generatePinterestCsv(pins, { utmTracking });
       downloadCsv(csv, `pinterest-${keyword.replace(/\s+/g, '-').toLowerCase()}.csv`);
       toast.success('CSV exported');
     } catch {
@@ -73,6 +76,14 @@ export function HistoryActions({ generationId, keyword, wordpressArticles }: His
             <Download className="mr-2 h-4 w-4" />
             {exporting ? 'Exporting...' : 'Export CSV'}
           </DropdownMenuItem>
+          <DropdownMenuCheckboxItem
+            checked={utmTracking}
+            onCheckedChange={(checked) => setUtmTracking(checked === true)}
+            closeOnClick={false}
+            className="text-xs text-muted-foreground"
+          >
+            Add UTM tracking
+          </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"

@@ -10,6 +10,7 @@ import { GenerateImagesButton } from '@/components/pinterest/generate-images-but
 import { ScheduleDialog } from '@/components/pinterest/schedule-dialog';
 import { GenerateWordPressButton } from '@/components/pinterest/generate-wordpress-button';
 import { GenerateMediumButton } from '@/components/pinterest/generate-medium-button';
+import { DestinationUrlDialog } from '@/components/pinterest/destination-url-dialog';
 import type { Pin, ImageStatus } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 
@@ -104,6 +105,7 @@ function EditorialWorkspaceContent({
               keyword={keyword}
               selectedPinIds={selectedIds}
             />
+            <DestinationUrlDialog selectedPinIds={selectedIds} />
             <GenerateWordPressButton selectedPinIds={selectedIds} />
             <GenerateMediumButton generationId={generationId} hasArticle={hasSourceArticle} />
           </SelectionActionBar>

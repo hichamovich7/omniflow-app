@@ -43,6 +43,7 @@ import { ReferenceImageUpload } from '@/components/pinterest/reference-image-upl
 import { ArticleSourceSummary, type ArticleFormSource } from '@/components/social/article-source-summary';
 import { ArticleBoardPicker, type ContentStreamOption } from '@/components/social/article-board-picker';
 import { articlePinterestCreateHref, wordpressPostPinterestHref } from '@/lib/social/pin-display';
+import { DESTINATION_URL_MAX_LENGTH, validateDestinationUrl } from '@/lib/pinterest/destination-url';
 import {
   Select,
   SelectContent,
@@ -247,6 +248,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   const [keyword, setKeyword] = useState(articleSource?.primaryKeyword ?? searchParams.get('keyword') ?? '');
   const [board, setBoard] = useState(articleSource?.suggestedBoardName ?? '');
   const [boardSection, setBoardSection] = useState('');
+  // TASK-071: saved in pins.link_url as typed; never sent to the AI.
+  const [destinationUrl, setDestinationUrl] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>(
     articleSource?.language ?? (defaultProject?.default_language as SupportedLanguage) ?? 'en'
   );
@@ -331,6 +334,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   const boardOptions = boards.filter((b) => b.project_id === projectId);
   const boardSectionError =
     boardSection.trim() && !board.trim() ? BOARD_SECTION_REQUIRES_BOARD_MESSAGE : null;
+  const destinationUrlCheck = validateDestinationUrl(destinationUrl);
+  const destinationUrlError = destinationUrlCheck.ok ? null : destinationUrlCheck.message;
 
   // Derived, never stored: the alert appears the moment the third element is
   // set to None and disappears as soon as any one is re-enabled. The chosen
@@ -352,6 +357,12 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
 
     if (boardSectionError) {
       setError(boardSectionError);
+      return;
+    }
+
+    if (destinationUrlError) {
+      setError(destinationUrlError);
+      document.getElementById('destination-url')?.focus();
       return;
     }
 
@@ -378,6 +389,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       analysisId,
       wordpressArticleId: articleSource?.articleId ?? undefined,
       wordpressPost: articleSource?.externalPost ?? undefined,
+      destinationUrl: destinationUrl.trim() || undefined,
     };
     const parsed = generatePinsSchema.safeParse(
       generationMode === 'ai-integrated'
@@ -442,6 +454,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
     }
 
     toast.success('Pins generated successfully');
+    if (json.data?.destinationWarning) toast.warning(json.data.destinationWarning);
     if (articleSource) {
       // A new generation each time: the previous one is kept, never overwritten.
       router.push(
@@ -677,6 +690,33 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
             </p>
             {boardSectionError && (
               <p className="text-xs text-destructive">{boardSectionError}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="destination-url" className="text-xs font-medium text-muted-foreground">
+              Destination URL (optional)
+            </Label>
+            <Input
+              id="destination-url"
+              type="url"
+              inputMode="url"
+              placeholder="https://example.com/article/"
+              value={destinationUrl}
+              onChange={(e) => setDestinationUrl(e.target.value)}
+              maxLength={DESTINATION_URL_MAX_LENGTH}
+              disabled={loading}
+              aria-describedby="destination-url-help"
+              aria-invalid={!!destinationUrlError}
+            />
+            <p id="destination-url-help" className="text-xs text-muted-foreground">
+              {articleSource?.externalPost && articleSource.permalink
+                ? "Leave blank to use the post's link shown above. "
+                : 'The page every generated Pin links to. '}
+              Saved as typed and never sent to the AI; UTM tracking is added only to the CSV export.
+            </p>
+            {destinationUrlError && (
+              <p className="text-xs text-destructive">{destinationUrlError}</p>
             )}
           </div>
         </FormSection>

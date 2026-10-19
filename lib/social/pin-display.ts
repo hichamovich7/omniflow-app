@@ -13,7 +13,8 @@ export const ANGLE_LABELS: Record<PinterestAngle, string> = {
   'article-promise': 'Article Promise',
 };
 
-export const NO_LINK_NOTICE = 'No link added automatically — add your destination URL manually in the CSV.';
+export const NO_LINK_NOTICE =
+  'No destination URL — add one with "Edit destination URL" on the generation page, or in the CSV.';
 
 export interface PinTextFields {
   title: string;

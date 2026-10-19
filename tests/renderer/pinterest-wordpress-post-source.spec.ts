@@ -355,7 +355,8 @@ test.describe('Routes, page and UI (source level)', () => {
     expect(generateRoute).toContain('create: !articleSource');
     expect(generateRoute).toContain('.update(generationSourceColumns(articleSource))');
     expect(generateRoute).toContain('if (articleSource?.articleId) {');
-    expect(generateRoute).not.toContain('link_url');
+    expect(generateRoute.match(/link_url/g)).toEqual(['link_url']); // TASK-071: only `link_url: destination.linkUrl`
+    expect(generateRoute).toContain('link_url: destination.linkUrl');
   });
 
   test('page: picker first, nothing generated on load, public site columns only', () => {

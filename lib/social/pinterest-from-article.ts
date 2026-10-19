@@ -98,6 +98,11 @@ export interface ArticlePinterestSource {
   context: WordPressArticleContext;
   /** The project's connected WordPress site — only to allow its images as Vision input. */
   siteUrl?: string | null;
+  /**
+   * Existing WordPress post only (TASK-071): its verified public permalink,
+   * the Pins' default destination URL (pins.link_url). Never in the prompt.
+   */
+  permalink?: string | null;
 }
 
 export type SocialGenerationErrorCode =

@@ -167,6 +167,7 @@ export default async function PinterestFromWordPressPage({
     hasBrandProfile: Boolean(article.brandProfileDescription?.trim()),
     suggestedBoardName: boardList.find((b) => b.id === suggestion.boardId)?.name ?? null,
     boardNameSuggestion: suggestion.suggestedName,
+    permalink: article.permalink ?? null,
   };
 
   // The saved generation, only if it is the user's and from this project.

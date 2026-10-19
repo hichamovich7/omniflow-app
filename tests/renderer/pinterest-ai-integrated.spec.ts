@@ -542,8 +542,9 @@ test('the form follows the workflow order with one help sentence per section and
   expect(form.match(/data-testid="ai-integrated-reference-notice"/g)).toHaveLength(1);
   expect(form.slice(0, sections[4])).not.toContain('coming soon');
 
-  // No Link / URL / destination field was added.
-  expect(form).not.toMatch(/htmlFor="(?:link|url|destination)/i);
+  // The only URL field is the optional Destination URL (TASK-071), outside the AI settings.
+  expect(form.match(/htmlFor="(?:link|url|destination)[^"]*"/gi)).toEqual(['htmlFor="destination-url"']);
+  expect(aiSection).not.toContain('destination-url');
 });
 
 // --- Exact provider contract (offline: fetch is stubbed, no paid call) -------

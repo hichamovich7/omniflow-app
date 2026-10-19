@@ -401,7 +401,7 @@ test.describe('/pinterest/create page', () => {
     expect(page).toContain('<ArticlePinResults');
   });
 
-  test('the form is the existing PinForm, pre-filled, with no destination URL field', () => {
+  test('the form is the existing PinForm, pre-filled, with only the optional Destination URL field', () => {
     expect(page).toContain('<PinForm');
     expect(form).toContain("articleSource?.primaryKeyword ?? searchParams.get('keyword')");
     expect(form).toContain('articleSource?.language ??');
@@ -410,7 +410,10 @@ test.describe('/pinterest/create page', () => {
     expect(form).toContain("const websiteUrl = articleSource ? undefined");
     expect(form).toContain("const pinterestUrl = articleSource ? undefined");
     expect(form).toContain("const analysisId = articleSource ? undefined");
-    expect(form).not.toMatch(/<Label[^>]*>\s*Destination URL|id="(website|destination)-url"/i);
+    // TASK-071: one optional Destination URL field; never a Research website URL field.
+    expect(form).not.toMatch(/id="website-url"/i);
+    expect(form.match(/id="destination-url"/g)).toHaveLength(1);
+    expect(form).toContain('destinationUrl: destinationUrl.trim() || undefined');
     expect(read('components/social/article-board-picker.tsx')).not.toMatch(/Combobox|<Input/);
     expect(form).toContain('articlePinterestCreateHref(articleSource.articleId, json.data.generationId)');
   });
@@ -479,9 +482,10 @@ test.describe('Generation route reuses the existing Pinterest pipeline', () => {
     expect(route).toContain('validateDistinctAngles(resolvedPins, pinsRequested)');
   });
 
-  test('saves into generations / pins, without link and without creating boards', () => {
+  test('saves into generations / pins, link only from the resolved destination, without creating boards', () => {
     expect(route).toContain(".from('pins').insert(pinsToInsert)");
-    expect(route).not.toContain('link_url');
+    expect(route.match(/link_url/g)).toEqual(['link_url']);
+    expect(route).toContain('link_url: destination.linkUrl');
     expect(route).toContain('return articleSource ? withoutUrls(resolved) : resolved;');
     expect(route).toContain('create: !articleSource');
     expect(route).toContain('source_wordpress_generation_id: articleSource.articleId');
@@ -818,7 +822,8 @@ test.describe('Result cards and CSV', () => {
       expect(cards).toContain(text);
     }
     expect(cards).not.toContain('not saved');
-    expect(NO_LINK_NOTICE).toMatch(/No link added automatically/);
+    expect(NO_LINK_NOTICE).toMatch(/No destination URL/);
+    expect(cards).toContain('pin.link_url ?');
   });
 
   test('actions: copies, edit, single regeneration, per-Pin image and confirmed batch images', () => {

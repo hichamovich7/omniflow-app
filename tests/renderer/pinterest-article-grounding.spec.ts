@@ -507,7 +507,8 @@ test.describe('Safety and compatibility (source level)', () => {
   });
 
   test('no destination URL, no WordPress write, briefs stored per Pin, Vision before any row is written', () => {
-    expect(generateRoute).not.toContain('link_url');
+    expect(generateRoute.match(/link_url/g)).toEqual(['link_url']); // TASK-071: only `link_url: destination.linkUrl`
+    expect(generateRoute).toContain('link_url: destination.linkUrl');
     expect(generateRoute).toContain('website_url: websiteUrl ?? null');
     expect(generateRoute).not.toMatch(/upsertPost|uploadMedia|updateMediaAltText|findOrCreateTag/);
     expect(generateRoute).toContain('attachArticleSourceMetadata(integratedAnalysis');

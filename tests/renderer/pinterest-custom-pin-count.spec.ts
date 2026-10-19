@@ -178,10 +178,12 @@ test.describe('Number of Pins — angles', () => {
   });
 });
 
-test.describe('Number of Pins — no destination URL', () => {
-  test('the generator never adds a link_url, and website_url only comes from the request', () => {
+test.describe('Number of Pins — destination URL never invented', () => {
+  test('link_url only comes from the resolved destination, and website_url only from the request', () => {
     const route = read('app/api/pinterest/generate/route.ts');
-    expect(route).not.toContain('link_url');
+    // TASK-071: the typed Destination URL or the verified post permalink — never the AI.
+    expect(route.match(/link_url/g)).toEqual(['link_url']);
+    expect(route).toContain('link_url: destination.linkUrl');
     expect(route).toContain('website_url: websiteUrl ?? null');
     expect(route.match(/website_url/g)).toHaveLength(1);
   });

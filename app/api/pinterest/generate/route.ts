@@ -49,6 +49,7 @@ import { describeSectionImages, referenceImageHosts } from '@/lib/pinterest/arti
 import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
 import { WordPressReadError } from '@/lib/wordpress/post-reader';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
+import { resolvePinDestination } from '@/lib/pinterest/destination-url';
 import type { ApiResponse } from '@/types/api';
 import {
   attachAiIntegratedMetadata,
@@ -154,6 +155,7 @@ export async function POST(request: Request) {
     generationMode,
     wordpressArticleId,
     wordpressPost,
+    destinationUrl,
   } = parsed.data;
   // The schema already rejects a reference for the other modes; this is a
   // second guard so the Vision step below can only ever run for Legacy
@@ -213,6 +215,11 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  // Destination URL (TASK-071): the typed URL, else the verified permalink of
+  // an existing WordPress post. Saved on the Pins only — it is never
+  // passed to the prompt builder below, and never carries UTM parameters.
+  const destination = resolvePinDestination({ manualUrl: destinationUrl, source: articleSource });
 
   // The article flow lets the user pick the language (the article's by
   // default) in every mode, instead of inheriting the project's.
@@ -499,6 +506,7 @@ export async function POST(request: Request) {
         // Zod already rejects a boardSection without a manually-set board,
         // so this only ever applies when every pin shares the same board.
         board_section: boardSection ?? null,
+        link_url: destination.linkUrl,
         image_prompt: pin.image_prompt,
         visual_format: visualFormat,
         overlay_text: generationMode === 'legacy-composite' ? pin.overlayText ?? null : null,
@@ -561,9 +569,21 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json<ApiResponse<{ generationId: string; status: string; pinsGenerated: number }>>(
+    return NextResponse.json<ApiResponse<{
+      generationId: string;
+      status: string;
+      pinsGenerated: number;
+      linkUrl: string | null;
+      destinationWarning: string | null;
+    }>>(
       {
-        data: { generationId: generation.id, status: 'completed', pinsGenerated },
+        data: {
+          generationId: generation.id,
+          status: 'completed',
+          pinsGenerated,
+          linkUrl: destination.linkUrl,
+          destinationWarning: destination.warning,
+        },
         error: null,
       },
       { status: 201 }

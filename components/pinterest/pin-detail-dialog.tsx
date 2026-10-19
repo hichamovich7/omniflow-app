@@ -15,6 +15,7 @@ import {
 import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 import { getPinGenerationModeLabel } from './pin-diagnostic-badges';
+import { PinDestinationUrlEditor } from './destination-url-dialog';
 
 interface PinDetailDialogProps {
   pin: Pin;
@@ -100,6 +101,8 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
               </div>
             </div>
           )}
+
+          <PinDestinationUrlEditor pin={pin} />
 
           {imageModel && (
             <p className="text-xs text-muted-foreground">

@@ -1280,6 +1280,34 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Pinterest Destination URL (TASK-071, 2026-10-19)
+
+```txt
+npx playwright test tests/renderer/pinterest-destination-url.spec.ts tests/renderer/pinterest-utm.spec.ts tests/renderer/pinterest-wordpress-post-source.spec.ts tests/renderer/social-content-studio.spec.ts --project=renderer --reporter=list
+```
+
+Offline (in-memory Supabase and WordPress fakes, no AI). `pinterest-destination-url.spec.ts` (21): valid manual URL kept as typed; invalid URLs (no scheme, relative, `ftp:`, `javascript:`, spaces, credentials) refused with the message; blank = no link; accepted with every source while Research URLs stay refused with an article; typed URL wins over the permalink; route writes `link_url: destination.linkUrl` and the prompt call carries no destination; PATCH `{ linkUrl }` sets / changes / removes and writes only `link_url`; another user's Pin → 403, nothing written; link and text edits never mixed; PATCH route and `updatePinLink` without AI; bulk dialog and per-Pin editor wired through PATCH; existing post with permalink (GET only, no write, not in the prompt); no permalink / draft / foreign host / invalid link → no URL + warning; WordPress 403 / 500 / network error → `WordPressReadError`, nothing written; OmniFlow article unchanged; WordPress never written; UTM: clean saved URL → `pin-01` / `pin-02` in the CSV only, no duplicates, parameters and fragment kept, UTM builder never imported by the save paths. Six older specs updated to the new rule (`pinterest-ai-integrated`, `pinterest-article-grounding`, `pinterest-custom-pin-count`, `pinterest-wordpress-post-source`, `social-content-studio` ×3).
+
+Manual check (no paid call needed beyond one normal generation): generate with a Destination URL → every Pin of `/pinterest/[id]` shows it in its detail; select 2 Pins → "Add destination URL" → both changed, the others not; "Edit destination URL" → Remove URL → "No destination URL"; export CSV with UTM → `?utm_source=pinterest&utm_medium=organic&utm_content=pin-01`, the Pin detail still shows the clean URL; from an existing published post → summary shows its permalink and the Pins get it; from a draft → amber notice, Pins without link, warning toast; the WordPress post is unchanged.
+
+Validation (2026-10-19): TypeScript OK, ESLint (touched files) OK, focused 21/21, full renderer 1229/1229, production build OK, `git diff --check` OK.
+
+---
+
+# Pinterest CSV UTM tracking (TASK-070, 2026-10-19)
+
+```txt
+npx playwright test tests/renderer/pinterest-utm.spec.ts tests/renderer/pinterest-csv.spec.ts --project=renderer --reporter=list
+```
+
+Offline (no network, no Supabase, no AI). `pinterest-utm.spec.ts` (15): exact three parameters; `pin-01` / `pin-02` / `pin-03` in CSV order and deterministic; no link → empty cell (row number still counted); option off / omitted → URL unchanged; other parameters kept with their encoding (`utm_campaign` / `utm_term` included); old OmniFlow UTM replaced, never duplicated; `#fragment` kept; non-ASCII encoded by `URL`, comma-containing link quoted in the CSV; relative / invalid / `mailto:` left as is; the Pin object is not mutated; no-link CSV identical to the previous output; UTM module and CSV builder import no AI / network / database; both export entry points pass `{ utmTracking }` with `useState(true)`; only `lib/csv/pinterest.ts` imports the UTM builder.
+
+Manual check: export a generation with a linked Pin, open the CSV — Link ends with `?utm_source=pinterest&utm_medium=organic&utm_content=pin-01`; uncheck "Add UTM tracking", export again — Link is the stored URL; reopen the Pin — its link is unchanged.
+
+Validation (2026-10-19): TypeScript OK, ESLint (touched files) OK, focused 21/21, full renderer 1208/1208, production build OK, `git diff --check` OK.
+
+---
+
 # Legal pages (TASK-069, 2026-10-18)
 
 ```bash

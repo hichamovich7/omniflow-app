@@ -96,7 +96,8 @@ export function ArticlePinResults({ pins, generationId, regenerateSource, boardN
             {pins.length} {pins.length === 1 ? 'Pin' : 'Pins'} saved
           </h2>
           <p className="text-xs text-muted-foreground">
-            Saved in your Pinterest generations. {NO_LINK_NOTICE}
+            Saved in your Pinterest generations.{' '}
+            {pins[0]?.link_url ? `Destination URL: ${pins[0].link_url}` : NO_LINK_NOTICE}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -335,7 +336,7 @@ function ArticlePinCard({
           )}
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <LinkIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
-            {NO_LINK_NOTICE}
+            {pin.link_url ? <span className="truncate">{pin.link_url}</span> : NO_LINK_NOTICE}
           </p>
         </div>
       )}

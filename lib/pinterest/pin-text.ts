@@ -9,7 +9,7 @@ import {
 import { loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
 import type { ReadDeps } from '@/lib/wordpress/post-reader';
 import type { WordPressPostSource } from '@/lib/validations/wordpress-post-source';
-import type { UpdatePinTextInput } from '@/lib/validations/pinterest';
+import type { UpdatePinLinkInput, UpdatePinTextInput } from '@/lib/validations/pinterest';
 import { SUPPORTED_LANGUAGES } from '@/types/pinterest';
 import type { SupportedLanguage } from '@/types/pinterest';
 import type { Generation, Pin } from '@/types/database';
@@ -18,6 +18,7 @@ import type { Generation, Pin } from '@/types/database';
  * Saved Pin text: manual edit and single-Pin regeneration (TASK-044 phase
  * 2). Only the text fields and the private angle metadata are ever written;
  * board, board section, link_url, image and schedule are never touched.
+ * `updatePinLink` (TASK-071) writes link_url alone.
  */
 
 type OwnedGeneration = Pick<Generation, 'id' | 'user_id' | 'project_id' | 'keyword' | 'language' | 'status'>;
@@ -70,6 +71,31 @@ export async function updatePinText(
 
   if (error || !data) {
     throw new SocialGenerationError('generation_failed', 'Failed to save the Pin. Please try again.');
+  }
+  return data as Pin;
+}
+
+/**
+ * Destination URL edit (TASK-071): ownership first, then only
+ * `pins.link_url` is written — no AI call, text / image / board untouched.
+ */
+export async function updatePinLink(
+  supabase: SupabaseClient,
+  userId: string,
+  pinId: string,
+  input: UpdatePinLinkInput
+): Promise<Pin> {
+  await loadOwnedPin(supabase, userId, pinId);
+
+  const { data, error } = await supabase
+    .from('pins')
+    .update({ link_url: input.linkUrl })
+    .eq('id', pinId)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new SocialGenerationError('generation_failed', 'Failed to save the destination URL. Please try again.');
   }
   return data as Pin;
 }

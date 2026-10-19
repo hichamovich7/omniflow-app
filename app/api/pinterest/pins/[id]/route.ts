@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { updatePinTextSchema } from '@/lib/validations/pinterest';
-import { updatePinText } from '@/lib/pinterest/pin-text';
+import { updatePinLinkSchema, updatePinTextSchema } from '@/lib/validations/pinterest';
+import { updatePinLink, updatePinText } from '@/lib/pinterest/pin-text';
 import { SocialGenerationError } from '@/lib/social/pinterest-from-article';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
@@ -9,7 +9,8 @@ import type { Pin } from '@/types/database';
 
 /**
  * Manual edit of a saved Pin's title, description and keywords (TASK-044
- * phase 2). No AI call; board, link, image and schedule are never changed.
+ * phase 2), or of its destination URL alone with `{ linkUrl }` (TASK-071).
+ * No AI call; board, image and schedule are never changed.
  */
 export async function PATCH(
   request: Request,
@@ -46,7 +47,9 @@ export async function PATCH(
     );
   }
 
-  const parsed = updatePinTextSchema.safeParse(body);
+  // `{ linkUrl }` alone edits the destination URL; anything else is a text edit.
+  const isLinkEdit = !!body && typeof body === 'object' && !Array.isArray(body) && 'linkUrl' in body;
+  const parsed = isLinkEdit ? updatePinLinkSchema.safeParse(body) : updatePinTextSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json<ApiResponse<null>>(
@@ -56,7 +59,9 @@ export async function PATCH(
   }
 
   try {
-    const pin = await updatePinText(supabase, user.id, id, parsed.data);
+    const pin = 'linkUrl' in parsed.data
+      ? await updatePinLink(supabase, user.id, id, parsed.data)
+      : await updatePinText(supabase, user.id, id, parsed.data);
     return NextResponse.json<ApiResponse<Pin>>({ data: pin, error: null });
   } catch (err) {
     if (err instanceof SocialGenerationError) {

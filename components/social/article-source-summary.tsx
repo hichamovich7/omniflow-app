@@ -5,7 +5,12 @@ import { LANGUAGE_LABELS } from '@/types/pinterest';
 import { wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import type { SupportedLanguage } from '@/types/pinterest';
 
-/** What the Pinterest form shows and pre-fills from a WordPress article (TASK-044 phase 2). No URL. */
+/**
+ * What the Pinterest form shows and pre-fills from a WordPress article
+ * (TASK-044 phase 2). The only URL is the verified permalink of an existing
+ * post (TASK-071) — shown here and used as the Pins' destination, never sent
+ * to the AI.
+ */
 export interface ArticleFormSource {
   /** OmniFlow article (wordpress_generations.id); null for an existing WordPress post. */
   articleId: string | null;
@@ -28,6 +33,8 @@ export interface ArticleFormSource {
   suggestedBoardName: string | null;
   /** Name only suggested when no real board matches — never created. */
   boardNameSuggestion: string | null;
+  /** Existing post only: its verified public permalink (null = none found). */
+  permalink?: string | null;
 }
 
 export function ArticleSourceSummary({ source }: { source: ArticleFormSource }) {
@@ -88,9 +95,25 @@ export function ArticleSourceSummary({ source }: { source: ArticleFormSource }) 
             {source.subjects.join(' · ')}
           </p>
         )}
+        {source.externalPost && (
+          source.permalink ? (
+            <p className="truncate text-xs text-muted-foreground" data-testid="article-source-permalink">
+              <span className="font-medium">Destination URL:</span>{' '}
+              <a href={source.permalink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                {source.permalink}
+              </a>{' '}
+              — used for every Pin unless you enter another one below.
+            </p>
+          ) : (
+            <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="article-source-permalink-missing">
+              No public link was found for this post (not published yet, or its link could not be verified). The
+              Pins will be saved without a destination URL unless you enter one below.
+            </p>
+          )
+        )}
         <p className="text-xs text-muted-foreground">
-          The article is only read, never modified. No destination link is added to the Pins — add your URLs
-          manually in the CSV.{' '}
+          The article is only read, never modified.{' '}
+          {source.externalPost ? '' : 'Add a destination URL below if you want one on the Pins. '}
           {source.articleId ? (
             <Link href={`/wordpress/${source.articleId}`} className="text-primary hover:underline">
               Back to article

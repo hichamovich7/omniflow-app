@@ -18,6 +18,21 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest Destination URL — TASK-071 (2026-10-19)
+
+* **Destination URL (optional)** in the Pinterest form, on every source (keyword, Research, OmniFlow article, existing WordPress post): http(s) only, clear error otherwise; saved as typed in every generated Pin's `pins.link_url`; never sent to the AI. Blank = no link, as before.
+* **Existing WordPress post**: its verified permalink (published, inside the connected site — read from the GET already made) is shown in the summary and used automatically as the Pins' destination unless another URL is typed. No permalink → Pins without link and a warning. WordPress is never written.
+* **After generation** (`/pinterest/[id]`): "Add destination URL" for the selected Pins and "Edit destination URL" (add / change / remove) in the Pin detail — through the existing `PATCH /api/pinterest/pins/[id]` with `{ linkUrl }`, ownership checked, only `link_url` written, no AI call.
+* UTM (TASK-070) unchanged: added to the CSV only, never stored. No migration, no new endpoint, prompts unchanged.
+* Tests: new `pinterest-destination-url.spec.ts` (21, offline); six older source-level specs updated from "no link" to the new rule.
+
+## Pinterest CSV: UTM tracking per Pin — TASK-070 (2026-10-19)
+
+* New option **Add UTM tracking**, checked by default, on every Pinterest CSV export (generation page, selection, board page, History menu). Each Pin link in the CSV gets `utm_source=pinterest&utm_medium=organic&utm_content=pin-01`, `pin-02`… (row order in that CSV).
+* New pure helper `lib/analytics/utm.ts`; `generatePinterestCsv(pins, { utmTracking })` (off when omitted). Earlier OmniFlow UTM replaced, other parameters and `#fragment` kept, no link → nothing added, no URL invented. The "Link" cell is now CSV-escaped like the other text columns.
+* CSV only: `pins.link_url`, the database, WordPress and other platforms unchanged. No endpoint, no migration, no AI call. Guide "Export" section updated.
+* Tests: new `pinterest-utm.spec.ts` (15, offline).
+
 ## Legal pages — TASK-069 (2026-10-18)
 
 * New public pages: **Terms of Service** (`/terms`), **Privacy Policy** (`/privacy`), **GDPR rights** (`/gdpr`), **Cookie Policy** (`/cookies`), **Data Deletion** (`/data-deletion`, the instructions URL Meta requires for the Facebook app) and **Legal Notice** (`/legal-notice`). English, written from what OmniFlow actually does (processors, Facebook permissions, cookies, retention).
