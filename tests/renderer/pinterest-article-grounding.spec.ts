@@ -313,6 +313,65 @@ test.describe('Article-grounded validation', () => {
   });
 });
 
+// Real case (Pin 10 of a 20-outfit cardigan article): the photo alt says
+// "coatigan" and the section mentions a tote — "coatigan" must count as the
+// expected cardigan, not as no project at all.
+test.describe('Coatigan is a cardigan spelling', () => {
+  function cardiganGrounding() {
+    const context = buildWordPressArticleContext({
+      sourceType: 'external_wordpress_post',
+      html: `
+<p>Twenty ways to wear a crochet cardigan, from denim to satin.</p>
+<h2>1. A tied long cardigan as the outer layer</h2>
+<figure class="wp-block-image"><img src="${SITE}/wp-content/uploads/19.jpg" alt="Long cream crochet coatigan tied at the waist over a black turtleneck and straight trousers."></figure>
+<p>A long cardigan with a tie can replace a light coat on mild days. Boots add structure, while a simple tote keeps the look practical for work or travel.</p>
+<h2>2. Puffed sleeves with evening satin</h2>
+<p>An ivory puff-sleeve cardigan paired with bronze satin wide-leg trousers.</p>`,
+      title: 'How to Style a Crochet Cardigan: 20 Outfit Formulas for Every Season',
+      language: 'en',
+      siteId: 'site-1',
+      wordpressPostId: 1943,
+      featuredImage: null,
+      categories: ['Crochet Cardigans'],
+      permalink: `${SITE}/how-to-style-crochet-cardigan-outfits/`,
+    });
+    const g = buildArticleGrounding(context, 1);
+    return { g, sectionId: g.sectionPlan[0] };
+  }
+
+  const check = (prompt: string) => {
+    const { g, sectionId } = cardiganGrounding();
+    return validateArticleGroundedPins([{ sourceSectionId: sectionId, image_prompt: prompt }], g);
+  };
+
+  test('coatigan is normalized to cardigan, never to a separate object', () => {
+    expect(extractVisualAttributes('crochet coatigan').objects).toEqual(['cardigan']);
+    expect(extractVisualAttributes('two long coatigans').objects).toEqual(['cardigan']);
+    expect(extractVisualAttributes('a cardigan and a coatigan').objects).toEqual(['cardigan']);
+  });
+
+  test('the section expects a cardigan', () => {
+    const { g, sectionId } = cardiganGrounding();
+    expect(g.briefs[sectionId].represented).toBe('A tied long cardigan as the outer layer');
+  });
+
+  test('a coatigan image satisfies a cardigan section, with or without a tote bag', () => {
+    expect(check('Long cream crochet coatigan tied at the waist over a black turtleneck and straight trousers, neutral backdrop.')).toEqual([]);
+    expect(check('Long cream crochet coatigan tied at the waist over a black turtleneck, with a simple tote bag, soft natural light.')).toEqual([]);
+  });
+
+  test('a cardigan section without any recognized cardigan is still refused', () => {
+    const issues = check('Long cream crochet layer tied at the waist over a black turtleneck, with a simple tote bag.');
+    const mismatch = issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
+    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'] });
+  });
+
+  test('other objects are unchanged', () => {
+    expect(extractVisualAttributes('a coat over a sweater').objects).toEqual(['sweater']);
+    expect(extractVisualAttributes('a tote bag next to a scarf and a vest').objects).toEqual(['scarf', 'vest', 'bag']);
+  });
+});
+
 test.describe('Context reaches the text prompt and the image prompt', () => {
   function articleSource() {
     const source = buildArticlePinterestSource(

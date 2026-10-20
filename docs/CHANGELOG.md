@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest article Pins: "coatigan" counts as a cardigan — TASK-072 (2026-10-20)
+
+* A Pin built from a cardigan section was rejected ("expected: cardigan; detected: bag") when its image prompt said "coatigan" (taken from the article photo's alt text) next to a tote. `coatigan` / `coatigans` are now spellings of `cardigan` in the object vocabulary — not a new object.
+* Other checks unchanged: a cardigan section with no recognized cardigan is still rejected; tote → bag, prompts, UTM, Destination URL, database and WordPress untouched.
+* Tests: 5 new offline cases in `pinterest-article-grounding.spec.ts`.
+
 ## Pinterest Destination URL — TASK-071 (2026-10-19)
 
 * **Destination URL (optional)** in the Pinterest form, on every source (keyword, Research, OmniFlow article, existing WordPress post): http(s) only, clear error otherwise; saved as typed in every generated Pin's `pins.link_url`; never sent to the AI. Blank = no link, as before.

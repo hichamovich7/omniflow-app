@@ -1280,6 +1280,16 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Pinterest coatigan = cardigan (TASK-072, 2026-10-20)
+
+```txt
+npx playwright test tests/renderer/pinterest-article-grounding.spec.ts --project=renderer --reporter=list
+```
+
+Offline: `coatigan(s)` → `cardigan` (never a separate object); a coatigan image prompt, with or without a tote bag, passes a cardigan section; a cardigan section without a recognized cardigan is still refused (expected cardigan, detected bag); other objects unchanged.
+
+Validation (2026-10-20): TypeScript OK, ESLint (touched files) OK, focused 34/34, Pinterest suite + niche specs 415/415, production build OK, `git diff --check` OK. No AI call.
+
 # Pinterest Destination URL (TASK-071, 2026-10-19)
 
 ```txt

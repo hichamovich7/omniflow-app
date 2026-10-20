@@ -77,7 +77,7 @@ const TEXTURES: Lexicon = [
 const OBJECTS: Lexicon = [
   ['scarf', 'scarves', 'scarfs'], ['cowl', 'cowls'], ['shawl', 'shawls'], ['wrap', 'wraps'], ['poncho', 'ponchos'], ['infinity scarf'],
   ['hat', 'hats'], ['beanie', 'beanies'], ['headband', 'headbands', 'ear warmer', 'ear warmers'], ['mittens'], ['gloves'], ['socks'], ['slippers'],
-  ['blanket', 'blankets', 'afghan', 'afghans', 'throw'], ['baby blanket'], ['sweater', 'sweaters', 'pullover', 'jumper'], ['cardigan', 'cardigans'],
+  ['blanket', 'blankets', 'afghan', 'afghans', 'throw'], ['baby blanket'], ['sweater', 'sweaters', 'pullover', 'jumper'], ['cardigan', 'cardigans', 'coatigan', 'coatigans'],
   ['tank top', 'crop top'], ['dress', 'dresses'], ['vest'], ['bag', 'bags', 'tote', 'tote bag', 'purse', 'pouch'], ['basket', 'baskets'],
   ['pillow', 'pillows', 'cushion', 'cushions'], ['amigurumi', 'stuffed toy', 'plushie'], ['coaster', 'coasters'], ['placemat', 'placemats'], ['rug', 'rugs'],
   ['garland', 'bunting'], ['ornament', 'ornaments'], ['bandana', 'kerchief'], ['bookmark'], ['dishcloth', 'washcloth', 'dish cloth'],
