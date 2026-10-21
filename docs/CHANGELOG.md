@@ -18,6 +18,21 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest article Pins: step Pins must show the project — TASK-075 (2026-10-21)
+
+* On the brioche cardigan article, Pin 2 ("2. Make and measure a textured gauge swatch") was rejected (422, "Expected: cardigan. Detected: no recognizable project."): the AI pictured a gauge swatch alone. The check was right.
+* Step sections that take the article's project now carry a "Required subject" line in their visual brief (text prompt and image prompt): the image description must explicitly mention and show the cardigan; a sample, tool or material alone is not enough.
+* No alias added; generic words (clothing, outfit, garment, fashion) still never count. Home Decor, safeguards, UTM, Destination URL and WordPress unchanged.
+* Tests: 4 new grounding cases, 1 new route case (422, nothing saved).
+
+## Pinterest generate: AI timeout answered as 504 — TASK-074 (2026-10-21)
+
+* A 7-Pin generation from an existing WordPress post failed in production with HTTP 500 after 66.6 s: the AI text call hit its 60 s timeout and the abort was reported as a generic "Generation failed".
+* A timeout now returns HTTP **504** `ai_timeout` ("The AI model took too long to answer. Nothing was saved and no credit was used…"); the generation is marked failed, no Pin is saved.
+* Article-grounded generations give the AI text call 120 s (was 60 s); the route declares `maxDuration = 180`. Keyword / Research generations unchanged.
+* Prompts, safeguards, UTM, Destination URL, database and WordPress unchanged.
+* Tests: new `pinterest-generate-errors.spec.ts` (9, offline).
+
 ## Pinterest article Pins: step sections expect the article's project — TASK-073 (2026-10-21)
 
 * Step-by-step articles ("Autumn Brioche Crochet Cardigan: Size Guide, Steps…") had their correct cardigan Pins rejected ("does not clearly represent the article section. Detected: cardigan."): step headings name no project, so the check required a word of the step heading instead.

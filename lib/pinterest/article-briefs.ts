@@ -213,6 +213,16 @@ function expectedProjectObjects(brief: PinVisualBrief): string[] {
   return main ? [main] : [];
 }
 
+function articleStepRepresented(object: string, step: string): string {
+  return `${object} of this article — step: ${step}`;
+}
+
+/** The H1 project of a step brief (project check only), else null — Home Decor and headed sections never have one. */
+function articleStepObject(brief: PinVisualBrief): string | null {
+  const main = mainArticleObject(brief.articleSubject);
+  return main && brief.represented.startsWith(articleStepRepresented(main, '')) ? main : null;
+}
+
 export function buildPinVisualBrief(
   context: WordPressArticleContext,
   section: ArticleSection,
@@ -239,7 +249,7 @@ export function buildPinVisualBrief(
   const represented = section.kind === 'intro'
     ? context.title
     : articleObject
-      ? `${articleObject} of this article — step: ${section.subject}`
+      ? articleStepRepresented(articleObject, section.subject)
       : section.subject;
 
   return {
@@ -271,10 +281,16 @@ function list(values: string[], empty = 'not specified in the article — keep i
 
 /** The brief in the fixed format shared by the text and the image prompts. */
 export function formatVisualBrief(brief: PinVisualBrief): string {
+  // A step ("Make and measure a gauge swatch") was drawn as a swatch alone:
+  // the project itself must stay in the picture.
+  const stepObject = articleStepObject(brief);
   return [
     `Article subject: ${brief.articleSubject}`,
     `Source section: ${brief.sourceSection}`,
     `Pattern or project represented: ${brief.represented}`,
+    ...(stepObject
+      ? [`Required subject: the image description must explicitly mention ${stepObject} and must show a ${stepObject} — this step may be shown on it (a detail, a work in progress), but a sample, tool or material alone is not enough`]
+      : []),
     `Materials: ${list(brief.materials)}`,
     `Colors: ${list(brief.colors)}`,
     `Techniques: ${list(brief.techniques)}`,

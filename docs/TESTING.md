@@ -1280,6 +1280,26 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Pinterest step briefs require the project (TASK-075, 2026-10-21)
+
+```txt
+npx playwright test tests/renderer/pinterest-article-grounding.spec.ts tests/renderer/pinterest-generate-errors.spec.ts --project=renderer --reporter=list
+```
+
+Offline: every brioche step brief carries "Required subject: … must explicitly mention cardigan and must show a cardigan", also in the brief appended to the image prompt; the real Pin 2 answer (gauge swatch alone) is refused, a swatch beside the crochet cardigan passes; clothing / outfit / garment / fashion piece are refused as "no recognizable project"; headed sections and Home Decor briefs get no such line; route: a step Pin showing only a swatch → 422 `IMAGE_SUBJECT_MISMATCH` (Pin 2, "Expected: cardigan…"), no Pin insert, generation `failed`.
+
+Validation (2026-10-21): TypeScript OK, ESLint (touched files) OK, grounding + Clay + Home Decor + niche + generate/strategy error specs 142/142, Pinterest + WordPress + social + niche renderer specs 992/992, production build OK, `git diff --check` OK. One controlled real AI call before the fix (7 Pins, post 1957, nothing saved): only Pin 2 refused, swatch-only image prompt.
+
+# Pinterest generate errors (TASK-074, 2026-10-21)
+
+```txt
+npx playwright test tests/renderer/pinterest-generate-errors.spec.ts --project=renderer --reporter=list
+```
+
+Offline route tests (Supabase, AI engine, rate limit, boards and the WordPress read replaced; `fetch` blocked): `AbortError` / `TimeoutError` → 504 `ai_timeout`, generation `failed`, no Pin insert; article-grounded call gets `timeoutMs` 120000, keyword call none; safeguard failure → 422, nothing saved; non-JSON answer → 422 `invalid_pin_plan`; provider 503 → unchanged 500 `generation_failed`; refused Pin insert → 500 `server_error`, generation `failed`, never `completed`; a retry after a timeout saves its Pins once on its own generation; `maxDuration = 180`. Against the previous route the 5 timeout cases fail (500), the 4 others pass.
+
+Validation (2026-10-21): TypeScript OK, ESLint (touched files) OK, focused 9/9, Pinterest + WordPress + social + niche renderer specs 987/987, production build OK, `git diff --check` OK. One controlled real AI call (7 Pins, post 1957, same prompt as the route, nothing saved): 19.9 s with the local FAST model.
+
 # Pinterest step sections expect the article project (TASK-073, 2026-10-21)
 
 ```txt

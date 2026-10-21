@@ -198,8 +198,11 @@ invalid_language
 invalid_analysis
 invalid_pin_plan
 strategy_safeguard_failed
+ai_timeout
 generation_failed
 ```
+
+`ai_timeout` (HTTP **504**, TASK-074): the text model did not answer before its timeout (the provider's `AbortError` / `TimeoutError`). Message: `The AI model took too long to answer. Nothing was saved and no credit was used. Try again, or request fewer Pins.` The generation row is marked `failed` with that message; no board, Pin or image is created. Formerly this fell into the generic 500 `generation_failed` "Generation failed. Please try again.". Article-grounded generations (OmniFlow article or existing WordPress post) give the text call 120 s instead of the provider's 60 s default; the route declares `maxDuration = 180`. `generation_failed` (HTTP 500) keeps the provider / empty-response / invalid-JSON messages; a refused Pin insert stays HTTP 500 `server_error` (one insert statement: no Pin is partially saved, the generation is marked `failed`).
 
 `invalid_pin_plan` (HTTP **422**): the planning model's response was not a complete, valid Pin plan — truncated (for example cut off by the output-token limit), not JSON, ambiguous, or valid JSON that fails the existing Zod contract. The message is `The AI could not create a complete Pin plan. No images were generated. Please try again.` The plan is parsed by `parsePinterestGenerationPlan()` (`lib/pinterest/generation-plan.ts`), which accepts a complete JSON value optionally wrapped in a Markdown code fence or plain text, and **never repairs** a truncated response. When it fails, no board is created, no pin is written and no image request is made; the generation row is marked `failed`, and only bounded diagnostics (kind, length, short preview) are logged server-side — never the full response.
 

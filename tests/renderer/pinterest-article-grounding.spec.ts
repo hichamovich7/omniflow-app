@@ -485,6 +485,40 @@ test.describe('Step sections expect the article project', () => {
     expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
   });
 
+  test('every step brief requires the cardigan, in the text prompt and the image prompt', () => {
+    const g = briocheGrounding();
+    const required = 'Required subject: the image description must explicitly mention cardigan and must show a cardigan';
+    for (const id of g.sectionPlan) expect(formatVisualBrief(g.briefs[id])).toContain(required);
+    const pin2 = g.briefs[g.sectionPlan[1]];
+    expect(pin2.sourceSection).toBe('2. Make and measure a textured gauge swatch');
+    const stored = attachArticleSourceMetadata(null, { sourceType: 'external_wordpress_post', sectionId: pin2.sectionId, brief: pin2 });
+    expect(appendArticleVisualBrief('A crochet cardigan.', stored)).toContain(required);
+  });
+
+  test('real Pin 2 answer (gauge swatch alone) is refused; the swatch on the cardigan passes', () => {
+    const g = briocheGrounding();
+    const swatchOnly = checkPin(g, 1, 'A single textured crochet gauge swatch sits front and center on a plain light gray surface, with its fabric gently bending at one edge to suggest drape while the rest lies flat.');
+    expect(swatchOnly.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
+      .toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
+    expect(checkPin(g, 1, 'A textured crochet gauge swatch laid beside the finished crochet cardigan on a plain light gray surface.')).toEqual([]);
+  });
+
+  test('generic clothing words are not a cardigan', () => {
+    const g = briocheGrounding();
+    for (const generic of ['clothing', 'outfit', 'garment', 'fashion piece']) {
+      const issues = checkPin(g, 1, `A textured crochet ${generic} shown on a hanger, with a clean neutral background.`);
+      expect(issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
+        .toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
+    }
+  });
+
+  test('headed sections and Home Decor briefs get no required-subject line', () => {
+    const scarf = grounding();
+    expect(formatVisualBrief(scarf.briefs[scarf.sectionPlan[0]])).not.toContain('Required subject:');
+    const decor = briocheGrounding('Home Decor');
+    expect(formatVisualBrief(decor.briefs[decor.sectionPlan[0]])).not.toContain('Required subject:');
+  });
+
   test('a title without a recognizable project keeps the former step-word check', () => {
     const g = buildArticleGrounding(briocheContext('Ten Autumn Crochet Ideas: Size Guide and Steps'), 7, {}, { niche: 'Crochet' });
     const brief = g.briefs[g.sectionPlan[0]];

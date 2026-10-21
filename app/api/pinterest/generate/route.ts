@@ -70,37 +70,63 @@ function clampBannerTemplate(
   return allowed[0];
 }
 
-function classifyGenerationError(err: unknown): string {
+// The route runs Vision, one text call and the inserts: give it the same
+// room as the WordPress article routes so the platform never cuts it before
+// the text call's own timeout below.
+export const maxDuration = 180;
+
+// Article-grounded prompts carry the article sections and one visual brief
+// per Pin (~33k characters for 7 Pins), so the text call gets more than the
+// provider's 60s default. Keyword / Research generations keep the default.
+const ARTICLE_GROUNDED_TEXT_TIMEOUT_MS = 120_000;
+
+/** The provider's fetch was aborted by its timeout (AbortController / AbortSignal.timeout). */
+function isTimeoutError(err: unknown): boolean {
+  const name = typeof err === 'object' && err !== null ? (err as { name?: unknown }).name : undefined;
+  return name === 'AbortError' || name === 'TimeoutError';
+}
+
+function classifyGenerationError(err: unknown): { status: number; code: string; message: string } {
+  const failed = (message: string) => ({ status: 500, code: 'generation_failed', message });
+
+  if (isTimeoutError(err)) {
+    return {
+      status: 504,
+      code: 'ai_timeout',
+      message: 'The AI model took too long to answer. Nothing was saved and no credit was used. Try again, or request fewer Pins.',
+    };
+  }
+
   const message = err instanceof Error ? err.message : String(err);
 
   if (message === 'OpenRouter returned empty response') {
-    return "The AI model didn't return any content — it likely ran out of response tokens before finishing. Try again, or request fewer pins.";
+    return failed("The AI model didn't return any content — it likely ran out of response tokens before finishing. Try again, or request fewer pins.");
   }
 
   if (message.startsWith('OpenRouter stream error')) {
-    return 'The AI provider connection was interrupted mid-response. Please try again.';
+    return failed('The AI provider connection was interrupted mid-response. Please try again.');
   }
 
   const httpMatch = message.match(/^OpenRouter error: (\d+)$/);
   if (httpMatch) {
     const status = Number(httpMatch[1]);
     if (status === 401 || status === 403) {
-      return 'AI provider rejected the request (authentication error). Please contact support.';
+      return failed('AI provider rejected the request (authentication error). Please contact support.');
     }
     if (status === 429) {
-      return 'AI provider rate limit reached. Try again in a moment.';
+      return failed('AI provider rate limit reached. Try again in a moment.');
     }
     if (status >= 500) {
-      return 'AI provider is temporarily unavailable. Try again shortly.';
+      return failed('AI provider is temporarily unavailable. Try again shortly.');
     }
-    return `AI provider request failed (HTTP ${status}). Try again.`;
+    return failed(`AI provider request failed (HTTP ${status}). Try again.`);
   }
 
   if (err instanceof SyntaxError) {
-    return "The AI returned a response that wasn't valid JSON. Try again.";
+    return failed("The AI returned a response that wasn't valid JSON. Try again.");
   }
 
-  return 'Generation failed. Please try again.';
+  return failed('Generation failed. Please try again.');
 }
 
 export async function POST(request: Request) {
@@ -363,6 +389,7 @@ export async function POST(request: Request) {
         integratedText: generationMode === 'ai-integrated',
         articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
       }),
+      ...(articleGrounding?.sectionPlan.length ? { timeoutMs: ARTICLE_GROUNDED_TEXT_TIMEOUT_MS } : {}),
     });
 
     // The plan must be complete and valid before anything else happens: no
@@ -589,12 +616,14 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (err) {
-    console.error('Generation failed:', err);
-    const errorMessage = classifyGenerationError(err);
-    await supabase.from('generations').update({ status: 'failed', error_message: errorMessage }).eq('id', generation.id);
+    const failure = classifyGenerationError(err);
+    // Error name and code only on a timeout — the abort carries no useful stack.
+    if (failure.code === 'ai_timeout') console.error(`[${PROMPT_ID}] Generation failed: AI text call timed out (${(err as Error).name})`);
+    else console.error('Generation failed:', err);
+    await supabase.from('generations').update({ status: 'failed', error_message: failure.message }).eq('id', generation.id);
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message: errorMessage, code: 'generation_failed' } },
-      { status: 500 }
+      { data: null, error: { message: failure.message, code: failure.code } },
+      { status: failure.status }
     );
   }
 }
