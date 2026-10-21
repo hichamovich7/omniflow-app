@@ -11,6 +11,7 @@ import {
   type AttributeCategory,
   type VisualAttributes,
   type WordPressArticleContext,
+  VISUAL_LEXICON,
 } from '@/lib/wordpress/article-context';
 import type { PinterestStrategyIssue, PinterestSubjectReport } from '@/lib/pinterest/strategy';
 import { checkHomeDecorSubject, describeHomeAnchors, findHomeAnchors, findUngroundedHomeTerms } from '@/lib/pinterest/home-decor-anchors';
@@ -183,11 +184,41 @@ function forbiddenFor(evidence: string): string[] {
   return uniq([...absentInventions, ...absentProjects.slice(0, 12)]);
 }
 
+/**
+ * The article's main project (H1 "Autumn Brioche Crochet Cardigan: Size
+ * Guide…" → `cardigan`): the object named first in the title, so an
+ * accessory named later ("…with a tote bag") never replaces it.
+ */
+export function mainArticleObject(title: string): string | null {
+  const normalized = normalizeForMatch(title);
+  let best: { term: string; position: number } | null = null;
+  for (const spellings of VISUAL_LEXICON.objects) {
+    for (const spelling of spellings) {
+      const position = normalized.indexOf(normalizeForMatch(spelling));
+      if (position >= 0 && (!best || position < best.position)) best = { term: spellings[0], position };
+    }
+  }
+  return best?.term ?? null;
+}
+
+/**
+ * Project nouns the image prompt must show: the section's own (heading),
+ * else — a step section such as "1. Measure yourself and select a size" —
+ * the article's main project. Empty when neither names one.
+ */
+function expectedProjectObjects(brief: PinVisualBrief): string[] {
+  const fromSection = findTerms(`${brief.represented}\n${brief.sourceSection}`, 'objects');
+  if (fromSection.length > 0) return fromSection;
+  const main = mainArticleObject(brief.articleSubject);
+  return main ? [main] : [];
+}
+
 export function buildPinVisualBrief(
   context: WordPressArticleContext,
   section: ArticleSection,
   descriptions: SectionImageDescription[] = [],
-  evidence = buildArticleEvidence(context)
+  evidence = buildArticleEvidence(context),
+  options: { subjectCheck?: ArticleSubjectCheck } = {}
 ): PinVisualBrief {
   const described = descriptions.map((item) => cleanArticleText(item.text)).filter(Boolean);
   const attributes: VisualAttributes = mergeVisualAttributes(section.attributes, ...described.map(extractVisualAttributes));
@@ -199,7 +230,17 @@ export function buildPinVisualBrief(
   const visualDetails = uniq([...described, ...descriptive, ...(descriptive.length ? [] : sentences.slice(0, 2))])
     .slice(0, MAX_DETAILS_PER_BRIEF)
     .map((detail) => clip(detail));
-  const represented = section.kind === 'intro' ? context.title : section.subject;
+  // Project check only (never Home Decor): a step heading without a project
+  // noun is shown as a step of the article's main project.
+  const articleObject =
+    (options.subjectCheck ?? 'project') === 'project' && section.kind !== 'intro' && findTerms(`${section.subject}\n${section.heading}`, 'objects').length === 0
+      ? mainArticleObject(context.title)
+      : null;
+  const represented = section.kind === 'intro'
+    ? context.title
+    : articleObject
+      ? `${articleObject} of this article — step: ${section.subject}`
+      : section.subject;
 
   return {
     sectionId: section.id,
@@ -258,12 +299,13 @@ export function buildArticleGrounding(
 ): ArticleGrounding {
   const sectionPlan = planArticlePinSections(context, pinsRequested);
   const evidence = buildArticleEvidence(context, imageDescriptions);
+  const subjectCheck = subjectCheckForNiche(options.niche);
   const briefs: Record<string, PinVisualBrief> = {};
   const sectionTexts: Record<string, string> = {};
   for (const sectionId of new Set(sectionPlan)) {
     const section = findSection(context, sectionId);
     if (!section) continue;
-    briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence);
+    briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence, { subjectCheck });
     sectionTexts[sectionId] = [
       section.kind === 'intro' ? context.title : section.heading,
       section.text,
@@ -279,7 +321,7 @@ export function buildArticleGrounding(
     briefs,
     evidence,
     enforceVocabulary: context.language === 'en',
-    subjectCheck: subjectCheckForNiche(options.niche),
+    subjectCheck,
     language: context.language,
     sectionTexts,
   };
@@ -335,7 +377,7 @@ export function findUngroundedVisualTerms(imagePrompt: string, evidence: string)
 
 function mentionsSubject(imagePrompt: string, brief: PinVisualBrief): boolean {
   const prompt = normalizeForMatch(imagePrompt);
-  const objects = findTerms(`${brief.represented}\n${brief.sourceSection}`, 'objects');
+  const objects = expectedProjectObjects(brief);
   if (objects.length > 0) return objects.some((object) => findTerms(imagePrompt, 'objects').includes(object));
   return normalizeForMatch(brief.represented)
     .trim()
@@ -346,7 +388,7 @@ function mentionsSubject(imagePrompt: string, brief: PinVisualBrief): boolean {
 
 /** Fixed-vocabulary report for the project check (Crochet, Clay…): the section's project nouns. */
 function projectSubjectReport(imagePrompt: string, brief: PinVisualBrief): PinterestSubjectReport {
-  const expected = findTerms(`${brief.represented}\n${brief.sourceSection}`, 'objects');
+  const expected = expectedProjectObjects(brief);
   const detected = findTerms(imagePrompt, 'objects');
   return {
     expected,

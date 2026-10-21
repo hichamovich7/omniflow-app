@@ -18,10 +18,13 @@ import {
   findUngroundedVisualTerms,
   formatVisualBrief,
   isDescriptiveImageText,
+  mainArticleObject,
   planArticlePinSections,
   readArticleSourceMetadata,
+  subjectCheckForNiche,
   validateArticleGroundedPins,
 } from '@/lib/pinterest/article-briefs';
+import { buildStrategySafeguardError } from '@/lib/pinterest/strategy-errors';
 import {
   ARTICLE_IMAGE_VISION_INSTRUCTIONS,
   describeSectionImages,
@@ -369,6 +372,122 @@ test.describe('Coatigan is a cardigan spelling', () => {
   test('other objects are unchanged', () => {
     expect(extractVisualAttributes('a coat over a sweater').objects).toEqual(['sweater']);
     expect(extractVisualAttributes('a tote bag next to a scarf and a vest').objects).toEqual(['scarf', 'vest', 'bag']);
+  });
+});
+
+// Real case: "Autumn Brioche Crochet Cardigan: Size Guide, Steps & 6 Color
+// Ideas" (same heading structure). Its H3 steps name no project, so the
+// check fell back to the step words and refused a correct cardigan image
+// with "expected: []; detected: cardigan". A step now expects the H1's project.
+const BRIOCHE_STEPS = [
+  ['Measure yourself and select a size', 'Measure around the fullest part of your bust while wearing a light layer. Compare that number with the size chart, then compare the finished bust measurement with a cardigan you already like.'],
+  ['Make and measure a textured gauge swatch', 'Work a swatch in the main stitch pattern and measure it after blocking.'],
+  ['Prepare yarn and mark your size information', 'Wind the yarn and note your size numbers before starting.'],
+  ['Work the body sideways', 'The body is worked sideways in rows.'],
+  ['Follow the front and armhole shaping exactly', 'Follow each shaping row for your size.'],
+  ['Finish the body and check its dimensions', 'Lay the body flat and measure it.'],
+  ['Crochet two sleeves', 'Each sleeve starts with a chain that depends on the size.'],
+  ['Seam the garment in a controlled order', 'Join the shoulders first, then set in the sleeves.'],
+  ['Add the ribbed front and neckline band', 'Work a ribbed band along the fronts and neckline.'],
+  ['Weave in, shape, and try it on', 'Weave in the ends, block lightly and try it on.'],
+] as const;
+
+function briocheContext(title = 'Autumn Brioche Crochet Cardigan: Size Guide, Steps & 6 Color Ideas'): WordPressArticleContext {
+  const steps = BRIOCHE_STEPS.map(([heading, text], index) => `<h3>${index + 1}. ${heading}</h3>\n<p>${text}</p>`).join('\n');
+  const colors = ['Burnt sienna: the classic autumn choice', 'Oatmeal cream: a versatile neutral', 'Forest green: rich and understated']
+    .map((heading) => `<h3>${heading}</h3>\n<p>A warm shade that shows the stitch texture well on this cardigan.</p>`)
+    .join('\n');
+  return buildWordPressArticleContext({
+    sourceType: 'external_wordpress_post',
+    html: `
+<p>This autumn crochet cardigan uses a textured stitch and a sideways body.</p>
+<h2>What to Expect from This Crochet Cardigan</h2><p>A relaxed fit with a ribbed band.</p>
+<h2>Materials and Pattern Details</h2><p>Worsted weight yarn and a 5 mm hook.</p>
+<h2>Gauge, Sizing, and Finished Measurements</h2><p>Eight sizes with ease included.</p>
+<h2>Step-by-Step Construction Roadmap</h2>
+${steps}
+<h2>Six Color Ideas for the Same Cardigan</h2>
+${colors}
+<h2>Frequently Asked Questions</h2>
+<h3>Can I use a different yarn?</h3><p>Yes, if you match the gauge.</p>`,
+    title,
+    language: 'en',
+    siteId: 'site-1',
+    wordpressPostId: 1957,
+    featuredImage: null,
+    categories: ['Crochet Cardigans'],
+    permalink: `${SITE}/autumn-brioche-cardigan-guide/`,
+  });
+}
+
+test.describe('Step sections expect the article project', () => {
+  const briocheGrounding = (niche: string | null = 'Crochet') => buildArticleGrounding(briocheContext(), 7, {}, { niche });
+  const checkPin = (g: ReturnType<typeof briocheGrounding>, index: number, prompt: string) =>
+    validateArticleGroundedPins([{ sourceSectionId: g.sectionPlan[index], image_prompt: prompt }], { ...g, sectionPlan: [g.sectionPlan[index]] });
+
+  test('the main project is the object named first in the H1', () => {
+    expect(mainArticleObject('Autumn Brioche Crochet Cardigan: Size Guide, Steps & 6 Color Ideas')).toBe('cardigan');
+    expect(mainArticleObject('Cozy Chunky Sweater Pattern: Steps and Sizes')).toBe('sweater');
+    expect(mainArticleObject('Easy Ribbed Scarf: Step by Step')).toBe('scarf');
+    expect(mainArticleObject('How to Style a Crochet Cardigan with a Tote Bag')).toBe('cardigan');
+    expect(mainArticleObject('Ten Autumn Crochet Ideas')).toBeNull();
+  });
+
+  test('7 Pins: seven step sections, each expecting a cardigan in its brief', () => {
+    const g = briocheGrounding();
+    expect(g.subjectCheck).toBe('project');
+    expect(g.sectionPlan.map((id) => g.briefs[id].sourceSection)).toEqual(
+      [1, 2, 3, 5, 6, 8, 9].map((step) => `${step}. ${BRIOCHE_STEPS[step - 1][0]}`)
+    );
+    for (const id of g.sectionPlan) {
+      expect(g.briefs[id].represented).toContain('cardigan');
+      expect(formatVisualBrief(g.briefs[id])).toContain('Pattern or project represented: cardigan of this article — step:');
+    }
+    expect(g.briefs[g.sectionPlan[0]].represented).toBe('cardigan of this article — step: Measure yourself and select a size');
+  });
+
+  test('a crochet cardigan passes on every step, with or without a tote bag', () => {
+    const g = briocheGrounding();
+    g.sectionPlan.forEach((_, index) => {
+      expect(checkPin(g, index, 'A cozy brioche crochet cardigan folded on a wooden table, soft autumn light.')).toEqual([]);
+    });
+    // The subject check accepts the cardigan; the bag is still flagged by the
+    // separate ungrounded-elements check, since this article never mentions one.
+    const withTote = checkPin(g, 0, 'A crochet cardigan on a hanger next to a simple tote bag, neutral backdrop.');
+    expect(withTote.map((issue) => issue.reason)).toEqual(['UNGROUNDED_IMAGE_ELEMENTS']);
+    expect(withTote[0].details).toEqual(['bag']);
+  });
+
+  test('a bag alone is refused and the message says Expected: cardigan', () => {
+    const g = briocheGrounding();
+    const issues = checkPin(g, 0, 'A woven tote bag with a leather belt on a wooden table.');
+    const mismatch = issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
+    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'] });
+    const shown = buildStrategySafeguardError(issues).issues.map((issue) => issue.message).join(' ');
+    expect(shown).toContain('Pin 1 does not clearly represent the article section. Expected: cardigan. Detected: bag. Missing: cardigan.');
+  });
+
+  test('an image without the project is still refused', () => {
+    const g = briocheGrounding();
+    const mismatch = checkPin(g, 0, 'A tape measure and a size chart on a wooden table.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
+    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
+  });
+
+  test('a title without a recognizable project keeps the former step-word check', () => {
+    const g = buildArticleGrounding(briocheContext('Ten Autumn Crochet Ideas: Size Guide and Steps'), 7, {}, { niche: 'Crochet' });
+    const brief = g.briefs[g.sectionPlan[0]];
+    expect(brief.represented).toBe('Measure yourself and select a size');
+    const check = (prompt: string) => validateArticleGroundedPins([{ sourceSectionId: g.sectionPlan[0], image_prompt: prompt }], { ...g, sectionPlan: [g.sectionPlan[0]] });
+    expect(check('Hands measure a crochet cardigan before choosing a size.')).toEqual([]);
+    const mismatch = check('A crochet cardigan folded on a table.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
+    expect(mismatch?.subject).toEqual({ expected: [], detected: ['cardigan'], missing: [] });
+  });
+
+  test('Home Decor briefs never take the article project fallback; Clay uses the project rule', () => {
+    const decor = briocheGrounding('Home Decor');
+    expect(decor.subjectCheck).toBe('home-decor');
+    expect(decor.briefs[decor.sectionPlan[0]].represented).toBe('Measure yourself and select a size');
+    expect(subjectCheckForNiche('Clay Crafts')).toBe('project');
   });
 });
 

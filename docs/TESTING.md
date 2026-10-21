@@ -1280,6 +1280,16 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Pinterest step sections expect the article project (TASK-073, 2026-10-21)
+
+```txt
+npx playwright test tests/renderer/pinterest-article-grounding.spec.ts --project=renderer --reporter=list
+```
+
+Offline, on the heading structure of the real brioche cardigan article: the H1's first object is the main project (cardigan / sweater / scarf; a later "tote bag" never wins; none → null); 7 Pins → steps 1, 2, 3, 5, 6, 8, 9, each brief "cardigan of this article — step: …"; a crochet cardigan passes every step; a bag alone is refused with "Expected: cardigan. Detected: bag. Missing: cardigan."; an image without the project is still refused; a cardigan with a tote the article never mentions passes the subject check but is still flagged as an invented element; a title without a project keeps the former step-word check; Home Decor briefs unchanged, Clay keeps the project rule.
+
+Validation (2026-10-21): TypeScript OK, ESLint (touched files) OK, focused 41/41, Pinterest + WordPress + social + niche renderer specs 973/973, production build OK, `git diff --check` OK. Real article re-checked offline (public GET only): 7 sections expect `cardigan`. No AI call.
+
 # Pinterest coatigan = cardigan (TASK-072, 2026-10-20)
 
 ```txt

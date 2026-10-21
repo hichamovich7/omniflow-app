@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest article Pins: step sections expect the article's project — TASK-073 (2026-10-21)
+
+* Step-by-step articles ("Autumn Brioche Crochet Cardigan: Size Guide, Steps…") had their correct cardigan Pins rejected ("does not clearly represent the article section. Detected: cardigan."): step headings name no project, so the check required a word of the step heading instead.
+* When a section heading names no project, the check now expects the project named first in the article title (cardigan, sweater, scarf…) — in the subject check, the error message ("Expected: cardigan") and the visual brief ("cardigan of this article — step: …"). An accessory never replaces it.
+* Home Decor unchanged; titles without a recognizable project keep the former rule; the invented-element check is unchanged. No prompt, UTM, Destination URL, database or WordPress change.
+* Tests: 7 new offline cases in `pinterest-article-grounding.spec.ts`.
+
 ## Pinterest article Pins: "coatigan" counts as a cardigan — TASK-072 (2026-10-20)
 
 * A Pin built from a cardigan section was rejected ("expected: cardigan; detected: bag") when its image prompt said "coatigan" (taken from the article photo's alt text) next to a tote. `coatigan` / `coatigans` are now spellings of `cardigan` in the object vocabulary — not a new object.
