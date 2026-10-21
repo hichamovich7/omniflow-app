@@ -446,21 +446,33 @@ test.describe('Step sections expect the article project', () => {
     expect(g.briefs[g.sectionPlan[0]].represented).toBe('cardigan of this article — step: Measure yourself and select a size');
   });
 
-  test('a crochet cardigan passes on every step, with or without a tote bag', () => {
+  test('a crochet cardigan passes on every step', () => {
     const g = briocheGrounding();
     g.sectionPlan.forEach((_, index) => {
-      expect(checkPin(g, index, 'A cozy brioche crochet cardigan folded on a wooden table, soft autumn light.')).toEqual([]);
+      expect(checkPin(g, index, 'A crochet cardigan shown on a hanger, with a clean neutral background.')).toEqual([]);
     });
-    // The subject check accepts the cardigan; the bag is still flagged by the
-    // separate ungrounded-elements check, since this article never mentions one.
-    const withTote = checkPin(g, 0, 'A crochet cardigan on a hanger next to a simple tote bag, neutral backdrop.');
+  });
+
+  test('a color the article names passes; a color it never names is still refused', () => {
+    const g = briocheGrounding();
+    // "Forest green" is one of the article's six color ideas.
+    expect(checkPin(g, 0, 'A forest green crochet cardigan shown on a hanger, with a clean neutral background.')).toEqual([]);
+    const invented = checkPin(g, 0, 'A purple crochet cardigan shown on a hanger, with a clean neutral background.');
+    expect(invented.map((issue) => issue.reason)).toEqual(['UNGROUNDED_IMAGE_ELEMENTS']);
+    expect(invented[0].details).toEqual(['purple']);
+  });
+
+  test('the article never mentions a tote: a cardigan with a tote bag passes the subject check but the bag is refused', () => {
+    const g = briocheGrounding();
+    const withTote = checkPin(g, 0, 'A crochet cardigan on a hanger next to a simple tote bag, with a clean neutral background.');
     expect(withTote.map((issue) => issue.reason)).toEqual(['UNGROUNDED_IMAGE_ELEMENTS']);
     expect(withTote[0].details).toEqual(['bag']);
   });
 
   test('a bag alone is refused and the message says Expected: cardigan', () => {
     const g = briocheGrounding();
-    const issues = checkPin(g, 0, 'A woven tote bag with a leather belt on a wooden table.');
+    const issues = checkPin(g, 0, 'A simple tote bag on a wooden table.');
+    expect(issues.map((issue) => issue.reason)).toEqual(['IMAGE_SUBJECT_MISMATCH', 'UNGROUNDED_IMAGE_ELEMENTS']);
     const mismatch = issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
     expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'] });
     const shown = buildStrategySafeguardError(issues).issues.map((issue) => issue.message).join(' ');
@@ -483,11 +495,57 @@ test.describe('Step sections expect the article project', () => {
     expect(mismatch?.subject).toEqual({ expected: [], detected: ['cardigan'], missing: [] });
   });
 
-  test('Home Decor briefs never take the article project fallback; Clay uses the project rule', () => {
+  test('Home Decor briefs never take the article project fallback', () => {
     const decor = briocheGrounding('Home Decor');
     expect(decor.subjectCheck).toBe('home-decor');
     expect(decor.briefs[decor.sectionPlan[0]].represented).toBe('Measure yourself and select a size');
-    expect(subjectCheckForNiche('Clay Crafts')).toBe('project');
+  });
+});
+
+// Clay shares the project check: headed sections are unchanged, and a step
+// section without a project noun expects the H1's project, like Crochet.
+test.describe('Clay articles under the project check', () => {
+  const CLAY = 'Clay Crafts & DIY';
+  function clayGrounding(title: string, headings: string[]) {
+    const html = [
+      '<p>An air dry clay project for a calm afternoon.</p>',
+      ...headings.map((heading, index) => `<h2>${index + 1}. ${heading}</h2>\n<p>Work on a smooth board with air dry clay and let it rest between steps.</p>`),
+    ].join('\n');
+    const context = buildWordPressArticleContext({
+      sourceType: 'external_wordpress_post',
+      html,
+      title,
+      language: 'en',
+      siteId: 'site-1',
+      wordpressPostId: 77,
+      featuredImage: null,
+      categories: ['Clay'],
+      permalink: `${SITE}/clay/`,
+    });
+    const g = buildArticleGrounding(context, headings.length, {}, { niche: CLAY });
+    const check = (index: number, prompt: string) =>
+      validateArticleGroundedPins([{ sourceSectionId: g.sectionPlan[index], image_prompt: prompt }], { ...g, sectionPlan: [g.sectionPlan[index]] });
+    return { g, check };
+  }
+
+  test('Clay keeps the project check', () => {
+    expect(subjectCheckForNiche(CLAY)).toBe('project');
+  });
+
+  test('sections that name their own project are unchanged', () => {
+    const { g, check } = clayGrounding('7 Air Dry Clay Ideas for Beginners', ['Air dry clay trinket dish', 'Air dry clay vase', 'Air dry clay coaster']);
+    expect(g.sectionPlan.map((id) => g.briefs[id].represented)).toEqual(['Air dry clay trinket dish', 'Air dry clay vase', 'Air dry clay coaster']);
+    expect(check(0, 'An air dry clay trinket dish on a smooth board.')).toEqual([]);
+    expect(check(1, 'An air dry clay trinket dish on a smooth board.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
+      .toEqual({ expected: ['vase'], detected: ['trinket dish'], missing: ['vase'] });
+  });
+
+  test('step sections expect the H1 project', () => {
+    const { g, check } = clayGrounding('Air Dry Clay Vase: Steps and Drying Tips', ['Condition the clay', 'Shape the walls', 'Smooth and dry the surface']);
+    expect(g.briefs[g.sectionPlan[0]].represented).toBe('vase of this article — step: Condition the clay');
+    expect(check(0, 'An air dry clay vase on a smooth board.')).toEqual([]);
+    expect(check(1, 'An air dry clay trinket dish on a smooth board.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
+      .toEqual({ expected: ['vase'], detected: ['trinket dish'], missing: ['vase'] });
   });
 });
 
