@@ -1280,6 +1280,31 @@ Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/
 
 ---
 
+# Pinterest Regenerate text (TASK-076, 2026-10-24)
+
+```txt
+npx playwright test tests/renderer/pinterest-regenerate-text.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/pinterest-regenerate-text.spec.ts` (19) — AI text call stubbed, Supabase in-memory fake recording every write, WordPress a fake `fetch`: keyword Pin → one AI call, one `pins` update with only title / description / keywords; image, `image_prompt`, `image_analysis`, link, board, section, date and the other Pin kept; niche Content Stream, Brand Profile, angle and sibling titles in the prompt, no link; OmniFlow article Pin → H1, article text and the stored section (`<pin_plan>`) in the prompt; existing WordPress post Pin → post re-read with GET only, its content in the prompt; AI URLs stripped from all three fields; refused with nothing written: other angle, invented number (an article number passes), color / material / project absent from the article (`UNGROUNDED_TEXT_ELEMENTS` on description / keywords / title), Home Decor furniture absent from the article, another source section, title too close to another Pin, prompt scaffolding echoed, provider error, invalid JSON; ownership 404 / 403 (Pin, project), deleted article → 409 `source_unavailable`, article of another project → `project_mismatch`; route source: 401, UUID, checks before the shared `pinterest/regenerate-pin` rate limit, no image / Vision / storage module, no UTM; UI source: button route, loading, ref double-click guard, error toast, placement after "Regenerate image" on the grid, in the Pin dialog and on article result cards, history → `/pinterest/[id]` → grid.
+
+Validation (2026-10-24): TypeScript OK, ESLint (touched files) OK, focused 19/19, Pinterest + WordPress-to-Pinterest + safeguard specs 260/261, full renderer **1278/1279**, production build OK, `git diff --check` OK. The one failure (`social-content-studio.spec.ts` "actions: copies, edit…") is pre-existing and unrelated: it fails identically without this change — the working copy is checked out with CRLF line endings and the test looks for a `\n`-joined snippet.
+
+**Manual check (founder, costs one text generation per click):** on `/pinterest/<id>` (keyword Pins) and on an article result page, click "Regenerate text" on a Pin with an image → new title / description / keywords, same image, link, board, section and date; double-click → one request; with a safeguard failure the toast explains it and the Pin is unchanged.
+
+## TASK-076 follow-up — button not visible (2026-10-24)
+
+Reported: no "Regenerate text" on `/pinterest/eb71c988-…`. Cause (code, not cache): on the grid the button was only the icon-only copy inside the image overlay — rendered only for Pins **with an image**, without visible text (accessible name only) and at `opacity-0` on desktop (`lg`) until hover. The dev server was `next dev` started at 17:01, after the TASK-076 files were written (Next 16 dev uses `.next/dev`, separate from `next build`), so no stale cache. Fix: a labeled "Regenerate text" button in the body of every card (overlay icon kept after "Regenerate image").
+
+```txt
+npx playwright test tests/renderer/pinterest-regenerate-text-ui.spec.ts --project=renderer --reporter=list
+set PLAYWRIGHT_STORAGE_STATE=path	outhenticated-state.json
+set PLAYWRIGHT_PIN_GENERATION_URL=/pinterest/{generation-id}
+npx playwright test tests/playwright/pinterest-regenerate-text.spec.ts --project=chromium
+```
+
+`pinterest-regenerate-text-ui.spec.ts` (4, offline): the real `PinTable` is server-rendered with React (router + selection providers only; the test redirects Playwright's component-testing JSX runtime to React's) and loaded in Chromium — every card (keyword Pin with image, Pin without image / link / angle, article AI Integrated scheduled Pin) shows a visible, enabled "Regenerate text" button at 1440 px and 390 px; the overlay icon follows "Regenerate image". Without the fix, 2 of the 4 fail. Gated `tests/playwright/pinterest-regenerate-text.spec.ts` (skipped without a session): on the real page, grid button visible with its text → click → one `POST /api/pinterest/pins/<id>/regenerate-text` (intercepted, answered 422 by the test — no AI call, nothing written) and its error toast; the Pin dialog shows the same button and sends a second POST.
+
 # Pinterest step briefs require the project (TASK-075, 2026-10-21)
 
 ```txt

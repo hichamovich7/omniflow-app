@@ -10,6 +10,7 @@ import { ImageVersionsDialog } from './image-versions-dialog';
 import { RecomposePinDialog } from './recompose-pin-dialog';
 import { PinDetailDialog } from './pin-detail-dialog';
 import { PinBatchReviewDialog } from './pin-batch-review-dialog';
+import { RegenerateTextButton } from './regenerate-text-button';
 import { PinDiagnosticBadges, formatCreativeLabel } from './pin-diagnostic-badges';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -269,6 +270,13 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                       >
                         <RefreshCw data-icon="inline-start" />
                       </Button>
+                      <RegenerateTextButton
+                        pin={pin}
+                        iconOnly
+                        size="sm"
+                        className="shadow-sm"
+                        disabled={isRegenerating}
+                      />
                       {versionCount > 1 && (
                         <Button
                           type="button"
@@ -324,6 +332,11 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                 </p>
 
                 <PinDiagnosticBadges pin={pin} />
+
+                {/* Always visible, labeled, with or without an image (the overlay copy is hover-only on desktop). */}
+                <div className="flex justify-end">
+                  <RegenerateTextButton pin={pin} disabled={isRegenerating} />
+                </div>
 
                 <div className="flex items-center justify-between gap-2 pt-0.5">
                   <Badge variant="outline" className="min-w-0 justify-start">

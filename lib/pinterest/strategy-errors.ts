@@ -48,6 +48,7 @@ const RETRYABLE: Record<PinterestSafeguardReason, boolean> = {
   DUPLICATE_SOURCE_SECTION: true,
   IMAGE_SUBJECT_MISMATCH: true,
   UNGROUNDED_IMAGE_ELEMENTS: true,
+  UNGROUNDED_TEXT_ELEMENTS: true,
 };
 
 const FALLBACK_REASON: Record<PinterestStrategyIssueCode, PinterestSafeguardReason> = {
@@ -61,6 +62,7 @@ const FIELD_LABEL: Record<PinterestSafeguardField, string> = {
   angle: 'angle',
   title: 'title',
   description: 'description',
+  keywords: 'keywords',
   image_prompt: 'image description',
   sourceSectionId: 'article section',
 };
@@ -153,6 +155,13 @@ function describe(issue: PinterestStrategyIssue, scope: StrategySafeguardScope):
       return {
         message:
           `${pin}'s image adds elements the article never mentions` +
+          (details.length ? `: ${details.join(', ')}.` : '.'),
+        action: 'Try again.',
+      };
+    case 'UNGROUNDED_TEXT_ELEMENTS':
+      return {
+        message:
+          `${pin}'s ${field} names elements the article never mentions` +
           (details.length ? `: ${details.join(', ')}.` : '.'),
         action: 'Try again.',
       };

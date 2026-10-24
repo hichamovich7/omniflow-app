@@ -110,6 +110,7 @@ export type SocialGenerationErrorCode =
   | 'forbidden'
   | 'article_not_completed'
   | 'project_mismatch'
+  | 'source_unavailable'
   | 'invalid_pin_plan'
   | typeof STRATEGY_SAFEGUARD_ERROR_CODE
   | 'generation_failed';
@@ -119,6 +120,7 @@ const ERROR_STATUS: Record<SocialGenerationErrorCode, number> = {
   forbidden: 403,
   article_not_completed: 409,
   project_mismatch: 400,
+  source_unavailable: 409,
   invalid_pin_plan: 422,
   [STRATEGY_SAFEGUARD_ERROR_CODE]: 422,
   generation_failed: 500,

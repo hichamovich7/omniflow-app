@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Copy, FileText, Sparkles } from 'lucide-react';
@@ -16,6 +17,7 @@ import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 import { getPinGenerationModeLabel } from './pin-diagnostic-badges';
 import { PinDestinationUrlEditor } from './destination-url-dialog';
+import { RegenerateTextButton } from './regenerate-text-button';
 
 interface PinDetailDialogProps {
   pin: Pin;
@@ -25,7 +27,9 @@ interface PinDetailDialogProps {
 }
 
 export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDetailDialogProps) {
-  const keywords = pin.keywords
+  // Text only: "Regenerate text" replaces title / description / keywords in place.
+  const [text, setText] = useState({ title: pin.title, description: pin.description, keywords: pin.keywords });
+  const keywords = text.keywords
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean);
@@ -68,9 +72,18 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
           )}
 
           <div className="space-y-1.5">
-            <h3 className="text-sm font-semibold leading-snug">{pin.title}</h3>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-sm font-semibold leading-snug">{text.title}</h3>
+              <RegenerateTextButton
+                pin={{ id: pin.id, title: text.title }}
+                className="shrink-0"
+                onRegenerated={(saved) =>
+                  setText({ title: saved.title, description: saved.description, keywords: saved.keywords })
+                }
+              />
+            </div>
             <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
-              {pin.description}
+              {text.description}
             </p>
           </div>
 

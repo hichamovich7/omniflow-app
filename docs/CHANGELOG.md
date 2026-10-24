@@ -18,6 +18,15 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest: "Regenerate text" for saved Pins — TASK-076 (2026-10-24)
+
+* New "Regenerate text" action next to "Regenerate image" on the Pin grid of `/pinterest/[id]` (opened from History), in the Pin Details dialog and on the article result cards: new title, description and keywords for one Pin — loading state, double clicks ignored, clear error toast ("the Pin was not changed").
+* New `POST /api/pinterest/pins/[id]/regenerate-text`: session, Pin / generation / project ownership, source resolved server-side (keyword, OmniFlow article, existing WordPress post re-read with GET), same `pinterest/regenerate-pin` hourly budget and trial cap, same prompt and angle with niche, Content Stream, Brand Profile and the full article context (stored section kept). One text AI call, never the image model.
+* Same safeguards as the generation (angle, distinct title, numbers / claims only from the source, AI URLs removed) plus a new `UNGROUNDED_TEXT_ELEMENTS` check: article Pins may not name a material, color, technique, motif, project (Home Decor: room / furniture) absent from the article; prompt text echoed in the output is refused.
+* Only `title`, `description`, `keywords` are written; image, image prompt, overlay / AI Integrated text, link, board, section, schedule, generation and other Pins kept. On failure nothing is written. UTM, Destination URL, WordPress and other prompts unchanged. No migration.
+* Tests: new `pinterest-regenerate-text.spec.ts` (19).
+* Follow-up: the grid only had the hover-only icon on Pins with an image, so the action looked missing — every card now shows a labeled "Regenerate text" button (with or without image, desktop and mobile). New UI tests `pinterest-regenerate-text-ui.spec.ts` (4) and gated browser spec `tests/playwright/pinterest-regenerate-text.spec.ts`.
+
 ## Pinterest article Pins: step Pins must show the project — TASK-075 (2026-10-21)
 
 * On the brioche cardigan article, Pin 2 ("2. Make and measure a textured gauge swatch") was rejected (422, "Expected: cardigan. Detected: no recognizable project."): the AI pictured a gauge swatch alone. The check was right.

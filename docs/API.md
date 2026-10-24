@@ -1635,6 +1635,43 @@ generation_failed      500
 
 ---
 
+# POST /api/pinterest/pins/[id]/regenerate-text
+
+"Regenerate text" (TASK-076): new **title, description and keywords** for one saved Pin, whatever its source (keyword / Research, OmniFlow article, existing WordPress post). The image is not touched. `maxDuration = 60`. Code: `app/api/pinterest/pins/[id]/regenerate-text/route.ts`, `lib/pinterest/pin-text.ts` (`preparePinTextRegeneration`, `regenerateAndSavePinText`), `lib/pinterest/regenerate-text.ts` (`regeneratePinText`).
+
+## Description
+
+1. Auth (401), UUID (400). No request body: the source is resolved server-side.
+2. `preparePinTextRegeneration()` (selects only + WordPress GET): the Pin and its generation are the caller's (404 / 403), the project is the caller's (404 / 403). Source from the generation row: `source_type = 'external_wordpress_post'` → the post is read again (`loadWordPressPostPinterestSource`, GET only); `source_wordpress_generation_id` → the OmniFlow article (`loadArticlePinterestSource`, owned + completed); otherwise a keyword generation. An article Pin whose article / post reference is gone → 409 `source_unavailable` (never rewritten from the keyword alone). An article of another project → 400 `project_mismatch`. Context: the generation's keyword and language, project niche + niche settings, the Content Stream of the Pin's board plus the article category's Streams, the Brand Profile (project description), the article context (no URL) and the Pin's stored source section / visual brief.
+3. Rate limit `pinterest/regenerate-pin` (30/hour, trial cap) — **the same bucket** as `POST /api/pinterest/pins/[id]/regenerate`, after the checks.
+4. `regeneratePinText()`: same `buildPinterestPinsPrompt()` (1 Pin, the Pin's mode, AI Integrated settings with the Manual strategy set to the Pin's angle), the instruction to rewrite only the title / description / keywords with the Pin's angle, the other Pins' titles and the current title to differ from. **One** text AI call (`FAST`); the image model, Vision and storage are never called. URLs written by the model are removed (every source). Rejected (nothing written):
+   * provider error → 500 `generation_failed`; unparsable plan, empty text after URL removal, or prompt scaffolding in the output (`<article>`, `pin_plan`, `sourceSectionId`, `image_prompt`, "visual brief"…) → 422 `invalid_pin_plan`;
+   * 422 `strategy_safeguard_failed` (structured, scope "pin"): `ANGLE_MISMATCH`, `UNSUPPORTED_NUMBER` / `UNSUPPORTED_CLAIM` (numbers / claims absent from the keyword and source), `DUPLICATE_TITLE` (vs the other Pins), `MISSING_SOURCE_SECTION` (article Pin that left its stored section), and new `UNGROUNDED_TEXT_ELEMENTS` (article Pins: a material, color, technique, motif or project of the fixed vocabularies — Home Decor: rooms / furniture / colors / materials, English + German — named in the title, description or keywords but absent from the article; `field` = `title` / `description` / `keywords`).
+5. One update of that Pin: `title`, `description`, `keywords` only. Kept: `id`, `generation_id`, `media_url`, `image_prompt`, `image_analysis` (angle, AI Integrated text, article source), `overlay_text`, `link_url`, board / `board_id` / `board_section`, `publish_date`, `visual_format`, banner templates. No new generation, no new image, no other Pin changed, WordPress never written. UTM stay CSV-only.
+
+## Response
+
+The updated `pins` row.
+
+## Possible Errors
+
+```txt
+unauthorized           401
+invalid_id             400
+not_found              404  (Pin, generation, project or article)
+forbidden              403
+project_mismatch       400
+article_not_completed  409
+source_unavailable     409
+WordPress read errors  (same codes as the existing-post flow)
+rate_limited / trial_limit_reached
+invalid_pin_plan       422
+strategy_safeguard_failed 422 (structured: retryable + issues)
+generation_failed      500
+```
+
+---
+
 # PATCH /api/pinterest/schedule
 
 Apply or clear schedule dates for pins in a generation.

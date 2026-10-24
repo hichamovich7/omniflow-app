@@ -39,9 +39,10 @@ export type PinterestSafeguardReason =
   | 'MISSING_SOURCE_SECTION'
   | 'DUPLICATE_SOURCE_SECTION'
   | 'IMAGE_SUBJECT_MISMATCH'
-  | 'UNGROUNDED_IMAGE_ELEMENTS';
+  | 'UNGROUNDED_IMAGE_ELEMENTS'
+  | 'UNGROUNDED_TEXT_ELEMENTS';
 
-export type PinterestSafeguardField = 'angle' | 'title' | 'description' | 'image_prompt' | 'sourceSectionId';
+export type PinterestSafeguardField = 'angle' | 'title' | 'description' | 'keywords' | 'image_prompt' | 'sourceSectionId';
 
 export interface PinterestStrategyIssue {
   code: PinterestStrategyIssueCode;

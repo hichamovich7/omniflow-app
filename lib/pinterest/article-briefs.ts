@@ -391,6 +391,23 @@ export function findUngroundedVisualTerms(imagePrompt: string, evidence: string)
   return uniq(ungrounded);
 }
 
+/**
+ * Text-only regeneration (TASK-076): the same fixed vocabularies, applied to
+ * a Pin's title / description / keywords — a material, color, technique,
+ * motif, project (or, Home Decor, room / furniture) the article never names.
+ */
+export function findUngroundedTextTerms(
+  text: string,
+  grounding: Pick<ArticleGrounding, 'evidence' | 'enforceVocabulary' | 'subjectCheck' | 'language'>
+): string[] {
+  return uniq([
+    ...(grounding.enforceVocabulary ? findUngroundedVisualTerms(text, grounding.evidence) : []),
+    ...(grounding.subjectCheck === 'home-decor'
+      ? findUngroundedHomeTerms(withoutNegatedClauses(text), grounding.evidence, grounding.language)
+      : []),
+  ]);
+}
+
 function mentionsSubject(imagePrompt: string, brief: PinVisualBrief): boolean {
   const prompt = normalizeForMatch(imagePrompt);
   const objects = expectedProjectObjects(brief);

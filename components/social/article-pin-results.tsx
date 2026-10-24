@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
+import { RegenerateTextButton } from '@/components/pinterest/regenerate-text-button';
 import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection } from '@/lib/social/pin-display';
 import type { Pin } from '@/types/database';
 import type { ApiError } from '@/types/api';
@@ -367,6 +368,7 @@ function ArticlePinCard({
             <RefreshCw data-icon="inline-start" />
             Regenerate this Pin
           </Button>
+          <RegenerateTextButton pin={pin} disabled={busy !== null} />
           <Button
             size="xs"
             variant="outline"
