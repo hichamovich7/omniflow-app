@@ -262,6 +262,42 @@ test.describe('Errors, prompts and safety', () => {
     expect(formatPinPlanForPrompt(homeGrounding('de', 3, 'Crochet'))).not.toContain('Visual anchors');
   });
 
+  test('13. Neo Deco post 1489: shelves the article never names stay rejected, and the plan forbids them', () => {
+    // Real sections 7 and 9 (the bar cart's "Glasablagen" are the cart's own glass tiers, not shelves).
+    const html = `
+<p>Neo Deco interpretiert Art déco für das moderne Wohnzimmer mit Geometrie, Samt und glänzenden Details.</p>
+<h2>7. Ein Barwagen als funktionales Art-déco-Detail</h2>
+<figure><img src="${SITE}/barwagen.webp" alt="Eleganter Barwagen mit Chromrahmen, Glasablagen und Kristallkaraffe in einem modernen Wohnzimmer"><figcaption>Ein Barwagen verbindet eine praktische Ablage mit einem klassischen Art-déco-Detail.</figcaption></figure>
+<p>Ein Barwagen auf Rollen verbindet Dekoration und Alltag. Chrom und Glas wirken klassisch, dunkles Holz etwas wärmer. Lass genügend freie Ablagefläche und gruppiere Gegenstände auf einem Tablett.</p>
+<h2>9. Samtvorhänge in Waldgrün oder Burgunderrot</h2>
+<figure><img src="${SITE}/vorhaenge.webp" alt="Dunkelgrüne Samtvorhänge rahmen ein helles Wohnzimmer mit geschwungenem Sofa und Chromdetails"><figcaption>Samtvorhänge bringen Farbe, Stofflichkeit und einen weichen Rahmen ans Fenster.</figcaption></figure>
+<p>Schwere, weich fallende Vorhänge rahmen das Fenster und bringen eine satte Farbe in den Raum. Waldgrün passt zu Walnuss und Creme; Burgunderrot harmoniert mit warmen neutralen Tönen.</p>`;
+    const context = deepFreeze(
+      buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html, title: 'Neo Deco Wohnzimmer: 12 elegante Ideen für den Trend 2026', language: 'de', siteId: 'site-1', wordpressPostId: 1489 })
+    );
+    const g = buildArticleGrounding(context, 2, {}, { niche: 'Home Decor' });
+    expect(findHomeAnchors(g.evidence, 'de')).not.toContain('shelves');
+
+    const curtains = 'A bright living room where dark forest green velvet curtains frame a tall window, a curved sofa and cream walls, walnut wood accents, eye-level, photorealistic.';
+    const bar = 'A modern living room with an elegant chrome and glass bar cart on wheels, dark wood floor, wide shot, photorealistic.';
+    expect(validateArticleGroundedPins(pins(g, [bar, curtains]), g)).toEqual([]);
+
+    const invented = curtains.replace('cream walls', 'cream walls and open wooden shelves styled with books');
+    const issues = validateArticleGroundedPins(pins(g, [bar, invented]), g);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ reason: 'UNGROUNDED_IMAGE_ELEMENTS', pinIndex: 1, details: ['shelves'] });
+
+    const plan = formatPinPlanForPrompt(g);
+    const curtainBrief = plan.slice(plan.indexOf(`section "${g.sectionPlan[1]}"`));
+    expect(curtainBrief).toContain('Furniture and decor allowed in the image prompt: only sofa, curtains (named in this section).');
+    expect(curtainBrief).toContain('Do not add any other furniture, storage or decorative element this section does not name.');
+    expect(curtainBrief).toMatch(/Never show \(the article never mentions them\): [^\n]*\bshelves\b/);
+    // Article furniture is never listed as forbidden.
+    expect(curtainBrief).not.toMatch(/Never show[^\n]*\b(sofa|curtains)\b/);
+    // Crochet plans are unchanged.
+    expect(formatPinPlanForPrompt(homeGrounding('de', 3, 'Crochet'))).not.toContain('Furniture and decor allowed');
+  });
+
   test('11-12. regeneration is checked the same way, offline, without touching the article', async () => {
     const markdown = [
       'Farbe bringt Leben in jedes Zuhause, auch in kleinen Wohnungen und Mietwohnungen.',

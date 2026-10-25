@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Home Decor Pins: the prompt forbids furniture the section does not name — TASK-067 follow-up (2026-10-25)
+
+* Reported: WordPress post 1489 ("Neo Deco Wohnzimmer", German, 7 Pins) rejected with `UNGROUNDED_IMAGE_ELEMENTS` — "Pin 6's image adds elements the article never mentions: shelves." Audit: Pin 6 = section "9. Samtvorhänge in Waldgrün oder Burgunderrot" (curtains, window, sofa, walnut, cream); no "Regal" / "Wandboard" / "shelf" anywhere in the post (text, 13 alt texts, 13 captions, featured image). The only near term, "Glasablagen", is the bar cart's glass tiers in section 7. Vision descriptions are part of the evidence, so a Vision-seen shelf would have been accepted: the model invented the shelves. Correct rejection, guard unchanged.
+* Fix (prompt only): every Home Decor brief in `<pin_plan>` now lists the furniture / decor named in its section as the only pieces allowed ("Do not add any other furniture, storage or decorative element this section does not name") and the checked furniture the article never mentions ("Never show …", e.g. shelves). New helpers `sectionHomeFurniture()` / `absentHomeFurniture()` in `lib/pinterest/home-decor-anchors.ts`. Vocabulary, validator, thresholds, UTM, Destination URL, Crochet / Clay unchanged.
+* Tests: `pinterest-home-decor-grounding.spec.ts` case 13 (18 total) reproduces the post.
+
 ## Pinterest: "Regenerate text" for saved Pins — TASK-076 (2026-10-24)
 
 * New "Regenerate text" action next to "Regenerate image" on the Pin grid of `/pinterest/[id]` (opened from History), in the Pin Details dialog and on the article result cards: new title, description and keywords for one Pin — loading state, double clicks ignored, clear error toast ("the Pin was not changed").

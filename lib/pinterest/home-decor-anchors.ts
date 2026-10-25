@@ -289,6 +289,17 @@ export function checkHomeDecorSubject(imagePrompt: string, sectionText: string, 
   return { ok: roomOk && anchorsOk, expected, detected, missing };
 }
 
+/** Furniture and decor the section names — the only pieces its image may show. */
+export function sectionHomeFurniture(sectionText: string, language: string): string[] {
+  return byCategory(findHomeAnchors(sectionText, language), 'furniture');
+}
+
+/** Checked furniture the article never mentions: named in the prompt so the model does not add it (shelves in a curtain Pin). */
+export function absentHomeFurniture(articleEvidence: string, language: string): string[] {
+  const inArticle = new Set(findHomeAnchors(articleEvidence, language));
+  return FURNITURE.filter((anchor) => anchor.checked && !inArticle.has(anchor.term)).map((anchor) => anchor.term);
+}
+
 /** Checked furniture, materials and chromatic colors the image shows but the article never mentions. */
 export function findUngroundedHomeTerms(imagePrompt: string, articleEvidence: string, language: string): string[] {
   const inArticle = new Set(findHomeAnchors(articleEvidence, language));

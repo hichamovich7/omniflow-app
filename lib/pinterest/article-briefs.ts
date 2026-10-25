@@ -14,7 +14,14 @@ import {
   VISUAL_LEXICON,
 } from '@/lib/wordpress/article-context';
 import type { PinterestStrategyIssue, PinterestSubjectReport } from '@/lib/pinterest/strategy';
-import { checkHomeDecorSubject, describeHomeAnchors, findHomeAnchors, findUngroundedHomeTerms } from '@/lib/pinterest/home-decor-anchors';
+import {
+  absentHomeFurniture,
+  checkHomeDecorSubject,
+  describeHomeAnchors,
+  findHomeAnchors,
+  findUngroundedHomeTerms,
+  sectionHomeFurniture,
+} from '@/lib/pinterest/home-decor-anchors';
 import { findNicheProfile } from '@/lib/niche/resolve';
 import { ARTICLE_SOURCE_METADATA_KEY } from '@/lib/social/pin-display';
 
@@ -353,13 +360,20 @@ export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
     const brief = grounding.briefs[sectionId];
     return `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
   });
+  const absentFurniture = grounding.subjectCheck === 'home-decor' ? absentHomeFurniture(grounding.evidence, grounding.language) : [];
   const briefs = Object.values(grounding.briefs).map((brief) => {
     const block = `Visual brief for section "${brief.sectionId}":\n${formatVisualBrief(brief)}`;
     if (grounding.subjectCheck !== 'home-decor') return block;
-    const anchors = describeHomeAnchors(findHomeAnchors(sectionTextOf(grounding, brief.sectionId, brief), grounding.language), 8);
-    return anchors.length
-      ? `${block}\nVisual anchors the image prompt must show (English terms taken from this section): ${anchors.join(', ')}`
-      : block;
+    const sectionText = sectionTextOf(grounding, brief.sectionId, brief);
+    const anchors = describeHomeAnchors(findHomeAnchors(sectionText, grounding.language), 8);
+    const furniture = sectionHomeFurniture(sectionText, grounding.language);
+    // Home Decor scenes invite filler furniture: only the section's pieces, never one the article lacks.
+    return [
+      block,
+      ...(anchors.length ? [`Visual anchors the image prompt must show (English terms taken from this section): ${anchors.join(', ')}`] : []),
+      `Furniture and decor allowed in the image prompt: ${furniture.length ? `only ${furniture.join(', ')} (named in this section)` : 'none named in this section — keep the room plain'}. Do not add any other furniture, storage or decorative element this section does not name.`,
+      ...(absentFurniture.length ? [`Never show (the article never mentions them): ${absentFurniture.join(', ')}`] : []),
+    ].join('\n');
   });
   return [
     '<pin_plan>',

@@ -1276,6 +1276,8 @@ Offline, `tests/renderer/pinterest-home-decor-grounding.spec.ts` (17) — `fetch
 
 Results 2026-10-14: 17/17; Pinterest + WordPress-to-Pinterest + niche specs 472/472; full renderer **1155/1155**; TypeScript, ESLint (touched files), `next build` and `git diff --check` pass.
 
+Follow-up 2026-10-25 (post 1489, Pin 6 invented "shelves"): case 13 rebuilds sections 7 (bar cart, "Glasablagen") and 9 (velvet curtains) of the real post — the evidence has no `shelves`, a faithful curtain prompt passes, the same prompt with "open wooden shelves" is rejected with `UNGROUNDED_IMAGE_ELEMENTS` `["shelves"]`, and the curtain brief says "only sofa, curtains", "Do not add any other furniture…" and "Never show … shelves" (Crochet plan unchanged). Results: 18/18; Pinterest grounding + WordPress post source + strategy specs 126/126. One live attempt (local `.env.local` models, Vision + one text call, no image, no DB): 5 Vision calls, 0 failures, 30.6 s, 7 Pins, 0 safeguard issues.
+
 **Manual check (founder, costs one text generation):** in a Home Organization & Decor project, generate 2-3 Pins from a German Home Decor article (the one that failed) → no "image description" rejection; open the image prompts — each shows the section's room and palette. Record the result in TASKS.md (TASK-067).
 
 ---
