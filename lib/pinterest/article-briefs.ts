@@ -314,6 +314,18 @@ export function briefSectionText(brief: PinVisualBrief): string {
   return [brief.sourceSection, brief.represented, ...brief.visualDetails, ...brief.colors, ...brief.materials].join('\n');
 }
 
+/** What one section says or shows: heading, body, photo alt / caption, photo description. */
+export function articleSectionText(context: WordPressArticleContext, section: ArticleSection, descriptions: SectionImageDescription[] = []): string {
+  return [
+    section.kind === 'intro' ? context.title : section.heading,
+    section.text,
+    ...section.images.flatMap((image) => [image.alt, image.caption]),
+    ...descriptions.map((item) => item.text),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function buildArticleGrounding(
   context: WordPressArticleContext,
   pinsRequested: number,
@@ -329,14 +341,7 @@ export function buildArticleGrounding(
     const section = findSection(context, sectionId);
     if (!section) continue;
     briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence, { subjectCheck });
-    sectionTexts[sectionId] = [
-      section.kind === 'intro' ? context.title : section.heading,
-      section.text,
-      ...section.images.flatMap((image) => [image.alt, image.caption]),
-      ...(imageDescriptions[sectionId] ?? []).map((item) => item.text),
-    ]
-      .filter(Boolean)
-      .join('\n');
+    sectionTexts[sectionId] = articleSectionText(context, section, imageDescriptions[sectionId] ?? []);
   }
   return {
     sourceType: context.sourceType,
@@ -350,7 +355,7 @@ export function buildArticleGrounding(
   };
 }
 
-function sectionTextOf(grounding: ArticleGrounding, sectionId: string, brief: PinVisualBrief): string {
+export function sectionTextOf(grounding: ArticleGrounding, sectionId: string, brief: PinVisualBrief): string {
   return grounding.sectionTexts?.[sectionId] ?? briefSectionText(brief);
 }
 
@@ -360,19 +365,19 @@ export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
     const brief = grounding.briefs[sectionId];
     return `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
   });
-  const absentFurniture = grounding.subjectCheck === 'home-decor' ? absentHomeFurniture(grounding.evidence, grounding.language) : [];
   const briefs = Object.values(grounding.briefs).map((brief) => {
     const block = `Visual brief for section "${brief.sectionId}":\n${formatVisualBrief(brief)}`;
     if (grounding.subjectCheck !== 'home-decor') return block;
     const sectionText = sectionTextOf(grounding, brief.sectionId, brief);
     const anchors = describeHomeAnchors(findHomeAnchors(sectionText, grounding.language), 8);
     const furniture = sectionHomeFurniture(sectionText, grounding.language);
-    // Home Decor scenes invite filler furniture: only the section's pieces, never one the article lacks.
+    const absentFurniture = absentHomeFurniture(sectionText, grounding.language);
+    // Home Decor scenes invite filler furniture: only the section's own pieces.
     return [
       block,
       ...(anchors.length ? [`Visual anchors the image prompt must show (English terms taken from this section): ${anchors.join(', ')}`] : []),
       `Furniture and decor allowed in the image prompt: ${furniture.length ? `only ${furniture.join(', ')} (named in this section)` : 'none named in this section — keep the room plain'}. Do not add any other furniture, storage or decorative element this section does not name.`,
-      ...(absentFurniture.length ? [`Never show (the article never mentions them): ${absentFurniture.join(', ')}`] : []),
+      ...(absentFurniture.length ? [`Never show (this section never mentions them): ${absentFurniture.join(', ')}`] : []),
     ].join('\n');
   });
   return [
@@ -522,7 +527,8 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
     const ungrounded = uniq([
       ...(grounding.enforceVocabulary ? findUngroundedVisualTerms(pin.image_prompt, grounding.evidence) : []),
       // Home Decor: controlled English/German vocabulary, so German articles are checked too.
-      ...(homeDecor ? findUngroundedHomeTerms(shown, grounding.evidence, grounding.language) : []),
+      // Furniture is checked against the Pin's own section, not the whole article.
+      ...(homeDecor ? findUngroundedHomeTerms(shown, grounding.evidence, grounding.language, brief ? sectionTextOf(grounding, sectionId, brief) : undefined) : []),
     ]);
     if (ungrounded.length > 0) {
       issues.push({

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'playwright/test';
 import * as wordpressPostSource from '@/lib/social/pinterest-from-wordpress-post';
+import { buildWordPressArticleContext } from '@/lib/wordpress/article-context';
+import { planArticlePinSections } from '@/lib/pinterest/article-briefs';
 
 // Offline route tests for POST /api/pinterest/generate failures (production
 // 500 after 66.6s on a 7-Pin existing-WordPress-post generation). Supabase,
@@ -69,7 +71,54 @@ const BRIOCHE_HTML = `
 <h3>3. Prepare yarn and mark your size information</h3><p>Wind the yarn and note your size numbers before starting.</p>
 <h3>4. Work the body sideways</h3><p>The body is worked sideways in rows.</p>`;
 
-type TextCall = { timeoutMs?: number; maxTokens?: number };
+// Post 1489 shape: shelves exist in the bar cart section only, never in the curtain section.
+const HOME_DECOR_HTML = `
+<p>Neo Deco interpretiert Art déco für das moderne Wohnzimmer mit Geometrie, Samt und glänzenden Details.</p>
+<h2>1. Ein geschwungenes Samtsofa als Mittelpunkt</h2><p>Ein Sofa mit weichen Rundungen gibt dem Raum die typische Silhouette. Dunkelgrüner Samt wirkt tief und wohnlich.</p>
+<h2>2. Ein Barwagen als funktionales Art-déco-Detail</h2><p>Ein Barwagen auf Rollen mit zwei Regalböden aus Glas verbindet Dekoration und Alltag. Chrom und Glas wirken klassisch.</p>
+<h2>3. Samtvorhänge in Waldgrün oder Burgunderrot</h2><p>Schwere, weich fallende Vorhänge rahmen das Fenster neben dem Sofa. Waldgrün passt zu Walnuss und Creme.</p>`;
+
+const HOME_DECOR_POST = {
+  id: 1489,
+  title: 'Neo Deco Wohnzimmer: elegante Ideen für den Trend',
+  date: '2026-10-25T00:00:00',
+  status: 'publish',
+  categories: ['Wohnzimmer'],
+  featuredImage: null,
+  categoryIds: [],
+  excerpt: 'Neo Deco Ideen für das Wohnzimmer.',
+  contentHtml: HOME_DECOR_HTML,
+  tags: [],
+  link: `${SITE}/neo-deco-wohnzimmer/`,
+};
+
+const homeDecorRequest = { ...articleRequest, keyword: 'Neo Deco Wohnzimmer', language: 'de', wordpressPost: { siteId: SITE_ID, postId: 1489 } };
+
+const CURTAINS_PROMPT = 'A bright living room where dark forest green velvet curtains frame a tall window beside a sofa, eye-level, photorealistic.';
+const SHELVES_PROMPT = CURTAINS_PROMPT.replace('beside a sofa', 'beside a sofa, with open wooden shelves on the wall');
+
+function homeDecorPlan(curtainPrompt: string, sectionIds: string[]) {
+  const prompts = [
+    'A moody living room with a curved dark green velvet sofa as the focal point, soft daylight, wide shot, photorealistic.',
+    'A modern living room with a chrome bar cart on wheels and two glass shelves, wide shot, photorealistic.',
+    curtainPrompt,
+  ];
+  const titles = ['Was ein Samtsofa mit dem Raumgefühl macht', 'Barwagen im Alltag: Wo er wirklich hilft', 'Samtvorhänge im Wohnzimmer: Welche Farbe wirkt?'];
+  return JSON.stringify({
+    pins: sectionIds.map((sourceSectionId, index) => ({
+      sourceSectionId,
+      angle: ANGLES[index],
+      title: titles[index],
+      description: 'Eine Idee aus dem Neo-Deco-Wohnzimmer, die den Raum ruhiger und eleganter wirken lässt. Merke dir den Pin für dein nächstes Projekt.',
+      keywords: 'neo deco, wohnzimmer, art deco',
+      board: 'Wohnzimmer',
+      image_prompt: prompts[index],
+      visualFormat: 'photo',
+    })),
+  });
+}
+
+type TextCall = { timeoutMs?: number; maxTokens?: number; user?: string };
 type ModelStep = string | Error;
 
 interface RecordedEvent {
@@ -86,7 +135,7 @@ interface Harness {
 
 async function withRoute(
   steps: ModelStep[],
-  options: { failPinsInsert?: boolean },
+  options: { failPinsInsert?: boolean; homeDecor?: boolean },
   run: (harness: Harness) => Promise<void>
 ): Promise<void> {
   const events: RecordedEvent[] = [];
@@ -100,7 +149,8 @@ async function withRoute(
     textCalls,
   };
 
-  const project = { id: PROJECT_ID, description: null, niche: 'Crochet', user_id: 'user-1', default_language: 'en' };
+  const niche = options.homeDecor ? 'Home Decor' : 'Crochet';
+  const project = { id: PROJECT_ID, description: null, niche, user_id: 'user-1', default_language: options.homeDecor ? 'de' : 'en' };
 
   const supabase = {
     auth: { getUser: async () => ({ data: { user: { id: 'user-1', email: 'user@example.com' } } }) },
@@ -135,7 +185,7 @@ async function withRoute(
     },
   };
 
-  const post = {
+  const post = options.homeDecor ? HOME_DECOR_POST : {
     id: 1957,
     title: 'Autumn Brioche Crochet Cardigan: Size Guide, Steps & 6 Color Ideas',
     date: '2026-10-01T00:00:00',
@@ -158,8 +208,8 @@ async function withRoute(
       },
     },
     '@/lib/ai/engine': {
-      generateText: async (params: TextCall) => {
-        textCalls.push({ timeoutMs: params.timeoutMs, maxTokens: params.maxTokens });
+      generateText: async (params: TextCall & { messages?: Array<{ content: string }> }) => {
+        textCalls.push({ timeoutMs: params.timeoutMs, maxTokens: params.maxTokens, user: params.messages?.[1]?.content });
         const step = steps.shift();
         if (step === undefined) throw new Error('unexpected AI call');
         if (step instanceof Error) throw step;
@@ -187,7 +237,7 @@ async function withRoute(
         ...wordpressPostSource.buildWordPressPostPinterestSource(
           post,
           { id: SITE_ID, project_id: PROJECT_ID, site_url: SITE },
-          { niche: 'Crochet', description: null, default_language: 'en' }
+          { niche, description: null, default_language: project.default_language }
         ),
         contentStreams: [],
         nicheSettings: null,
@@ -365,6 +415,69 @@ test.describe('Other failures keep their structured answer and leave no partial 
       const rows = inserts[0].row as Array<Record<string, unknown>>;
       expect(rows).toHaveLength(3);
       expect(new Set(rows.map((row) => row.generation_id))).toEqual(new Set(['generation-2']));
+    });
+  });
+});
+
+test.describe('Home Decor: section-grounded image elements and one targeted repair', () => {
+  const sectionIds = () =>
+    planArticlePinSections(
+      buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html: HOME_DECOR_HTML, title: HOME_DECOR_POST.title, language: 'de' }),
+      3
+    );
+
+  test('faithful curtain Pin: saved on the first answer, no repair call', async () => {
+    await withRoute([homeDecorPlan(CURTAINS_PROMPT, sectionIds())], { homeDecor: true }, async ({ post, events, textCalls }) => {
+      const res = await post(homeDecorRequest);
+      expect(res.status).toBe(201);
+      expect(textCalls).toHaveLength(1);
+      expect(pinInserts(events)).toHaveLength(1);
+    });
+  });
+
+  test('shelves in the curtain Pin (present only in another section) and a failed repair → 422, nothing saved', async () => {
+    const stillShelves = JSON.stringify({ pins: [{ pin: 3, image_prompt: SHELVES_PROMPT }] });
+    for (const repair of [stillShelves, 'not json', new Error('OpenRouter error: 503')]) {
+      await withRoute([homeDecorPlan(SHELVES_PROMPT, sectionIds()), repair], { homeDecor: true }, async ({ post, events, textCalls }) => {
+        const res = await post(homeDecorRequest);
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error.code).toBe('strategy_safeguard_failed');
+        expect(body.error.issues).toEqual([expect.objectContaining({ code: 'UNGROUNDED_IMAGE_ELEMENTS', pinIndex: 3, field: 'image_prompt' })]);
+        expect(body.error.issues[0].message).toContain('shelves');
+        expect(textCalls).toHaveLength(2);
+        expect(pinInserts(events)).toHaveLength(0);
+        expect(generationUpdates(events).map((row) => row.status)).toEqual(['failed']);
+      });
+    }
+  });
+
+  test('a successful repair replaces only that image_prompt, is revalidated, then saved', async () => {
+    const repaired = JSON.stringify({ pins: [{ pin: 3, image_prompt: CURTAINS_PROMPT }] });
+    await withRoute([homeDecorPlan(SHELVES_PROMPT, sectionIds()), repaired], { homeDecor: true }, async ({ post, events, textCalls }) => {
+      const res = await post(homeDecorRequest);
+      expect(res.status).toBe(201);
+      expect(textCalls).toHaveLength(2);
+      // The repair asks to remove the fixed-vocabulary term, with the section's allowed furniture.
+      expect(textCalls[1].user).toContain('Remove: shelves');
+      expect(textCalls[1].user).toContain('Furniture and decor allowed: sofa, curtains');
+      const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+      const original = JSON.parse(homeDecorPlan(SHELVES_PROMPT, sectionIds())).pins;
+      expect(rows).toHaveLength(3);
+      expect(rows[2].image_prompt).toBe(CURTAINS_PROMPT);
+      rows.forEach((row, index) => {
+        expect(row.title).toBe(original[index].title);
+        expect(row.description).toBe(original[index].description);
+      });
+      expect(rows[0].image_prompt).toBe(original[0].image_prompt);
+      expect(rows[1].image_prompt).toBe(original[1].image_prompt);
+    });
+  });
+
+  test('other failures are never "repaired": no second AI call', async () => {
+    await withRoute([duplicatePlan()], {}, async ({ post, textCalls }) => {
+      expect((await post(keywordRequest)).status).toBe(422);
+      expect(textCalls).toHaveLength(1);
     });
   });
 });

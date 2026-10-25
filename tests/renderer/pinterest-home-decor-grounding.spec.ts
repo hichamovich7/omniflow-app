@@ -165,8 +165,8 @@ test.describe('Home Decor sections are validated by their visual anchors', () =>
     const ungrounded = issues.find((issue) => issue.reason === 'UNGROUNDED_IMAGE_ELEMENTS');
     expect(ungrounded?.pinIndex).toBe(0);
     expect(ungrounded?.details).toEqual(expect.arrayContaining(['marble', 'fireplace', 'red', 'leather']));
-    // The sofa is in the article (living room section): not an invention.
-    expect(ungrounded?.details).not.toContain('sofa');
+    // The sofa is only in the living room section: furniture is checked per section, so it is refused in the kitchen.
+    expect(ungrounded?.details).toContain('sofa');
     // Negated mentions and neutral backdrops are not claims.
     const negated = validateArticleGroundedPins([{ sourceSectionId: 's1', image_prompt: 'A kitchen with green cabinets, no marble, white walls, gray floor, green plants.' }], g);
     expect(negated).toEqual([]);
@@ -291,11 +291,42 @@ test.describe('Errors, prompts and safety', () => {
     const curtainBrief = plan.slice(plan.indexOf(`section "${g.sectionPlan[1]}"`));
     expect(curtainBrief).toContain('Furniture and decor allowed in the image prompt: only sofa, curtains (named in this section).');
     expect(curtainBrief).toContain('Do not add any other furniture, storage or decorative element this section does not name.');
-    expect(curtainBrief).toMatch(/Never show \(the article never mentions them\): [^\n]*\bshelves\b/);
-    // Article furniture is never listed as forbidden.
+    expect(curtainBrief).toMatch(/Never show \(this section never mentions them\): [^\n]*\bshelves\b/);
+    // The section's own furniture is never listed as forbidden.
     expect(curtainBrief).not.toMatch(/Never show[^\n]*\b(sofa|curtains)\b/);
     // Crochet plans are unchanged.
     expect(formatPinPlanForPrompt(homeGrounding('de', 3, 'Crochet'))).not.toContain('Furniture and decor allowed');
+  });
+
+  test('14. furniture is grounded per section: the bar cart\'s Vision "glass shelves" do not allow shelves in the curtain Pin', () => {
+    const html = `
+<p>Neo Deco interpretiert Art déco für das moderne Wohnzimmer.</p>
+<h2>7. Ein Barwagen als funktionales Art-déco-Detail</h2>
+<figure><img src="${SITE}/barwagen.webp" alt="Barwagen"></figure>
+<p>Ein Barwagen auf Rollen verbindet Dekoration und Alltag. Chrom und Glas wirken klassisch, dunkles Holz etwas wärmer.</p>
+<h2>9. Samtvorhänge in Waldgrün oder Burgunderrot</h2>
+<p>Schwere, weich fallende Samtvorhänge rahmen das Fenster neben dem geschwungenen Sofa. Waldgrün passt zu Walnuss und Creme.</p>`;
+    const context = deepFreeze(
+      buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html, title: 'Neo Deco Wohnzimmer', language: 'de', siteId: 'site-1', wordpressPostId: 1489 })
+    );
+    const [bar, curtainsId] = buildArticleGrounding(context, 2, {}, { niche: 'Home Decor' }).sectionPlan;
+    // Real Vision answer for the bar cart photo (live run, 2026-10-25).
+    const g = buildArticleGrounding(context, 2, { [bar]: [{ source: 'vision', text: 'Photo shows: A two-tier bar cart. construction: Open metal frame with two glass shelves and curved handles.' }] }, { niche: 'Home Decor' });
+    expect(findHomeAnchors(g.evidence, 'de')).toContain('shelves');
+    expect(findHomeAnchors(g.sectionTexts?.[curtainsId] ?? '', 'de')).not.toContain('shelves');
+
+    const barPrompt = 'A modern living room with a chrome bar cart on wheels, two glass shelves and dark wood accents, wide shot, photorealistic.';
+    const curtains = 'A bright living room where dark forest green velvet curtains frame a tall window beside a curved sofa, cream walls, eye-level, photorealistic.';
+    // Shelves of the bar cart's own section are grounded; a faithful curtain prompt passes.
+    expect(validateArticleGroundedPins([{ sourceSectionId: bar, image_prompt: barPrompt }, { sourceSectionId: curtainsId, image_prompt: curtains }], g)).toEqual([]);
+    // Shelves (or a synonym) in the curtain Pin stay refused although another section has them.
+    for (const added of ['open wooden shelves', 'a tall bookcase', 'wall shelving']) {
+      const issues = validateArticleGroundedPins([{ sourceSectionId: bar, image_prompt: barPrompt }, { sourceSectionId: curtainsId, image_prompt: curtains.replace('cream walls', `cream walls and ${added}`) }], g);
+      expect(issues).toEqual([expect.objectContaining({ reason: 'UNGROUNDED_IMAGE_ELEMENTS', pinIndex: 1, field: 'image_prompt', details: ['shelves'] })]);
+    }
+    // The section-level list in the plan forbids shelves for the curtain Pin even though the article has them.
+    const plan = formatPinPlanForPrompt(g);
+    expect(plan.slice(plan.indexOf(`section "${curtainsId}"`))).toMatch(/Never show \(this section never mentions them\): [^\n]*\bshelves\b/);
   });
 
   test('11-12. regeneration is checked the same way, offline, without touching the article', async () => {

@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Home Decor Pins: furniture grounded per section + one image_prompt repair — TASK-067 follow-up 2 (2026-10-25)
+
+* Reported again on post 1489 (Pin 6, `UNGROUNDED_IMAGE_ELEMENTS`) after the prompt fix. Audit: both reported request ids encode 19:18Z and 19:55Z, before the production deployment of commit 4a78c94 (20:20Z) — the fix was most likely not live yet (the Vercel `dpl_` id could not be mapped without a Vercel token). Architecture gap found anyway: the Home Decor element check used the whole article, so a section's Vision ("two glass shelves" of the bar cart, section 7) allowed shelves in the curtain Pin (section 9).
+* Now: checked furniture in a Home Decor image_prompt must come from the Pin's own section (heading, text, alt, caption, that section's Vision description); colors and materials stay article-wide. The `<pin_plan>` "Never show" list is per section. Single-Pin regeneration checks against the live section text plus the stored brief.
+* One targeted repair (`lib/pinterest/image-prompt-repair.ts`): when the only failures are Home Decor `UNGROUNDED_IMAGE_ELEMENTS`, one text call removes the listed terms from those image_prompts (30 s timeout); title, description, angle and every other field kept; the whole batch is validated again before saving. Unusable / failed / still-invalid repair → the original structured 422, nothing saved. Logs: counts only.
+* Vocabulary: "Samtvorhang / Samtvorhänge" now reads as velvet (it was not recognized). Crochet, Clay, UTM, Destination URL and WordPress unchanged.
+* Tests: Home Decor case 14 (per-section shelves, synonyms), route cases in `pinterest-generate-errors.spec.ts` (faithful Pin saved without repair; failed repair ×3 → 422 nothing saved; successful repair saves with the same titles / descriptions; other failures never repaired).
+
 ## Home Decor Pins: the prompt forbids furniture the section does not name — TASK-067 follow-up (2026-10-25)
 
 * Reported: WordPress post 1489 ("Neo Deco Wohnzimmer", German, 7 Pins) rejected with `UNGROUNDED_IMAGE_ELEMENTS` — "Pin 6's image adds elements the article never mentions: shelves." Audit: Pin 6 = section "9. Samtvorhänge in Waldgrün oder Burgunderrot" (curtains, window, sofa, walnut, cream); no "Regal" / "Wandboard" / "shelf" anywhere in the post (text, 13 alt texts, 13 captions, featured image). The only near term, "Glasablagen", is the bar cart's glass tiers in section 7. Vision descriptions are part of the evidence, so a Vision-seen shelf would have been accepted: the model invented the shelves. Correct rejection, guard unchanged.

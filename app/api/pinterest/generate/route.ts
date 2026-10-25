@@ -46,6 +46,7 @@ import {
   type ArticleGrounding,
 } from '@/lib/pinterest/article-briefs';
 import { describeSectionImages, referenceImageHosts } from '@/lib/pinterest/article-vision';
+import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
 import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
 import { WordPressReadError } from '@/lib/wordpress/post-reader';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
@@ -414,7 +415,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const resolvedPins = plan.pins.map((pin) => {
+    let resolvedPins = plan.pins.map((pin) => {
       const resolved = {
         ...pin,
         angle: aiIntegrated
@@ -426,20 +427,40 @@ export async function POST(request: Request) {
     });
 
     const enforceBalancedAngles = !aiIntegrated || aiIntegrated.strategy === 'balanced';
-    const strategyIssues = [
+    const validateBatch = (pinsToCheck: typeof resolvedPins) => [
       ...validatePinterestStrategyBatch(
-        resolvedPins,
+        pinsToCheck,
         pinsRequested,
         [keyword, analysisContext].filter(Boolean).join('\n'),
         { enforceBalancedAngles }
       ),
       ...(articleSource && enforceBalancedAngles
-        ? validateDistinctAngles(resolvedPins, pinsRequested)
+        ? validateDistinctAngles(pinsToCheck, pinsRequested)
         : []),
       ...(articleGrounding?.sectionPlan.length
-        ? validateArticleGroundedPins(resolvedPins, articleGrounding)
+        ? validateArticleGroundedPins(pinsToCheck, articleGrounding)
         : []),
     ];
+    let strategyIssues = validateBatch(resolvedPins);
+
+    // Home Decor: an image_prompt that only adds elements its section never
+    // names gets one targeted repair (image_prompt only), then the whole
+    // batch is validated again. Otherwise the original 422 stands.
+    const repairTargets = imagePromptRepairTargets(strategyIssues, resolvedPins, articleGrounding);
+    if (repairTargets) {
+      const repaired = await repairImagePrompts(resolvedPins, repairTargets, { generateText });
+      const repairedIssues = repaired ? validateBatch(repaired) : null;
+      const accepted = Boolean(repaired && repairedIssues?.length === 0);
+      // Counts only: no Pin text, no article content.
+      console.log(
+        `[${PROMPT_ID}] Image prompt repair: ${JSON.stringify({ pins: repairTargets.length, parsed: Boolean(repaired), accepted })}`
+      );
+      if (repaired && accepted) {
+        resolvedPins = repaired;
+        strategyIssues = [];
+      }
+    }
+
     if (strategyIssues.length > 0) {
       // A single flattened string argument — never a bare object — so the
       // issue codes stay legible in log viewers that summarize/collapse

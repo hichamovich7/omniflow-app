@@ -40,6 +40,7 @@ import type { ChatMessage } from '@/lib/ai/types';
 import type { ApiError } from '@/types/api';
 import {
   buildArticleContextFromMarkdown,
+  findSection,
   formatArticleSectionsForPrompt,
   neutralizeArticleText,
   stripUrls,
@@ -47,6 +48,7 @@ import {
   type WordPressArticleContext,
 } from '@/lib/wordpress/article-context';
 import {
+  articleSectionText,
   buildArticleEvidence,
   formatPinPlanForPrompt,
   subjectCheckForNiche,
@@ -447,6 +449,8 @@ export async function regenerateArticlePin(
 
   // Article-grounded Pin: it keeps its section and stored visual brief.
   const stored = readArticleSourceMetadata(pin.image_analysis);
+  // Home Decor furniture is checked against the section itself (plus its stored photo description).
+  const section = stored ? findSection(source.context, stored.sectionId) : null;
   const grounding: ArticleGrounding | null = stored
     ? {
         sourceType: stored.sourceType,
@@ -456,6 +460,9 @@ export async function regenerateArticlePin(
         enforceVocabulary: source.context.language === 'en',
         subjectCheck: subjectCheckForNiche(source.niche),
         language: source.context.language,
+        ...(section
+          ? { sectionTexts: { [stored.sectionId]: [articleSectionText(source.context, section), ...stored.brief.visualDetails].join('\n') } }
+          : {}),
       }
     : null;
 

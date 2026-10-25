@@ -239,8 +239,8 @@ test.describe('Every flow uses the structured error, safeguards untouched', () =
     const route = read('app/api/pinterest/generate/route.ts');
     // The three sources share this single validation block.
     expect(route).toContain('validatePinterestStrategyBatch(');
-    expect(route).toContain('validateDistinctAngles(resolvedPins, pinsRequested)');
-    expect(route).toContain('validateArticleGroundedPins(resolvedPins, articleGrounding)');
+    expect(route).toContain('validateDistinctAngles(pinsToCheck, pinsRequested)');
+    expect(route).toContain('validateArticleGroundedPins(pinsToCheck, articleGrounding)');
     expect(route).toContain('buildStrategySafeguardError(strategyIssues)');
     expect(route).toContain('{ status: 422 }');
     expect(route).not.toContain('failed strategy safeguards. Try again.');

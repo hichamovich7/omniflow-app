@@ -129,7 +129,7 @@ const MATERIALS = anchors('material', [
   ['rattan', ['wicker'], ['rattan*', 'korbgeflecht', 'geflecht'], true],
   ['jute', ['sisal', 'seagrass'], ['jute*', 'sisal', 'seegras'], true],
   ['linen', [], ['leinen*']],
-  ['velvet', [], ['=samt', 'samtsofa', 'samtsessel', 'samtig'], true],
+  ['velvet', [], ['=samt', 'samtsofa', 'samtsessel', 'samtvorhang', 'samtvorhaeng', 'samtig'], true],
   ['boucle', [], ['boucle'], true],
   ['leather', [], ['leder*'], true],
   ['ceramic', ['ceramics', 'stoneware', 'porcelain'], ['keramik*', 'steingut', 'porzellan']],
@@ -294,16 +294,25 @@ export function sectionHomeFurniture(sectionText: string, language: string): str
   return byCategory(findHomeAnchors(sectionText, language), 'furniture');
 }
 
-/** Checked furniture the article never mentions: named in the prompt so the model does not add it (shelves in a curtain Pin). */
-export function absentHomeFurniture(articleEvidence: string, language: string): string[] {
-  const inArticle = new Set(findHomeAnchors(articleEvidence, language));
-  return FURNITURE.filter((anchor) => anchor.checked && !inArticle.has(anchor.term)).map((anchor) => anchor.term);
+/** Checked furniture the section never mentions: named in the prompt so the model does not add it (shelves in a curtain Pin). */
+export function absentHomeFurniture(sectionText: string, language: string): string[] {
+  const inSection = new Set(findHomeAnchors(sectionText, language));
+  return FURNITURE.filter((anchor) => anchor.checked && !inSection.has(anchor.term)).map((anchor) => anchor.term);
 }
 
-/** Checked furniture, materials and chromatic colors the image shows but the article never mentions. */
-export function findUngroundedHomeTerms(imagePrompt: string, articleEvidence: string, language: string): string[] {
+/**
+ * Checked furniture, materials and chromatic colors the image shows but the
+ * source never mentions. With `sectionText`, furniture must come from the
+ * Pin's own section: a bar cart's shelves elsewhere in the article do not
+ * allow shelves in a curtain Pin. Colors and materials stay article-wide.
+ */
+export function findUngroundedHomeTerms(imagePrompt: string, articleEvidence: string, language: string, sectionText?: string): string[] {
   const inArticle = new Set(findHomeAnchors(articleEvidence, language));
+  const inSection = sectionText === undefined ? inArticle : new Set(findHomeAnchors(sectionText, language));
   // "green plants" are plants, not a green palette claim.
   const prompt = imagePrompt.replace(/\bgreen (?:plants?|leaves|foliage)\b/gi, 'plants');
-  return findHomeAnchors(prompt, 'en').filter((term) => BY_TERM.get(term)?.checked && !inArticle.has(term));
+  return findHomeAnchors(prompt, 'en').filter((term) => {
+    if (!BY_TERM.get(term)?.checked) return false;
+    return categoryOf(term) === 'furniture' ? !inSection.has(term) : !inArticle.has(term);
+  });
 }
