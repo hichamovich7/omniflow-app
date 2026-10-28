@@ -27,6 +27,7 @@ import type {
   PinterestGenerationMode,
   PinterestStrategy,
   PinterestTextImportance,
+  PinterestVisualStyle,
 } from '@/types/pinterest';
 import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,21 @@ const CUSTOM_PINS_VALUE = 'custom';
 
 type RequiredTextMode = 'generate' | 'exact';
 type OptionalTextMode = RequiredTextMode | 'none';
+
+// TASK-078: article Pins only. Classic stays the default (behavior unchanged).
+const VISUAL_STYLE_OPTIONS: Array<{ value: PinterestVisualStyle; label: string; description: string }> = [
+  {
+    value: 'classic',
+    label: 'Classic',
+    description: 'Same visual approach as before for every Pin.',
+  },
+  {
+    value: 'auto-variety',
+    label: 'Auto variety',
+    description:
+      'Each Pin gets a different layout (step-by-step, materials, collage, close-up…) only when the article supports it. The article stays the source.',
+  },
+];
 
 const MODE_OPTIONS: Array<{
   value: PinterestGenerationMode;
@@ -276,6 +292,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   const [subtitleImportance, setSubtitleImportance] = useState<PinterestTextImportance>('medium');
   const [ctaImportance, setCtaImportance] = useState<PinterestTextImportance>('low');
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [visualStyle, setVisualStyle] = useState<PinterestVisualStyle>('classic');
   const [error, setError] = useState<string | null>(null);
   const [safeguardError, setSafeguardError] = useState<StrategySafeguardError | null>(null);
   const [loading, setLoading] = useState(false);
@@ -390,6 +407,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       wordpressArticleId: articleSource?.articleId ?? undefined,
       wordpressPost: articleSource?.externalPost ?? undefined,
       destinationUrl: destinationUrl.trim() || undefined,
+      // Keyword flows never send it (the schema defaults to classic).
+      ...(articleSource ? { visualStyle } : {}),
     };
     const parsed = generatePinsSchema.safeParse(
       generationMode === 'ai-integrated'
@@ -782,6 +801,41 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
               );
             })}
           </div>
+
+          {articleSource && (
+            <div className="space-y-1.5 border-t border-border/60 pt-4">
+              <Label id="visual-style-heading" className="text-xs font-medium text-muted-foreground">
+                Visual style
+              </Label>
+              <div role="group" aria-labelledby="visual-style-heading" className="grid gap-2 md:grid-cols-2">
+                {VISUAL_STYLE_OPTIONS.map((option) => {
+                  const selected = visualStyle === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      disabled={loading}
+                      onClick={() => setVisualStyle(option.value)}
+                      data-testid={`visual-style-${option.value}`}
+                      className={cn(
+                        'min-w-0 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
+                        selected
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                          : 'border-border/60 hover:border-border hover:bg-muted/30'
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                        {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
+                        {option.label}
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {generationMode === 'legacy-composite' && (
             <div className="space-y-4 border-t border-border/60 pt-4">

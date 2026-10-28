@@ -302,6 +302,21 @@ export const guideSections: GuideSection[] = [
     ],
   },
   {
+    id: 'pinterest-visual-style',
+    title: 'Pinterest visual style: Classic or Auto variety',
+    icon: LayoutGrid,
+    summary: 'When you create Pins from a WordPress article, choose whether every Pin keeps the same visual approach or each one gets its own layout.',
+    points: [
+      'The "Visual style" choice appears in the Generation mode section, only when the Pins come from an article (an OmniFlow article or an existing WordPress post). Pins created from a keyword are not affected.',
+      'Classic is selected by default and works exactly as before.',
+      'Auto variety gives each Pin a different layout, for example a lifestyle photo, a step-by-step sequence, the materials laid out next to the project, a collage of several views, hands at work, the finished project or its color variations.',
+      'A layout is only used when the article supports it: no materials layout without materials in the article, no step-by-step without steps, no color variations without colors. A Pin whose section supports nothing special keeps the Classic approach.',
+      'The article stays the source: the layout never changes what the Pin shows. The visual checks still apply, and the main subject of the section stays the main subject of the image.',
+      'The images contain no written step text, numbers or lists: those are not reliable when drawn by the image model.',
+      'The layout chosen for each Pin is shown as a small label on the result cards, in the Pin grid and in Pin Details. "Regenerate image" keeps the same layout.',
+    ],
+  },
+  {
     id: 'medium-summary',
     title: 'Medium summary',
     icon: FileText,

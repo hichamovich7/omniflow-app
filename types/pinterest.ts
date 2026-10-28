@@ -17,6 +17,12 @@ export const PINTEREST_GENERATION_MODES = [
 ] as const;
 export type PinterestGenerationMode = (typeof PINTEREST_GENERATION_MODES)[number];
 
+// TASK-078: Pins from an article only. `classic` = the behavior before
+// visual archetypes; `auto-variety` gives each Pin a composition family
+// (lib/pinterest/visual-archetypes.ts).
+export const PINTEREST_VISUAL_STYLES = ['classic', 'auto-variety'] as const;
+export type PinterestVisualStyle = (typeof PINTEREST_VISUAL_STYLES)[number];
+
 export const PINTEREST_CREATIVE_FORMATS = [
   'hero-pin',
   'pattern-guide',

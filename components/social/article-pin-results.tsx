@@ -21,7 +21,7 @@ import {
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
 import { RegenerateTextButton } from '@/components/pinterest/regenerate-text-button';
-import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection } from '@/lib/social/pin-display';
+import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection, readPinVisualArchetype } from '@/lib/social/pin-display';
 import type { Pin } from '@/types/database';
 import type { ApiError } from '@/types/api';
 
@@ -176,6 +176,7 @@ function ArticlePinCard({
   const router = useRouter();
   const angle = readPinterestStrategyAngle(pin.image_analysis);
   const sourceSection = readPinSourceSection(pin.image_analysis);
+  const visualArchetype = readPinVisualArchetype(pin.image_analysis);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(pin.title);
   const [description, setDescription] = useState(pin.description);
@@ -271,6 +272,11 @@ function ArticlePinCard({
           {sourceSection && (
             <Badge variant="secondary" className="max-w-56 truncate" title={`Source section: ${sourceSection}`}>
               {sourceSection}
+            </Badge>
+          )}
+          {visualArchetype && (
+            <Badge variant="outline" title={`Visual archetype: ${visualArchetype}`} data-testid="article-pin-archetype">
+              {visualArchetype}
             </Badge>
           )}
         </div>

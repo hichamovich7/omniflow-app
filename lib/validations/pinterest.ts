@@ -7,6 +7,7 @@ import {
   PINTEREST_GENERATION_MODES,
   PINTEREST_STRATEGIES,
   PINTEREST_TEXT_IMPORTANCE,
+  PINTEREST_VISUAL_STYLES,
   SUPPORTED_LANGUAGES,
   PINS_MIN,
   PINS_MAX,
@@ -102,6 +103,9 @@ const generatePinsBaseSchema = z.object({
   // (trimmed). Never sent to the AI, never with UTM parameters. Works with
   // every source (keyword, research, OmniFlow article, existing post).
   destinationUrl: optionalDestinationUrlSchema,
+  // TASK-078: visual archetypes for article Pins. `classic` (default) keeps
+  // the former behavior; `auto-variety` needs an article source.
+  visualStyle: z.enum(PINTEREST_VISUAL_STYLES, { message: 'Invalid visual style' }).default('classic'),
 });
 
 // websiteUrl / pinterestUrl are Research source URLs (provenance), not the
@@ -110,6 +114,8 @@ export const ARTICLE_SOURCE_NO_URL_MESSAGE =
   'Research source URLs cannot be combined with an article source. Use the Destination URL field for the link of your Pins.';
 export const ARTICLE_SOURCE_NO_ANALYSIS_MESSAGE =
   'A content analysis cannot be combined with an article source.';
+export const AUTO_VARIETY_REQUIRES_ARTICLE_MESSAGE =
+  'Auto variety is only available for Pins generated from a WordPress article.';
 export const ARTICLE_SOURCE_SINGLE_MESSAGE =
   'Choose either an OmniFlow article or an existing WordPress post, not both.';
 
@@ -279,6 +285,9 @@ export const generatePinsSchema = z.preprocess(
       }
       if (data.wordpressArticleId && data.wordpressPost) {
         ctx.addIssue({ code: 'custom', path: ['wordpressPost'], message: ARTICLE_SOURCE_SINGLE_MESSAGE });
+      }
+      if (data.visualStyle === 'auto-variety' && !data.wordpressArticleId && !data.wordpressPost) {
+        ctx.addIssue({ code: 'custom', path: ['visualStyle'], message: AUTO_VARIETY_REQUIRES_ARTICLE_MESSAGE });
       }
       if (data.wordpressArticleId || data.wordpressPost) {
         // No Research source URL travels with an article-based request

@@ -1284,6 +1284,18 @@ Follow-up 2 (2026-10-25, per-section furniture + repair): `pinterest-home-decor-
 
 ---
 
+# Pinterest visual archetypes — Auto variety (TASK-078 Phase A, 2026-10-28)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-visual-archetypes.spec.ts tests/renderer/pinterest-visual-archetypes-ui.spec.ts tests/renderer/pinterest-generate-errors.spec.ts
+```
+
+Offline, fake AI by default (no AI, Vision, image, storage or WordPress call; `fetch` throws in the route harness). `pinterest-visual-archetypes.spec.ts` (23): Classic default (no plan, no archetype in prompt / briefs, schema default `classic`, `auto-variety` without an article refused); selection follows the article — Crochet EN (tutorial + materials, 4 distinct), materials only from the article (no invented yarn), no materials / no steps → neither layout (a single word such as "chunky" is not a list), post 2119 fixture (only eligible archetypes, subject contract unchanged), Clay EN, Home Decor DE (no tutorial / materials / hands / finished-object), Recipes EN (no product showcase, ingredients section used), Crochet DE / FR / ES (materials heading + step markers recognized); controlled diversity (deterministic, 7 Pins on 4 niches: never twice in a row, no repeat before exhaustion), slot assignment when sections are reordered; source of truth (subject contract before archetype, forbidden list kept, no written text, no URL; an object absent from the article → `UNGROUNDED_IMAGE_ELEMENTS`, no subject → `IMAGE_SUBJECT_MISMATCH`; props allowance replaced only by layouts that need it); persistence (stored, read back, appended by "Regenerate image", label shown; classic / keyword / older Pins unchanged; malformed archetype dropped; `pinterest-pin` profile still 1000×1500 JPEG). `pinterest-visual-archetypes-ui.spec.ts` (1, Chromium): grid badge for an Auto variety Pin, none for Classic. `pinterest-generate-errors.spec.ts` +3 route cases: Auto variety → 201, one text call, archetype per Pin in `<pin_plan>` and on each saved Pin (3 distinct), subject anchor still required, title / image_prompt / `link_url` as before; Classic → no archetype anywhere; Auto variety on a keyword request → 400, no AI call, nothing written.
+
+Validation (2026-10-28): targeted specs 44/44; full renderer **1345/1346** (the one failure is the pre-existing CRLF source-text case `social-content-studio.spec.ts:829`, see TASK-076 below); TypeScript OK, ESLint (touched files) OK, production build OK, `git diff --check` OK.
+
+Controlled real AI test (pending founder approval — not run): one article (e.g. post 1957 or 2119), 3-4 Pins, Auto variety, Photo Only or AI Integrated; no publication, WordPress read only; check each image shows the section's main subject, follows its archetype, adds nothing absent from the article and contains no invented written text; report the estimated cost.
+
 # Pinterest visual subject contract (TASK-077, 2026-10-28)
 
 ```txt

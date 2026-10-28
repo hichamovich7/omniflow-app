@@ -18,6 +18,7 @@ import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 import { getPinGenerationModeLabel } from './pin-diagnostic-badges';
 import { PinDestinationUrlEditor } from './destination-url-dialog';
 import { RegenerateTextButton } from './regenerate-text-button';
+import { readPinVisualArchetype } from '@/lib/social/pin-display';
 
 interface PinDetailDialogProps {
   pin: Pin;
@@ -33,6 +34,7 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean);
+  const visualArchetype = readPinVisualArchetype(pin.image_analysis);
 
   async function copyImagePrompt() {
     try {
@@ -51,9 +53,16 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
         </DialogHeader>
 
         <div className="space-y-4">
-          <Badge variant="outline" className="w-fit text-xs">
-            {getPinGenerationModeLabel(pin.visual_format)}
-          </Badge>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline" className="w-fit text-xs">
+              {getPinGenerationModeLabel(pin.visual_format)}
+            </Badge>
+            {visualArchetype && (
+              <Badge variant="secondary" className="w-fit text-xs" title="Visual archetype (Auto variety)">
+                {visualArchetype}
+              </Badge>
+            )}
+          </div>
           {pin.media_url ? (
             <div className="relative aspect-2/3 w-full overflow-hidden rounded-lg bg-muted" data-testid="pin-detail-preview">
               <Image

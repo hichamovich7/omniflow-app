@@ -32,6 +32,13 @@ import {
 } from '@/lib/pinterest/subject-concepts';
 import { findNicheProfile } from '@/lib/niche/resolve';
 import { ARTICLE_SOURCE_METADATA_KEY } from '@/lib/social/pin-display';
+import {
+  formatArchetypeLines,
+  isPinVisualArchetype,
+  planVisualArchetypes,
+  type PinVisualArchetype,
+  type PinterestVisualStyle,
+} from '@/lib/pinterest/visual-archetypes';
 
 /**
  * Article-grounded Pins (Volet B). Before the text model runs, every Pin is
@@ -60,6 +67,8 @@ export interface PinVisualBrief {
   forbiddenElements: string[];
   /** Absent on briefs stored before the contract existed: the former checks apply. */
   subjectContract?: VisualSubjectContract;
+  /** Auto variety (TASK-078): this Pin's composition family. Absent = classic brief. */
+  archetype?: PinVisualArchetype;
 }
 
 /**
@@ -117,6 +126,8 @@ export interface ArticleGrounding {
   language: string;
   /** Planned section text (heading, body, photo text) for the Home Decor check; the brief is used otherwise. */
   sectionTexts?: Record<string, string>;
+  /** Auto variety (TASK-078): one archetype per planned Pin, in Pin order. Absent in classic mode. */
+  pinArchetypes?: (PinVisualArchetype | null)[];
 }
 
 // What the image prompt check looks for. Only claims about the project:
@@ -399,6 +410,7 @@ export function formatVisualBrief(brief: PinVisualBrief): string {
     ...(contract ? subjectContractLines(contract) : stepObject
       ? [`Required subject: the image description must explicitly mention ${stepObject} and must show a ${stepObject} — this step may be shown on it (a detail, a work in progress), but a sample, tool or material alone is not enough`]
       : []),
+    ...(brief.archetype ? formatArchetypeLines(brief.archetype) : []),
     `Materials: ${list(brief.materials)}`,
     `Colors: ${list(brief.colors)}`,
     `Techniques: ${list(brief.techniques)}`,
@@ -445,7 +457,7 @@ export function buildArticleGrounding(
   context: WordPressArticleContext,
   pinsRequested: number,
   imageDescriptions: Record<string, SectionImageDescription[]> = {},
-  options: { niche?: string | null } = {}
+  options: { niche?: string | null; visualStyle?: PinterestVisualStyle } = {}
 ): ArticleGrounding {
   const sectionPlan = planArticlePinSections(context, pinsRequested);
   const evidence = buildArticleEvidence(context, imageDescriptions);
@@ -467,6 +479,9 @@ export function buildArticleGrounding(
     subjectCheck,
     language: context.language,
     sectionTexts,
+    ...(options.visualStyle === 'auto-variety'
+      ? { pinArchetypes: planVisualArchetypes(context, sectionPlan, briefs, options.niche) }
+      : {}),
   };
 }
 
@@ -478,7 +493,16 @@ export function sectionTextOf(grounding: ArticleGrounding, sectionId: string, br
 export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
   const assignments = grounding.sectionPlan.map((sectionId, index) => {
     const brief = grounding.briefs[sectionId];
-    return `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
+    const line = `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
+    const archetype = grounding.pinArchetypes?.[index];
+    if (!archetype) return line;
+    // Per Pin: two Pins of one section may get different layouts.
+    return [
+      line,
+      `  Visual archetype for Pin ${index + 1}: ${archetype.label} (${archetype.id}). Composition: ${archetype.composition}.`,
+      ...(archetype.elements.length ? [`  Elements this layout may add (still from the article only): ${archetype.elements.join('; ')}`] : []),
+      '  The archetype changes the layout only: the required subject of the section brief stays the dominant main subject; no written text, numbers or lists in the image.',
+    ].join('\n');
   });
   const briefs = Object.values(grounding.briefs).map((brief) => {
     const block = `Visual brief for section "${brief.sectionId}":\n${formatVisualBrief(brief)}`;
@@ -745,6 +769,12 @@ export function readArticleSourceMetadata(imageAnalysisJson: string | null): Per
   const listFields = ['materials', 'colors', 'techniques', 'patterns', 'shape', 'texture', 'visualDetails', 'allowedElements', 'forbiddenElements'] as const;
   if (!textFields.every((field) => typeof brief[field] === 'string')) return null;
   if (!listFields.every((field) => isStringArray(brief[field]))) return null;
+  // A malformed archetype is dropped: the Pin keeps its classic brief.
+  if (brief.archetype !== undefined && !isPinVisualArchetype(brief.archetype)) {
+    const classic = { ...(brief as PinVisualBrief) };
+    delete classic.archetype;
+    return { sourceType, sectionId, brief: classic };
+  }
   return { sourceType, sectionId, brief: brief as PinVisualBrief };
 }
 

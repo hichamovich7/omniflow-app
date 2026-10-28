@@ -56,6 +56,20 @@ export function readPinSourceSection(imageAnalysisJson: string | null): string |
   }
 }
 
+/** The visual archetype label of an Auto variety Pin (TASK-078), for display only (null otherwise). */
+export function readPinVisualArchetype(imageAnalysisJson: string | null): string | null {
+  if (!imageAnalysisJson) return null;
+  try {
+    const value = (JSON.parse(imageAnalysisJson) as Record<string, unknown>)?.[ARTICLE_SOURCE_METADATA_KEY] as
+      | { brief?: { archetype?: { label?: unknown } } }
+      | undefined;
+    const label = value?.brief?.archetype?.label;
+    return typeof label === 'string' && label.trim() ? label : null;
+  } catch {
+    return null;
+  }
+}
+
 export function articlePinterestCreateHref(articleId: string, generationId?: string): string {
   const params = new URLSearchParams({ source: 'wordpress', articleId });
   if (generationId) params.set('generationId', generationId);

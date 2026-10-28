@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest article Pins: Auto variety visual archetypes — TASK-078 Phase A (2026-10-28)
+
+* New option **Visual style** on Pins made from a WordPress article (OmniFlow article or existing post): **Classic** (default — exactly the former behavior) or **Auto variety**. Keyword and Research flows are unchanged; `visualStyle: "auto-variety"` without an article → 400.
+* Auto variety gives every Pin of the batch a composition family (new `lib/pinterest/visual-archetypes.ts`): lifestyle hero, step-by-step tutorial, materials & tools, collage grid, hands in action, finished project, variations, problem / solution, product showcase, minimal editorial, recipe card, before / after. Each niche (Crochet, Clay, Home Decor, Recipes, other) has its recommended order.
+* An archetype is only chosen when the article backs it: steps (a step section, or numbered "Step / Row / Round" markers in EN, DE, FR, ES), a materials or ingredients section (EN, DE, FR, ES headings) or at least two materials named, two colors for variations, an explicit before/after or problem section. Home Decor never gets tutorial, materials, hands or finished-object layouts; Recipes never a product showcase.
+* Controlled, deterministic diversity: no archetype repeats before the eligible ones are used, never twice in a row when another is possible; same article and count → same plan.
+* The archetype changes the layout only. The visual subject contract (TASK-077) comes first in the brief, every safeguard and the single image_prompt repair are unchanged, the fixed forbidden list (text, logos, brand names) stays, and the archetype forbids written step text, numbers or lists inside the image.
+* Stored in the Pin's brief (`pins.image_analysis._articleSource.brief.archetype`, no migration), so "Regenerate image" keeps it; a malformed stored archetype is ignored. The archetype label is shown on article result cards, the Pin grid and Pin Details.
+* Not touched: UTM, CSV export, Destination URL, scheduling, WordPress, image storage (R2, 1000×1500 JPEG), keyword flows. No reference image is sent to the image model, no Pinterest scraping, no new AI call, no migration (the reference library and migration 047 are Phase B).
+
 ## Pinterest article Pins: multilingual visual subject contract per section — TASK-077 (2026-10-28)
 
 * Reported on post 2119 ("6 Festive Crochet Cat Patterns for Ornaments, Amigurumi & Gifts"): Pins drawn as a kitten ornament or a hat instead of the amigurumi. The H1 subject was the first object named (`ornament`), accessories could stand in for the project, and an object named in one section was accepted in another.

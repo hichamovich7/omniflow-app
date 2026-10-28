@@ -45,6 +45,7 @@ import {
   validateArticleGroundedPins,
   type ArticleGrounding,
 } from '@/lib/pinterest/article-briefs';
+import { assignPinArchetypes, withVisualArchetype } from '@/lib/pinterest/visual-archetypes';
 import { describeSectionImages, referenceImageHosts } from '@/lib/pinterest/article-vision';
 import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
 import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
     wordpressArticleId,
     wordpressPost,
     destinationUrl,
+    visualStyle,
   } = parsed.data;
   // The schema already rejects a reference for the other modes; this is a
   // second guard so the Vision step below can only ever run for Legacy
@@ -267,7 +269,11 @@ export async function POST(request: Request) {
     });
     // Counts only: no URL, no article content.
     console.log(`[${PROMPT_ID}] Article image descriptions: ${JSON.stringify(stats)}`);
-    articleGrounding = buildArticleGrounding(articleSource.context, pinsRequested, descriptions, { niche: articleSource.niche });
+    // TASK-078: archetypes only with Auto variety; classic keeps the former briefs.
+    articleGrounding = buildArticleGrounding(articleSource.context, pinsRequested, descriptions, {
+      niche: articleSource.niche,
+      visualStyle,
+    });
   }
 
   let analysisContext: string | null = articleSource
@@ -514,6 +520,10 @@ export async function POST(request: Request) {
       [...BANNER_TEMPLATES];
 
     const angleOccurrences = new Map<string, number>();
+    // Auto variety: each saved Pin keeps the archetype planned for its slot.
+    const pinArchetypes = articleGrounding?.pinArchetypes
+      ? assignPinArchetypes(articleGrounding.sectionPlan, articleGrounding.pinArchetypes, resolvedPins.map((pin) => pin.sourceSectionId))
+      : null;
 
     const pinsToInsert = resolvedPins.map((pin, i) => {
       const angleOccurrence = angleOccurrences.get(pin.angle) ?? 0;
@@ -540,7 +550,7 @@ export async function POST(request: Request) {
         ? attachArticleSourceMetadata(integratedAnalysis, {
             sourceType: articleGrounding.sourceType,
             sectionId: sourceBrief.sectionId,
-            brief: sourceBrief,
+            brief: withVisualArchetype(sourceBrief, pinArchetypes?.[i] ?? null),
           })
         : integratedAnalysis;
 

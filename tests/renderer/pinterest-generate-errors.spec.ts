@@ -572,6 +572,58 @@ test.describe('Crochet: the amigurumi article and one targeted repair', () => {
   });
 });
 
+test.describe('Visual style (TASK-078): Auto variety on article Pins, Classic by default', () => {
+  const catSectionIds = () =>
+    planArticlePinSections(buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html: CAT_POST.contentHtml, title: CAT_POST.title, language: 'en' }), 3);
+  const storedBriefs = (events: RecordedEvent[]) =>
+    (pinInserts(events)[0].row as Array<Record<string, unknown>>).map(
+      (row) => JSON.parse(row.image_analysis as string)._articleSource.brief as { archetype?: { id: string }; subjectContract?: unknown }
+    );
+
+  test('Auto variety: one different archetype per Pin in the prompt and on each saved Pin; nothing else changes', async () => {
+    await withRoute([catPlan(KITTEN_AMIGURUMI, catSectionIds())], { catPost: true }, async ({ post, events, textCalls }) => {
+      const res = await post({ ...catRequest, visualStyle: 'auto-variety' });
+      expect(res.status).toBe(201);
+      expect(textCalls).toHaveLength(1);
+      const prompt = `${textCalls[0].system}\n${textCalls[0].user}`;
+      expect(prompt).toContain('Visual archetype for Pin 1:');
+      expect(prompt).toContain('Visual archetype for Pin 3:');
+      // The subject contract is still in the prompt.
+      expect(prompt).toContain('(write "amigurumi crochet toy")');
+      const briefs = storedBriefs(events);
+      const archetypes = briefs.map((brief) => brief.archetype?.id);
+      expect(archetypes.every(Boolean)).toBe(true);
+      expect(new Set(archetypes).size).toBe(3);
+      const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+      const original = JSON.parse(catPlan(KITTEN_AMIGURUMI, catSectionIds())).pins;
+      rows.forEach((row, index) => {
+        // Destination URL untouched (none given, no permalink added), text and image prompt as returned.
+        expect(row.link_url).toBeNull();
+        expect(row.title).toBe(original[index].title);
+        expect(row.image_prompt).toBe(original[index].image_prompt);
+      });
+    });
+  });
+
+  test('Classic (no visualStyle sent): same prompt and stored briefs as before, no archetype', async () => {
+    await withRoute([catPlan(KITTEN_AMIGURUMI, catSectionIds())], { catPost: true }, async ({ post, events, textCalls }) => {
+      const res = await post(catRequest);
+      expect(res.status).toBe(201);
+      expect(`${textCalls[0].system}\n${textCalls[0].user}`).not.toContain('Visual archetype');
+      expect(storedBriefs(events).every((brief) => brief.archetype === undefined)).toBe(true);
+    });
+  });
+
+  test('Auto variety without an article: 400 before any AI call, nothing created', async () => {
+    await withRoute([], {}, async ({ post, events, textCalls }) => {
+      const res = await post({ ...keywordRequest, visualStyle: 'auto-variety' });
+      expect(res.status).toBe(400);
+      expect(textCalls).toHaveLength(0);
+      expect(events).toHaveLength(0);
+    });
+  });
+});
+
 test('the route declares a 180s maxDuration (longer than the 120s text timeout)', () => {
   const source = readFileSync('app/api/pinterest/generate/route.ts', 'utf8');
   expect(source).toMatch(/export const maxDuration = 180;/);
