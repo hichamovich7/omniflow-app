@@ -220,7 +220,7 @@ test.describe('Crochet and Clay do not regress', () => {
       expect(validateArticleGroundedPins(good, g)).toEqual([]);
       const offTopic = validateArticleGroundedPins(good.map((pin) => ({ ...pin, image_prompt: 'A cozy reading nook with a mug of tea.' })), g);
       expect(offTopic.every((issue) => issue.message.includes("does not show its source section's project"))).toBe(true);
-      expect(offTopic[0].subject).toEqual({ expected: ['scarf'], detected: ['no recognizable project'], missing: ['scarf'] });
+      expect(offTopic[0].subject).toEqual({ expected: ['scarf'], detected: ['no recognizable project'], missing: ['scarf'], required: 'scarf' });
       const invented = validateArticleGroundedPins([{ ...good[0], image_prompt: 'A chunky wool scarf with fringe.' }], g);
       expect(invented.find((issue) => issue.reason === 'UNGROUNDED_IMAGE_ELEMENTS')?.details).toEqual(expect.arrayContaining(['chunky', 'wool', 'fringe']));
     }

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from 'playwright/test';
 import * as wordpressPostSource from '@/lib/social/pinterest-from-wordpress-post';
 import { buildWordPressArticleContext } from '@/lib/wordpress/article-context';
@@ -118,7 +119,36 @@ function homeDecorPlan(curtainPrompt: string, sectionIds: string[]) {
   });
 }
 
-type TextCall = { timeoutMs?: number; maxTokens?: number; user?: string };
+// Real post 2119 (6 Festive Crochet Cat Patterns…): the production
+// "Expected: amigurumi. Detected: hat, ornament." case.
+const CAT_FIXTURE = JSON.parse(readFileSync(join(__dirname, '../fixtures/pinterest/crochet-cat-amigurumi-post.json'), 'utf8'));
+const CAT_POST = { ...CAT_FIXTURE, id: 2119, date: '2026-10-20T00:00:00', status: 'publish', categories: ['Crochet Christmas'], categoryIds: [], tags: [] };
+const catRequest = { ...articleRequest, keyword: 'Christmas crochet cat patterns', wordpressPost: { siteId: SITE_ID, postId: 2119 } };
+const KITTEN_ORNAMENT_ONLY = 'A small seated cream crocheted kitten Christmas ornament wearing a red Santa hat, with a hanging loop on top, plain cream surface, soft natural light, photorealistic.';
+const KITTEN_AMIGURUMI = 'A small seated cream amigurumi crochet toy kitten wearing a red Santa hat, with a hanging loop on top, plain cream surface, soft natural light, photorealistic.';
+
+function catPlan(kittenPrompt: string, sectionIds: string[]) {
+  const prompts = [
+    kittenPrompt,
+    'A flat heart-shaped crochet ornament with an embroidered cat face, overhead on a plain light gray surface, soft natural light, photorealistic.',
+    'A ginger amigurumi crochet toy cat with a Santa hat and a scarf, worked in the round, plain white backdrop, soft natural light, photorealistic.',
+  ];
+  const titles = ['What Makes a Crochet Kitten Feel Festive?', 'A Flat Cat Ornament for Quick Holiday Gifts', 'Christmas Cat Amigurumi You Can Follow Round by Round'];
+  return JSON.stringify({
+    pins: sectionIds.map((sourceSectionId, index) => ({
+      sourceSectionId,
+      angle: ANGLES[index],
+      title: titles[index],
+      description: 'A festive crochet cat idea from this Christmas pattern roundup. Save this Pin for your next holiday crochet session.',
+      keywords: 'crochet cat, christmas crochet, amigurumi',
+      board: 'Crochet',
+      image_prompt: prompts[index],
+      visualFormat: 'photo',
+    })),
+  });
+}
+
+type TextCall = { timeoutMs?: number; maxTokens?: number; system?: string; user?: string };
 type ModelStep = string | Error;
 
 interface RecordedEvent {
@@ -135,7 +165,7 @@ interface Harness {
 
 async function withRoute(
   steps: ModelStep[],
-  options: { failPinsInsert?: boolean; homeDecor?: boolean },
+  options: { failPinsInsert?: boolean; homeDecor?: boolean; catPost?: boolean },
   run: (harness: Harness) => Promise<void>
 ): Promise<void> {
   const events: RecordedEvent[] = [];
@@ -185,7 +215,7 @@ async function withRoute(
     },
   };
 
-  const post = options.homeDecor ? HOME_DECOR_POST : {
+  const post = options.homeDecor ? HOME_DECOR_POST : options.catPost ? CAT_POST : {
     id: 1957,
     title: 'Autumn Brioche Crochet Cardigan: Size Guide, Steps & 6 Color Ideas',
     date: '2026-10-01T00:00:00',
@@ -209,7 +239,7 @@ async function withRoute(
     },
     '@/lib/ai/engine': {
       generateText: async (params: TextCall & { messages?: Array<{ content: string }> }) => {
-        textCalls.push({ timeoutMs: params.timeoutMs, maxTokens: params.maxTokens, user: params.messages?.[1]?.content });
+        textCalls.push({ timeoutMs: params.timeoutMs, maxTokens: params.maxTokens, system: params.messages?.[0]?.content, user: params.messages?.[1]?.content });
         const step = steps.shift();
         if (step === undefined) throw new Error('unexpected AI call');
         if (step instanceof Error) throw step;
@@ -360,8 +390,10 @@ test.describe('Other failures keep their structured answer and leave no partial 
         visualFormat: 'photo',
       })),
     });
-    await withRoute([answer], {}, async ({ post, events }) => {
+    await withRoute([answer], {}, async ({ post, events, textCalls }) => {
       const res = await post(articleRequest);
+      // Pin 1 also has an unplanned section: a repair cannot fix the batch, so none is tried.
+      expect(textCalls).toHaveLength(1);
       expect(res.status).toBe(422);
       const body = await res.json();
       expect(body.error.code).toBe('strategy_safeguard_failed');
@@ -479,6 +511,64 @@ test.describe('Home Decor: section-grounded image elements and one targeted repa
       expect((await post(keywordRequest)).status).toBe(422);
       expect(textCalls).toHaveLength(1);
     });
+  });
+});
+
+test.describe('Crochet: the amigurumi article and one targeted repair', () => {
+  const catSectionIds = () =>
+    planArticlePinSections(buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html: CAT_POST.contentHtml, title: CAT_POST.title, language: 'en' }), 3);
+
+  test('a faithful batch is saved on the first answer: no repair, no image call, no destination URL added', async () => {
+    await withRoute([catPlan(KITTEN_AMIGURUMI, catSectionIds())], { catPost: true }, async ({ post, events, textCalls }) => {
+      const res = await post(catRequest);
+      expect(res.status).toBe(201);
+      expect(textCalls).toHaveLength(1);
+      // The brief sent to the text model asks for the explicit anchor.
+      expect(`${textCalls[0].system}\n${textCalls[0].user}`).toContain('(write "amigurumi crochet toy")');
+      const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+      expect(rows).toHaveLength(3);
+      expect(rows.every((row) => row.link_url === null)).toBe(true);
+      // generateImage / analyzeImage / fetch all throw in this harness: reaching 201 proves none ran,
+      // and the post is only read through the faked loader — WordPress is never written.
+    });
+  });
+
+  test('kitten ornament with a hat only → one repair naming amigurumi → only that image_prompt changes, then saved', async () => {
+    const repaired = JSON.stringify({ pins: [{ pin: 1, image_prompt: KITTEN_AMIGURUMI }] });
+    await withRoute([catPlan(KITTEN_ORNAMENT_ONLY, catSectionIds()), repaired], { catPost: true }, async ({ post, events, textCalls }) => {
+      const res = await post(catRequest);
+      expect(res.status).toBe(201);
+      expect(textCalls).toHaveLength(2);
+      expect(textCalls[1].user).toContain('Required primary subject: amigurumi.');
+      expect(textCalls[1].user).toContain('write "amigurumi crochet toy" explicitly');
+      const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+      const original = JSON.parse(catPlan(KITTEN_ORNAMENT_ONLY, catSectionIds())).pins;
+      expect(rows[0].image_prompt).toBe(KITTEN_AMIGURUMI);
+      rows.forEach((row, index) => {
+        expect(row.title).toBe(original[index].title);
+        expect(row.description).toBe(original[index].description);
+        if (index > 0) expect(row.image_prompt).toBe(original[index].image_prompt);
+      });
+    });
+  });
+
+  test('a failed repair → 422 with the required subject, nothing saved', async () => {
+    const stillOrnament = JSON.stringify({ pins: [{ pin: 1, image_prompt: KITTEN_ORNAMENT_ONLY }] });
+    for (const repair of [stillOrnament, 'not json', new Error('OpenRouter error: 503')]) {
+      await withRoute([catPlan(KITTEN_ORNAMENT_ONLY, catSectionIds()), repair], { catPost: true }, async ({ post, events, textCalls }) => {
+        const res = await post(catRequest);
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error.issues).toEqual([expect.objectContaining({ code: 'IMAGE_SUBJECT_MISMATCH', pinIndex: 1, field: 'image_prompt' })]);
+        expect(body.error.issues[0].message).toBe(
+          'Pin 1 does not clearly represent the article section. Expected: amigurumi. Detected: ornament, hat. Missing: amigurumi. Required subject: amigurumi.'
+        );
+        expect(body.error.issues[0].action).toContain('the image must show amigurumi as its main subject');
+        expect(textCalls).toHaveLength(2);
+        expect(pinInserts(events)).toHaveLength(0);
+        expect(generationUpdates(events).map((row) => row.status)).toEqual(['failed']);
+      });
+    }
   });
 });
 

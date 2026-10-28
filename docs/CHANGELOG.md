@@ -18,6 +18,17 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest article Pins: multilingual visual subject contract per section — TASK-077 (2026-10-28)
+
+* Reported on post 2119 ("6 Festive Crochet Cat Patterns for Ornaments, Amigurumi & Gifts"): Pins drawn as a kitten ornament or a hat instead of the amigurumi. The H1 subject was the first object named (`ornament`), accessories could stand in for the project, and an object named in one section was accepted in another.
+* Visual subject contract per section (`PinVisualBrief.subjectContract`, `lib/pinterest/article-briefs.ts`): one primary subject from the section heading, else (step section) from the H1; supporting elements from that section only; elements of other sections forbidden. In the H1 a project wins over a form or an accessory (→ `amigurumi`). The brief asks for the primary subject as the visible, dominant main subject with its English anchor ("amigurumi crochet toy").
+* Multilingual concepts (new `lib/pinterest/subject-concepts.ts`): canonical ids with English, German, French and Spanish aliases, niche-only heading hints (Crochet "cat" → amigurumi), roles project / form / accessory; generic words (object, craft, decoration, clothing…) are never a subject. The image prompt (English) must name the concept; negated mentions do not count.
+* Primary subject before accessories: a hat, scarf or ornament alone → `IMAGE_SUBJECT_MISMATCH` with `subject.required` ("Required subject: amigurumi."). Objects must be proven by the Pin's own section; materials, colors, motifs and techniques stay article-wide. Home Decor: only curated pieces (sofa, curtains, bar cart…), no H1 inheritance; room sections keep the TASK-067 check.
+* Automatic repair limited to **one** text call (30 s), now for every article niche, when all failures concern the image_prompt (`UNGROUNDED_IMAGE_ELEMENTS`, or a contract `IMAGE_SUBJECT_MISMATCH`): names the anchor, removes unsupported accessories, keeps every other field; the whole batch is validated again. If the final validation fails, the original 422 is returned and **nothing is saved** (no Pin, generation `failed`).
+* Real AI test on post 2119: 5 Pins accepted on the first answer. Briefs stored before the contract keep the former checks.
+* User Guide: new "Pinterest visual checks" section (`lib/guide/content.ts`). No "Style reference only" label is added to the interface (Pinterest inspiration is not implemented).
+* Limits: Pinterest inspiration remains "Style reference only — performance not verified"; no Pinterest metrics are collected (no table, no migration). UTM, Destination URL, WordPress and other prompts unchanged. No migration, no new endpoint.
+
 ## Home Decor Pins: furniture grounded per section + one image_prompt repair — TASK-067 follow-up 2 (2026-10-25)
 
 * Reported again on post 1489 (Pin 6, `UNGROUNDED_IMAGE_ELEMENTS`) after the prompt fix. Audit: both reported request ids encode 19:18Z and 19:55Z, before the production deployment of commit 4a78c94 (20:20Z) — the fix was most likely not live yet (the Vercel `dpl_` id could not be mapped without a Vercel token). Architecture gap found anyway: the Home Decor element check used the whole article, so a section's Vision ("two glass shelves" of the bar cart, section 7) allowed shelves in the curtain Pin (section 9).

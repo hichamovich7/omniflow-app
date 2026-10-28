@@ -147,8 +147,11 @@ function describe(issue: PinterestStrategyIssue, scope: StrategySafeguardScope):
           `${pin} does not clearly represent the article section.` +
           list('Expected', subject?.expected) +
           list('Detected', subject?.detected) +
-          list('Missing', subject?.missing),
-        action: 'Try again, or review the article section.',
+          list('Missing', subject?.missing) +
+          (subject?.required ? ` Required subject: ${subject.required}.` : ''),
+        action: subject?.required
+          ? `Try again: the image must show ${subject.required} as its main subject, other elements only beside it. Or review the article section.`
+          : 'Try again, or review the article section.',
       };
     }
     case 'UNGROUNDED_IMAGE_ELEMENTS':

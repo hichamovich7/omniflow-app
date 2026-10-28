@@ -22,6 +22,14 @@ import {
   findUngroundedHomeTerms,
   sectionHomeFurniture,
 } from '@/lib/pinterest/home-decor-anchors';
+import {
+  findSubjectConcepts,
+  isCuratedSubjectConcept,
+  resolveHeadingSubject,
+  subjectConcept,
+  subjectNicheOf,
+  type SubjectNiche,
+} from '@/lib/pinterest/subject-concepts';
 import { findNicheProfile } from '@/lib/niche/resolve';
 import { ARTICLE_SOURCE_METADATA_KEY } from '@/lib/social/pin-display';
 
@@ -50,6 +58,32 @@ export interface PinVisualBrief {
   visualDetails: string[];
   allowedElements: string[];
   forbiddenElements: string[];
+  /** Absent on briefs stored before the contract existed: the former checks apply. */
+  subjectContract?: VisualSubjectContract;
+}
+
+/**
+ * What a Pin image must show, independent of the article language: one
+ * canonical concept (subject-concepts.ts) taken from the section heading,
+ * else — a step section that names no project — inherited from the H1.
+ * Supporting elements come from this section only and never replace the
+ * primary subject.
+ */
+export interface VisualSubjectContract {
+  primarySubjectId: string;
+  /** Heading or H1 text in the article language (data, never sent as an instruction). */
+  primarySubjectLabel: string;
+  /** Normalized English anchors the image prompt must contain ("amigurumi crochet toy"). */
+  requiredImageAnchors: string[];
+  /** Concepts this section names beside the primary subject (hat on an amigurumi). */
+  allowedSupportingElements: string[];
+  /** Concepts other sections name but this one never does. */
+  forbiddenElements: string[];
+  sourceSectionId: string;
+  /** True when a step section inherits the H1's subject. */
+  inheritedFromTitle: boolean;
+  /** Fixed-template provenance: where the primary subject was read. */
+  evidence: string[];
 }
 
 /** Text-only description of a section's photo (alt/caption or Vision). */
@@ -182,21 +216,33 @@ export function buildArticleEvidence(context: WordPressArticleContext, imageDesc
     .join('\n');
 }
 
-function forbiddenFor(evidence: string): string[] {
+/**
+ * Elements the brief forbids. Objects (projects, accessories) must come from
+ * the Pin's own section (`objectEvidence`): a hat in another section never
+ * allows a hat here. Materials, motifs and techniques stay article-wide.
+ */
+function forbiddenFor(evidence: string, objectEvidence = evidence): string[] {
   const present = new Set(
-    (['objects', 'materials', 'patterns', 'techniques'] as const).flatMap((category) => findTerms(evidence, category))
+    (['materials', 'patterns', 'techniques'] as const).flatMap((category) => findTerms(evidence, category))
   );
-  const absentProjects = (CHECKED_TERMS.objects ?? []).filter((term) => !present.has(term));
-  const absentInventions = COMMON_INVENTIONS.filter((term) => !present.has(term));
+  const presentObjects = new Set(findTerms(objectEvidence, 'objects'));
+  const isPresent = (term: string) => present.has(term) || presentObjects.has(term);
+  const absentProjects = (CHECKED_TERMS.objects ?? []).filter((term) => !presentObjects.has(term));
+  const absentInventions = COMMON_INVENTIONS.filter((term) => !isPresent(term));
   return uniq([...absentInventions, ...absentProjects.slice(0, 12)]);
 }
 
 /**
  * The article's main project (H1 "Autumn Brioche Crochet Cardigan: Size
- * Guide…" → `cardigan`): the object named first in the title, so an
+ * Guide…" → `cardigan`), resolved by concept (subject-concepts.ts): a
+ * project named in the head of the title wins over a form or an accessory
+ * ("…Cat Patterns for Ornaments, Amigurumi & Gifts" → `amigurumi`), and an
  * accessory named later ("…with a tote bag") never replaces it.
  */
-export function mainArticleObject(title: string): string | null {
+export function mainArticleObject(title: string, options: { language?: string; niche?: SubjectNiche | null } = {}): string | null {
+  const resolved = resolveHeadingSubject(title, options);
+  if (resolved) return resolved;
+  // Former rule, for objects no concept covers: the object named first.
   const normalized = normalizeForMatch(title);
   let best: { term: string; position: number } | null = null;
   for (const spellings of VISUAL_LEXICON.objects) {
@@ -208,12 +254,53 @@ export function mainArticleObject(title: string): string | null {
   return best?.term ?? null;
 }
 
+interface ContractInput {
+  context: WordPressArticleContext;
+  section: ArticleSection;
+  sectionText: string;
+  subjectCheck: ArticleSubjectCheck;
+  niche: SubjectNiche | null;
+}
+
 /**
- * Project nouns the image prompt must show: the section's own (heading),
- * else — a step section such as "1. Measure yourself and select a size" —
- * the article's main project. Empty when neither names one.
+ * The section's visual subject contract, or null when neither the section
+ * nor the H1 names a concept (the former step-word check then applies).
+ * Home Decor only uses its curated concepts (sofa, curtains, bar cart…) and
+ * never inherits the H1: a room section is not "the article's sofa".
+ */
+export function buildVisualSubjectContract({ context, section, sectionText, subjectCheck, niche }: ContractInput): VisualSubjectContract | null {
+  const options = { language: context.language, niche };
+  const homeDecor = subjectCheck === 'home-decor';
+  const usable = (id: string | null) => (id && (!homeDecor || isCuratedSubjectConcept(id)) ? id : null);
+  const heading = section.kind === 'intro' ? context.title : section.subject;
+  const own = usable(resolveHeadingSubject(heading, options));
+  const inherited = !own && !homeDecor && section.kind !== 'intro' ? usable(mainArticleObject(context.title, options)) : null;
+  const primary = own ?? inherited;
+  const concept = primary ? subjectConcept(primary) : null;
+  if (!primary || !concept) return null;
+
+  const inSection = new Set(findSubjectConcepts(sectionText, options));
+  const inArticle = findSubjectConcepts(buildArticleEvidence(context), options);
+  return {
+    primarySubjectId: primary,
+    primarySubjectLabel: heading,
+    requiredImageAnchors: [concept.imageAnchor],
+    allowedSupportingElements: [...inSection].filter((id) => id !== primary),
+    forbiddenElements: inArticle.filter((id) => id !== primary && !inSection.has(id)),
+    sourceSectionId: section.id,
+    inheritedFromTitle: Boolean(inherited),
+    evidence: [inherited ? 'inherited from the article title (H1)' : section.kind === 'intro' ? 'article title (H1)' : 'section heading'],
+  };
+}
+
+/**
+ * Project nouns the image prompt must show: the contract's primary subject,
+ * else (briefs stored before the contract) the section's own (heading), else
+ * — a step section such as "1. Measure yourself and select a size" — the
+ * article's main project. Empty when neither names one.
  */
 function expectedProjectObjects(brief: PinVisualBrief): string[] {
+  if (brief.subjectContract) return [brief.subjectContract.primarySubjectId];
   const fromSection = findTerms(`${brief.represented}\n${brief.sourceSection}`, 'objects');
   if (fromSection.length > 0) return fromSection;
   const main = mainArticleObject(brief.articleSubject);
@@ -226,6 +313,7 @@ function articleStepRepresented(object: string, step: string): string {
 
 /** The H1 project of a step brief (project check only), else null — Home Decor and headed sections never have one. */
 function articleStepObject(brief: PinVisualBrief): string | null {
+  if (brief.subjectContract) return brief.subjectContract.inheritedFromTitle ? brief.subjectContract.primarySubjectId : null;
   const main = mainArticleObject(brief.articleSubject);
   return main && brief.represented.startsWith(articleStepRepresented(main, '')) ? main : null;
 }
@@ -235,8 +323,17 @@ export function buildPinVisualBrief(
   section: ArticleSection,
   descriptions: SectionImageDescription[] = [],
   evidence = buildArticleEvidence(context),
-  options: { subjectCheck?: ArticleSubjectCheck } = {}
+  options: { subjectCheck?: ArticleSubjectCheck; niche?: string | null } = {}
 ): PinVisualBrief {
+  const subjectCheck = options.subjectCheck ?? 'project';
+  const sectionText = articleSectionText(context, section, descriptions);
+  const contract = buildVisualSubjectContract({
+    context,
+    section,
+    sectionText,
+    subjectCheck,
+    niche: subjectNicheOf(findNicheProfile(options.niche)?.slug),
+  });
   const described = descriptions.map((item) => cleanArticleText(item.text)).filter(Boolean);
   const attributes: VisualAttributes = mergeVisualAttributes(section.attributes, ...described.map(extractVisualAttributes));
   const sentences = sentencesOf(section.text).filter((sentence) => !/^original photo\b/i.test(sentence));
@@ -249,10 +346,7 @@ export function buildPinVisualBrief(
     .map((detail) => clip(detail));
   // Project check only (never Home Decor): a step heading without a project
   // noun is shown as a step of the article's main project.
-  const articleObject =
-    (options.subjectCheck ?? 'project') === 'project' && section.kind !== 'intro' && findTerms(`${section.subject}\n${section.heading}`, 'objects').length === 0
-      ? mainArticleObject(context.title)
-      : null;
+  const articleObject = contract?.inheritedFromTitle ? contract.primarySubjectId : null;
   const represented = section.kind === 'intro'
     ? context.title
     : articleObject
@@ -278,8 +372,14 @@ export function buildPinVisualBrief(
       'soft natural light',
       'at most one or two text-free styling props that do not compete with the project',
     ]),
-    forbiddenElements: uniq([...forbiddenFor(evidence), ...FIXED_FORBIDDEN]),
+    forbiddenElements: uniq([...forbiddenFor(evidence, objectEvidenceOf(sectionText, contract)), ...FIXED_FORBIDDEN]),
+    ...(contract ? { subjectContract: contract } : {}),
   };
+}
+
+/** What may prove an object in a Pin image: its own section, plus the primary subject a step inherits. */
+function objectEvidenceOf(sectionText: string, contract: VisualSubjectContract | null | undefined): string {
+  return contract ? `${sectionText}\n${contract.primarySubjectId}` : sectionText;
 }
 
 function list(values: string[], empty = 'not specified in the article — keep it plain, do not invent'): string {
@@ -291,11 +391,12 @@ export function formatVisualBrief(brief: PinVisualBrief): string {
   // A step ("Make and measure a gauge swatch") was drawn as a swatch alone:
   // the project itself must stay in the picture.
   const stepObject = articleStepObject(brief);
+  const contract = brief.subjectContract;
   return [
     `Article subject: ${brief.articleSubject}`,
     `Source section: ${brief.sourceSection}`,
     `Pattern or project represented: ${brief.represented}`,
-    ...(stepObject
+    ...(contract ? subjectContractLines(contract) : stepObject
       ? [`Required subject: the image description must explicitly mention ${stepObject} and must show a ${stepObject} — this step may be shown on it (a detail, a work in progress), but a sample, tool or material alone is not enough`]
       : []),
     `Materials: ${list(brief.materials)}`,
@@ -307,6 +408,20 @@ export function formatVisualBrief(brief: PinVisualBrief): string {
     `Allowed elements: ${brief.allowedElements.join('; ')}`,
     `Forbidden elements: ${brief.forbiddenElements.join('; ')}`,
   ].join('\n');
+}
+
+/** The contract as brief lines: fixed templates and canonical concept ids only. */
+function subjectContractLines(contract: VisualSubjectContract): string[] {
+  const id = contract.primarySubjectId;
+  const anchors = contract.requiredImageAnchors.map((anchor) => `"${anchor}"`).join(' or ');
+  const step = contract.inheritedFromTitle
+    ? ' — this step may be shown on it (a detail, a work in progress), but a sample, tool or material alone is not enough'
+    : '';
+  return [
+    `Required subject: the image description must explicitly mention ${id} and must show a ${id} as the visible, dominant main subject (write ${anchors})${step}`,
+    `Supporting elements (only beside the ${id}, never instead of it): ${contract.allowedSupportingElements.length ? contract.allowedSupportingElements.join(', ') : 'none named in this section'}`,
+    ...(contract.forbiddenElements.length ? [`Not in this section (never show them): ${contract.forbiddenElements.join(', ')}`] : []),
+  ];
 }
 
 /** What a stored brief says about its section — the Home Decor check's input when the full section is not at hand. */
@@ -340,7 +455,7 @@ export function buildArticleGrounding(
   for (const sectionId of new Set(sectionPlan)) {
     const section = findSection(context, sectionId);
     if (!section) continue;
-    briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence, { subjectCheck });
+    briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence, { subjectCheck, niche: options.niche });
     sectionTexts[sectionId] = articleSectionText(context, section, imageDescriptions[sectionId] ?? []);
   }
   return {
@@ -397,14 +512,19 @@ function withoutNegatedClauses(value: string): string {
   return value.replace(/\b(?:no|without|not|never|avoid|avoiding|excluding|free of)\b[^.,;:\n]*/gi, ' ');
 }
 
-/** Project claims in an image prompt that the article never makes. */
-export function findUngroundedVisualTerms(imagePrompt: string, evidence: string): string[] {
+/**
+ * Project claims in an image prompt that the article never makes. With
+ * `objectEvidence` (the Pin's own section), objects must come from it: an
+ * accessory of another section is never proof. Other categories stay
+ * article-wide.
+ */
+export function findUngroundedVisualTerms(imagePrompt: string, evidence: string, objectEvidence?: string): string[] {
   const checked = withoutNegatedClauses(imagePrompt);
   const ungrounded: string[] = [];
   for (const [category, terms] of Object.entries(CHECKED_TERMS) as Array<[AttributeCategory, readonly string[]]>) {
     const inPrompt = findTerms(checked, category).filter((term) => terms.includes(term));
     if (inPrompt.length === 0) continue;
-    const inEvidence = new Set(findTerms(evidence, category));
+    const inEvidence = new Set(findTerms(category === 'objects' && objectEvidence !== undefined ? objectEvidence : evidence, category));
     ungrounded.push(...inPrompt.filter((term) => !inEvidence.has(term)));
   }
   return uniq(ungrounded);
@@ -427,7 +547,29 @@ export function findUngroundedTextTerms(
   ]);
 }
 
+/** Concepts an (English) image prompt really shows: negated mentions ("no hat") do not count. */
+export function detectedImageSubjects(imagePrompt: string): string[] {
+  return findSubjectConcepts(withoutNegatedClauses(imagePrompt), { language: 'en' });
+}
+
+/**
+ * The contract check: the primary subject must be named. Accessories or
+ * forms alone ("a kitten ornament with a Santa hat") never stand in for it.
+ */
+export function checkSubjectContract(imagePrompt: string, contract: VisualSubjectContract): PinterestSubjectReport & { ok: boolean } {
+  const detected = detectedImageSubjects(imagePrompt);
+  const ok = detected.includes(contract.primarySubjectId);
+  return {
+    ok,
+    expected: [contract.primarySubjectId],
+    detected: detected.length ? detected : ['no recognizable project'],
+    missing: ok ? [] : [contract.primarySubjectId],
+    required: contract.primarySubjectId,
+  };
+}
+
 function mentionsSubject(imagePrompt: string, brief: PinVisualBrief): boolean {
+  if (brief.subjectContract) return checkSubjectContract(imagePrompt, brief.subjectContract).ok;
   const prompt = normalizeForMatch(imagePrompt);
   const objects = expectedProjectObjects(brief);
   if (objects.length > 0) return objects.some((object) => findTerms(imagePrompt, 'objects').includes(object));
@@ -440,6 +582,10 @@ function mentionsSubject(imagePrompt: string, brief: PinVisualBrief): boolean {
 
 /** Fixed-vocabulary report for the project check (Crochet, Clay…): the section's project nouns. */
 function projectSubjectReport(imagePrompt: string, brief: PinVisualBrief): PinterestSubjectReport {
+  if (brief.subjectContract) {
+    const { expected, detected, missing, required } = checkSubjectContract(imagePrompt, brief.subjectContract);
+    return { expected, detected, missing, required };
+  }
   const expected = expectedProjectObjects(brief);
   const detected = findTerms(imagePrompt, 'objects');
   return {
@@ -497,9 +643,22 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
     const homeDecor = grounding.subjectCheck === 'home-decor';
     // Negated mentions ("no sofa") are not something the image shows.
     const shown = withoutNegatedClauses(pin.image_prompt);
+    const sectionText = brief ? sectionTextOf(grounding, sectionId, brief) : '';
     if (brief && homeDecor) {
-      const check = checkHomeDecorSubject(shown, sectionTextOf(grounding, sectionId, brief), grounding.evidence, grounding.language);
-      if (!check.ok) {
+      const check = checkHomeDecorSubject(shown, sectionText, grounding.evidence, grounding.language);
+      // A section about a named piece (bar cart, sofa) must also show that piece.
+      const contract = brief.subjectContract ? checkSubjectContract(pin.image_prompt, brief.subjectContract) : null;
+      if (contract && !contract.ok) {
+        const { expected, detected, missing, required } = contract;
+        issues.push({
+          code: 'unsupported-claim',
+          message: `Pin ${index + 1} image does not show its source section's main piece (expected: ${required})`,
+          reason: 'IMAGE_SUBJECT_MISMATCH',
+          pinIndex: index,
+          field: 'image_prompt',
+          subject: { expected, detected, missing, required },
+        });
+      } else if (!check.ok) {
         const subject: PinterestSubjectReport = {
           expected: describeHomeAnchors(check.expected),
           detected: check.detected.length ? describeHomeAnchors(check.detected) : ['generic interior'],
@@ -525,10 +684,13 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
       });
     }
     const ungrounded = uniq([
-      ...(grounding.enforceVocabulary ? findUngroundedVisualTerms(pin.image_prompt, grounding.evidence) : []),
+      // Objects (projects, accessories) need proof in the Pin's own section; the rest is article-wide.
+      ...(grounding.enforceVocabulary
+        ? findUngroundedVisualTerms(pin.image_prompt, grounding.evidence, brief ? objectEvidenceOf(sectionText, brief.subjectContract) : undefined)
+        : []),
       // Home Decor: controlled English/German vocabulary, so German articles are checked too.
       // Furniture is checked against the Pin's own section, not the whole article.
-      ...(homeDecor ? findUngroundedHomeTerms(shown, grounding.evidence, grounding.language, brief ? sectionTextOf(grounding, sectionId, brief) : undefined) : []),
+      ...(homeDecor ? findUngroundedHomeTerms(shown, grounding.evidence, grounding.language, brief ? sectionText : undefined) : []),
     ]);
     if (ungrounded.length > 0) {
       issues.push({

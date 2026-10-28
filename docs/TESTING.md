@@ -1284,6 +1284,18 @@ Follow-up 2 (2026-10-25, per-section furniture + repair): `pinterest-home-decor-
 
 ---
 
+# Pinterest visual subject contract (TASK-077, 2026-10-28)
+
+```txt
+npx playwright test tests/renderer/pinterest-article-grounding.spec.ts tests/renderer/pinterest-subject-contract.spec.ts tests/renderer/pinterest-home-decor-grounding.spec.ts tests/renderer/pinterest-generate-errors.spec.ts tests/renderer/project-niche-clay-crafts.spec.ts tests/renderer/pinterest-strategy-errors.spec.ts tests/renderer/pinterest-strategy.spec.ts tests/renderer/niche-profiles.spec.ts --project=renderer --reporter=list
+```
+
+Offline, no AI call. `pinterest-subject-contract.spec.ts` (27, fixture `tests/fixtures/pinterest/crochet-cat-amigurumi-post.json` = post 2119): the H1 subject is `amigurumi`, not the first object named (`ornament`); each pattern section gets one primary subject, accessories never replace it; supporting elements come from the section only (a hat named in another section is refused); the brief asks for "amigurumi crochet toy" and lists supporting elements; a hat / ornament alone → `IMAGE_SUBJECT_MISMATCH` with `required: 'amigurumi'`; an amigurumi with its section's hat passes; negated and generic words never count; step sections inherit the H1 (also from a German H1); concepts in English, German, French and Spanish, image prompts read with English spellings only; every curated concept has an anchor and English aliases, no generic alias; Clay (vase section requires the vase), Home Decor (a bar cart section must show the bar cart; room sections keep the room check), Recipes (dishes with supporting ingredients, steps inherit the dish); repair: one target per Pin naming the anchor, unsupported accessories listed for removal, success changes only the image_prompt, a still-invalid repair keeps the required subject in the 422, other failures not repaired. `pinterest-generate-errors.spec.ts` (17) adds route cases: faithful batch saved on the first answer (one text call, no image call, no destination URL added); kitten ornament + hat only → one repair naming amigurumi, only that image_prompt changes, then 201; failed repair → 422 with the required subject, no Pin insert, generation `failed`. Grounding expectations now include `required`.
+
+Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 27, Home Decor 19, generate errors 17, Clay niche 8, strategy errors 19, strategy 10, niche profiles 38); full renderer **1318/1319** (the one failure is the pre-existing CRLF source-text case `social-content-studio.spec.ts`, see TASK-076 below); TypeScript OK, ESLint (touched files) OK, production build OK, `git diff --check` OK. Real AI test (founder, post 2119): 5 Pins accepted on the first answer, no repair.
+
+Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
+
 # Pinterest Regenerate text (TASK-076, 2026-10-24)
 
 ```txt

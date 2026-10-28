@@ -66,6 +66,8 @@ export interface PinterestSubjectReport {
   detected: string[];
   /** Expected anchors the image prompt does not show. */
   missing: string[];
+  /** The visual subject contract's primary subject, when the section has one. */
+  required?: string;
 }
 
 const TITLE_SIMILARITY_LIMIT = 0.8;

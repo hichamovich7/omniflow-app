@@ -366,7 +366,7 @@ test.describe('Coatigan is a cardigan spelling', () => {
   test('a cardigan section without any recognized cardigan is still refused', () => {
     const issues = check('Long cream crochet layer tied at the waist over a black turtleneck, with a simple tote bag.');
     const mismatch = issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
-    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'] });
+    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'], required: 'cardigan' });
   });
 
   test('other objects are unchanged', () => {
@@ -474,7 +474,7 @@ test.describe('Step sections expect the article project', () => {
     const issues = checkPin(g, 0, 'A simple tote bag on a wooden table.');
     expect(issues.map((issue) => issue.reason)).toEqual(['IMAGE_SUBJECT_MISMATCH', 'UNGROUNDED_IMAGE_ELEMENTS']);
     const mismatch = issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
-    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'] });
+    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['bag'], missing: ['cardigan'], required: 'cardigan' });
     const shown = buildStrategySafeguardError(issues).issues.map((issue) => issue.message).join(' ');
     expect(shown).toContain('Pin 1 does not clearly represent the article section. Expected: cardigan. Detected: bag. Missing: cardigan.');
   });
@@ -482,7 +482,7 @@ test.describe('Step sections expect the article project', () => {
   test('an image without the project is still refused', () => {
     const g = briocheGrounding();
     const mismatch = checkPin(g, 0, 'A tape measure and a size chart on a wooden table.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH');
-    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
+    expect(mismatch?.subject).toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'], required: 'cardigan' });
   });
 
   test('every step brief requires the cardigan, in the text prompt and the image prompt', () => {
@@ -499,7 +499,7 @@ test.describe('Step sections expect the article project', () => {
     const g = briocheGrounding();
     const swatchOnly = checkPin(g, 1, 'A single textured crochet gauge swatch sits front and center on a plain light gray surface, with its fabric gently bending at one edge to suggest drape while the rest lies flat.');
     expect(swatchOnly.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
-      .toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
+      .toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'], required: 'cardigan' });
     expect(checkPin(g, 1, 'A textured crochet gauge swatch laid beside the finished crochet cardigan on a plain light gray surface.')).toEqual([]);
   });
 
@@ -508,13 +508,14 @@ test.describe('Step sections expect the article project', () => {
     for (const generic of ['clothing', 'outfit', 'garment', 'fashion piece']) {
       const issues = checkPin(g, 1, `A textured crochet ${generic} shown on a hanger, with a clean neutral background.`);
       expect(issues.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
-        .toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'] });
+        .toEqual({ expected: ['cardigan'], detected: ['no recognizable project'], missing: ['cardigan'], required: 'cardigan' });
     }
   });
 
-  test('headed sections and Home Decor briefs get no required-subject line', () => {
-    const scarf = grounding();
-    expect(formatVisualBrief(scarf.briefs[scarf.sectionPlan[0]])).not.toContain('Required subject:');
+  test('headed sections require their own project (no step clause); Home Decor step briefs get no required-subject line', () => {
+    const scarf = formatVisualBrief(grounding().briefs[grounding().sectionPlan[0]]);
+    expect(scarf).toContain('Required subject: the image description must explicitly mention scarf and must show a scarf as the visible, dominant main subject (write "crochet scarf")');
+    expect(scarf).not.toContain('this step may be shown on it');
     const decor = briocheGrounding('Home Decor');
     expect(formatVisualBrief(decor.briefs[decor.sectionPlan[0]])).not.toContain('Required subject:');
   });
@@ -571,7 +572,7 @@ test.describe('Clay articles under the project check', () => {
     expect(g.sectionPlan.map((id) => g.briefs[id].represented)).toEqual(['Air dry clay trinket dish', 'Air dry clay vase', 'Air dry clay coaster']);
     expect(check(0, 'An air dry clay trinket dish on a smooth board.')).toEqual([]);
     expect(check(1, 'An air dry clay trinket dish on a smooth board.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
-      .toEqual({ expected: ['vase'], detected: ['trinket dish'], missing: ['vase'] });
+      .toEqual({ expected: ['vase'], detected: ['trinket dish'], missing: ['vase'], required: 'vase' });
   });
 
   test('step sections expect the H1 project', () => {
@@ -579,7 +580,7 @@ test.describe('Clay articles under the project check', () => {
     expect(g.briefs[g.sectionPlan[0]].represented).toBe('vase of this article — step: Condition the clay');
     expect(check(0, 'An air dry clay vase on a smooth board.')).toEqual([]);
     expect(check(1, 'An air dry clay trinket dish on a smooth board.').find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject)
-      .toEqual({ expected: ['vase'], detected: ['trinket dish'], missing: ['vase'] });
+      .toEqual({ expected: ['vase'], detected: ['trinket dish'], missing: ['vase'], required: 'vase' });
   });
 });
 

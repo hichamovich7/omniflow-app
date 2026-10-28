@@ -289,6 +289,19 @@ export const guideSections: GuideSection[] = [
     ],
   },
   {
+    id: 'pinterest-visual-checks',
+    title: 'Pinterest visual checks',
+    icon: ShieldCheck,
+    summary: 'Before Pins made from an article are saved, OmniFlow checks that each image matches the section it comes from.',
+    points: [
+      'Each Pin must show the main subject of its source section — for example the amigurumi of a crochet pattern section, or the vase of a clay section.',
+      'Accessories cannot replace the main subject: a hat, a scarf or an ornament may appear beside it, never instead of it.',
+      'An element the section does not mention (a piece of furniture, an accessory or a project from another section) can lead to the Pin being refused.',
+      'When only the image description is off, OmniFlow tries one automatic repair, once. The whole batch is then checked again.',
+      'If the check still fails, no Pin is saved and you see which Pin was refused and why. Generate again, or review the source section of the article.',
+    ],
+  },
+  {
     id: 'medium-summary',
     title: 'Medium summary',
     icon: FileText,

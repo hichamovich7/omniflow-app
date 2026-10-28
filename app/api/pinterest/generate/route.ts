@@ -443,8 +443,9 @@ export async function POST(request: Request) {
     ];
     let strategyIssues = validateBatch(resolvedPins);
 
-    // Home Decor: an image_prompt that only adds elements its section never
-    // names gets one targeted repair (image_prompt only), then the whole
+    // Article flow: an image_prompt that only adds elements its section never
+    // names, or misses its section's primary subject (visual subject
+    // contract), gets one targeted repair (image_prompt only), then the whole
     // batch is validated again. Otherwise the original 422 stands.
     const repairTargets = imagePromptRepairTargets(strategyIssues, resolvedPins, articleGrounding);
     if (repairTargets) {
