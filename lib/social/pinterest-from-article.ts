@@ -16,7 +16,6 @@ import {
   buildStrategySafeguardError,
   strategySafeguardLogLine,
   STRATEGY_SAFEGUARD_ERROR_CODE,
-  type StrategySafeguardError,
 } from '@/lib/pinterest/strategy-errors';
 import { getRoleConfig } from '@/lib/ai/config';
 import {
@@ -131,10 +130,10 @@ const ERROR_STATUS: Record<SocialGenerationErrorCode, number> = {
 export class SocialGenerationError extends Error {
   readonly code: SocialGenerationErrorCode;
   readonly status: number;
-  /** Structured detail of a strategy-safeguard rejection (user-safe). */
-  readonly safeguard?: StrategySafeguardError;
+  /** Structured detail (user-safe): a strategy-safeguard rejection or an invalid regenerated text (TASK-082). */
+  readonly safeguard?: ApiError;
 
-  constructor(code: SocialGenerationErrorCode, message: string, safeguard?: StrategySafeguardError) {
+  constructor(code: SocialGenerationErrorCode, message: string, safeguard?: ApiError) {
     super(message);
     this.name = 'SocialGenerationError';
     this.code = code;

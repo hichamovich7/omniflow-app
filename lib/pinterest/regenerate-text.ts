@@ -1,11 +1,8 @@
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { getRoleConfig } from '@/lib/ai/config';
-import {
-  PIN_PLAN_FAILURE_MESSAGE,
-  PinterestPlanError,
-  parsePinterestGenerationPlan,
-} from '@/lib/pinterest/generation-plan';
+import { PinterestPlanError, parsePinterestPlanWith } from '@/lib/pinterest/generation-plan';
+import { regeneratedPinTextResponseSchema } from '@/lib/validations/pinterest';
 import {
   readPinterestStrategyAngle,
   validatePinterestStrategyBatch,
@@ -34,6 +31,7 @@ import {
 } from '@/lib/social/pinterest-from-article';
 import type { NicheSettings } from '@/lib/niche/settings';
 import type { SupportedLanguage } from '@/types/pinterest';
+import type { ApiError } from '@/types/api';
 import type { Pin } from '@/types/database';
 
 /**
@@ -69,10 +67,49 @@ export interface RegeneratedPinText {
 }
 
 // Prompt scaffolding that must never reach a saved Pin.
-const PROMPT_LEAK_PATTERN = /<\/?\s*(?:article|pin_plan)\b|\bpin_plan\b|\bsourceSectionId\b|\bimage_prompt\b|\bvisual brief\b|treat everything between/i;
+const PROMPT_LEAK_PATTERN = /<\/?\s*(?:article|pin_plan)\b|\bpin_plan\b|\bsourceSectionId\b|\bimage_prompt\b|\bvisual brief\b|treat everything between|rewrite only the title|text-only rewrite/i;
 
 export function containsPromptLeak(text: string): boolean {
   return PROMPT_LEAK_PATTERN.test(text);
+}
+
+export const PIN_TEXT_NOT_MODIFIED = 'The Pin was not modified.';
+
+const TEXT_FIELDS = ['title', 'description', 'keywords'] as const;
+
+/**
+ * The field a rejected answer got wrong, from the schema issue paths (never
+ * model text): "pins" for a wrong number of Pins or shape, a text field, any
+ * other named field, or null when the answer is not JSON at all.
+ */
+export function invalidPinTextField(error: PinterestPlanError): string | null {
+  const paths = (error.diagnostics().issues ?? []).map((issue) => issue.path.split('.'));
+  if (paths.length === 0) return null;
+  if (paths.some((path) => path.length <= 1)) return 'pins';
+  const fields = paths.map((path) => path[2]).filter(Boolean);
+  return TEXT_FIELDS.find((field) => fields.includes(field)) ?? fields[0] ?? 'pins';
+}
+
+/** User-safe structured error: what was wrong, and that nothing changed. */
+export function buildInvalidPinTextError(field: string | null): ApiError {
+  const problem =
+    field === 'pins'
+      ? 'The AI did not return exactly one Pin.'
+      : field
+        ? `The AI returned an invalid or missing ${field}.`
+        : 'The AI did not return valid text.';
+  return {
+    code: 'invalid_pin_plan',
+    message: `${problem} ${PIN_TEXT_NOT_MODIFIED}`,
+    retryable: true,
+    issues: [{ code: 'INVALID_PIN_TEXT', ...(field ? { field } : {}), message: problem, action: 'Try again.' }],
+    issueCount: 1,
+  };
+}
+
+function invalidPinText(field: string | null): SocialGenerationError {
+  const detail = buildInvalidPinTextError(field);
+  return new SocialGenerationError('invalid_pin_plan', detail.message, detail);
 }
 
 export async function regeneratePinText(
@@ -132,6 +169,7 @@ export async function regeneratePinText(
     brandProfile: buildBrandProfileContext(source.brandProfileDescription),
     analysisContext: regenerationContext,
     articleGrounded: Boolean(grounding),
+    textOnlyRewrite: true,
   });
 
   let content: string;
@@ -149,29 +187,37 @@ export async function regeneratePinText(
     });
   } catch (err) {
     console.error(`[${PROMPT_ID}] Pin text regeneration failed:`, err);
-    throw new SocialGenerationError('generation_failed', 'Text regeneration failed. Please try again.');
+    throw new SocialGenerationError('generation_failed', `Text regeneration failed. ${PIN_TEXT_NOT_MODIFIED} Please try again.`);
   }
 
+  // Text-only contract (TASK-082): exactly one Pin with title, description
+  // and keywords. One AI call only — an invalid answer is never sent back to
+  // the model; the user retries by hand.
   let planned;
   try {
-    [planned] = parsePinterestGenerationPlan(content).pins;
+    [planned] = parsePinterestPlanWith(content, regeneratedPinTextResponseSchema).pins;
   } catch (planError) {
     if (!(planError instanceof PinterestPlanError)) throw planError;
     console.error(`[${PROMPT_ID}] Regenerated Pin text plan rejected: ${JSON.stringify(planError.diagnostics())}`);
-    throw new SocialGenerationError('invalid_pin_plan', PIN_PLAN_FAILURE_MESSAGE);
+    throw invalidPinText(invalidPinTextField(planError));
   }
 
   // Every source: a URL the model writes anyway is removed, never saved.
   const next = withoutUrls({ title: planned.title, description: planned.description, keywords: planned.keywords });
-  if (!next.title.trim() || !next.description.trim() || [next.title, next.description, next.keywords].some(containsPromptLeak)) {
-    console.error(`[${PROMPT_ID}] Regenerated Pin text rejected: empty after URL removal or prompt text in the output`);
-    throw new SocialGenerationError('invalid_pin_plan', PIN_PLAN_FAILURE_MESSAGE);
+  const emptyField = TEXT_FIELDS.find((field) => !next[field].trim());
+  const leakField = TEXT_FIELDS.find((field) => containsPromptLeak(next[field]));
+  if (emptyField || leakField) {
+    console.error(
+      `[${PROMPT_ID}] Regenerated Pin text rejected: ${emptyField ? `${emptyField} empty after URL removal` : `prompt text in ${leakField}`}`
+    );
+    throw invalidPinText(emptyField ?? leakField ?? null);
   }
 
   // The kept image prompt stands in for the image (only the text changes).
   const candidate = { angle, ...next, image_prompt: pin.image_prompt };
   const issues: PinterestStrategyIssue[] = [
-    ...(planned.angle !== angle
+    // Angle and section are fixed by the stored Pin; an echoed different one is refused.
+    ...(planned.angle !== undefined && planned.angle !== angle
       ? [{
           code: 'angle-coverage' as const,
           message: `Expected the "${angle}" angle, got "${planned.angle}"`,
@@ -182,7 +228,7 @@ export async function regeneratePinText(
         }]
       : []),
     ...validatePinterestStrategyBatch([candidate], 1, `${keyword}\n${regenerationContext}`),
-    ...(grounding && planned.sourceSectionId?.trim() !== stored?.sectionId
+    ...(grounding && planned.sourceSectionId !== undefined && planned.sourceSectionId !== stored?.sectionId
       ? [{
           code: 'unsupported-claim' as const,
           message: `Regenerated text left its source section "${stored?.sectionId}"`,

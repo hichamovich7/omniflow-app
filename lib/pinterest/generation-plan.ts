@@ -150,6 +150,15 @@ function parseJsonValue(text: string, raw: string): unknown {
  * validated against the existing Zod contract before it is returned.
  */
 export function parsePinterestGenerationPlan(raw: string): PinterestGenerationPlan {
+  return parsePinterestPlanWith(raw, openRouterPinsResponseSchema);
+}
+
+/**
+ * Same JSON extraction and rejection rules as `parsePinterestGenerationPlan`,
+ * validated against another contract (e.g. the text-only "Regenerate text"
+ * answer, TASK-082).
+ */
+export function parsePinterestPlanWith<T extends z.ZodType>(raw: string, schema: T): z.output<T> {
   const text = raw.replace(/^﻿/, '').trim();
   if (!text) throw new PinterestPlanError('empty', raw);
 
@@ -179,7 +188,7 @@ export function parsePinterestGenerationPlan(raw: string): PinterestGenerationPl
     value = parseJsonValue(text.slice(located.start, located.end), raw);
   }
 
-  const validated = openRouterPinsResponseSchema.safeParse(value);
+  const validated = schema.safeParse(value);
   if (!validated.success) {
     throw new PinterestPlanError('invalid_schema', raw, {
       issues: validated.error.issues.slice(0, MAX_LOGGED_ISSUES).map((issue) => ({

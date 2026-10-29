@@ -32,6 +32,8 @@ const { EditorialSelectionProvider } = require('@/components/editorial/selection
 };
 const { PinTable } = require('@/components/pinterest/pin-table') as typeof import('@/components/pinterest/pin-table');
 const { RegenerateTextButton } = require('@/components/pinterest/regenerate-text-button') as typeof import('@/components/pinterest/regenerate-text-button');
+const { BulkRegenerateTextDialog, BulkRegenerateTextSummaryView, bulkRegenerateTextLabel } =
+  require('@/components/pinterest/bulk-regenerate-text-dialog') as typeof import('@/components/pinterest/bulk-regenerate-text-dialog');
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
@@ -137,10 +139,63 @@ test.describe('Regenerate text — Pin grid of /pinterest/[id]', () => {
     expect(labels[image + 1]).toBe('Regenerate text for: Keyword Pin with image');
   });
 
-  test('mobile width: the labeled button stays visible', async ({ page }) => {
+  test('mobile width: the labeled button stays visible on every card, with and without image', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.setContent(`<!doctype html><html><body>${gridMarkup()}</body></html>`);
-    await expect(page.getByRole('button', { name: 'Regenerate text', exact: true }).first()).toBeVisible();
+    const cards = page.getByTestId('pin-card');
+    for (let i = 0; i < PINS.length; i++) {
+      const labeled = cards.nth(i).getByRole('button', { name: 'Regenerate text', exact: true });
+      await labeled.scrollIntoViewIfNeeded();
+      await expect(labeled).toBeVisible();
+    }
+    // The second card has no image: its labeled button is the only text action.
+    await expect(cards.nth(1).getByTestId('pin-grid-preview')).toHaveCount(0);
+  });
+
+  test('bulk action: disabled without selection, counts the selected Pins', async ({ page }) => {
+    const render = (ids: string[]) =>
+      renderToStaticMarkup(withProviders(createElement(BulkRegenerateTextDialog, { selectedPinIds: new Set(ids), pins: PINS })));
+
+    await page.setContent(`<!doctype html><html><body>${render([])}</body></html>`);
+    await expect(page.getByTestId('bulk-regenerate-text-button')).toBeDisabled();
+    await expect(page.getByTestId('bulk-regenerate-text-button')).toHaveText('Regenerate text');
+    // Closed confirmation: nothing runs before "Continue".
+    await expect(page.getByTestId('bulk-regenerate-text-confirm')).toHaveCount(0);
+
+    await page.setContent(`<!doctype html><html><body>${render(PINS.map((p) => p.id))}</body></html>`);
+    await expect(page.getByTestId('bulk-regenerate-text-button')).toBeEnabled();
+    await expect(page.getByTestId('bulk-regenerate-text-button')).toHaveText('Regenerate text for 3 Pins');
+    expect(bulkRegenerateTextLabel(1)).toBe('Regenerate text for 1 Pin');
+  });
+
+  test('bulk summary: regenerated, failed, not modified, with the failed Pin and its reason', async ({ page }) => {
+    const markup = renderToStaticMarkup(
+      createElement(BulkRegenerateTextSummaryView, {
+        pins: PINS,
+        summary: {
+          outcomes: [
+            { pinId: PINS[0].id, status: 'succeeded' },
+            {
+              pinId: PINS[1].id,
+              status: 'failed',
+              error: { code: 'invalid_pin_plan', message: 'The AI returned an invalid or missing keywords. The Pin was not modified.' },
+            },
+            { pinId: PINS[2].id, status: 'succeeded' },
+          ],
+          succeeded: [PINS[0].id, PINS[2].id],
+          failed: [PINS[1].id],
+          notProcessed: [],
+          stoppedBy: null,
+        },
+      })
+    );
+    await page.setContent(`<!doctype html><html><body>${markup}</body></html>`);
+    const summary = page.getByTestId('bulk-regenerate-text-summary');
+    await expect(summary).toContainText('Regenerated: 2');
+    await expect(summary).toContainText('Failed: 1');
+    await expect(summary).toContainText('Not modified: 1');
+    await expect(summary).toContainText('Keyword Pin without image — The AI returned an invalid or missing keywords. The Pin was not modified.');
+    await expect(summary).toContainText('Images, links, boards, sections and dates were not changed.');
   });
 
   test('the button renders its label and the dialog uses the same component', () => {

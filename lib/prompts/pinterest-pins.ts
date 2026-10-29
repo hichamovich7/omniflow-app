@@ -37,6 +37,12 @@ interface PromptContext {
    * <pin_plan>) instead of free art direction. Absent = keyword flow, unchanged.
    */
   articleGrounded?: boolean;
+  /**
+   * "Regenerate text" (TASK-082): the answer carries only title, description
+   * and keywords (array) of one Pin — the image fields are not asked for, the
+   * image is kept. Absent = full generation contract, unchanged.
+   */
+  textOnlyRewrite?: boolean;
 }
 
 // Room/space nouns across the 4 supported content languages (en, de, es, fr).
@@ -216,6 +222,23 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
         .join(', ')
     : '';
 
+  const fullStructure = `Respond with this exact JSON structure:
+{
+  "pins": [
+    {
+      "angle": "curiosity",
+      "title": "...",
+      "description": "...",
+      "keywords": "keyword1, keyword2, keyword3, ...",
+      "board": "...",
+      "image_prompt": "...",${ctx.articleGrounded ? '\n      "sourceSectionId": "s1",' : ''}
+      "visualFormat": "photo",
+      "overlayText": "...",
+      "ctaBannerTemplate": "clean-band"${isAiIntegrated ? `,\n      "integratedText": { ${integratedTextExample} }` : ''}
+    }
+  ]
+}`;
+
   const system = `You are an expert Pinterest SEO content creator and visual director. You generate high-quality, unique Pinterest content optimized for search, engagement, and click-through. You have deep expertise in what makes images go viral on Pinterest: scroll-stopping visuals, aspirational lifestyle imagery, and photorealistic compositions. All text content must be written in ${langName}. You must respond ONLY with valid JSON. No markdown, no explanations, no extra text.${ctx.brandProfile ? ` ${ctx.brandProfile}` : ''}${ctx.analysisContext ? ` ${ctx.analysisContext}` : ''}`;
 
   const user = `Generate ${ctx.pinsRequested} unique Pinterest pins for the keyword: "${ctx.keyword}"${nicheBlock}
@@ -254,25 +277,25 @@ ${imageVariationRule} Never include text, typography, logos, watermarks, or grap
 
 Output format (strict): return exactly one complete, strictly valid JSON object and nothing else. Do not use Markdown or code fences, and do not add explanations, comments, or any text before or after the JSON. Do not use trailing commas. Escape every double quote inside a string value as \\" and never put a raw line break inside a string value. Complete every pin and close every string, array, and object.
 
+${ctx.textOnlyRewrite ? TEXT_ONLY_REWRITE_STRUCTURE : fullStructure}`;
+
+  return { system, user };
+}
+
+// TASK-082: the "Regenerate text" answer. Asked for the full structure, a
+// text-only rewrite dropped the image fields and failed validation.
+const TEXT_ONLY_REWRITE_STRUCTURE = `This is a text-only rewrite of exactly one existing Pin: its image, image description, board and on-image text are kept and must not be written. Return only title, description and keywords — keywords as a JSON array of strings, without hashtags.
+
 Respond with this exact JSON structure:
 {
   "pins": [
     {
-      "angle": "curiosity",
       "title": "...",
       "description": "...",
-      "keywords": "keyword1, keyword2, keyword3, ...",
-      "board": "...",
-      "image_prompt": "...",${ctx.articleGrounded ? '\n      "sourceSectionId": "s1",' : ''}
-      "visualFormat": "photo",
-      "overlayText": "...",
-      "ctaBannerTemplate": "clean-band"${isAiIntegrated ? `,\n      "integratedText": { ${integratedTextExample} }` : ''}
+      "keywords": ["keyword1", "keyword2", "keyword3"]
     }
   ]
 }`;
-
-  return { system, user };
-}
 
 /**
  * Custom number of Pins (any batch other than 5 or 10): the exact angle of

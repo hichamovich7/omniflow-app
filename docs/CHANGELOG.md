@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest: "Regenerate text" fix + bulk text regeneration — TASK-082 (2026-10-29)
+
+* Fix: "Regenerate text" failed with `invalid_schema` (`[pinterest-pins-v13] Regenerated Pin text plan rejected`). Cause: the regeneration told the model to rewrite only the title, description and keywords, but validated its answer against the **full generation schema** (`angle`, `board`, `image_prompt`, `visualFormat` required, `keywords` a string). The model obeyed and returned only the three text fields — keywords often as an array — so every such answer was refused. Now the regeneration asks for and validates a dedicated text-only contract (`regeneratedPinTextResponseSchema`): exactly one Pin, `title`, `description`, `keywords` required, no unknown field; keywords as an array or a comma string are normalized deterministically, strings trimmed, a ```json fence tolerated. Content safeguards unchanged (numbers, claims, ungrounded elements, duplicate titles, prompt leaks, echoed angle / section).
+* An invalid answer returns a structured 422 naming the field ("The AI returned an invalid or missing keywords. The Pin was not modified."), retryable, with "Try again" in the toast; nothing is written. Still one AI call per click — no automatic second attempt.
+* New: "Regenerate text for N Pins" in the selection bar of `/pinterest/[id]`, after a confirmation ("This will use one text AI generation per Pin. Images and links will not change. Continue?"). Pins go one by one through the existing route (same auth, ownership, rate limit and trial cap), progress "2 of 5", a failure does not stop the batch, a rate / trial limit stops it; the summary shows regenerated / failed / not modified and can retry only the Pins not regenerated. No migration, no new endpoint, images / links / boards / sections / dates never touched.
+
 ## Fix: Auto variety 500 "context is not defined" — TASK-FIX-081 (2026-10-29)
 
 * Pinterest from a WordPress article with **Auto variety** returned a 500 in production (`ReferenceError: context is not defined`, `/api/pinterest/generate`). The TypeScript source was correct: the production minifier inlined `eligibleArchetypes()` into the `.map()` of `planVisualArchetypes()` and kept the shorthand keys `{ context, section, brief }` after renaming the parameters. `lib/pinterest/visual-archetypes.ts` now builds the archetype input in one helper with explicit keys; behavior, archetypes and every safeguard unchanged.

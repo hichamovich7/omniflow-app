@@ -103,7 +103,10 @@ export function StrategySafeguardAlert({
  */
 export function toastApiError(error: ApiError | null | undefined, fallback: string, onRetry?: () => void) {
   if (!isStrategySafeguardError(error)) {
-    toast.error(error?.message ?? fallback);
+    toast.error(
+      error?.message ?? fallback,
+      error?.retryable && onRetry ? { action: { label: 'Try again', onClick: onRetry } } : undefined
+    );
     return;
   }
   const [first] = error.issues;

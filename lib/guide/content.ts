@@ -120,6 +120,7 @@ export const guideSections: GuideSection[] = [
       'Actions like Regenerate, Export, and Schedule apply only to your selection — or to everything if nothing is selected.',
       'Click anywhere on a pin card (outside the checkbox and image actions) to open its full details — untruncated title and description, keywords, and the image prompt used for generation, with a Copy button to reuse it elsewhere.',
       '"Regenerate text" (next to "Regenerate image" on a pin\'s image, and in its details) rewrites only that pin\'s title, description and keywords — same angle, same keyword or article, your niche, Content Stream and Brand Profile. The image, link, board, section and scheduled date stay exactly as they were. It uses one AI text generation; if the new text fails a quality check (a number or a color, material or project the article never mentions, a title too close to another pin…), nothing is changed and the message tells you why.',
+      'To rewrite the text of several pins, select them and click "Regenerate text for N Pins" in the selection bar. After you confirm, the pins are processed one at a time (one AI text generation each) with a progress counter. A pin that fails keeps its text and the others continue; the summary lists what was regenerated, what failed and why, and lets you try again only for the pins that were not regenerated. Images, links, boards, sections and dates never change.',
     ],
   },
   {

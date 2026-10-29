@@ -6,7 +6,7 @@ import { Type } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
-import type { ApiError } from '@/types/api';
+import { requestPinTextRegeneration } from '@/lib/pinterest/regenerate-text-client';
 import type { Pin } from '@/types/database';
 
 interface RegenerateTextButtonProps {
@@ -43,18 +43,15 @@ export function RegenerateTextButton({
     inFlight.current = true;
     setLoading(true);
     try {
-      const res = await fetch(`/api/pinterest/pins/${pin.id}/regenerate-text`, { method: 'POST' });
-      const json = (await res.json().catch(() => ({}))) as { data?: Pin | null; error?: ApiError | null };
-      if (!res.ok || json.error || !json.data) {
-        // The Pin is unchanged; a safeguard rejection explains what failed.
-        toastApiError(json.error, 'Text regeneration failed — the Pin was not changed', () => void regenerateText());
+      const result = await requestPinTextRegeneration(pin.id);
+      if (!result.ok) {
+        // The Pin is unchanged; the error names what failed and offers "Try again".
+        toastApiError(result.error, 'Text regeneration failed — the Pin was not modified', () => void regenerateText());
         return;
       }
       toast.success('Text regenerated — image, link, board and schedule kept');
-      onRegenerated?.(json.data);
+      onRegenerated?.(result.pin);
       router.refresh();
-    } catch {
-      toast.error('Text regeneration failed — the Pin was not changed');
     } finally {
       inFlight.current = false;
       setLoading(false);

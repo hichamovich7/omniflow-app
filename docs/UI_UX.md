@@ -717,7 +717,9 @@ Each card displays, read-only:
 * Description, truncated to 3 lines (`line-clamp-3`)
 * Board badge — shows the linked board's **current** name, joined live via `pins.board_id` (TASK-FIX-032), not the frozen `pins.board` text captured at generation time. Renamed boards update the badge without regenerating; a deleted board (`board_id` set to `null`, see `DELETE /api/boards/[id]`) shows "No board assigned" instead of the stale name. CSV export is unaffected — it still reads `pins.board`, the original AI-generated text, unchanged.
 * Publish date (if scheduled)
-* "Regenerate text" (TASK-076) — labeled outline button, always visible (desktop and mobile), on **every** card, with or without an image, whatever the source; same behavior as the overlay icon below
+* "Regenerate text" (TASK-076) — labeled outline button, always visible (desktop and mobile), on **every** card, with or without an image, whatever the source; same behavior as the overlay icon below. Failure toast (TASK-082): the error names the field and ends with "The Pin was not modified.", with a "Try again" action when retryable
+
+Selection bar (TASK-082, `components/pinterest/bulk-regenerate-text-dialog.tsx`): "Regenerate text for N Pins" (disabled with no selection) → confirmation dialog "This will use one text AI generation per Pin. Images and links will not change. Continue?" (Cancel / Continue) → "Regenerating text… 2 of 5" with a progress bar, dialog not closable while running → summary (Regenerated / Failed / Not modified, each failed Pin with its reason, the stop reason when a rate or trial limit ended the batch) with "Try again for N not regenerated" and Close. Pins run one at a time through the one-Pin route.
 
 Results page only, hover-revealed:
 

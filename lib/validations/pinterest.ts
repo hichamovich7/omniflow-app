@@ -348,6 +348,44 @@ export const openRouterPinsResponseSchema = z.object({
   pins: z.array(pinResponseSchema).min(1),
 });
 
+// "Regenerate text" (TASK-082): the text-only answer for exactly one Pin.
+// Deterministic format recovery only: keywords given as an array or a
+// comma-separated string become one trimmed "a, b, c" string (the stored
+// format); every string is trimmed. Content limits are those of the
+// generation (pinResponseSchema) — never truncated, never invented.
+const regeneratedKeywordsSchema = z
+  .union([z.array(z.string()), z.string()])
+  .transform((value) =>
+    (Array.isArray(value) ? value : value.split(','))
+      .map((keyword) => keyword.trim())
+      .filter(Boolean)
+      .join(', ')
+  )
+  .refine((keywords) => keywords.length > 0, { message: 'keywords must not be empty' });
+
+const regeneratedPinTextSchema = z
+  .object({
+    title: z.string().trim().min(1).max(100),
+    description: z.string().trim().min(1).max(500),
+    keywords: regeneratedKeywordsSchema,
+    // Checked against the Pin when the model echoes them (never required).
+    angle: z.enum(PINTEREST_ANGLES).optional(),
+    sourceSectionId: z.string().trim().max(20).optional(),
+    // Image fields of the generation contract: tolerated, always discarded.
+    board: z.unknown().optional(),
+    image_prompt: z.unknown().optional(),
+    visualFormat: z.unknown().optional(),
+    overlayText: z.unknown().optional(),
+    integratedText: z.unknown().optional(),
+    titleBannerTemplate: z.unknown().optional(),
+    ctaBannerTemplate: z.unknown().optional(),
+  })
+  .strict();
+
+export const regeneratedPinTextResponseSchema = z
+  .object({ pins: z.array(regeneratedPinTextSchema).length(1) })
+  .strict();
+
 export type GeneratePinsInput = z.infer<typeof generatePinsSchema>;
 
 // PATCH /api/pinterest/pins/[id] (TASK-044 phase 2): manual edit of a saved

@@ -6,7 +6,15 @@ import { encryptSecret } from '@/lib/wordpress/crypto';
 import { buildArticleContextFromMarkdown } from '@/lib/wordpress/article-context';
 import { attachArticleSourceMetadata, buildArticleGrounding, findUngroundedTextTerms } from '@/lib/pinterest/article-briefs';
 import { attachPinterestStrategyMetadata } from '@/lib/pinterest/strategy';
-import { containsPromptLeak } from '@/lib/pinterest/regenerate-text';
+import { buildInvalidPinTextError, containsPromptLeak, invalidPinTextField } from '@/lib/pinterest/regenerate-text';
+import { parsePinterestGenerationPlan, parsePinterestPlanWith, type PinterestPlanError } from '@/lib/pinterest/generation-plan';
+import { regeneratedPinTextResponseSchema } from '@/lib/validations/pinterest';
+import { buildPinterestPinsPrompt } from '@/lib/prompts';
+import {
+  requestPinTextRegeneration,
+  runBulkPinTextRegeneration,
+  type PinTextRegenerationResult,
+} from '@/lib/pinterest/regenerate-text-client';
 import { preparePinTextRegeneration, regenerateAndSavePinText } from '@/lib/pinterest/pin-text';
 import { SocialGenerationError, type GenerateTextFn } from '@/lib/social/pinterest-from-article';
 import type { Pin } from '@/types/database';
@@ -495,13 +503,20 @@ test.describe('Regenerate text — interface', () => {
   const button = read('components/pinterest/regenerate-text-button.tsx');
 
   test('button calls the route, shows loading, ignores a second click and explains failures', () => {
-    expect(button).toContain('fetch(`/api/pinterest/pins/${pin.id}/regenerate-text`, { method: \'POST\' })');
+    expect(read('lib/pinterest/regenerate-text-client.ts')).toContain(
+      'fetchImpl(`/api/pinterest/pins/${pinId}/regenerate-text`, { method: \'POST\' })'
+    );
+    expect(button).toContain('requestPinTextRegeneration(pin.id)');
     expect(button).toContain('if (inFlight.current) return;');
     expect(button).toContain('inFlight.current = true;');
     expect(button).toContain('loading={loading}');
     expect(button).toContain('disabled={disabled || loading}');
-    expect(button).toContain("toastApiError(json.error, 'Text regeneration failed — the Pin was not changed'");
+    expect(button).toContain("toastApiError(result.error, 'Text regeneration failed — the Pin was not modified', () => void regenerateText())");
     expect(button).toContain('Regenerate text');
+    // A retryable non-safeguard error (invalid AI text) also offers "Try again".
+    expect(read('components/pinterest/strategy-safeguard-alert.tsx')).toContain(
+      "error?.retryable && onRetry ? { action: { label: 'Try again', onClick: onRetry } } : undefined"
+    );
   });
 
   test('shown next to "Regenerate image" on the Pin grid, in the Pin dialog and on article result cards', () => {
@@ -513,5 +528,295 @@ test.describe('Regenerate text — interface', () => {
     expect(read('app/(dashboard)/pinterest/[id]/page.tsx')).toContain('<EditorialWorkspace');
     expect(read('components/editorial/editorial-workspace.tsx')).toContain('<PinTable');
     expect(read('components/history/history-table.tsx')).toContain('href={`/pinterest/${gen.id}`}');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TASK-082: text-only answer contract
+
+// Shape of the real rejected answer (583 characters, production log
+// "[pinterest-pins-v13] Regenerated Pin text plan rejected: invalid_schema"):
+// the model followed "rewrite only the title, description and keywords" and
+// returned those three fields only — no angle, board, image_prompt or
+// visualFormat, which the full generation schema requires — with keywords as
+// an array, where that schema expects a string.
+const REAL_TEXT_ONLY_ANSWER = JSON.stringify({
+  pins: [
+    {
+      title: 'The Color Choice Behind This 2026 Crochet Sweater Idea',
+      description:
+        'One yarn color decision changes how this granny square scarf reads from across the room. See which shade the pattern uses and why it works with cotton yarn. Save it for your next make.',
+      keywords: ['granny square scarf', 'cotton yarn scarf', 'crochet scarf pattern', 'granny square ideas', 'crochet gift idea'],
+    },
+  ],
+});
+
+const textPin = (overrides: Row = {}): Row => ({
+  title: 'Why This Granny Square Scarf Pattern Gets Saved',
+  description: 'Cluster stitch rounds in cotton yarn, joined in one long strip.',
+  keywords: ['granny square scarf', 'cotton yarn scarf'],
+  ...overrides,
+});
+
+function withoutField(field: string): Row {
+  const pin = textPin();
+  delete pin[field];
+  return pin;
+}
+
+const parseText = (raw: string) => parsePinterestPlanWith(raw, regeneratedPinTextResponseSchema).pins[0];
+
+function rejectionOf(parse: () => unknown): PinterestPlanError {
+  try {
+    parse();
+  } catch (error) {
+    return error as PinterestPlanError;
+  }
+  throw new Error('expected a rejection');
+}
+
+test.describe('Regenerate text — TASK-082 text-only contract', () => {
+  test('root cause: the real answer fails the generation schema, passes the text-only one', () => {
+    const diagnostics = rejectionOf(() => parsePinterestGenerationPlan(REAL_TEXT_ONLY_ANSWER)).diagnostics();
+    expect(diagnostics.kind).toBe('invalid_schema');
+    expect(diagnostics.preview.startsWith('{"pins":[{"title":"The Color Choice Behind This 2026 Crochet Sweater Idea"')).toBe(true);
+    expect(diagnostics.issues?.map((issue) => issue.path)).toEqual(
+      expect.arrayContaining(['pins.0.angle', 'pins.0.keywords', 'pins.0.board', 'pins.0.image_prompt', 'pins.0.visualFormat'])
+    );
+
+    const pin = parseText(REAL_TEXT_ONLY_ANSWER);
+    expect(pin.title).toBe('The Color Choice Behind This 2026 Crochet Sweater Idea');
+    expect(pin.keywords).toBe('granny square scarf, cotton yarn scarf, crochet scarf pattern, granny square ideas, crochet gift idea');
+  });
+
+  test('valid answer, keywords array, comma string, extra spaces and a ```json fence are accepted', () => {
+    expect(parseText(plan(textPin())).keywords).toBe('granny square scarf, cotton yarn scarf');
+    expect(parseText(plan(textPin({ keywords: ' granny square scarf ,cotton yarn scarf,, ' }))).keywords).toBe(
+      'granny square scarf, cotton yarn scarf'
+    );
+    expect(parseText(plan(textPin({ title: '  Why This Granny Square Scarf Pattern Gets Saved  ' }))).title).toBe(
+      'Why This Granny Square Scarf Pattern Gets Saved'
+    );
+    expect(parseText('```json\n' + plan(textPin()) + '\n```').title).toBe('Why This Granny Square Scarf Pattern Gets Saved');
+  });
+
+  test('missing field, empty or non-string keywords, too long title, unknown field are refused', () => {
+    const cases: Array<[string, string]> = [
+      [plan(withoutField('title')), 'title'],
+      [plan(withoutField('description')), 'description'],
+      [plan(withoutField('keywords')), 'keywords'],
+      [plan(textPin({ keywords: [] })), 'keywords'],
+      [plan(textPin({ keywords: '  , ' })), 'keywords'],
+      [plan(textPin({ keywords: ['granny square scarf', 42] })), 'keywords'],
+      [plan(textPin({ description: '   ' })), 'description'],
+      [plan(textPin({ title: 'x'.repeat(101) })), 'title'],
+      // An invented field is never silently accepted (strict object).
+      [plan(textPin({ note: 'Here is your rewritten Pin' })), 'pins'],
+      [JSON.stringify({ pins: [textPin()], comment: 'done' }), 'pins'],
+    ];
+    for (const [raw, field] of cases) {
+      const error = rejectionOf(() => parseText(raw));
+      expect(error.kind).toBe('invalid_schema');
+      expect(invalidPinTextField(error)).toBe(field);
+    }
+    // Free text instead of JSON: no field to name.
+    expect(invalidPinTextField(rejectionOf(() => parseText('Here is a better title for your Pin.')))).toBeNull();
+  });
+
+  test('wrong number of Pins is refused', () => {
+    for (const raw of [JSON.stringify({ pins: [] }), JSON.stringify({ pins: [textPin(), textPin({ title: 'Another' })] })]) {
+      expect(invalidPinTextField(rejectionOf(() => parseText(raw)))).toBe('pins');
+    }
+  });
+
+  test('the user error names the field, says the Pin was not modified and is retryable', () => {
+    expect(buildInvalidPinTextError('keywords')).toEqual({
+      code: 'invalid_pin_plan',
+      message: 'The AI returned an invalid or missing keywords. The Pin was not modified.',
+      retryable: true,
+      issues: [{ code: 'INVALID_PIN_TEXT', field: 'keywords', message: 'The AI returned an invalid or missing keywords.', action: 'Try again.' }],
+      issueCount: 1,
+    });
+    expect(buildInvalidPinTextError('pins').message).toBe('The AI did not return exactly one Pin. The Pin was not modified.');
+  });
+
+  test('content checks are not weakened: the real answer, off-topic for this Pin, hits a safeguard, not the schema', async () => {
+    const fake = db();
+    const { result } = await regenerate(fake, REAL_TEXT_ONLY_ANSWER);
+    // "2026" is not in the scarf keyword or context: the same refusal as before TASK-082.
+    expect((result as SocialGenerationError).code).toBe('strategy_safeguard_failed');
+    expect((result as SocialGenerationError).toApiError().issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'UNSUPPORTED_NUMBER', field: 'title' })])
+    );
+    expectPinUnchanged(fake);
+  });
+
+  test('a text-only answer saves only the three text fields; image, link, board, section, date kept', async () => {
+    const fake = db();
+    const before = { ...fake.tables.pins[0] };
+    const { ai, result } = await regenerate(
+      fake,
+      REAL_TEXT_ONLY_ANSWER.replace('The Color Choice Behind This 2026 Crochet Sweater Idea', 'The Color Choice Behind This Granny Square Scarf')
+    );
+    expect(ai.calls).toHaveLength(1);
+    expect(fake.writes).toEqual([
+      {
+        kind: 'update',
+        table: 'pins',
+        payload: {
+          title: 'The Color Choice Behind This Granny Square Scarf',
+          description: expect.stringContaining('One yarn color decision'),
+          keywords: 'granny square scarf, cotton yarn scarf, crochet scarf pattern, granny square ideas, crochet gift idea',
+        },
+      },
+    ]);
+    for (const field of PRESERVED) expect((result as Pin)[field]).toEqual(before[field]);
+    expect(fake.tables.pins[1].title).toBe('Cozy Cotton Scarf Rounds to Try This Weekend');
+  });
+
+  test('article Pin: a text-only answer (no echoed section) keeps every content safeguard', async () => {
+    const accepted = articleDb();
+    const { result } = await regenerate(accepted, plan(textPin()));
+    expect((result as Pin).title).toBe('Why This Granny Square Scarf Pattern Gets Saved');
+
+    const ungrounded = articleDb();
+    const { result: refused } = await regenerate(ungrounded, plan(textPin({ description: 'A pink granny square scarf in cotton yarn.' })));
+    expect((refused as SocialGenerationError).code).toBe('strategy_safeguard_failed');
+    expectPinUnchanged(ungrounded);
+  });
+
+  test('invalid answer: structured 422, nothing written, a single AI call (no automatic retry)', async () => {
+    for (const raw of [
+      plan(withoutField('title')),
+      JSON.stringify({ pins: [textPin(), textPin()] }),
+      'not json',
+      plan(textPin({ title: 'Rewrite only the title of this Pin' })),
+    ]) {
+      const fake = db();
+      const { ai, result } = await regenerate(fake, raw);
+      const error = result as SocialGenerationError;
+      expect(error.status).toBe(422);
+      expect(error.toApiError()).toMatchObject({ code: 'invalid_pin_plan', retryable: true });
+      expect(error.toApiError().message).toContain('The Pin was not modified.');
+      expect(ai.calls).toHaveLength(1);
+      expectPinUnchanged(fake);
+    }
+    const { result } = await regenerate(db(), plan(withoutField('title')));
+    expect((result as SocialGenerationError).toApiError().issues?.[0].field).toBe('title');
+  });
+
+  test('the prompt asks for the text-only structure; the generation prompt is unchanged', async () => {
+    const { ai } = await regenerate(db(), plan(textPin()));
+    const prompt = promptOf(ai.calls);
+    expect(prompt).toContain('This is a text-only rewrite of exactly one existing Pin');
+    expect(prompt).toContain('"keywords": ["keyword1", "keyword2", "keyword3"]');
+    expect(prompt).not.toContain('"image_prompt": "...",');
+
+    const generation = buildPinterestPinsPrompt({ keyword: 'granny square scarf', language: 'en', pinsRequested: 3, textOverlayMode: 'never' });
+    expect(generation.user).toContain('"image_prompt": "...",');
+    expect(generation.user).not.toContain('text-only rewrite');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TASK-082: bulk regeneration (browser runner, offline stubs)
+
+const succeeded = (pinId: string): PinTextRegenerationResult => ({ ok: true, pin: { id: pinId } as Pin });
+const failedWith = (code = 'invalid_pin_plan', message = 'The AI returned an invalid or missing keywords. The Pin was not modified.'): PinTextRegenerationResult => ({
+  ok: false,
+  status: code === 'rate_limited' ? 429 : 422,
+  error: { code, message, retryable: true },
+});
+
+test.describe('Regenerate text — TASK-082 bulk', () => {
+  test('3 Pins are processed one at a time, in order, with progress', async () => {
+    const order: string[] = [];
+    let active = 0;
+    let maxActive = 0;
+    const progress: string[] = [];
+    const summary = await runBulkPinTextRegeneration(
+      ['a', 'b', 'c'],
+      async (pinId) => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        order.push(pinId);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active--;
+        return succeeded(pinId);
+      },
+      (done, total) => progress.push(`${done} of ${total}`)
+    );
+    expect(order).toEqual(['a', 'b', 'c']);
+    expect(maxActive).toBe(1);
+    expect(progress).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+    expect(summary).toMatchObject({ succeeded: ['a', 'b', 'c'], failed: [], notProcessed: [], stoppedBy: null });
+  });
+
+  test('a failure in the middle does not stop the others; summary and retry of the failed Pin only', async () => {
+    const calls: string[] = [];
+    const summary = await runBulkPinTextRegeneration(['a', 'b', 'c'], async (pinId) => {
+      calls.push(pinId);
+      return pinId === 'b' ? failedWith() : succeeded(pinId);
+    });
+    expect(calls).toEqual(['a', 'b', 'c']);
+    expect(summary.succeeded).toEqual(['a', 'c']);
+    expect(summary.failed).toEqual(['b']);
+    expect(summary.outcomes[1]).toMatchObject({ pinId: 'b', status: 'failed', error: { code: 'invalid_pin_plan' } });
+
+    // The dialog retries [...failed, ...notProcessed] only.
+    const retried: string[] = [];
+    await runBulkPinTextRegeneration([...summary.failed, ...summary.notProcessed], async (pinId) => {
+      retried.push(pinId);
+      return succeeded(pinId);
+    });
+    expect(retried).toEqual(['b']);
+  });
+
+  test('a rate or trial limit stops the batch; the remaining Pins are not processed', async () => {
+    const calls: string[] = [];
+    const summary = await runBulkPinTextRegeneration(['a', 'b', 'c', 'd'], async (pinId) => {
+      calls.push(pinId);
+      return pinId === 'b' ? failedWith('rate_limited', 'Rate limit exceeded. Try again later.') : succeeded(pinId);
+    });
+    expect(calls).toEqual(['a', 'b']);
+    expect(summary).toMatchObject({ succeeded: ['a'], failed: ['b'], notProcessed: ['c', 'd'], stoppedBy: { code: 'rate_limited' } });
+  });
+
+  test('each Pin goes through the existing one-Pin route; a network error is a failure', async () => {
+    const requests: Array<{ url: string; method?: string; body?: unknown }> = [];
+    const fetchOk = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(url), method: init?.method, body: init?.body });
+      return new Response(JSON.stringify({ data: { id: PIN_ID }, error: null }), { status: 200 });
+    }) as typeof fetch;
+    expect(await requestPinTextRegeneration(PIN_ID, fetchOk)).toMatchObject({ ok: true });
+    expect(requests).toEqual([{ url: `/api/pinterest/pins/${PIN_ID}/regenerate-text`, method: 'POST', body: undefined }]);
+
+    const fetch422 = (async () =>
+      new Response(JSON.stringify({ data: null, error: buildInvalidPinTextError('keywords') }), { status: 422 })) as unknown as typeof fetch;
+    expect(await requestPinTextRegeneration(PIN_ID, fetch422)).toMatchObject({ ok: false, status: 422, error: { retryable: true } });
+
+    const offline = (async () => {
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+    expect(await requestPinTextRegeneration(PIN_ID, offline)).toMatchObject({ ok: false, status: 0 });
+  });
+
+  test('bulk UI: confirmation before any call, selection bar only, no image generator', () => {
+    const dialog = read('components/pinterest/bulk-regenerate-text-dialog.tsx');
+    expect(dialog).toContain("'This will use one text AI generation per Pin. Images and links will not change. Continue?'");
+    // The trigger only opens the confirmation; run() starts from Continue or Try again.
+    expect(dialog).toContain("onClick={() => setPhase({ kind: 'confirm', pinIds: selected })}");
+    expect(dialog).toContain('disabled={count === 0 || running}');
+    expect(dialog.match(/void run\(/g)).toHaveLength(2);
+    expect(dialog).toContain('onClick={() => void run(phase.pinIds, null)} data-testid="bulk-regenerate-text-confirm"');
+    expect(dialog).toContain('(pinId) => requestPinTextRegeneration(pinId)');
+
+    const workspace = read('components/editorial/editorial-workspace.tsx');
+    const bar = workspace.slice(workspace.indexOf('<SelectionActionBar>'), workspace.indexOf('</SelectionActionBar>'));
+    expect(bar).toContain('<BulkRegenerateTextDialog selectedPinIds={selectedIds} pins={pins} />');
+
+    for (const file of ['components/pinterest/bulk-regenerate-text-dialog.tsx', 'lib/pinterest/regenerate-text-client.ts']) {
+      expect(read(file)).not.toMatch(/generateImage|generate-images|pin-image-storage|link_url|board_section|publish_date/);
+    }
   });
 });

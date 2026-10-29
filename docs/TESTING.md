@@ -1345,6 +1345,18 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Pinterest Regenerate text fix + bulk (TASK-082, 2026-10-29)
+
+```txt
+npx playwright test tests/renderer/pinterest-regenerate-text.spec.ts tests/renderer/pinterest-regenerate-text-ui.spec.ts --project=renderer --reporter=list
+```
+
+Offline (no AI call, no network, no image model). `pinterest-regenerate-text.spec.ts` (34): fixture shaped like the real rejected answer (`{"pins":[{"title":"The Color Choice Behind This 2026 Crochet Sweater Idea",…,"keywords":[…]}]}`) fails the generation schema with `pins.0.angle / keywords / board / image_prompt / visualFormat` (root cause) and passes the text-only schema; valid answer, keywords array, comma string, extra spaces, ```json fence accepted; missing title / description / keywords, empty or non-string keywords, too long title, unknown field, 0 or 2 Pins refused with the field named; invalid answer → 422 `invalid_pin_plan`, retryable, "The Pin was not modified.", **no write**, one AI call; success writes only title / description / keywords (image, link, board, section, date and the other Pin kept); content safeguards unchanged (the real answer, off-topic for the scarf fixture, is refused by `UNSUPPORTED_NUMBER`); prompt asks for the text-only structure, the generation prompt unchanged. Bulk runner: 3 Pins strictly sequential (max 1 in flight) with progress "1 of 3"…, a failure in the middle does not stop the others, retry of the failed Pin only, a `rate_limited` stops the batch (rest "not processed"), each call is the one-Pin route; the dialog only runs after Continue, sits in the selection bar, never references the image generator, link, section or date. `pinterest-regenerate-text-ui.spec.ts` (6): labeled button visible on every card with and without image at 1440 px and 390 px; bulk button disabled with no selection, "Regenerate text for 3 Pins" with 3; summary shows Regenerated / Failed / Not modified and the failed Pin's reason.
+
+Pinterest renderer suite (2026-10-29): 614 passed, 1 failed — `social-content-studio.spec.ts` "actions: copies, edit…", which fails identically on the unmodified `HEAD` (pre-existing, unrelated: a source-text assertion on `article-pin-results.tsx`, not touched here).
+
+**Manual check (founder, costs one text generation per Pin):** on `/pinterest/<id>`, click "Regenerate text" on one Pin → new text, same image / link / board / date. Select 3 Pins → "Regenerate text for 3 Pins" → confirm → progress "1 of 3" … → summary; "Try again" only reruns the failed ones.
+
 # Pinterest Regenerate text (TASK-076, 2026-10-24)
 
 ```txt
