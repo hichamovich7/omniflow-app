@@ -22,6 +22,7 @@ import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
 import { RegenerateTextButton } from '@/components/pinterest/regenerate-text-button';
 import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection, readPinVisualArchetype } from '@/lib/social/pin-display';
+import { PinVisualFormatBadge, PinVisualFormatDetails } from '@/components/pinterest/pin-visual-format';
 import type { Pin } from '@/types/database';
 import type { ApiError } from '@/types/api';
 
@@ -279,12 +280,15 @@ function ArticlePinCard({
               {visualArchetype}
             </Badge>
           )}
+          <PinVisualFormatBadge imageAnalysis={pin.image_analysis} />
         </div>
         <Badge variant="success">
           <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
           Saved
         </Badge>
       </div>
+
+      <PinVisualFormatDetails imageAnalysis={pin.image_analysis} />
 
       {pin.media_url && (
         // eslint-disable-next-line @next/next/no-img-element

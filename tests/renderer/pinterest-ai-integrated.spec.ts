@@ -482,7 +482,8 @@ test('the form only offers and sends a reference in Legacy Composite, and tells 
 
   expect(form.match(/<ReferenceImageUpload/g)).toHaveLength(1);
   const uploadIndex = form.indexOf('<ReferenceImageUpload');
-  expect(form.slice(uploadIndex - 400, uploadIndex)).toContain("generationMode === 'legacy-composite'");
+  // TASK-079: effectiveMode = the chosen mode unless a composed format replaces it.
+  expect(form.slice(uploadIndex - 400, uploadIndex)).toMatch(/(?:generationMode|effectiveMode) === 'legacy-composite'/);
 
   const basePayload = form.slice(
     form.indexOf('const basePayload = {'),
@@ -493,7 +494,7 @@ test('the form only offers and sends a reference in Legacy Composite, and tells 
   expect(form).toContain(
     'Reference images for AI Integrated are coming soon. A reference is not yet sent to the image model.'
   );
-  expect(form).toContain("generationMode === 'ai-integrated' && (");
+  expect(form).toMatch(/(?:generationMode|effectiveMode) === 'ai-integrated' && \(/);
 });
 
 test('the form follows the workflow order with one help sentence per section and no link field', () => {

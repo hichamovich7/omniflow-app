@@ -39,6 +39,15 @@ import {
   readAiIntegratedMetadata,
   sanitizeFinalPinterestImage,
 } from '@/lib/pinterest/ai-integrated';
+import {
+  isStepByStepV2,
+  markComposerRendered,
+  readComposerMetadata,
+  type ComposerMetadata,
+} from '@/lib/pinterest/composer/content';
+import { composePinImage, composerImagePrompt } from '@/lib/pinterest/composer/pipeline';
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 const requestSchema = z.object({
   generationId: z.string().uuid(),
@@ -200,6 +209,20 @@ export async function POST(request: Request) {
           .limit(1);
 
         const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1;
+        // TASK-079: a composed Pin keeps its template on every regeneration.
+        const composer = readComposerMetadata(pin.image_analysis);
+        if (composer) {
+          releaseSelection();
+          return await generateComposedPin({
+            supabase,
+            mediaStorage,
+            pin,
+            composer,
+            userId: user.id,
+            generationId,
+            nextVersion,
+          });
+        }
         const generationMode = generationModeForVisualFormat(pin.visual_format);
         const integratedMetadata = generationMode === 'ai-integrated'
           ? readAiIntegratedMetadata(pin.image_analysis)
@@ -413,4 +436,108 @@ export async function POST(request: Request) {
     },
     error: null,
   });
+}
+
+/**
+ * TASK-079: a composed Pin — one photo without text (photo model; Step-by-step
+ * v2: plus one per step panel, at most 4 calls), then the stored article text
+ * rendered by OmniFlow. Nothing is stored unless the
+ * whole composition succeeds; the new version is recorded inactive first and
+ * only replaces the current image once everything is saved.
+ */
+async function generateComposedPin(params: {
+  supabase: SupabaseServerClient;
+  mediaStorage: MediaStorage;
+  pin: Pin;
+  composer: ComposerMetadata;
+  userId: string;
+  generationId: string;
+  nextVersion: number;
+}): Promise<string> {
+  const { supabase, mediaStorage, pin, composer, nextVersion } = params;
+  const { model: imageModel } = resolveImageModel('photo-only');
+  const photo = await generateImage({
+    prompt: composerImagePrompt(appendArticleVisualBrief(buildImagePrompt(pin, nextVersion), pin.image_analysis), composer),
+    size: IMAGE_CONFIG.size,
+    visualFormat: 'photo-only',
+  });
+  // Step-by-step v2: one photo per step panel, from its stored deterministic
+  // prompt, one after the other, in memory. Any failure stores nothing.
+  const stepPhotos: Buffer[] = [];
+  if (isStepByStepV2(composer)) {
+    for (const [index, panel] of composer.panels.entries()) {
+      try {
+        stepPhotos.push(await generateImage({ prompt: panel.imagePrompt, size: IMAGE_CONFIG.size, visualFormat: 'photo-only' }));
+      } catch (error) {
+        throw new Error(`Step-by-step panel ${index + 1} image failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      }
+    }
+  }
+  const { optimized, metadata } = await composePinImage({ photo, stepPhotos, metadata: composer, hasDestination: Boolean(pin.link_url) });
+  console.log(`[pinterest images] pin ${pin.id} composer ${metadata.templateType} ${describeOptimization(optimized)}`);
+
+  const composedPath = getPinImageObjectKey(mediaStorage.provider, {
+    userId: params.userId,
+    generationId: params.generationId,
+    pinId: pin.id,
+    version: nextVersion,
+    extension: optimized.extension,
+  });
+  let storedComposed: StoredMedia;
+  try {
+    storedComposed = await mediaStorage.upload({ key: composedPath, body: optimized.buffer, contentType: optimized.contentType });
+  } catch (uploadError) {
+    throw new Error(`Storage upload failed: ${uploadError instanceof Error ? uploadError.message : 'unknown error'}`);
+  }
+  const removeComposed = () => mediaStorage.remove([composedPath]).catch(() => undefined);
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('pin_images')
+    .insert({
+      pin_id: pin.id,
+      storage_path: composedPath,
+      url: storedComposed.publicUrl,
+      is_active: false,
+      version: nextVersion,
+      image_model: imageModel,
+    })
+    .select('id')
+    .single();
+  if (insertError || !inserted) {
+    await removeComposed();
+    throw new Error('Composed image record could not be saved');
+  }
+
+  const { data: previousActive } = await supabase
+    .from('pin_images')
+    .select('id')
+    .eq('pin_id', pin.id)
+    .eq('is_active', true);
+  const previousIds = ((previousActive ?? []) as Array<{ id: string }>).map((row) => row.id);
+  if (previousIds.length > 0) {
+    await supabase.from('pin_images').update({ is_active: false }).in('id', previousIds);
+  }
+  const { error: activateError } = await supabase.from('pin_images').update({ is_active: true }).eq('id', inserted.id);
+  if (activateError) {
+    // Back to the image the Pin had: the failed version and its file are removed.
+    await supabase.from('pin_images').delete().eq('id', inserted.id);
+    if (previousIds.length > 0) {
+      await supabase.from('pin_images').update({ is_active: true }).in('id', previousIds);
+    }
+    await removeComposed();
+    throw new Error('Composed image could not be activated');
+  }
+
+  // Only the image changes: text, Destination URL, board and schedule stay as they are.
+  const { error: pinError } = await supabase
+    .from('pins')
+    .update({
+      media_url: storedComposed.publicUrl,
+      image_analysis: markComposerRendered(pin.image_analysis, metadata, []),
+    })
+    .eq('id', pin.id);
+  if (pinError) {
+    console.warn(`[pinterest images] pin ${pin.id} composed image saved, Pin row not updated: ${pinError.message}`);
+  }
+  return pin.id;
 }

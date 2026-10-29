@@ -275,7 +275,8 @@ test('the inline alert shows the exact message only when all three importances a
   // Derived from the three importance states, never stored, so it appears
   // immediately and disappears as soon as any single element is re-enabled.
   const derived = form.slice(form.indexOf('const allTextImportanceNone ='), form.indexOf('async function handleSubmit'));
-  expect(derived).toContain("generationMode === 'ai-integrated'");
+  // TASK-079: effectiveMode = the chosen mode unless a composed format replaces it.
+  expect(derived).toMatch(/(?:generationMode|effectiveMode) === 'ai-integrated'/);
   for (const state of ['headlineImportance', 'subtitleImportance', 'ctaImportance']) {
     expect(derived).toContain(`${state} === 'none'`);
   }

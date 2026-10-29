@@ -161,6 +161,8 @@ interface Harness {
   post: (body: unknown) => Promise<Response>;
   events: RecordedEvent[];
   textCalls: TextCall[];
+  /** Vision (article photo description) calls — they throw, but are counted. */
+  visionCalls: number[];
 }
 
 async function withRoute(
@@ -170,6 +172,7 @@ async function withRoute(
 ): Promise<void> {
   const events: RecordedEvent[] = [];
   const textCalls: TextCall[] = [];
+  const visionCalls: number[] = [];
   let generationCount = 0;
   const harness: Harness = {
     post: async () => {
@@ -177,6 +180,7 @@ async function withRoute(
     },
     events,
     textCalls,
+    visionCalls,
   };
 
   const niche = options.homeDecor ? 'Home Decor' : 'Crochet';
@@ -246,6 +250,7 @@ async function withRoute(
         return step;
       },
       analyzeImage: async () => {
+        visionCalls.push(1);
         throw new Error('Vision must not be called');
       },
       generateImage: async () => {
@@ -580,21 +585,27 @@ test.describe('Visual style (TASK-078): Auto variety on article Pins, Classic by
       (row) => JSON.parse(row.image_analysis as string)._articleSource.brief as { archetype?: { id: string }; subjectContract?: unknown }
     );
 
-  test('Auto variety: one different archetype per Pin in the prompt and on each saved Pin; nothing else changes', async () => {
+  test('Auto variety: one different layout per Pin in the prompt and on each saved Pin; nothing else changes', async () => {
     await withRoute([catPlan(KITTEN_AMIGURUMI, catSectionIds())], { catPost: true }, async ({ post, events, textCalls }) => {
       const res = await post({ ...catRequest, visualStyle: 'auto-variety' });
       expect(res.status).toBe(201);
       expect(textCalls).toHaveLength(1);
       const prompt = `${textCalls[0].system}\n${textCalls[0].user}`;
-      expect(prompt).toContain('Visual archetype for Pin 1:');
-      expect(prompt).toContain('Visual archetype for Pin 3:');
+      // TASK-079: a Pin gets a composed template when the article proves it, else its archetype.
+      for (const pin of [1, 2, 3]) {
+        expect(prompt).toMatch(new RegExp(`Visual archetype for Pin ${pin}:|Pin ${pin} is a composed Pin`));
+      }
       // The subject contract is still in the prompt.
       expect(prompt).toContain('(write "amigurumi crochet toy")');
-      const briefs = storedBriefs(events);
-      const archetypes = briefs.map((brief) => brief.archetype?.id);
-      expect(archetypes.every(Boolean)).toBe(true);
-      expect(new Set(archetypes).size).toBe(3);
       const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+      const briefs = storedBriefs(events);
+      const layouts = rows.map((row, index) => {
+        const composed = JSON.parse(row.image_analysis as string)._pinterestComposer?.templateType as string | undefined;
+        if (composed) expect(row.visual_format).toBe('photo-only');
+        return composed ?? briefs[index].archetype?.id;
+      });
+      expect(layouts.every(Boolean)).toBe(true);
+      expect(new Set(layouts).size).toBe(3);
       const original = JSON.parse(catPlan(KITTEN_AMIGURUMI, catSectionIds())).pins;
       rows.forEach((row, index) => {
         // Destination URL untouched (none given, no permalink added), text and image prompt as returned.
@@ -620,6 +631,89 @@ test.describe('Visual style (TASK-078): Auto variety on article Pins, Classic by
       expect(res.status).toBe(400);
       expect(textCalls).toHaveLength(0);
       expect(events).toHaveLength(0);
+    });
+  });
+});
+
+test.describe('Visual format (TASK-079): Template Composer', () => {
+  const catSectionIds = () =>
+    planArticlePinSections(buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html: CAT_POST.contentHtml, title: CAT_POST.title, language: 'en' }), 3);
+  const composerOf = (row: Record<string, unknown>) =>
+    JSON.parse(row.image_analysis as string)._pinterestComposer as
+      | { templateType: string; sourceSections: string[]; renderedBy: string; status: string; text: { title: string; cta: string | null } }
+      | undefined;
+
+  for (const [visualStyle, label] of [['materials-and-tools', 'Materials']] as const) {
+    test(`${visualStyle} on an article without ${label}: 422 before Vision, the text call or any write`, async () => {
+      await withRoute([], { catPost: true }, async ({ post, events, textCalls, visionCalls }) => {
+        const res = await post({ ...catRequest, visualStyle });
+        expect(res.status).toBe(422);
+        const body = (await res.json()) as { error: { code: string; message: string } };
+        expect(body.error.code).toBe('visual_format_unavailable');
+        expect(body.error.message).toContain('Choose another visual format');
+        expect(textCalls).toHaveLength(0);
+        expect(visionCalls).toHaveLength(0);
+        expect(events).toHaveLength(0);
+      });
+    });
+  }
+
+  test('a composed format on a keyword request, or with another generation mode: 400 before any AI call', async () => {
+    await withRoute([], {}, async ({ post, events, textCalls }) => {
+      expect((await post({ ...keywordRequest, visualStyle: 'hero' })).status).toBe(400);
+      expect((await post({ ...catRequest, generationMode: 'legacy-composite', visualStyle: 'hero' })).status).toBe(400);
+      expect(textCalls).toHaveLength(0);
+      expect(events).toHaveLength(0);
+    });
+  });
+
+  test('Hero: every Pin is a photo-only composed Pin with the article title; CTA only with a Destination URL', async () => {
+    for (const destinationUrl of [undefined, 'https://crochet.example.test/landing/'] as const) {
+      await withRoute([catPlan(KITTEN_AMIGURUMI, catSectionIds())], { catPost: true }, async ({ post, events, textCalls }) => {
+        const res = await post({ ...catRequest, visualStyle: 'hero', ...(destinationUrl ? { destinationUrl } : {}) });
+        expect(res.status).toBe(201);
+        expect(textCalls).toHaveLength(1);
+        expect(`${textCalls[0].system}\n${textCalls[0].user}`).toContain('Pin 1 is a composed Pin (format: Hero)');
+        const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+        const original = JSON.parse(catPlan(KITTEN_AMIGURUMI, catSectionIds())).pins;
+        rows.forEach((row, index) => {
+          const composer = composerOf(row)!;
+          expect(row.visual_format).toBe('photo-only');
+          expect(row.overlay_text).toBeNull();
+          expect(composer).toMatchObject({ templateType: 'hero', renderedBy: 'omniflow-composer', status: 'planned' });
+          expect(composer.text.title).toBe(CAT_POST.title);
+          expect(composer.text.cta === null).toBe(!destinationUrl);
+          expect(composer.sourceSections).toEqual([original[index].sourceSectionId]);
+          // Text, image prompt and destination as before: OmniFlow only adds the image text contract.
+          expect(row.title).toBe(original[index].title);
+          expect(row.image_prompt).toBe(original[index].image_prompt);
+          expect(row.link_url).toBe(destinationUrl ?? null);
+          // The brief and its subject contract stay; no prompt archetype on a composed Pin.
+          const brief = JSON.parse(row.image_analysis as string)._articleSource.brief;
+          expect(brief.archetype).toBeUndefined();
+        });
+      });
+    }
+  });
+
+  test('the withdrawn Step-by-step format: 400 before Vision, the text call or any write (1 Pin or more)', async () => {
+    await withRoute([], { catPost: true }, async ({ post, events, textCalls, visionCalls }) => {
+      for (const pinsRequested of [1, 3]) {
+        const res = await post({ ...catRequest, visualStyle: 'step-by-step', pinsRequested });
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe('invalid_request');
+      }
+      expect(textCalls).toHaveLength(0);
+      expect(visionCalls).toHaveLength(0);
+      expect(events).toHaveLength(0);
+    });
+  });
+
+  test('Classic: no composer contract is stored (unchanged behavior)', async () => {
+    await withRoute([catPlan(KITTEN_AMIGURUMI, catSectionIds())], { catPost: true }, async ({ post, events }) => {
+      expect((await post(catRequest)).status).toBe(201);
+      const rows = pinInserts(events)[0].row as Array<Record<string, unknown>>;
+      expect(rows.every((row) => composerOf(row) === undefined)).toBe(true);
     });
   });
 });

@@ -19,6 +19,7 @@ import { getPinGenerationModeLabel } from './pin-diagnostic-badges';
 import { PinDestinationUrlEditor } from './destination-url-dialog';
 import { RegenerateTextButton } from './regenerate-text-button';
 import { readPinVisualArchetype } from '@/lib/social/pin-display';
+import { PinVisualFormatDetails } from './pin-visual-format';
 
 interface PinDetailDialogProps {
   pin: Pin;
@@ -63,6 +64,7 @@ export function PinDetailDialog({ pin, onClose, usage = [], imageModel }: PinDet
               </Badge>
             )}
           </div>
+          <PinVisualFormatDetails imageAnalysis={pin.image_analysis} />
           {pin.media_url ? (
             <div className="relative aspect-2/3 w-full overflow-hidden rounded-lg bg-muted" data-testid="pin-detail-preview">
               <Image

@@ -18,6 +18,22 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest Step-by-step format withdrawn — TASK-079 (2026-10-29)
+
+* The **Step-by-step** visual format is removed from the selector and from the API (`visualStyle: "step-by-step"` → 400 before any AI call); Auto variety never uses it. It did not give a real tutorial: a planned **Pinterest Detailed Tutorial Infographic** (TASK-080 — finished project, materials, one image per step, numbers, the article's exact instructions, assembly, result) will replace it once implemented and tested.
+* Pins made earlier with Step-by-step keep their image and metadata (v1 / v2 contracts); they are still displayed and "Regenerate image" still works for them. No migration; UTM, CSV export, Destination URL, scheduling and WordPress untouched.
+
+## Pinterest article Pins: Template Composer — Hero, Materials & tools, Step-by-step — TASK-079 (2026-10-28)
+
+* The article form's **Visual format** (formerly "Visual style") now offers Classic (default), Auto variety and composed formats (Step-by-step withdrawn on 2026-10-29, see above): **Hero** (project photo + article title, a CTA only with a Destination URL), **Materials & tools** (photo + the article's Materials / Ingredients list, plus a Tools list when the article has one) and **Step-by-step** (finished project + 3–5 numbered step cards). Keyword and Research flows unchanged.
+* Composed Pins: the image model draws **one photo without any text** (photo model, one call per Pin — no call per step); OmniFlow renders every word with Sharp (bundled Inter fonts, accents, wrapping, shrink-to-fit, safe margins, opaque panels, contrast ≥ 4.5:1 checked) at 1000×1500, then the existing `pinterest-pin` JPEG profile. New `lib/pinterest/composer/` (`content.ts`, `render.ts`, `pipeline.ts`).
+* The text comes from the article only: title, list items, step labels ("Step 1", "Runde 2", "Étape 3", "Paso 1"…) and step titles are copied verbatim, shortened deterministically (parentheses dropped, cut at a separator, "…"), then verified against the article — an invented material, step or number is rejected. EN, DE, FR, ES headings and inline lists are recognized.
+* Eligibility is checked before any AI call: an explicitly chosen format the article cannot prove (no list of ≥ 3 materials, fewer than 3 numbered steps) → 422 `visual_format_unavailable` with a clear message, no Vision call, no text call, nothing created. A composed format requires Photo only (it replaces AI Integrated / Legacy for the image; the AI Integrated settings are hidden).
+* Auto variety now uses the real templates when the article proves them (finished project / lifestyle → Hero, materials → Materials & tools, tutorial → Step-by-step), never twice in a row, Materials and Step-by-step at most once per batch; the other Pins keep their TASK-078 archetype.
+* Stored in `pins.image_analysis._pinterestComposer` (`templateType`, `templateVersion: "v1"`, `sourceSections`, `renderedBy: "omniflow-composer"`, verified text; no migration). "Regenerate image" keeps the template, sources and text; the Pin text, Destination URL / UTM, schedule and board are never written. The new image version is recorded inactive and only replaces the current one once everything is saved; any failure stores nothing (an uploaded file is removed) and the current image stays.
+* Each Pin shows its format: a badge on result cards and in the Pin grid; format, sources, status and warnings in Pin Details and on result cards; older Pins read "Classic". User Guide section updated.
+* Not touched: UTM, CSV export, Destination URL, scheduling, WordPress, Medium, Facebook, keyword flows, existing images and generations, migrations. No reference library, no Pinterest scraping, no new dependency.
+
 ## Pinterest article Pins: Auto variety visual archetypes — TASK-078 Phase A (2026-10-28)
 
 * New option **Visual style** on Pins made from a WordPress article (OmniFlow article or existing post): **Classic** (default — exactly the former behavior) or **Auto variety**. Keyword and Research flows are unchanged; `visualStyle: "auto-variety"` without an article → 400.

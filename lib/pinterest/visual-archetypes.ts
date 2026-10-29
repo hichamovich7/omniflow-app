@@ -63,7 +63,7 @@ interface ArchetypeDefinition {
 
 // Multilingual markers (EN, DE, FR, ES). Structure only — never copied into a prompt.
 const STEP_MARKER = /\b(?:step|schritt|étape|etape|paso|round|rnd|row|runde|reihe|rang|tour|vuelta|fila)\s*\d+/gi;
-const MATERIALS_HEADING =
+export const MATERIALS_HEADING =
   /^(?:materials?|supplies|tools|what you(?:'ll| will)? need|you will need|ingredients|materialien|material\b|was du brauchst|was sie brauchen|benötigt|zutaten|werkzeug|matériel|matériaux|fournitures|il vous faut|ingrédients|outils|materiales|lo que necesitas|herramientas|ingredientes|necesitarás)/i;
 const PROBLEM_HEADING =
   /\b(?:mistakes?|problems?|fix(?:es|ing)?|troubleshoot\w*|avoid|fehler|probleme?|lösung\w*|vermeiden|erreurs?|problèmes?|solutions?|éviter|errores|problemas?|soluci\w+|evitar)\b/i;
@@ -284,11 +284,11 @@ export function planVisualArchetypes(
  * section differs from its planned slot takes the first unclaimed slot of
  * its own section, else none (classic brief).
  */
-export function assignPinArchetypes(
+export function assignPinArchetypes<T = PinVisualArchetype>(
   sectionPlan: string[],
-  archetypes: (PinVisualArchetype | null)[],
+  archetypes: (T | null)[],
   pinSectionIds: (string | undefined)[]
-): (PinVisualArchetype | null)[] {
+): (T | null)[] {
   const claimed = new Set<number>();
   return pinSectionIds.map((raw, index) => {
     const sectionId = raw?.trim();

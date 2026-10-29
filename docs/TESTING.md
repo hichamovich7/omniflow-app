@@ -1284,6 +1284,30 @@ Follow-up 2 (2026-10-25, per-section furniture + repair): `pinterest-home-decor-
 
 ---
 
+# Step-by-step withdrawn (TASK-079, 2026-10-29)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-composer.spec.ts tests/renderer/pinterest-composer-ui.spec.ts tests/renderer/pinterest-generate-errors.spec.ts tests/renderer/pinterest-visual-archetypes.spec.ts
+```
+
+The Step-by-step format is no longer offered (replaced by the planned TASK-080). Offline checks: `step-by-step` is not a `PinterestVisualStyle`, the request schema refuses it on `visualStyle`, eligibility only lists Hero / Materials & tools, no visual style (Auto variety included) ever plans a step template; the route returns 400 `invalid_request` for `visualStyle: "step-by-step"` (1 or 3 Pins) before Vision, the text call or any write. Historical compatibility: stored v1 and v2 `step_by_step` contracts are still read, verified, displayed (label, layout, panels, image generations, warning — desktop and 375 px), rendered (3 v2 layouts × palettes) and regenerated (v1: 1 image call; v2: 4 calls, one upload, a failed call stores nothing, Destination URL / UTM / schedule untouched). Hero, Materials & tools, Classic and Auto variety unchanged. No real AI test for this change.
+
+---
+
+# Pinterest Template Composer — Hero, Materials & tools, Step-by-step (TASK-079, 2026-10-28)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-composer.spec.ts tests/renderer/pinterest-composer-ui.spec.ts tests/renderer/pinterest-generate-errors.spec.ts tests/renderer/pinterest-visual-archetypes.spec.ts
+```
+
+Offline (no AI, Vision, network, WordPress or real storage call; `fetch` throws). `pinterest-composer.spec.ts` (38): content — Hero (article title, section subject as subtitle, CTA only with a Destination URL, fixed localized phrase), Materials & tools (verbatim `<li>` items, parentheses dropped, heading as label), Step-by-step (article labels and headings, step sections as sources), > 5 steps → first 5 + `STEPS_TRUNCATED:5/7`; eligibility per niche and language — Crochet EN / DE, Clay FR (inline "a, b, c et d" list, "Étape 1 :" headings), Recipes ES (Ingredientes list, inline "Paso 1:" markers), Home Decor DE and an ideas article (Hero only), numbered headings are steps only in a how-to title, long titles ("Title: subtitle" → first part; too long → no Hero; long step → "…" and still verified); rejection of an invented material, step, step number, number inside an item ("4 mm" for "3.5 mm"), CTA outside the fixed phrases, unknown source section; selection — Classic / keyword plan nothing, an explicit ineligible format plans nothing, Auto variety on 5 articles (templates only when proven, never twice in a row, Materials / Step-by-step ≤ 1 per batch, composed slots drop their archetype, deterministic), no Materials / Step-by-step / variations without lists or colors, a repeat → the second Pin keeps its archetype; guardrails and persistence — the composed photo prompt keeps the brief and subject contract and forbids text, collage and panels; contract stored next to the other metadata and read back; older / malformed → Classic; Hero CTA dropped without a Destination URL; rendering — palette contrast ≥ 4.5:1, the 3 templates × EN / DE / FR / ES → 1000×1500 JPEG, long German title with accents / ß and an unbreakable compound, unreadable photo → `ComposerRenderError`; image route (fake Supabase client, fake media storage) — Supabase and R2 keys, one `photo-only` image call whose prompt never contains the drawn article text, row inserted inactive then activated, only `media_url` + `image_analysis` written (text, `link_url` / UTM, `publish_date`, board untouched; only `generations` / `pin_images` / `pins` written), Regenerate image keeps template / sources / text and replaces the active image only at the end, composition failure → nothing uploaded or written, refused row → uploaded file removed and the current image kept, a Classic Pin keeps its former path. `pinterest-composer-ui.spec.ts` (2, Chromium): grid badge with sources tooltip on a composed Pin and none on a Classic Pin; details line (format, status, sources, warning; "Classic" for Classic and older Pins) at 1280 px and 375 px without horizontal overflow. `pinterest-generate-errors.spec.ts` +5 route cases: Step-by-step / Materials & tools on an article without them → 422 `visual_format_unavailable` with no Vision call, no text call and no write; a composed format on a keyword request or with Legacy Composite → 400; Hero → 201, every Pin `photo-only` with the article title, CTA only with a Destination URL, title / image_prompt / `link_url` unchanged, no archetype; Classic → no contract. Updated for TASK-079: the TASK-078 Auto variety route case (each Pin has a template or an archetype, 3 distinct layouts), the archetype spec helper (tests the TASK-078 planner directly), three source-text checks of `pin-form.tsx` (`effectiveMode`) and the `optimizeImage` call inventory (one more `pinterest-pin` call).
+
+Validation (2026-10-28): full renderer **1390/1391** (the one failure is the pre-existing CRLF source-text case `social-content-studio.spec.ts:829`); TypeScript OK, ESLint OK on touched files, `next build` OK, `git diff --check` OK. No migration, no `.env` change, no AI call, no commit.
+
+Controlled real AI test (approved by the founder after the offline tests; needs the founder's logged-in session): one article that proves materials and steps, 3-4 Pins, **Auto variety**; no publication, WordPress read only, no CSV export. Cost: one text call + one image call per Pin (photo model `AI_IMAGE_MODEL`), no call per step. Check each final image: template used, 1000×1500, title / list / steps readable on a phone, every word present in the article, main subject of the section visible and not covered by text.
+
+---
+
 # Pinterest visual archetypes — Auto variety (TASK-078 Phase A, 2026-10-28)
 
 ```txt

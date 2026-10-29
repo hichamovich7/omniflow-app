@@ -90,6 +90,9 @@ type RequiredTextMode = 'generate' | 'exact';
 type OptionalTextMode = RequiredTextMode | 'none';
 
 // TASK-078: article Pins only. Classic stays the default (behavior unchanged).
+// TASK-079: Hero and Materials & tools are composed by OmniFlow. A tutorial
+// infographic format (TASK-080) is planned and not offered yet.
+const COMPOSED_VISUAL_STYLES: readonly PinterestVisualStyle[] = ['hero', 'materials-and-tools'];
 const VISUAL_STYLE_OPTIONS: Array<{ value: PinterestVisualStyle; label: string; description: string }> = [
   {
     value: 'classic',
@@ -100,7 +103,17 @@ const VISUAL_STYLE_OPTIONS: Array<{ value: PinterestVisualStyle; label: string; 
     value: 'auto-variety',
     label: 'Auto variety',
     description:
-      'Each Pin gets a different layout (step-by-step, materials, collage, close-up…) only when the article supports it. The article stays the source.',
+      'Each Pin gets a different layout — including Hero and Materials & tools — only when the article supports it. The article stays the source.',
+  },
+  {
+    value: 'hero',
+    label: 'Hero',
+    description: 'The project photo with the article title added by OmniFlow (a CTA only with a Destination URL).',
+  },
+  {
+    value: 'materials-and-tools',
+    label: 'Materials & tools',
+    description: "A photo plus the article's own Materials / Ingredients list. Needs a list of at least 3 items.",
   },
 ];
 
@@ -308,10 +321,14 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   ) as SupportedLanguage;
   // AI Integrated inherits the project language, except from an article,
   // where the article's language is the default and stays editable.
+  // TASK-079: a composed format replaces the generation mode — a photo
+  // without text, every word added by OmniFlow (AI Integrated settings hidden).
+  const composedFormat = Boolean(articleSource) && COMPOSED_VISUAL_STYLES.includes(visualStyle);
+  const effectiveMode: PinterestGenerationMode = composedFormat ? 'photo-only' : generationMode;
   const languageInherited = generationMode === 'ai-integrated' && !articleSource;
   const nicheConvention = getNicheVisualConvention(selectedProject?.niche);
   const showTextOverlayMode = nicheConvention?.allowTextOverlay ?? false;
-  const showLegacyTextOverlayMode = generationMode === 'legacy-composite' && showTextOverlayMode;
+  const showLegacyTextOverlayMode = effectiveMode === 'legacy-composite' && showTextOverlayMode;
 
   function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
@@ -358,7 +375,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   // set to None and disappears as soon as any one is re-enabled. The chosen
   // values are left untouched so the user can simply correct one of them.
   const allTextImportanceNone =
-    generationMode === 'ai-integrated' &&
+    effectiveMode === 'ai-integrated' &&
     headlineImportance === 'none' &&
     subtitleImportance === 'none' &&
     ctaImportance === 'none';
@@ -411,10 +428,10 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       ...(articleSource ? { visualStyle } : {}),
     };
     const parsed = generatePinsSchema.safeParse(
-      generationMode === 'ai-integrated'
+      effectiveMode === 'ai-integrated'
         ? {
             ...basePayload,
-            generationMode,
+            generationMode: effectiveMode,
             aiIntegrated: {
               creativeFormat,
               strategy,
@@ -436,11 +453,11 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
               },
             },
           }
-        : generationMode === 'photo-only'
-          ? { ...basePayload, generationMode }
+        : effectiveMode === 'photo-only'
+          ? { ...basePayload, generationMode: effectiveMode }
           : {
               ...basePayload,
-              generationMode,
+              generationMode: effectiveMode,
               // The legacy style-analysis reference is Legacy Composite only.
               // Stale state from another mode is never sent.
               referenceImageUrl: referenceImageUrl ?? undefined,
@@ -774,7 +791,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
                   key={option.value}
                   type="button"
                   aria-pressed={selected}
-                  disabled={loading}
+                  disabled={loading || composedFormat}
                   onClick={() => setGenerationMode(option.value)}
                   className={cn(
                     'min-h-24 min-w-0 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
@@ -805,9 +822,9 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
           {articleSource && (
             <div className="space-y-1.5 border-t border-border/60 pt-4">
               <Label id="visual-style-heading" className="text-xs font-medium text-muted-foreground">
-                Visual style
+                Visual format
               </Label>
-              <div role="group" aria-labelledby="visual-style-heading" className="grid gap-2 md:grid-cols-2">
+              <div role="group" aria-labelledby="visual-style-heading" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {VISUAL_STYLE_OPTIONS.map((option) => {
                   const selected = visualStyle === option.value;
                   return (
@@ -834,10 +851,17 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
                   );
                 })}
               </div>
+              {composedFormat && (
+                <p className="text-xs text-muted-foreground" data-testid="visual-format-composer-note">
+                  This format uses a photo without text: OmniFlow adds the title and lists from the article, so it
+                  replaces the generation mode above. If the article does not have what this format needs, nothing is
+                  generated and no credit is used.
+                </p>
+              )}
             </div>
           )}
 
-          {generationMode === 'legacy-composite' && (
+          {effectiveMode === 'legacy-composite' && (
             <div className="space-y-4 border-t border-border/60 pt-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Reference Image (optional)</Label>
@@ -878,7 +902,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
         </FormSection>
 
         {/* 5. AI Integrated settings */}
-        {generationMode === 'ai-integrated' && (
+        {effectiveMode === 'ai-integrated' && (
           <FormSection
             id="ai-integrated-settings"
             title="AI Integrated settings"

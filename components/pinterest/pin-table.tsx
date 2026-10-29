@@ -30,6 +30,7 @@ import { PINTEREST_ANGLES, type PinterestAngle } from '@/types/pinterest';
 import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
 import { readPinVisualArchetype } from '@/lib/social/pin-display';
+import { PinVisualFormatBadge } from './pin-visual-format';
 
 interface PinTableProps {
   pins: Pin[];
@@ -339,6 +340,8 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
                     {readPinVisualArchetype(pin.image_analysis)}
                   </Badge>
                 )}
+
+                <PinVisualFormatBadge imageAnalysis={pin.image_analysis} />
 
                 {/* Always visible, labeled, with or without an image (the overlay copy is hover-only on desktop). */}
                 <div className="flex justify-end">

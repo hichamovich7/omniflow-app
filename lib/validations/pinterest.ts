@@ -104,7 +104,9 @@ const generatePinsBaseSchema = z.object({
   // every source (keyword, research, OmniFlow article, existing post).
   destinationUrl: optionalDestinationUrlSchema,
   // TASK-078: visual archetypes for article Pins. `classic` (default) keeps
-  // the former behavior; `auto-variety` needs an article source.
+  // the former behavior; every other value needs an article source.
+  // TASK-079: hero / materials-and-tools are composed by OmniFlow on a
+  // photo without text, so they require Photo only.
   visualStyle: z.enum(PINTEREST_VISUAL_STYLES, { message: 'Invalid visual style' }).default('classic'),
 });
 
@@ -116,6 +118,10 @@ export const ARTICLE_SOURCE_NO_ANALYSIS_MESSAGE =
   'A content analysis cannot be combined with an article source.';
 export const AUTO_VARIETY_REQUIRES_ARTICLE_MESSAGE =
   'Auto variety is only available for Pins generated from a WordPress article.';
+export const VISUAL_FORMAT_REQUIRES_ARTICLE_MESSAGE =
+  'The Hero and Materials & tools formats are only available for Pins generated from a WordPress article.';
+export const VISUAL_FORMAT_REQUIRES_PHOTO_ONLY_MESSAGE =
+  'The Hero and Materials & tools formats render their text with OmniFlow on a photo without text: use the Photo only generation mode.';
 export const ARTICLE_SOURCE_SINGLE_MESSAGE =
   'Choose either an OmniFlow article or an existing WordPress post, not both.';
 
@@ -288,6 +294,13 @@ export const generatePinsSchema = z.preprocess(
       }
       if (data.visualStyle === 'auto-variety' && !data.wordpressArticleId && !data.wordpressPost) {
         ctx.addIssue({ code: 'custom', path: ['visualStyle'], message: AUTO_VARIETY_REQUIRES_ARTICLE_MESSAGE });
+      }
+      if (data.visualStyle !== 'classic' && data.visualStyle !== 'auto-variety') {
+        if (!data.wordpressArticleId && !data.wordpressPost) {
+          ctx.addIssue({ code: 'custom', path: ['visualStyle'], message: VISUAL_FORMAT_REQUIRES_ARTICLE_MESSAGE });
+        } else if (data.generationMode !== 'photo-only') {
+          ctx.addIssue({ code: 'custom', path: ['generationMode'], message: VISUAL_FORMAT_REQUIRES_PHOTO_ONLY_MESSAGE });
+        }
       }
       if (data.wordpressArticleId || data.wordpressPost) {
         // No Research source URL travels with an article-based request

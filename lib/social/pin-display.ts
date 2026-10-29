@@ -70,6 +70,80 @@ export function readPinVisualArchetype(imageAnalysisJson: string | null): string
   }
 }
 
+/** Key of the Template Composer contract in pins.image_analysis (TASK-079). */
+export const COMPOSER_METADATA_KEY = '_pinterestComposer';
+
+const VISUAL_FORMAT_LABELS: Record<string, string> = {
+  hero: 'Hero',
+  materials_and_tools: 'Materials & tools',
+  step_by_step: 'Step-by-step',
+};
+
+export interface PinVisualFormatDisplay {
+  /** "Classic" for every Pin without a composed template (older Pins included). */
+  label: string;
+  composed: boolean;
+  /** Headings of the article sections the rendered text comes from. */
+  sources: string[];
+  status: 'planned' | 'rendered' | null;
+  warnings: string[];
+  /** Step-by-step v2 only: "Editorial grid · 3 panels · up to 4 image generations". */
+  layout: string | null;
+  panelCount: number | null;
+  imageCalls: number | null;
+}
+
+const STEP_LAYOUT_LABELS: Record<string, string> = {
+  'vertical-progression': 'Vertical progression',
+  'editorial-grid': 'Editorial grid',
+  alternating: 'Alternating',
+};
+
+function describeComposerWarning(code: string): string {
+  const truncated = /^STEPS_TRUNCATED:(\d+)\/(\d+)$/.exec(code);
+  if (truncated) return `Shows the first ${truncated[1]} of ${truncated[2]} steps`;
+  const selected = /^STEPS_SELECTED:(\d+)\/(\d+)$/.exec(code);
+  return selected ? `Shows ${selected[1]} of the article's ${selected[2]} steps (first, middle and last)` : code;
+}
+
+/** The visual format of a Pin, for display only. Never throws. */
+export function readPinVisualFormat(imageAnalysisJson: string | null): PinVisualFormatDisplay {
+  const classic: PinVisualFormatDisplay = {
+    label: 'Classic', composed: false, sources: [], status: null, warnings: [], layout: null, panelCount: null, imageCalls: null,
+  };
+  if (!imageAnalysisJson) return classic;
+  try {
+    const value = (JSON.parse(imageAnalysisJson) as Record<string, unknown>)?.[COMPOSER_METADATA_KEY] as
+      | { templateType?: unknown; sourceHeadings?: unknown; status?: unknown; warnings?: unknown; layout?: unknown; panelCount?: unknown }
+      | undefined;
+    const label = typeof value?.templateType === 'string' ? VISUAL_FORMAT_LABELS[value.templateType] : undefined;
+    if (!value || !label) return classic;
+    const strings = (list: unknown) => (Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string' && item.trim() !== '') : []);
+    const layout = typeof value.layout === 'string' ? STEP_LAYOUT_LABELS[value.layout] ?? null : null;
+    const panelCount = typeof value.panelCount === 'number' && Number.isInteger(value.panelCount) ? value.panelCount : null;
+    return {
+      label,
+      composed: true,
+      sources: strings(value.sourceHeadings),
+      status: value.status === 'rendered' ? 'rendered' : 'planned',
+      warnings: strings(value.warnings).map(describeComposerWarning),
+      layout,
+      panelCount,
+      // One finished-project photo + one per step panel; every other composed Pin makes one call.
+      imageCalls: panelCount ? panelCount + 1 : 1,
+    };
+  } catch {
+    return classic;
+  }
+}
+
+/** "Source: Materials" / "Sources: Step 1, Step 2 and Step 3". */
+export function describeVisualFormatSources(sources: string[]): string | null {
+  if (sources.length === 0) return null;
+  if (sources.length === 1) return `Source: ${sources[0]}`;
+  return `Sources: ${sources.slice(0, -1).join(', ')} and ${sources[sources.length - 1]}`;
+}
+
 export function articlePinterestCreateHref(articleId: string, generationId?: string): string {
   const params = new URLSearchParams({ source: 'wordpress', articleId });
   if (generationId) params.set('generationId', generationId);

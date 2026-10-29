@@ -174,7 +174,8 @@ test('planned profiles cannot be produced — no Facebook / Instagram / TikTok v
   const calls = files.flatMap((file) =>
     [...readFileSync(file, 'utf8').matchAll(/optimizeImage\([^,]+,\s*'([a-z-]+)'/g)].map((m) => m[1])
   );
-  expect(calls.sort()).toEqual(['pinterest-pin', 'pinterest-pin', 'wordpress-article']);
+  // Pinterest: generated Pin, recomposed Pin, composed Pin (TASK-079).
+  expect(calls.sort()).toEqual(['pinterest-pin', 'pinterest-pin', 'pinterest-pin', 'wordpress-article']);
 });
 
 // -------------------------------------------------------------- optimization

@@ -39,6 +39,13 @@ import {
   type PinVisualArchetype,
   type PinterestVisualStyle,
 } from '@/lib/pinterest/visual-archetypes';
+import {
+  COMPOSER_TEMPLATE_LABELS,
+  composerEligibility,
+  planComposerTemplates,
+  type ComposerEligibility,
+  type OfferedTemplateType,
+} from '@/lib/pinterest/composer/content';
 
 /**
  * Article-grounded Pins (Volet B). Before the text model runs, every Pin is
@@ -128,6 +135,10 @@ export interface ArticleGrounding {
   sectionTexts?: Record<string, string>;
   /** Auto variety (TASK-078): one archetype per planned Pin, in Pin order. Absent in classic mode. */
   pinArchetypes?: (PinVisualArchetype | null)[];
+  /** TASK-079: the composed template of each planned Pin (null = classic rendering). Absent in classic mode. */
+  pinTemplates?: (OfferedTemplateType | null)[];
+  /** TASK-079: which composer formats the article proves. Absent in classic mode. */
+  composerEligibility?: ComposerEligibility;
 }
 
 // What the image prompt check looks for. Only claims about the project:
@@ -470,6 +481,11 @@ export function buildArticleGrounding(
     briefs[sectionId] = buildPinVisualBrief(context, section, imageDescriptions[sectionId] ?? [], evidence, { subjectCheck, niche: options.niche });
     sectionTexts[sectionId] = articleSectionText(context, section, imageDescriptions[sectionId] ?? []);
   }
+  const style = options.visualStyle ?? 'classic';
+  const archetypes = style === 'auto-variety' ? planVisualArchetypes(context, sectionPlan, briefs, options.niche) : undefined;
+  // TASK-079: a composed slot shows one clean photo, so it drops its prompt archetype.
+  const eligibility = style === 'classic' ? undefined : composerEligibility(context);
+  const pinTemplates = eligibility ? planComposerTemplates(style, sectionPlan.length, archetypes, eligibility) : undefined;
   return {
     sourceType: context.sourceType,
     sectionPlan,
@@ -479,9 +495,8 @@ export function buildArticleGrounding(
     subjectCheck,
     language: context.language,
     sectionTexts,
-    ...(options.visualStyle === 'auto-variety'
-      ? { pinArchetypes: planVisualArchetypes(context, sectionPlan, briefs, options.niche) }
-      : {}),
+    ...(archetypes ? { pinArchetypes: archetypes.map((archetype, index) => (pinTemplates?.[index] ? null : archetype)) } : {}),
+    ...(eligibility && pinTemplates ? { pinTemplates, composerEligibility: eligibility } : {}),
   };
 }
 
@@ -494,6 +509,14 @@ export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
   const assignments = grounding.sectionPlan.map((sectionId, index) => {
     const brief = grounding.briefs[sectionId];
     const line = `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
+    const template = grounding.pinTemplates?.[index];
+    if (template) {
+      return [
+        line,
+        `  Pin ${index + 1} is a composed Pin (format: ${COMPOSER_TEMPLATE_LABELS[template]}): OmniFlow adds its title and lists afterwards.`,
+        "  Its image_prompt describes one single photo of the section brief's required subject — no collage, panels, grid, written text, numbers or lists.",
+      ].join('\n');
+    }
     const archetype = grounding.pinArchetypes?.[index];
     if (!archetype) return line;
     // Per Pin: two Pins of one section may get different layouts.

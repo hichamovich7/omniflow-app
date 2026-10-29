@@ -18,6 +18,7 @@ import {
   assignPinArchetypes,
   eligibleArchetypes,
   findMaterialsHeading,
+  planVisualArchetypes,
   withVisualArchetype,
   type PinVisualArchetype,
   type VisualArchetypeId,
@@ -42,8 +43,16 @@ function article(title: string, html: string, language = 'en'): WordPressArticle
   });
 }
 
+// TASK-079: Auto variety now renders some archetypes as composed templates
+// (pinterest-composer.spec.ts). These tests cover the TASK-078 archetype
+// planner itself: every slot keeps its planned archetype, no template.
 function auto(context: WordPressArticleContext, pins: number, niche: string): ArticleGrounding {
-  return buildArticleGrounding(context, pins, {}, { niche, visualStyle: 'auto-variety' });
+  const grounding = buildArticleGrounding(context, pins, {}, { niche, visualStyle: 'auto-variety' });
+  return {
+    ...grounding,
+    pinArchetypes: planVisualArchetypes(context, grounding.sectionPlan, grounding.briefs, niche),
+    pinTemplates: undefined,
+  };
 }
 
 const ids = (grounding: ArticleGrounding) => (grounding.pinArchetypes ?? []).map((archetype) => archetype?.id ?? null);

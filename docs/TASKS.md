@@ -53,7 +53,8 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 ### Ready to test (code shipped, real-condition check pending)
 
-* **TASK-078** — Pinterest Visual Style "Auto variety" (Phase A: visual archetypes + diversity planner, article Pins only, Classic default): offline tests pass, **not committed**; controlled real AI test pending founder approval. Phase B (visual reference library, private Supabase bucket, migration 047) **planned, not started**.
+* **TASK-079** — Pinterest Template Composer (Hero, Materials & tools, Step-by-step; photo without text + deterministic article text; Auto variety uses the templates): offline tests pass, **not committed**; controlled real AI test (3-4 Pins, Auto variety) pending. **Step-by-step withdrawn 2026-10-29** (v1 and the v2 attempt did not produce a real tutorial): removed from the selector, the API and Auto variety, older Step-by-step Pins kept (read, shown, regenerated); **replaced by TASK-080** (Pinterest Detailed Tutorial Infographic, planned). Hero and Materials & tools unchanged.
+* **TASK-078** — Pinterest Visual Style "Auto variety" (Phase A: visual archetypes + diversity planner, article Pins only, Classic default): offline tests pass, committed (`0b0f1a8`); controlled real AI test pending founder approval. Phase B (visual reference library, private Supabase bucket, migration 047) **planned, not started**.
 * **TASK-077** — Pinterest visual subject contract per section (multilingual concepts, primary subject before accessories, one image_prompt repair): offline tests pass, real AI test on post 2119 passed (5 Pins accepted on the first answer); committed and pushed (75710a9).
 
 * **TASK-068** — Facebook Content Studio + publication on Facebook Pages: offline tests pass, **not committed**; **migration 046 to apply by hand** (after 045), Meta app + env variables to set up, then the real test in TESTING.md (founder approval).
@@ -69,7 +70,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 ### Planned
 
 * **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook scheduling (after TASK-068 — separate task); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
-* **P2:** storage audit / archiving (read-only orphan audit first); TASK-042; TASK-030; TASK-028 Option 2.
+* **P2:** storage audit / archiving (read-only orphan audit first); TASK-080 (Pinterest Detailed Tutorial Infographic, after TASK-079 — replaces the withdrawn Step-by-step format); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
 
@@ -89,7 +90,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-28: 078 (TASK-078, Pinterest visual archetypes — Phase A) → **next task: 079**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-28: 080 (TASK-080, Pinterest Detailed Tutorial Infographic — planned) → **next task: 081**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
 * **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **next free migration: 047**.
@@ -99,6 +100,10 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 # RECENT IMPLEMENTATION LOG
 
 Former content of the ACTIVE TASK list, kept for history. Every entry below is **committed and pushed to `main`** (commit noted) unless it says otherwise; statuses corrected by the 2026-10-11 audit. Migrations mentioned as "to apply by hand" are all applied, except 045 (TASK-063).
+
+**[Withdrawn — not committed]** TASK-079 Step-by-step (2026-10-29). The Step-by-step format (v1: one photo + step cards; v2 attempt of 2026-10-28: per-step photos, 3 layouts, 4 image calls, 1 Pin) did not meet the goal — a real multi-panel tutorial infographic — and its v2 validation checked each step against its own section only ("…does not name amigurumi" on a "Continuous Body & Head" step). Founder decision: remove the option, do not fix the intermediate version, keep historical data. Done: `step-by-step` removed from `PINTEREST_VISUAL_STYLES` (400 before any AI call), the form card / cost warning / 1-Pin rule and the step planner (`lib/pinterest/composer/steps.ts`, step selection in `content.ts`) removed; eligibility and Auto variety only know Hero and Materials & tools (`OfferedTemplateType`). Kept for compatibility: the `step_by_step` v1 / v2 schema, display, rendering and Regenerate image of Pins stored before. Replaced by TASK-080 (design requirements recorded there). No migration; UTM, CSV, Destination URL, scheduling, WordPress untouched.
+
+**[Ready to test — not committed]** TASK-079 (Pinterest Template Composer — Hero, Materials & tools, Step-by-step, 2026-10-28). Audit (read-only, before any change): no new table is needed — `pins.image_analysis` already carries private keys (`_articleSource`, `_pinterestAiIntegrated`…), so the contract fits there; composition can run in memory (no temporary file); `MediaStorage` (Supabase / R2) already has `upload` + `remove`; the Sharp/Pango renderer with bundled Inter fonts (`text-layout.ts`) and the 4.5:1 contrast target (`local-contrast.ts`) exist; one photo per Pin is enough for all three templates; article images stay reference-only (no server download: SSRF, rights, external posts); the default AI Integrated mode asks the model to draw text (1/10 measured fidelity), so composed Pins must start from a photo without text; the extractor keeps one `<li>` per line, so lists are exact; `generate-images` did not remove an uploaded file when the row write failed (handled for the composer path only). Founder decisions: Step-by-step = option D (one image, the finished project, 3–5 step cards with the article's exact text, no call per step); Auto variety uses the real templates when proven, else the TASK-078 archetype; Hero CTA only with a valid Destination URL; a composed format replaces AI Integrated / Legacy for the image (photo without text, AI Integrated settings hidden). Shipped: `lib/pinterest/composer/content.ts` (eligibility, verbatim extraction and deterministic shortening, EN/DE/FR/ES list and step recognition, Auto variety mapping, Zod contract `_pinterestComposer`, `verifyComposerText()`, photo-only instruction), `render.ts` (Hero / Materials / Steps layouts, 1000×1500, wrap + shrink, margins, opaque panels, contrast check, `ComposerRenderError`), `pipeline.ts` (render + `pinterest-pin` profile, CTA dropped without a destination); `visualStyle` gains `hero`, `materials-and-tools`, `step-by-step` (article + Photo only required); `/generate` refuses an unproven explicit format with 422 `visual_format_unavailable` before Vision / text / writes and stores the verified contract per Pin (`visual_format: photo-only`, no archetype); `generate-images` composer branch (one photo-only call, render, upload, row inactive → swap, rollback); `buildArticleGrounding()` plans `pinTemplates` and the `<pin_plan>` asks a composed Pin for one photo without text; `MATERIALS_HEADING` exported and `assignPinArchetypes()` made generic; "Visual format" selector (5 cards) in `pin-form.tsx`; `components/pinterest/pin-visual-format.tsx` (badge + details) in the Pin grid, Pin Details and article result cards; `readPinVisualFormat()` in `pin-display.ts`; User Guide section rewritten. Docs: API, UI_UX, DATABASE (`image_analysis` key), TESTING, CHANGELOG. Tests: `pinterest-composer.spec.ts` (38), `pinterest-composer-ui.spec.ts` (2), +5 route cases; TASK-078 tests adapted. No migration, no new dependency, no new endpoint. Limits: Step-by-step has no per-step image (one finished-project photo); steps written as an `<ol>` without "Step N" markers are not recognized; Tools only from a separate Tools section; text placement avoids the busier third but there is no subject detection; titles over 90 characters without a separator cannot be Hero; no "Change visual format" action yet; the Hero CTA is a fixed "save" phrase.
 
 **[Ready to test — not committed]** TASK-078 Phase A (Pinterest Visual Creative Library — visual archetypes and Pin design variations, 2026-10-28). Audit (read-only, before any change): no reference library exists; the only reference is TASK-013 (Legacy Composite, one upload to the **public** Supabase bucket `reference-images`, URL in `generations.reference_image_url`, Vision limited to palette / materials / mood / lighting, copied into `pins.image_analysis`, no project / niche / tag link); production image adapters are text-to-image only (`input_references` exists only in the benchmark script, never exercised live — TASK-042); deterministic text composition exists only for banners (Legacy), there is no multi-panel renderer; AI Integrated on-image text fidelity is unverified; the article brief forced "single main subject" + "one or two styling props" and the niche profiles one framing; attribute extraction is English-only. Founder decisions: Classic stays the default with Auto variety as an option; Phase A for article Pins only; future library in a **private Supabase bucket** (the R2 bucket is public); Phase A only now — no migration, no library, no keyword-flow change. Shipped: new `lib/pinterest/visual-archetypes.ts` (12 archetypes, eligibility from the article — step section or EN/DE/FR/ES "Step / Row / Round" markers, materials / ingredients heading in EN/DE/FR/ES or ≥ 2 lexicon materials, ≥ 2 colors, explicit before/after or problem heading —, niche orders for Crochet, Clay, Home Decor, Recipes and default, deterministic planner without repeats before exhaustion and never twice in a row, slot assignment when the model reorders sections, `withVisualArchetype()` replacing the props allowance only for layouts that need it); `article-briefs.ts` (`PinVisualBrief.archetype`, `ArticleGrounding.pinArchetypes`, archetype lines after the subject contract, per-Pin archetype in `<pin_plan>`, malformed stored archetype dropped); `visualStyle` in `generatePinsSchema` (default `classic`, `auto-variety` without an article → 400); route passes it to `buildArticleGrounding()` and stores each Pin's archetype in its brief; "Visual style" toggle in `pin-form.tsx` (article sources only); archetype badge in `article-pin-results.tsx`, `pin-table.tsx`, `pin-detail-dialog.tsx` (`readPinVisualArchetype()` in `lib/social/pin-display.ts`). Not touched: safeguards, repair, UTM, CSV, Destination URL, scheduling, WordPress, storage / R2 / 1000×1500 JPEG, keyword prompts, niche rules. No migration, no new endpoint, no AI call added, no reference sent to the image model. Tests: new `pinterest-visual-archetypes.spec.ts` (23), `pinterest-visual-archetypes-ui.spec.ts` (1, Chromium), 3 route cases in `pinterest-generate-errors.spec.ts`. Limits: tools named in a materials layout are prompt-level only (the lexicon has no tool list); variety is lower on DE/FR/ES articles without a materials heading (English-only lexicon); no ingredients lexicon; `before_after` / `problem_solution` rarely eligible; no text inside images (Phase C: deterministic multi-panel composition). **Phase B (planned, not started):** table `pinterest_visual_references` (project, niche, category, sub-niche, tags, composition types, language, note, active, storage path, structured Vision analysis with closed enums and no copied text), private Supabase bucket with `auth.uid()` path RLS, migration **047**, CRUD routes, library page, generator choice "Auto / Project defaults / Library / Archetypes"; the reference only ever influences the brief as text, never the image model.
 
@@ -1258,6 +1263,61 @@ Give OmniFlow the legal pages a SaaS needs — and that Meta requires before the
 2. Have the texts reviewed by a legal professional if possible — they are a sound base, not legal advice.
 3. Enter the Privacy Policy, Terms and Data deletion instructions URLs in the Meta app (DEPLOYMENT.md step 8).
 4. Update the pages whenever a provider, payments or a new platform connection is added.
+
+## [TASK-080] Pinterest Detailed Tutorial Infographic
+
+### Status: PLANNED (future — documented 2026-10-28, not started, not the active task; no code, no migration). Replaces the withdrawn TASK-079 Step-by-step format (2026-10-29); the option stays unavailable until this task is really implemented and tested.
+
+### Priority
+
+P2 — after TASK-079 (Template Composer, incl. the Step-by-step improvement) is committed and validated in real conditions.
+
+### Goal
+
+An advanced Pinterest format that produces a multi-panel tutorial infographic for an article — the kind of visual sheet used for amigurumi / crochet patterns, Clay projects, recipes, DIY and "materials + steps" guides. It may contain: main title, finished-project image, Materials or Ingredients, Tools, 6–10 visual steps with step numbers and exact instructions, assembly, final result, optional CTA.
+
+### Planned architecture
+
+* The image model generates **only** pictures: the finished project, the step images, objects and scenes. It never writes instructions, numbers or long text.
+* OmniFlow composes the final 1000×1500 image deterministically (Sharp / SVG, reusing `lib/pinterest/composer/`) and adds titles, numbers, materials, tools, instructions, boxes, arrows, labels and the CTA.
+
+### Rules
+
+* The article is the source of truth; every text comes verbatim from the article — no invented number, material, tool, step or technique.
+* Each panel keeps its source section; the main subject stays visible.
+* 1000×1500 output; EN, DE, FR and ES; readable on a phone.
+* Panel count adapted to the real content: compact 6–8 panels recommended for Pinterest; a detailed 10–16 panel version may be studied later.
+* A cost confirmation is shown before any generation that uses several image calls.
+
+### Planned phases
+
+1. **Audit & architecture** — image-model capabilities, existing Sharp/SVG composer, data model, step selection, layout system, maximum cost per Pin.
+2. **Deterministic composition** — multi-panel template, reliable text rendering, materials and tools, titles and numbers, step panels, final result.
+3. **Image generation** — one image per important step, subject check per section, invented-element check, in-memory intermediate images (cleanup), final storage on Supabase or R2.
+4. **Interface** — explicit option in the Pinterest generator, estimated number of image calls, confirmation before generation, format preview, regenerate the infographic.
+
+### Design requirements (founder, 2026-10-29)
+
+Learned from the withdrawn Step-by-step: its v2 checked each step against its own section only, so a step section that does not repeat the project name (e.g. "Continuous Body & Head") was refused ("…does not name amigurumi"), and the result read as a list of titles, not a tutorial.
+
+* The H1 / the article's main subject defines the **global project**; every step section **inherits** it — "Continuous Body & Head" is a step of the amigurumi, the section does not need to repeat "amigurumi".
+* Steps are chosen among the real making actions; Overview, Materials, Tools, Abbreviations and Notes are never visual steps.
+* Every panel has a `sectionId`.
+* Step images are generated separately, one per step.
+* All text is added by OmniFlow, never by the image model; materials, numbers and instructions come exactly from the article; nothing is invented.
+* Option name: **Pinterest Detailed Tutorial Infographic**; unavailable in the selector until implemented and tested.
+
+### Depends On
+
+TASK-079 (Template Composer: Hero, Materials & tools, deterministic text rendering), TASK-077 (visual subject contract per section), TASK-049 / TASK-050 (R2 storage, `pinterest-pin` optimization). Related: TASK-047 (Crochet / Clay pattern mode), TASK-011 (Credits — multi-call cost).
+
+### Out of scope
+
+UTM, CSV export, Destination URL, scheduling, Pinterest publication, Facebook, Medium, WordPress, Pinterest scraping, automatic copy of Pinterest images, Pinterest metrics.
+
+### Success Criteria
+
+To be defined in Phase 1 (audit).
 
 # COMPLETED TASKS
 

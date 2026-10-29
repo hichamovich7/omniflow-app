@@ -46,6 +46,15 @@ import {
   type ArticleGrounding,
 } from '@/lib/pinterest/article-briefs';
 import { assignPinArchetypes, withVisualArchetype } from '@/lib/pinterest/visual-archetypes';
+import {
+  COMPOSER_INELIGIBLE_MESSAGES,
+  attachComposerMetadata,
+  buildComposerMetadata,
+  composerEligibility,
+  composerTemplateForStyle,
+  verifyComposerText,
+  type ComposerMetadata,
+} from '@/lib/pinterest/composer/content';
 import { describeSectionImages, referenceImageHosts } from '@/lib/pinterest/article-vision';
 import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
 import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
@@ -243,6 +252,16 @@ export async function POST(request: Request) {
         { status: err.status }
       );
     }
+  }
+
+  // TASK-079: an explicitly chosen composer format the article cannot prove
+  // is refused here — before Vision, the text call or any image call.
+  const explicitTemplate = composerTemplateForStyle(visualStyle);
+  if (explicitTemplate && articleSource && !composerEligibility(articleSource.context)[explicitTemplate]) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: COMPOSER_INELIGIBLE_MESSAGES[explicitTemplate], code: 'visual_format_unavailable' } },
+      { status: 422 }
+    );
   }
 
   // Destination URL (TASK-071): the typed URL, else the verified permalink of
@@ -525,18 +544,53 @@ export async function POST(request: Request) {
       ? assignPinArchetypes(articleGrounding.sectionPlan, articleGrounding.pinArchetypes, resolvedPins.map((pin) => pin.sourceSectionId))
       : null;
 
+    // TASK-079: composed Pins carry the exact article text OmniFlow renders.
+    // Built and checked against the article before anything is saved; an
+    // Auto variety Pin whose text cannot be proven falls back to classic.
+    const pinTemplates = articleGrounding?.pinTemplates
+      ? assignPinArchetypes(articleGrounding.sectionPlan, articleGrounding.pinTemplates, resolvedPins.map((pin) => pin.sourceSectionId))
+      : null;
+    const composerByPin: (ComposerMetadata | null)[] = resolvedPins.map((pin, i) => {
+      const template = pinTemplates?.[i];
+      if (!template || !articleSource) return null;
+      const metadata = buildComposerMetadata(template, articleSource.context, {
+        sectionId: pin.sourceSectionId,
+        language,
+        hasDestination: Boolean(destination.linkUrl),
+        ctaIndex: i,
+      });
+      const issues = metadata ? verifyComposerText(metadata, articleSource.context) : [];
+      if (metadata && issues.length === 0) return metadata;
+      // Codes and fields only — never the text itself.
+      console.warn(`[${PROMPT_ID}] Composer text rejected: ${JSON.stringify({ pin: i + 1, template, issues })}`);
+      return null;
+    });
+    if (explicitTemplate && composerByPin.some((metadata) => metadata === null)) {
+      const message = COMPOSER_INELIGIBLE_MESSAGES[explicitTemplate];
+      await supabase.from('generations').update({ status: 'failed', error_message: message }).eq('id', generation.id);
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message, code: 'visual_format_unavailable' } },
+        { status: 422 }
+      );
+    }
+
     const pinsToInsert = resolvedPins.map((pin, i) => {
       const angleOccurrence = angleOccurrences.get(pin.angle) ?? 0;
       angleOccurrences.set(pin.angle, angleOccurrence + 1);
 
+      const composer = composerByPin[i];
       const legacyVisualFormat = pin.visualFormat;
-      const visualFormat = generationMode === 'ai-integrated'
-        ? 'ai-integrated'
-        : generationMode === 'photo-only'
-          ? 'photo-only'
-          : legacyVisualFormat;
+      // A composed Pin is always a photo without text: OmniFlow draws the words.
+      const visualFormat = composer
+        ? 'photo-only'
+        : generationMode === 'ai-integrated'
+          ? 'ai-integrated'
+          : generationMode === 'photo-only'
+            ? 'photo-only'
+            : legacyVisualFormat;
+      const legacyComposite = generationMode === 'legacy-composite' && !composer;
       const strategyMetadata = attachPinterestStrategyMetadata(imageAnalysisJson, pin.angle);
-      const integratedAnalysis = aiIntegrated
+      const integratedAnalysis = aiIntegrated && !composer
         ? attachAiIntegratedMetadata(strategyMetadata, {
             language,
             settings: aiIntegrated,
@@ -546,13 +600,14 @@ export async function POST(request: Request) {
       // Article flow: the Pin keeps its source section and visual brief — the
       // image step appends the brief to the image prompt.
       const sourceBrief = pin.sourceSectionId ? articleGrounding?.briefs[pin.sourceSectionId] : undefined;
-      const persistedAnalysis = articleGrounding && sourceBrief
+      const groundedAnalysis = articleGrounding && sourceBrief
         ? attachArticleSourceMetadata(integratedAnalysis, {
             sourceType: articleGrounding.sourceType,
             sectionId: sourceBrief.sectionId,
-            brief: withVisualArchetype(sourceBrief, pinArchetypes?.[i] ?? null),
+            brief: withVisualArchetype(sourceBrief, composer ? null : pinArchetypes?.[i] ?? null),
           })
         : integratedAnalysis;
+      const persistedAnalysis = composer ? attachComposerMetadata(groundedAnalysis, composer) : groundedAnalysis;
 
       return {
         generation_id: generation.id,
@@ -568,11 +623,11 @@ export async function POST(request: Request) {
         link_url: destination.linkUrl,
         image_prompt: pin.image_prompt,
         visual_format: visualFormat,
-        overlay_text: generationMode === 'legacy-composite' ? pin.overlayText ?? null : null,
+        overlay_text: legacyComposite ? pin.overlayText ?? null : null,
         // Angle stays transient in Phase 4: it selects an existing persisted
         // template value without requiring a new pins column or migration.
         title_banner_template:
-          generationMode === 'legacy-composite' && legacyVisualFormat === 'text-overlay'
+          legacyComposite && legacyVisualFormat === 'text-overlay'
             ? selectHeadlineTemplateForAngle(
                 pin.angle,
                 angleOccurrence,
@@ -580,7 +635,7 @@ export async function POST(request: Request) {
               )
             : null,
         cta_banner_template:
-          generationMode === 'legacy-composite'
+          legacyComposite
             ? clampBannerTemplate(pin.ctaBannerTemplate, allowedBannerTemplates)
             : null,
         // Reuse the existing JSON text column so image rendering can recover
