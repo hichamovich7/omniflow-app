@@ -1284,6 +1284,19 @@ Follow-up 2 (2026-10-25, per-section furniture + repair): `pinterest-home-decor-
 
 ---
 
+# Auto variety in the production bundle (TASK-FIX-081, 2026-10-29)
+
+```txt
+npx next build
+npx playwright test tests/renderer/pinterest-auto-variety-bundle.spec.ts --project=renderer --reporter=list
+```
+
+`pinterest-auto-variety-bundle.spec.ts` (5, offline): the source planner on post 2119 (external WordPress, Crochet EN), an OmniFlow article (Crochet EN, materials + steps), Crochet DE and Home Decor DE — one archetype per Pin, materials taken from that article's own list, no materials layout for Home Decor; and the **compiled** `planVisualArchetypes()` loaded from `.next/server/chunks` (minimal Turbopack runtime, real `lib/niche/resolve` imports) — no shorthand `context,section,brief` object left by the minifier, no throw over several Pins, output equal to the source. The bundle case needs a fresh `next build` (skipped without `.next`); on the pre-fix build it fails (and running the old chunk throws the production `ReferenceError: context is not defined`). Unminified tests could not catch this bug.
+
+Validation (2026-10-29): new spec 5/5 (bundle case red on the old build, green after the fix); full renderer 1400/1401 (the known `social-content-studio.spec.ts:829` CRLF failure, also failing without this change); TypeScript, ESLint, `next build`, `git diff --check` pass. No real AI call.
+
+---
+
 # Step-by-step withdrawn (TASK-079, 2026-10-29)
 
 ```txt

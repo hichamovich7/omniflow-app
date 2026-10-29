@@ -216,6 +216,27 @@ function subjectOf(brief: PinVisualBrief): string {
   return brief.subjectContract?.primarySubjectId ?? brief.represented;
 }
 
+/**
+ * Explicit keys on purpose: with shorthand properties the production
+ * minifier inlined this object into planVisualArchetypes() but kept the
+ * names `context`, `section`, `brief` after renaming the parameters →
+ * "ReferenceError: context is not defined" (Auto variety only).
+ */
+function archetypeInput(
+  context: WordPressArticleContext,
+  section: ArticleSection,
+  brief: PinVisualBrief,
+  niche: string | null | undefined
+): ArchetypeInput {
+  return {
+    niche: archetypeNicheOf(niche),
+    context: context,
+    section: section,
+    brief: brief,
+    materialsHeading: findMaterialsHeading(context),
+  };
+}
+
 /** Archetypes this section can support, in the niche's order. */
 export function eligibleArchetypes(
   context: WordPressArticleContext,
@@ -223,7 +244,7 @@ export function eligibleArchetypes(
   brief: PinVisualBrief,
   niche: string | null | undefined
 ): VisualArchetypeId[] {
-  const input: ArchetypeInput = { niche: archetypeNicheOf(niche), context, section, brief, materialsHeading: findMaterialsHeading(context) };
+  const input = archetypeInput(context, section, brief, niche);
   return NICHE_ARCHETYPE_ORDER[input.niche].filter((id) => ARCHETYPES[id].eligible(input));
 }
 
@@ -234,7 +255,7 @@ export function resolveArchetype(
   brief: PinVisualBrief,
   niche: string | null | undefined
 ): PinVisualArchetype {
-  const input: ArchetypeInput = { niche: archetypeNicheOf(niche), context, section, brief, materialsHeading: findMaterialsHeading(context) };
+  const input = archetypeInput(context, section, brief, niche);
   const definition = ARCHETYPES[id];
   const subject = subjectOf(brief);
   return { id, label: definition.label, composition: definition.composition(subject), elements: definition.elements(input, subject) };

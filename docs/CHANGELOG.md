@@ -18,6 +18,11 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Fix: Auto variety 500 "context is not defined" — TASK-FIX-081 (2026-10-29)
+
+* Pinterest from a WordPress article with **Auto variety** returned a 500 in production (`ReferenceError: context is not defined`, `/api/pinterest/generate`). The TypeScript source was correct: the production minifier inlined `eligibleArchetypes()` into the `.map()` of `planVisualArchetypes()` and kept the shorthand keys `{ context, section, brief }` after renaming the parameters. `lib/pinterest/visual-archetypes.ts` now builds the archetype input in one helper with explicit keys; behavior, archetypes and every safeguard unchanged.
+* The failure happened while planning (before the `generations` row, the text call and any write): no Pin, board, credit or WordPress change. Classic, Hero, Materials & tools, keyword flows, regeneration, UTM, CSV, Destination URL and scheduling untouched.
+
 ## Pinterest Step-by-step format withdrawn — TASK-079 (2026-10-29)
 
 * The **Step-by-step** visual format is removed from the selector and from the API (`visualStyle: "step-by-step"` → 400 before any AI call); Auto variety never uses it. It did not give a real tutorial: a planned **Pinterest Detailed Tutorial Infographic** (TASK-080 — finished project, materials, one image per step, numbers, the article's exact instructions, assembly, result) will replace it once implemented and tested.
