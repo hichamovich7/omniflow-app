@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.1.2 — Fix: Pinterest near-duplicate titles repaired once before failing — TASK-FIX-085 (2026-10-31)
+
+* Production: a 15-Pin batch was rejected by `DUPLICATE_TITLE` (Pins 1, 3, 5, 7, 9, 11 — the same "15 … Ideas for …" pattern). The safeguard stays; when it is the only failure, OmniFlow now asks the model once for new titles for the Pins concerned only, then validates the whole batch again.
+* The repair keeps each Pin's angle, section, description, keywords, image prompt, language, link, board and dates; numbered titles keep exactly the article's count. Answers that drop the count, invent a number, add "best / viral / most popular / ultimate", number the Pins artificially ("Idea 2") or carry any extra field are refused. Never an image call.
+* Still failing → the same structured 422 with the Pins still concerned; nothing saved. Logs carry counts and fixed reasons only.
+* "ultimate" (and its DE / FR / ES forms) added to the unsupported promises of numbered batches.
+
 ## v3.1.1 — Fix: Pinterest numbered Pins in production — TASK-FIX-084 (2026-10-31)
 
 * Production test of v3.1.0 (4ec0bc2): one numbered title for 15 Pins on a "15 ideas" article, and a 422 `invalid_schema` on a plan carrying `subtitle` / `cta`. Causes: the numbered plan only ran with Balanced angles, while AI Integrated starts in "AI recommends"; `subtitle` / `cta` inside `integratedText` were validated even when the user had turned them off.

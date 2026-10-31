@@ -67,6 +67,8 @@ import {
   validateListicleBatch,
 } from '@/lib/pinterest/listicle';
 import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
+import { repairTitles, titleRepairTargets } from '@/lib/pinterest/title-repair';
+import { LANGUAGE_LABELS } from '@/types/pinterest';
 import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
 import { WordPressReadError } from '@/lib/wordpress/post-reader';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
@@ -543,6 +545,38 @@ export async function POST(request: Request) {
       if (repaired && accepted) {
         resolvedPins = repaired;
         strategyIssues = [];
+      }
+    }
+
+    // TASK-FIX-085: titles too close to each other (and nothing else) get one
+    // targeted repair — only those titles change — then the whole batch is
+    // validated again. Every flow and strategy (Manual keeps its angle).
+    const titleTargets = repairTargets
+      ? null
+      : titleRepairTargets(strategyIssues, resolvedPins, {
+          listicleNumber: listicleNumber?.value ?? null,
+          focusOf: (pin) => {
+            const brief = pin.sourceSectionId ? articleGrounding?.briefs[pin.sourceSectionId.trim()] : undefined;
+            return brief ? `${brief.sourceSection} — ${brief.represented}` : keyword;
+          },
+        });
+    if (titleTargets) {
+      const { pins: retitled, stats } = await repairTitles(resolvedPins, titleTargets, {
+        language: LANGUAGE_LABELS[language],
+        sourceTitle: articleSource?.title ?? keyword,
+        listicleNumber: listicleNumber?.value ?? null,
+        titles: resolvedPins.map((pin) => pin.title),
+        evidence: sourceEvidence,
+      }, { generateText });
+      const retitledIssues = retitled ? validateBatch(retitled) : null;
+      // Counts and fixed reasons only: no Pin text.
+      console.log(
+        `[${PROMPT_ID}] Title repair: ${JSON.stringify({ ...stats, accepted: retitledIssues?.length === 0, remainingIssues: retitledIssues?.length ?? strategyIssues.length })}`
+      );
+      if (retitled && retitledIssues) {
+        if (retitledIssues.length === 0) resolvedPins = retitled;
+        // A parsed repair that still fails reports what remains wrong with it.
+        strategyIssues = retitledIssues;
       }
     }
 

@@ -1345,6 +1345,20 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Pinterest near-duplicate title repair (TASK-FIX-085, 2026-10-31)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-listicle.spec.ts tests/renderer/pinterest-strategy-errors.spec.ts tests/renderer/pinterest-strategy.spec.ts tests/renderer/pinterest-generate-errors.spec.ts
+```
+
+Offline (fake AI answers in sequence, no image, network or WordPress call). `pinterest-listicle.spec.ts` adds 32 cases. Targets — 15 near-identical titles → the 14 later Pins are rewritten, the first kept, numbered Pins must keep 15; a batch with another failure gets no repair. Prompt — EN / DE / FR / ES language label, Pin index and angle, the real count rule, accepted titles only as constraints, every rule (4-word sequence, "N … Ideas for …", "Idea 1", "ultimate", 100 characters, exact JSON shape); no count → "never add a number". Answer contract — not JSON, extra field (per title or top level), title over 100 characters, wrong / repeated Pin, 15 removed, "Idea 2", "viral", "best", "ultimate" refused; a valid answer (fenced) accepted. Route — Balanced and AI recommends, 15 Pins with near-identical titles → exactly 2 text calls, 201, one insert, 15 distinct titles, 15 kept on every numbered Pin, angle / description / keywords / image prompt / section / link / board / board section kept, no `publish_date`, no image call, log `pins: 14, accepted: true`; Manual keeps its angle and is repaired; Keyword flow in German repaired with a German prompt; a repair that removes 15, invents a number (`UNSUPPORTED_NUMBER`), adds viral / best, is not JSON, has an extra field or stays near-identical → 422 `strategy_safeguard_failed`, one repair only, nothing saved, generation failed; a failed repair on 15 Pins → `issueCount` = body = log line = alert ("N problems found", items + "…and M more"), every issue `DUPLICATE_TITLE` with its Pin, no model text in the logs; a duplicate plus an invented number → no repair call.
+
+Validation (2026-10-31): pinterest-listicle 100/100; full renderer **1517/1518** (the one failure is the pre-existing CRLF source-text case `social-content-studio.spec.ts:829`, unchanged); TypeScript OK, ESLint (touched files) OK, `next build` OK, `git diff --check` OK. Also fixed: a TypeScript error in `pinterest-generation-plan.spec.ts` introduced by TASK-FIX-084 (untyped `error`). No migration, no `.env` change, no real AI call, no WordPress call, no commit.
+
+Real check (founder): rerun the 15-Pin generation that failed with `DUPLICATE_TITLE`; expect either the batch saved with 15 distinct titles (log `Title repair … accepted: true`) or a 422 listing the Pins still concerned.
+
+---
+
 # Pinterest numbered Pins — production fixes (TASK-FIX-084, 2026-10-31)
 
 ```txt

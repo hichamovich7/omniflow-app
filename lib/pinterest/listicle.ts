@@ -170,13 +170,15 @@ export function titleHasNumber(title: string, number: string): boolean {
   return numbersIn(title).has(number);
 }
 
-// Promises a count does not prove: "best", "viral", "most popular" (EN/DE/FR/ES).
+// Promises a count does not prove: "best", "viral", "most popular", "ultimate" (EN/DE/FR/ES).
 const HYPE_TOKENS = [
-  'best', 'viral', 'popular', 'beste', 'besten', 'bester', 'bestes', 'beliebteste', 'beliebtesten', 'virale', 'viralen',
-  'meilleur', 'meilleure', 'meilleurs', 'meilleures', 'populaire', 'populaires', 'mejor', 'mejores', 'virales', 'populares',
+  'best', 'viral', 'popular', 'ultimate', 'beste', 'besten', 'bester', 'bestes', 'beliebteste', 'beliebtesten', 'virale', 'viralen',
+  'ultimative', 'ultimativen', 'meilleur', 'meilleure', 'meilleurs', 'meilleures', 'populaire', 'populaires', 'ultime', 'ultimes',
+  'mejor', 'mejores', 'virales', 'populares', 'definitiva', 'definitivo',
 ];
 
-function hypeTokens(value: string): string[] {
+/** Hype words of `value` (normalized) — exported for the title repair (TASK-FIX-085). */
+export function hypeTokens(value: string): string[] {
   const words = new Set(normalizeText(value).split(' ').filter(Boolean));
   return HYPE_TOKENS.filter((token) => words.has(token));
 }

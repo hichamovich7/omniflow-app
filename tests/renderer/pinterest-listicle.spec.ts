@@ -16,6 +16,9 @@ import {
 } from '@/lib/pinterest/listicle';
 import { validatePinterestStrategyBatch } from '@/lib/pinterest/strategy';
 import { buildStrategySafeguardError } from '@/lib/pinterest/strategy-errors';
+import { buildTitleRepairPrompt, parseTitleRepair, titleRepairTargets, type TitleRepairTarget } from '@/lib/pinterest/title-repair';
+import { strategySafeguardView } from '@/components/pinterest/strategy-safeguard-alert';
+import type { StrategySafeguardError } from '@/lib/pinterest/strategy-errors';
 import {
   ARTICLE_IMAGE_MODEL,
   attachComposerMetadata,
@@ -540,7 +543,9 @@ function modelAnswer(post: ReturnType<typeof wordpressPost>, pinsRequested: numb
   });
 }
 
-async function runGenerate(post: ReturnType<typeof wordpressPost> | null, body: Record<string, unknown>, answer: string): Promise<GenerateRun> {
+/** `answer`: the same text for every AI call, or one text per call in order (a further call throws). */
+async function runGenerate(post: ReturnType<typeof wordpressPost> | null, body: Record<string, unknown>, answer: string | string[]): Promise<GenerateRun> {
+  const answers = Array.isArray(answer) ? [...answer] : null;
   const run: GenerateRun = { status: 0, body: { data: null, error: null }, events: [], prompts: [], logs: [] };
   const project = { id: PROJECT_ID, description: null, niche: 'Crochet', user_id: 'user-1', default_language: 'en' };
   const supabase = {
@@ -574,7 +579,10 @@ async function runGenerate(post: ReturnType<typeof wordpressPost> | null, body: 
     '@/lib/ai/engine': {
       generateText: async (params: { messages: Array<{ content: string }> }) => {
         run.prompts.push(params.messages.map((message) => message.content).join('\n'));
-        return answer;
+        if (!answers) return answer as string;
+        const next = answers.shift();
+        if (next === undefined) throw new Error('unexpected AI call');
+        return next;
       },
       analyzeImage: async () => {
         throw new Error('Vision unavailable in this test');
@@ -951,6 +959,228 @@ test('production bundle: the compiled route carries the numbered plan and its sa
   expect(sources.some((source) => source.includes('The source article confirms an exact count'))).toBe(true);
   expect(sources.some((source) => source.includes('LIST_NUMBER_MISSING'))).toBe(true);
   expect(sources.some((source) => source.includes('For the other pins, choose the strongest grounded angle.'))).toBe(true);
+});
+
+// ── TASK-FIX-085: one targeted repair of near-duplicate titles ─────────────
+
+const DUP_NUMBERED = '15 Cozy Crochet Blanket Ideas for Winter';
+const DUP_OTHER = 'Cozy Crochet Blanket Ideas for Winter';
+
+/** The first answer: the faithful plan with every title replaced by (almost) the same one. */
+function duplicateAnswer(post: ReturnType<typeof wordpressPost>, angles: PinterestAngle[], number: string | null, integrated = false): string {
+  const plan = JSON.parse(modelAnswer(post, angles.length, angles, number)) as { pins: Array<Record<string, unknown>> };
+  return JSON.stringify({
+    pins: plan.pins.map((pin) => ({
+      ...pin,
+      title: number && isNumberedAngle(pin.angle as PinterestAngle) ? DUP_NUMBERED.replace('15', number) : DUP_OTHER,
+      ...(integrated ? { integratedText: { headline: 'Cozy blankets' } } : {}),
+    })),
+  });
+}
+
+/** The repair answer: the faithful (distinct) titles for every Pin but the first, or `override` per 1-based Pin. */
+function repairAnswer(post: ReturnType<typeof wordpressPost>, angles: PinterestAngle[], number: string | null, override: Record<number, string> = {}, extra: Record<string, unknown> = {}): string {
+  const faithful = JSON.parse(modelAnswer(post, angles.length, angles, number)) as { pins: Array<{ title: string }> };
+  return JSON.stringify({
+    titles: faithful.pins.slice(1).map((pin, i) => ({ pinIndex: i + 2, title: override[i + 2] ?? pin.title, ...extra })),
+  });
+}
+
+function pinsOf(answer: string): Array<Record<string, unknown>> {
+  return (JSON.parse(answer) as { pins: Array<Record<string, unknown>> }).pins;
+}
+
+test.describe('TASK-FIX-085 — title repair: targets, prompt and answer contract', () => {
+  const pins = (count: number) => plannedPins(count).map((pin) => ({ ...pin, title: isNumberedAngle(pin.angle) ? DUP_NUMBERED : DUP_OTHER }));
+
+  test('15 near-identical titles: the later Pin of each pair is rewritten; numbered Pins keep 15; the first is kept', () => {
+    const batch = plannedPins(7).concat(plannedPins(7)).concat(plannedPins(1)).map((pin, i) => ({ ...pin, angle: buildListicleAnglePlan(15)[i], title: isNumberedAngle(buildListicleAnglePlan(15)[i]) ? DUP_NUMBERED : DUP_OTHER }));
+    const issues = validatePinterestStrategyBatch(batch, 15, EVIDENCE, { enforceBalancedAngles: false }).filter((issue) => issue.reason === 'DUPLICATE_TITLE');
+    expect(issues.length).toBeGreaterThan(14);
+    const targets = titleRepairTargets(issues, batch, { listicleNumber: '15', focusOf: () => 'focus' })!;
+    expect(targets.map((target) => target.pinIndex)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+    targets.forEach((target) => expect(target.requiredNumber).toBe(isNumberedAngle(target.angle) ? '15' : null));
+  });
+
+  test('another failure in the batch: no title repair (the 422 stays)', () => {
+    const batch = pins(3);
+    const issues = [...validatePinterestStrategyBatch(batch, 3, EVIDENCE, { enforceBalancedAngles: false }), { code: 'unsupported-claim' as const, message: 'x', reason: 'UNSUPPORTED_NUMBER' as const, pinIndex: 0, field: 'title' as const }];
+    expect(titleRepairTargets(issues, batch, { listicleNumber: '15', focusOf: () => '' })).toBeNull();
+    expect(titleRepairTargets([], batch, { listicleNumber: '15', focusOf: () => '' })).toBeNull();
+  });
+
+  const target = (overrides: Partial<TitleRepairTarget> = {}): TitleRepairTarget => ({
+    pinIndex: 2, angle: 'article-promise', title: DUP_NUMBERED, description: 'Winter blankets.', focus: '3. Ripple Blanket', requiredNumber: '15', ...overrides,
+  });
+
+  for (const [language, label] of [['en', 'English'], ['de', 'German'], ['fr', 'French'], ['es', 'Spanish']] as const) {
+    test(`prompt (${language}): language, real count, Pin index and angle, accepted titles, the rules`, () => {
+      const { system, user } = buildTitleRepairPrompt([target()], { language: label, sourceTitle: '15 Cozy Crochet Blanket Ideas', listicleNumber: '15', titles: ['Kept title', 'Other kept', DUP_NUMBERED], evidence: '' });
+      expect(system).toContain('You change only the titles you are given');
+      expect(user).toContain(`Write one new title in ${label}`);
+      expect(user).toContain('Pin 3 — angle: article-promise');
+      expect(user).toContain('it must contain the exact number 15');
+      expect(user).toContain('never the number of Pins in the batch');
+      expect(user).toContain('Pin 1: "Kept title"');
+      expect(user).not.toContain(`Pin 3: ${JSON.stringify(DUP_NUMBERED)}`);
+      for (const rule of ['sequence of 4 words', '"N … Ideas for …"', '"Idea 1"', '"ultimate"', 'at most 100 characters', '{"titles":[{"pinIndex"']) {
+        expect(user).toContain(rule);
+      }
+    });
+  }
+
+  test('prompt without a count: never add a number', () => {
+    const { user } = buildTitleRepairPrompt([target({ requiredNumber: null })], { language: 'English', sourceTitle: 'Cozy Blankets', listicleNumber: null, titles: [DUP_OTHER], evidence: '' });
+    expect(user).toContain('The article states no count: never add a number.');
+    expect(user).toContain('Do not add any number.');
+  });
+
+  const answer = (entries: unknown) => JSON.stringify({ titles: entries });
+  const cases: Array<[string, string, string]> = [
+    ['not JSON', 'Here are the titles', 'invalid_json'],
+    ['an extra field', answer([{ pinIndex: 3, title: 'All 15 Crochet Blankets to Save', angle: 'listicle' }]), 'invalid_schema'],
+    ['an extra top-level field', JSON.stringify({ titles: [{ pinIndex: 3, title: 'All 15 Crochet Blankets to Save' }], note: 'x' }), 'invalid_schema'],
+    ['a title over 100 characters', answer([{ pinIndex: 3, title: `15 ${'x'.repeat(100)}` }]), 'invalid_schema'],
+    ['another Pin', answer([{ pinIndex: 4, title: 'All 15 Crochet Blankets to Save' }]), 'wrong_pins'],
+    ['the same Pin twice', answer([{ pinIndex: 3, title: 'All 15 Crochet Blankets' }, { pinIndex: 3, title: 'Pick 15 Blankets' }]), 'wrong_pins'],
+    ['the number 15 removed', answer([{ pinIndex: 3, title: 'Crochet Blankets to Save for the Cold Season' }]), 'number_missing'],
+    ['an artificial "Idea 2"', answer([{ pinIndex: 3, title: '15 Crochet Blankets: Idea 2' }]), 'artificial_numbering'],
+    ['"viral"', answer([{ pinIndex: 3, title: '15 Viral Crochet Blankets for the Sofa' }]), 'unsupported_claim'],
+    ['"best"', answer([{ pinIndex: 3, title: 'The 15 Best Crochet Blankets for the Sofa' }]), 'unsupported_claim'],
+    ['"ultimate"', answer([{ pinIndex: 3, title: 'The Ultimate 15 Crochet Blankets' }]), 'unsupported_claim'],
+  ];
+  for (const [name, raw, reason] of cases) {
+    test(`answer with ${name} → refused (${reason})`, () => {
+      expect(parseTitleRepair(raw, [target()], { evidence: EVIDENCE })).toEqual({ rejected: reason });
+    });
+  }
+
+  test('a valid answer: one title per targeted Pin, ```json fence accepted', () => {
+    const result = parseTitleRepair('```json\n' + answer([{ pinIndex: 3, title: 'All 15 Crochet Blankets to Save' }]) + '\n```', [target()], { evidence: EVIDENCE });
+    expect(result).toEqual({ titles: new Map([[2, 'All 15 Crochet Blankets to Save']]) });
+  });
+});
+
+test.describe('TASK-FIX-085 — title repair in POST /api/pinterest/generate', () => {
+  const post = () => FIFTEEN_POST();
+
+  for (const [strategy, body] of [
+    ['balanced', articleBody(15)],
+    ['AI recommends', integratedBody(15)],
+  ] as const) {
+    test(`${strategy}, 15 Pins, near-identical titles → one repair, distinct titles, 15 kept, everything else unchanged, one insert, no image call`, async () => {
+      const article = post();
+      const plan = buildListicleAnglePlan(15);
+      const first = duplicateAnswer(article, plan, '15', strategy === 'AI recommends');
+      const run = await runGenerate(article, { ...body, board: 'Crochet Blankets', boardSection: 'Winter' }, [first, repairAnswer(article, plan, '15')]);
+      expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+      expect(run.prompts).toHaveLength(2);
+      expect(run.prompts[1]).toContain('You rewrite Pinterest Pin titles');
+      const rows = savedPins(run);
+      expect(rows).toHaveLength(15);
+      expect(run.events.filter((event) => event.table === 'pins')).toHaveLength(1);
+      expect(new Set(rows.map((row) => row.title)).size).toBe(15);
+      expect(rows[0].title).toBe(DUP_NUMBERED);
+      const original = pinsOf(first);
+      rows.forEach((row, i) => {
+        const angle = JSON.parse(row.image_analysis as string)._pinterestStrategy.angle as PinterestAngle;
+        expect(angle).toBe(original[i].angle);
+        if (isNumberedAngle(angle)) expect(row.title as string).toMatch(/\b15\b/);
+        expect(row.description).toBe(original[i].description);
+        expect(row.keywords).toBe(original[i].keywords);
+        expect(row.image_prompt).toBe(original[i].image_prompt);
+        expect(JSON.parse(row.image_analysis as string)._articleSource.sectionId).toBe(original[i].sourceSectionId);
+        expect(row.link_url).toBe(`${SITE}/blankets/`);
+        expect(row.board).toBe('Crochet Blankets');
+        expect(row.board_section).toBe('Winter');
+        expect(row).not.toHaveProperty('publish_date');
+      });
+      const repairLog = run.logs.find((line) => line.includes('Title repair:'));
+      expect(repairLog).toContain('"pins":14');
+      expect(repairLog).toContain('"accepted":true');
+    });
+  }
+
+  test('Manual: the explicit angle stays; duplicates are still repaired', async () => {
+    const article = wordpressPost('Cozy Crochet Blankets for Winter', 0);
+    const angles: PinterestAngle[] = ['curiosity', 'curiosity', 'curiosity'];
+    const settings = { ...AI_INTEGRATED_SETTINGS, strategy: 'manual', manualAngle: 'curiosity' };
+    const run = await runGenerate(article, integratedBody(3, settings), [duplicateAnswer(article, angles, null, true), repairAnswer(article, angles, null)]);
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+    expect(savedPins(run).map((row) => JSON.parse(row.image_analysis as string)._pinterestStrategy.angle)).toEqual(angles);
+    expect(new Set(savedPins(run).map((row) => row.title)).size).toBe(3);
+  });
+
+  test('Keyword flow in German: repaired too, the prompt asks for titles in Deutsch (same language label as the generation prompt)', async () => {
+    const titles = ['Gemütliche Häkeldecken für den Winter', 'Gemütliche Häkeldecken für den Winter', 'Gemütliche Häkeldecken für den Winter'];
+    const first = JSON.stringify({
+      pins: (['curiosity', 'problem-solution', 'listicle'] as const).map((angle, i) => ({
+        angle, title: titles[i],
+        description: `Ideen für warme Abende, Variante ${'ABC'[i]}. Speichere den Pin für dein nächstes Projekt.`,
+        keywords: 'häkeldecke, winter', board: 'Häkeln',
+        image_prompt: `A cream crochet blanket on a sofa, ${CAMERA[i]} view, photorealistic.`, visualFormat: 'photo',
+      })),
+    });
+    const repair = JSON.stringify({ titles: [{ pinIndex: 2, title: 'Zu kalt auf dem Sofa? Eine Häkeldecke hilft' }, { pinIndex: 3, title: 'Häkeldecken-Ideen, die du speichern solltest' }] });
+    const run = await runGenerate(null, { projectId: PROJECT_ID, keyword: 'Häkeldecke', language: 'de', pinsRequested: 3, generationMode: 'photo-only' }, [first, repair]);
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+    expect(run.prompts[1]).toContain('Write one new title in Deutsch');
+    expect(run.prompts[1]).toContain('The article states no count: never add a number.');
+  });
+
+  const failing: Array<[string, (article: ReturnType<typeof wordpressPost>, plan: PinterestAngle[]) => string, string]> = [
+    ['removes 15 from a numbered Pin', (a, plan) => repairAnswer(a, plan, '15', { 3: 'Crochet Blankets to Save for the Cold Season' }), 'DUPLICATE_TITLE'],
+    ['invents a number', (a, plan) => repairAnswer(a, plan, '15', { 2: '40 Crochet Blankets Worth Saving' }), 'UNSUPPORTED_NUMBER'],
+    ['adds "viral"', (a, plan) => repairAnswer(a, plan, '15', { 2: 'Viral Crochet Blankets for the Sofa' }), 'DUPLICATE_TITLE'],
+    ['adds "best"', (a, plan) => repairAnswer(a, plan, '15', { 2: 'The Best Crochet Blankets for the Sofa' }), 'DUPLICATE_TITLE'],
+    ['is not JSON', () => 'Sorry, here are better titles', 'DUPLICATE_TITLE'],
+    ['has an extra field', (a, plan) => repairAnswer(a, plan, '15', {}, { angle: 'listicle' }), 'DUPLICATE_TITLE'],
+    ['still gives near-identical titles', (a, plan) => repairAnswer(a, plan, '15', { 2: DUP_OTHER, 3: DUP_NUMBERED }), 'DUPLICATE_TITLE'],
+  ];
+  for (const [name, buildRepair, code] of failing) {
+    test(`a repair that ${name} → 422 strategy_safeguard_failed (${code}), one repair only, nothing saved`, async () => {
+      const article = post();
+      const plan = buildListicleAnglePlan(3);
+      const run = await runGenerate(article, articleBody(3), [duplicateAnswer(article, plan, '15'), buildRepair(article, plan)]);
+      expect(run.status).toBe(422);
+      expect(run.prompts).toHaveLength(2);
+      expect(run.body.error?.code).toBe('strategy_safeguard_failed');
+      expect(run.body.error?.issues?.map((issue) => issue.code)).toContain(code);
+      expect(run.events.filter((event) => event.table === 'pins')).toEqual([]);
+      const statuses = run.events.filter((event) => event.table === 'generations' && event.op === 'update').map((event) => (event.row as { status: string }).status);
+      expect(statuses).toEqual(['failed']);
+    });
+  }
+
+  test('a failed repair: issueCount = issues in the body = the log = the alert; no model text in the logs', async () => {
+    const article = post();
+    const plan = buildListicleAnglePlan(15);
+    const run = await runGenerate(article, articleBody(15), [duplicateAnswer(article, plan, '15'), 'not json']);
+    expect(run.status).toBe(422);
+    const error = run.body.error as unknown as StrategySafeguardError;
+    expect(error.issueCount).toBeGreaterThan(20);
+    expect(error.issues).toHaveLength(20);
+    const failed = run.logs.find((line) => line.includes('Strategy validation failed'))!;
+    expect(JSON.parse(failed.slice(failed.indexOf('{'))).issueCount).toBe(error.issueCount);
+    const view = strategySafeguardView(error, true);
+    expect(view.countLabel).toBe(`${error.issueCount} problems found`);
+    expect(view.items.length + view.hiddenCount).toBe(error.issueCount);
+    expect(error.issues.every((issue) => issue.code === 'DUPLICATE_TITLE' && typeof issue.pinIndex === 'number')).toBe(true);
+    const all = run.logs.join('\n');
+    for (const text of [DUP_OTHER, 'Winter crochet blanket inspiration', 'not json']) expect(all).not.toContain(text);
+    expect(run.logs.find((line) => line.includes('Title repair:'))).toContain('"rejected":"invalid_json"');
+  });
+
+  test('a duplicate plus another failure: no repair call, the 422 stands', async () => {
+    const article = post();
+    const plan = buildListicleAnglePlan(3);
+    const first = pinsOf(duplicateAnswer(article, plan, '15'));
+    first[1].description = 'Forty blankets: 40 ideas to save.';
+    const run = await runGenerate(article, articleBody(3), [JSON.stringify({ pins: first })]);
+    expect(run.status).toBe(422);
+    expect(run.prompts).toHaveLength(1);
+    expect(run.body.error?.issues?.map((issue) => issue.code)).toEqual(expect.arrayContaining(['DUPLICATE_TITLE', 'UNSUPPORTED_NUMBER']));
+  });
 });
 
 // ── POST /api/pinterest/generate-images ─────────────────────────────────────

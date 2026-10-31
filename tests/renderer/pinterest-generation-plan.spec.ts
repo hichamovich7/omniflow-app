@@ -510,7 +510,7 @@ test('Legacy Composite: the same invalid plans are rejected the same way, before
     await withRoute(modelResponse, async (harness) => {
       const response = await harness.post(legacyRequest);
       expect(response.status).toBe(422);
-      const error = (await response.json()).error;
+      const { error } = (await response.json()) as { error: { issues?: Array<{ field?: string }> } };
       expect(error).toMatchObject({ message: PIN_PLAN_FAILURE_MESSAGE, code: 'invalid_pin_plan', retryable: true });
       // Schema failures name the path at fault (TASK-FIX-084); other kinds have no issues.
       for (const issue of error.issues ?? []) expect(issue.field).toMatch(/^pins/);
