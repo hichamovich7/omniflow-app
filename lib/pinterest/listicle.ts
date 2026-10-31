@@ -191,16 +191,31 @@ interface ListiclePinCandidate {
  * The listicle batch contract: the angle counts of the plan, the article's
  * exact number in every Listicle / Article Promise title, and no "best /
  * viral / popular" promise the article does not make. Runs instead of the
- * balanced-angle check; every other safeguard still runs.
+ * balanced-angle check; every other safeguard still runs. `minimum`
+ * (AI recommends, TASK-FIX-084) only requires at least half of the batch
+ * on a numbered angle: the other Pins keep the angle the model chose.
  */
 export function validateListicleBatch(
   pins: ListiclePinCandidate[],
   plan: readonly PinterestAngle[],
   number: string,
-  sourceEvidence: string
+  sourceEvidence: string,
+  options: { mode?: 'exact' | 'minimum' } = {}
 ): PinterestStrategyIssue[] {
   const issues: PinterestStrategyIssue[] = [];
-  if (pins.length === plan.length && plan.length > 0) {
+  if (options.mode === 'minimum') {
+    const required = numberedPinCount(plan.length);
+    const numbered = pins.filter((pin) => isNumberedAngle(pin.angle)).length;
+    if (pins.length === plan.length && numbered < required) {
+      issues.push({
+        code: 'angle-coverage',
+        message: `Listicle plan expects at least ${required} Listicle / Article Promise Pins, got ${numbered}`,
+        reason: 'LISTICLE_ANGLE_PLAN',
+        field: 'angle',
+        details: [`listicle + article-promise ≥ ${required}`, `listicle + article-promise = ${numbered}`],
+      });
+    }
+  } else if (pins.length === plan.length && plan.length > 0) {
     const count = (list: readonly PinterestAngle[]) =>
       list.reduce((counts, angle) => counts.set(angle, (counts.get(angle) ?? 0) + 1), new Map<PinterestAngle, number>());
     const expected = count(plan);

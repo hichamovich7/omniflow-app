@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/prompts';
 import { buildBrandProfileContext } from '@/lib/brand-profile';
+import { isIntegratedTextEnabled } from '@/lib/validations/pinterest';
 import {
   PIN_PLAN_FAILURE_MESSAGE,
   PinterestPlanError,
@@ -288,6 +289,29 @@ export function articlePinterestKeyword(source: ArticlePinterestSource): string 
 }
 
 /**
+ * What a number or a claim in an article Pin may rest on (TASK-FIX-084): the
+ * keyword and the article itself (H1, meta, SEO keywords, featured image
+ * description, body, photo texts, plus `extra` source text such as photo
+ * descriptions). Never the prompt scaffolding — OmniFlow's <pin_plan>
+ * ("Pin 1 … Pin N"), instructions, or other Pins' titles — so the number of
+ * Pins requested is never proof of a number.
+ */
+export function articleClaimEvidence(source: ArticlePinterestSource, keyword: string | undefined, extra: string[] = []): string {
+  return [
+    keyword,
+    source.title,
+    source.metaTitle,
+    source.metaDescription,
+    ...source.seoKeywords,
+    source.featuredImagePrompt,
+    buildArticleEvidence(source.context),
+    ...extra,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
  * The article, handed to the existing Pinterest prompt through its
  * `analysisContext` slot. Delimited and labeled as data so article text can
  * never act as instructions. Carries no URL of any kind: the featured image
@@ -512,7 +536,11 @@ export async function regenerateArticlePin(
 
   let planned;
   try {
-    [planned] = parsePinterestGenerationPlan(content).pins;
+    [planned] = parsePinterestGenerationPlan(content, {
+      disabledIntegratedText: integrated
+        ? (['headline', 'subtitle', 'cta'] as const).filter((element) => !isIntegratedTextEnabled(integrated.settings, element))
+        : [],
+    }).pins;
   } catch (planError) {
     if (!(planError instanceof PinterestPlanError)) throw planError;
     console.error(`[${PROMPT_ID}] Regenerated Pin plan rejected: ${JSON.stringify(planError.diagnostics())}`);
@@ -520,7 +548,9 @@ export async function regenerateArticlePin(
   }
 
   const next = withoutUrls({ ...planned, angle });
-  const evidence = `${keyword}\n${regenerationContext}`;
+  // The article and the Pin's stored photo description only: never the
+  // prompt, the other Pins' titles or the replaced title (TASK-FIX-084).
+  const evidence = articleClaimEvidence(source, keyword, stored?.brief.visualDetails ?? []);
   const issues: PinterestStrategyIssue[] = [
     ...(planned.angle !== angle
       ? [{

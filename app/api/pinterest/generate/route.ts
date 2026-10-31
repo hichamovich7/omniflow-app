@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateText, analyzeImage } from '@/lib/ai/engine';
 import { getRoleConfig } from '@/lib/ai/config';
-import { generatePinsSchema, BANNER_TEMPLATES } from '@/lib/validations/pinterest';
+import { generatePinsSchema, BANNER_TEMPLATES, isIntegratedTextEnabled } from '@/lib/validations/pinterest';
 import type { BannerTemplate } from '@/lib/validations/pinterest';
 import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/niche-visual-conventions';
 import { imageStyleAnalysisSchema } from '@/lib/validations/vision';
@@ -27,10 +27,12 @@ import {
   PIN_PLAN_FAILURE_MESSAGE,
   PinterestPlanError,
   parsePinterestGenerationPlan,
+  planErrorIssues,
 } from '@/lib/pinterest/generation-plan';
 import type { PinterestGenerationPlan } from '@/lib/pinterest/generation-plan';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
 import {
+  articleClaimEvidence,
   buildArticlePinterestContext,
   loadArticlePinterestSource,
   SocialGenerationError,
@@ -308,12 +310,16 @@ export async function POST(request: Request) {
     : null;
 
   // TASK-083: an article that states an exact count (H1, else a reliable
-  // numbered list) gets at least half numbered Pins. Never with a manual or
-  // AI-recommended angle strategy; Keyword and Research flows never get here.
-  const listicleNumber = articleSource && (!aiIntegrated || aiIntegrated.strategy === 'balanced')
+  // numbered list) gets at least half numbered Pins. Balanced: every angle is
+  // planned; AI recommends (TASK-FIX-084): only the numbered slots are, the
+  // other Pins keep the model's choice. A Manual angle stays the user's
+  // choice. Keyword and Research flows never get here.
+  const listicleStrategy = aiIntegrated?.strategy ?? 'balanced';
+  const listicleNumber = articleSource && listicleStrategy !== 'manual'
     ? detectListicleNumber(articleSource.context)
     : null;
   const listicleAnglePlan = listicleNumber ? buildListicleAnglePlan(pinsRequested) : null;
+  const listicleMode = listicleStrategy === 'ai-recommends' ? 'minimum' : 'exact';
 
   if (analysisId) {
     const { data: analysis } = await supabase
@@ -420,7 +426,13 @@ export async function POST(request: Request) {
       referenceStyleGuidance,
       articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
       ...(listicleNumber && listicleAnglePlan
-        ? { listicle: { number: listicleNumber.value, anglePlan: listicleAnglePlan } }
+        ? {
+            listicle: {
+              number: listicleNumber.value,
+              anglePlan: listicleAnglePlan,
+              strategy: listicleMode === 'minimum' ? ('ai-recommends' as const) : ('balanced' as const),
+            },
+          }
         : {}),
     });
 
@@ -442,19 +454,36 @@ export async function POST(request: Request) {
     // response that cannot be trusted (it is never repaired or completed).
     let plan: PinterestGenerationPlan;
     try {
-      plan = parsePinterestGenerationPlan(content);
+      // AI Integrated: elements the user turned off are dropped before the
+      // schema check (never used anyway); enabled ones stay strict.
+      plan = parsePinterestGenerationPlan(content, {
+        disabledIntegratedText: aiIntegrated
+          ? (['headline', 'subtitle', 'cta'] as const).filter((element) => !isIntegratedTextEnabled(aiIntegrated, element))
+          : [],
+      });
     } catch (planError) {
       if (!(planError instanceof PinterestPlanError)) throw planError;
-      // Bounded diagnostics only — never the full raw response. A single
-      // flattened string argument (see the strategy-validation log below)
-      // so it stays legible in log viewers that collapse object arguments.
-      console.error(`[${PROMPT_ID}] Pin plan rejected: ${JSON.stringify(planError.diagnostics())}`);
+      // Kind, length, schema paths, codes and counts only — never any part of
+      // the model response (TASK-FIX-084). A single flattened string argument
+      // stays legible in log viewers that collapse object arguments.
+      console.error(
+        `[${PROMPT_ID}] Pin plan rejected: ${JSON.stringify({ step: 'generate', model, role: 'FAST', ...planError.diagnostics() })}`
+      );
       await supabase
         .from('generations')
         .update({ status: 'failed', error_message: PIN_PLAN_FAILURE_MESSAGE })
         .eq('id', generation.id);
+      const issues = planErrorIssues(planError);
       return NextResponse.json<ApiResponse<null>>(
-        { data: null, error: { message: PIN_PLAN_FAILURE_MESSAGE, code: 'invalid_pin_plan' } },
+        {
+          data: null,
+          error: {
+            message: PIN_PLAN_FAILURE_MESSAGE,
+            code: 'invalid_pin_plan',
+            retryable: true,
+            ...(issues.length ? { issues, issueCount: planError.diagnostics().issueCount ?? issues.length } : {}),
+          },
+        },
         { status: 422 }
       );
     }
@@ -471,7 +500,13 @@ export async function POST(request: Request) {
     });
 
     const enforceBalancedAngles = !aiIntegrated || aiIntegrated.strategy === 'balanced';
-    const sourceEvidence = [keyword, analysisContext].filter(Boolean).join('\n');
+    // What a number or claim may rest on (TASK-FIX-084): the keyword and the
+    // source itself — the article (with its photo descriptions) or the
+    // Research analysis. Never OmniFlow's own <pin_plan> ("Pin 1 … Pin N"),
+    // so the requested Pin count is never proof of a number.
+    const sourceEvidence = articleSource
+      ? articleClaimEvidence(articleSource, keyword, articleGrounding ? [articleGrounding.evidence] : [])
+      : [keyword, analysisContext].filter(Boolean).join('\n');
     const validateBatch = (pinsToCheck: typeof resolvedPins) => [
       ...validatePinterestStrategyBatch(
         pinsToCheck,
@@ -481,7 +516,7 @@ export async function POST(request: Request) {
         { enforceBalancedAngles: enforceBalancedAngles && !listicleAnglePlan }
       ),
       ...(listicleNumber && listicleAnglePlan
-        ? validateListicleBatch(pinsToCheck, listicleAnglePlan, listicleNumber.value, sourceEvidence)
+        ? validateListicleBatch(pinsToCheck, listicleAnglePlan, listicleNumber.value, sourceEvidence, { mode: listicleMode })
         : []),
       ...(articleSource && enforceBalancedAngles
         ? validateDistinctAngles(pinsToCheck, pinsRequested)

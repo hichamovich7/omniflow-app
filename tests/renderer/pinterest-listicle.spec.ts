@@ -1,3 +1,5 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from 'playwright/test';
 import sharp from 'sharp';
 import * as wordpressPostSource from '@/lib/social/pinterest-from-wordpress-post';
@@ -479,6 +481,8 @@ interface GenerateRun {
   body: { data: unknown; error: { code: string; issues?: Array<{ code: string }> } | null };
   events: RecordedEvent[];
   prompts: string[];
+  /** Everything the route logged (console.log / warn / error), one string per call. */
+  logs: string[];
 }
 
 function wordpressPost(title: string, count: number) {
@@ -498,6 +502,22 @@ function wordpressPost(title: string, count: number) {
 }
 const NO_NUMBER_HTML = `<p>Crochet blankets for cozy evenings.</p><h2>Moss stitch blanket</h2><p>A moss stitch crochet blanket in cream cotton yarn with a soft texture for the sofa.</p><h2>Waffle blanket</h2><p>A waffle crochet blanket in cream cotton yarn with a deep texture for the bed.</p><h2>Ripple blanket</h2><p>A ripple crochet blanket in cream cotton yarn that drapes over the sofa.</p>`;
 
+// Up to 15 Pins: 8 numbered and 7 other titles, all distinct enough for the duplicate-title check.
+const MORE_NUMBERED = [
+  'From Moss Stitch to Popcorn: 15 Blankets in Cream',
+  'Pick One of 15 Textured Blankets for the Sofa',
+  '15 Blanket Patterns Worth a Spot on Your Couch',
+  'Stitch Textures Across 15 Crochet Throws',
+];
+const MORE_OTHER = [
+  'Blanket Ideas Worth Saving for Winter',
+  'A Practical Guide to Cozy Crochet Blankets',
+  'Why Cream Yarn Makes a Blanket Look Calmer',
+  'Too Cold on the Sofa? Try a Textured Throw',
+];
+const CAMERA = ['overhead', 'eye-level', '45-degree', 'close-up', 'wide shot'];
+const BACKDROP = ['white', 'cream linen', 'light gray'];
+
 /** The model answer: titles per angle (numbered ones carry `number`), each on its planned section. */
 function modelAnswer(post: ReturnType<typeof wordpressPost>, pinsRequested: number, angles: PinterestAngle[], number: string | null): string {
   const context = buildWordPressArticleContext({ sourceType: 'external_wordpress_post', html: post.contentHtml, title: post.title, language: 'en' });
@@ -508,12 +528,12 @@ function modelAnswer(post: ReturnType<typeof wordpressPost>, pinsRequested: numb
     pins: angles.map((angle, index) => ({
       angle,
       title: number && isNumberedAngle(angle)
-        ? NUMBERED_TITLES[numbered++ % NUMBERED_TITLES.length].replace(/15/g, number)
-        : [...OTHER_TITLES, 'Blanket Ideas Worth Saving for Winter', 'A Practical Guide to Cozy Crochet Blankets'][other++],
-      description: `Winter crochet blanket inspiration, variant ${'ABCDEFGHIJ'[index]}: each blanket and its texture. See which one fits your sofa.`,
+        ? [...NUMBERED_TITLES, ...MORE_NUMBERED][numbered++].replace(/15/g, number)
+        : [...OTHER_TITLES, ...MORE_OTHER][other++],
+      description: `Winter crochet blanket inspiration around the ${BLANKETS[index].toLowerCase()} idea, variant ${'ABCDEFGHIJKLMNOPQRSTU'[index]}: each blanket and its texture. See which one fits your sofa.`,
       keywords: 'crochet blanket, winter crochet, cozy blanket',
       board: 'Crochet Blankets',
-      image_prompt: `A cream crochet blanket folded on a plain white surface, variant ${index}, soft natural light, eye-level, photorealistic.`,
+      image_prompt: `A cream crochet blanket folded on a plain ${BACKDROP[Math.floor(index / CAMERA.length) % BACKDROP.length]} surface, soft natural light, ${CAMERA[index % CAMERA.length]} view, photorealistic.`,
       sourceSectionId: sections[index],
       visualFormat: 'photo',
     })),
@@ -521,7 +541,7 @@ function modelAnswer(post: ReturnType<typeof wordpressPost>, pinsRequested: numb
 }
 
 async function runGenerate(post: ReturnType<typeof wordpressPost> | null, body: Record<string, unknown>, answer: string): Promise<GenerateRun> {
-  const run: GenerateRun = { status: 0, body: { data: null, error: null }, events: [], prompts: [] };
+  const run: GenerateRun = { status: 0, body: { data: null, error: null }, events: [], prompts: [], logs: [] };
   const project = { id: PROJECT_ID, description: null, niche: 'Crochet', user_id: 'user-1', default_language: 'en' };
   const supabase = {
     auth: { getUser: async () => ({ data: { user: { id: 'user-1', email: 'user@example.com' } } }) },
@@ -584,7 +604,7 @@ async function runGenerate(post: ReturnType<typeof wordpressPost> | null, body: 
     const response = await route.POST(new Request('http://localhost/api/pinterest/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
     run.status = response.status;
     run.body = (await response.json()) as GenerateRun['body'];
-  });
+  }, undefined, run.logs);
   return run;
 }
 
@@ -592,7 +612,8 @@ async function withFakes(
   fakes: Record<string, unknown>,
   routeSpecifier: string,
   run: (route: { POST: (request: Request) => Promise<Response> }) => Promise<void>,
-  fetchFn?: typeof fetch
+  fetchFn?: typeof fetch,
+  logs?: string[]
 ): Promise<void> {
   const routeKey = require.resolve(routeSpecifier);
   const keys = [...Object.keys(fakes).map((specifier) => require.resolve(specifier)), routeKey];
@@ -610,9 +631,12 @@ async function withFakes(
     globalThis.fetch = fetchFn ?? ((async () => {
       throw new Error('No network call is allowed in this test');
     }) as typeof fetch);
-    console.log = () => undefined;
-    console.warn = () => undefined;
-    console.error = () => undefined;
+    const sink = (...args: unknown[]) => {
+      logs?.push(args.map((arg) => (typeof arg === 'string' ? arg : arg instanceof Error ? arg.message : JSON.stringify(arg))).join(' '));
+    };
+    console.log = sink;
+    console.warn = sink;
+    console.error = sink;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     await run(require(routeSpecifier) as { POST: (request: Request) => Promise<Response> });
   } finally {
@@ -640,7 +664,7 @@ const savedPins = (run: GenerateRun) => (run.events.find((event) => event.table 
 const composerOf = (row: Record<string, unknown>) => readComposerMetadata(row.image_analysis as string);
 
 test.describe('POST /api/pinterest/generate — numbered article', () => {
-  for (const [count, pins, numbered] of [[15, 3, 2], [18, 7, 4], [15, 5, 3]] as const) {
+  for (const [count, pins, numbered] of [[15, 3, 2], [18, 7, 4], [15, 5, 3], [15, 15, 8]] as const) {
     test(`${count} ideas, ${pins} Pins → ${numbered} numbered titles on article photos; link, board and section unchanged`, async () => {
       const post = wordpressPost(`${count} Cozy Crochet Blanket Ideas for Winter`, count);
       const plan = buildListicleAnglePlan(pins);
@@ -650,6 +674,9 @@ test.describe('POST /api/pinterest/generate — numbered article', () => {
       expect(run.prompts[0]).toContain(`The source article confirms an exact count: ${count}.`);
       const rows = savedPins(run);
       expect(rows).toHaveLength(pins);
+      // One single insert of the whole batch, no duplicate title.
+      expect(run.events.filter((event) => event.table === 'pins')).toHaveLength(1);
+      expect(new Set(rows.map((row) => row.title)).size).toBe(pins);
       const numberedRows = rows.filter((row) => new RegExp(`\\b${count}\\b`).test(row.title as string));
       expect(numberedRows.length).toBeGreaterThanOrEqual(numbered);
       expect(numberedRows.length / pins).toBeGreaterThanOrEqual(0.5);
@@ -715,6 +742,215 @@ test.describe('POST /api/pinterest/generate — numbered article', () => {
     expect(run.prompts[0]).not.toContain('The source article confirms an exact count');
     expect(savedPins(run).every((row) => composerOf(row) === null)).toBe(true);
   });
+});
+
+// ── TASK-FIX-084: production fixes after the 4ec0bc2 / v3.1.0 test ──────────
+
+const AI_INTEGRATED_SETTINGS = {
+  creativeFormat: 'hero-pin',
+  // The form's default strategy (components/pinterest/pin-form.tsx), unchanged.
+  strategy: 'ai-recommends',
+  headline: { mode: 'generate' },
+  subtitle: { mode: 'none' },
+  cta: { mode: 'none' },
+  maximumTextLines: 4,
+  importance: { headline: 'high', subtitle: 'none', cta: 'none' },
+};
+/** Subtitle and CTA turned on: both are strictly validated. */
+const AI_INTEGRATED_ALL_ON = {
+  ...AI_INTEGRATED_SETTINGS,
+  subtitle: { mode: 'generate' },
+  cta: { mode: 'generate' },
+  importance: { headline: 'high', subtitle: 'medium', cta: 'low' },
+};
+const FIFTEEN_POST = () => wordpressPost('15 Cozy Crochet Blanket Ideas for Winter', 15);
+const integratedBody = (pins: number, settings: Record<string, unknown> = AI_INTEGRATED_SETTINGS) => ({
+  ...articleBody(pins),
+  generationMode: 'ai-integrated',
+  aiIntegrated: settings,
+});
+
+/** An AI Integrated answer: the given angles, numbered titles carrying `number`, one integratedText per Pin. */
+function integratedAnswer(
+  post: ReturnType<typeof wordpressPost>,
+  angles: PinterestAngle[],
+  integratedText: Record<string, unknown> = {},
+  number: string | null = '15'
+): string {
+  const plan = JSON.parse(modelAnswer(post, angles.length, angles, number)) as { pins: Array<Record<string, unknown>> };
+  return JSON.stringify({ pins: plan.pins.map((pin) => ({ ...pin, integratedText: { headline: 'Cozy blankets', ...integratedText } })) });
+}
+
+const numberedTitles = (run: GenerateRun, number = '15') => savedPins(run).filter((row) => new RegExp(`\\b${number}\\b`).test(row.title as string));
+
+test.describe('TASK-FIX-084 — the requested Pin count is never proof of a number', () => {
+  test('15 Pins for an article without a number: a title with "15" → 422 UNSUPPORTED_NUMBER, nothing saved', async () => {
+    const post = wordpressPost('Cozy Crochet Blankets for Winter', 0);
+    const answer = JSON.parse(modelAnswer(post, 3, ['curiosity', 'problem-solution', 'listicle'], null)) as { pins: Array<Record<string, unknown>> };
+    answer.pins[2].title = '15 Cozy Crochet Blanket Ideas for Winter';
+    const run = await runGenerate(post, articleBody(15), JSON.stringify(answer));
+    expect(run.prompts[0]).not.toContain('The source article confirms an exact count');
+    // The prompt still numbers OmniFlow's own plan 1…15 — it is no longer evidence.
+    expect(run.prompts[0]).toContain('Pin 15 → sourceSectionId');
+    expect(run.status).toBe(422);
+    expect(run.body.error?.code).toBe('strategy_safeguard_failed');
+    expect(run.body.error?.issues).toEqual([expect.objectContaining({ code: 'UNSUPPORTED_NUMBER', pinIndex: 3, field: 'title' })]);
+    expect(run.events.filter((event) => event.table === 'pins')).toEqual([]);
+  });
+
+  test('a number the article really gives (a list label, the H1 count) still passes', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, articleBody(3), modelAnswer(post, 3, buildListicleAnglePlan(3), '15'));
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+  });
+
+  test('15 Pins on an 18-idea article: titles written with 15 (the Pin count) are refused', () => {
+    const issues = validateListicleBatch(plannedPins(3, '15'), buildListicleAnglePlan(3), '18', `18 Cozy Crochet Blanket Ideas\n${FIFTEEN.plainText}`);
+    expect(issues.filter((issue) => issue.reason === 'LIST_NUMBER_MISSING')).toHaveLength(2);
+  });
+});
+
+test.describe('TASK-FIX-084 — AI Integrated "AI recommends" gets the numbered plan', () => {
+  for (const [pins, numbered] of [[3, 2], [7, 4], [15, 8]] as const) {
+    test(`"15 ideas", ${pins} Pins → at least ${numbered} titles with 15; the others keep the model's angles; one insert, no duplicate`, async () => {
+      const post = FIFTEEN_POST();
+      const run = await runGenerate(post, integratedBody(pins), integratedAnswer(post, buildListicleAnglePlan(pins)));
+      expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+      expect(run.prompts[0]).toContain('The source article confirms an exact count: 15.');
+      expect(run.prompts[0]).toContain(`At least ${numbered} of the ${pins} pins use the "listicle" or "article-promise" angle`);
+      expect(run.prompts[0]).toContain('For the other pins, choose the strongest grounded angle.');
+      const rows = savedPins(run);
+      expect(rows).toHaveLength(pins);
+      expect(numberedTitles(run).length).toBeGreaterThanOrEqual(numbered);
+      expect(run.events.filter((event) => event.table === 'pins')).toHaveLength(1);
+      expect(new Set(rows.map((row) => row.title)).size).toBe(pins);
+      for (const row of rows) {
+        const angle = JSON.parse(row.image_analysis as string)._pinterestStrategy.angle as PinterestAngle;
+        if (isNumberedAngle(angle)) expect(row.title as string).toMatch(/\b15\b/);
+      }
+    });
+  }
+
+  test('AI recommends: the numbered Pins may sit anywhere; the other angles are free (no even balance)', async () => {
+    const post = FIFTEEN_POST();
+    const angles: PinterestAngle[] = ['article-promise', 'listicle', 'curiosity', 'curiosity', 'listicle', 'article-promise', 'discovery'];
+    const run = await runGenerate(post, integratedBody(7), integratedAnswer(post, angles));
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+    expect(numberedTitles(run)).toHaveLength(4);
+  });
+
+  test('AI recommends: fewer than half numbered (the production run) → 422 LISTICLE_ANGLE_PLAN, nothing saved', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, integratedBody(3), integratedAnswer(post, ['listicle', 'curiosity', 'discovery']));
+    expect(run.status).toBe(422);
+    expect(run.body.error?.issues?.map((issue) => issue.code)).toEqual(['LISTICLE_ANGLE_PLAN']);
+    expect(run.events.filter((event) => event.table === 'pins')).toEqual([]);
+  });
+
+  test('Manual stays the user\'s explicit choice: no numbered plan', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, integratedBody(3, { ...AI_INTEGRATED_SETTINGS, strategy: 'manual', manualAngle: 'curiosity' }), integratedAnswer(post, ['curiosity', 'curiosity', 'curiosity'], {}, null));
+    expect(run.prompts[0]).not.toContain('The source article confirms an exact count');
+    expect(run.prompts[0]).toContain('Use the "curiosity" angle for every pin.');
+  });
+
+  test('Balanced keeps the exact plan', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, integratedBody(3, { ...AI_INTEGRATED_SETTINGS, strategy: 'balanced' }), integratedAnswer(post, buildListicleAnglePlan(3)));
+    expect(run.prompts[0]).toContain('pin 1 = "listicle", pin 2 = "curiosity", pin 3 = "article-promise"');
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+  });
+
+  test('an article without a number: AI recommends is unchanged', async () => {
+    const post = wordpressPost('Cozy Crochet Blankets for Winter', 0);
+    const run = await runGenerate(post, integratedBody(3), integratedAnswer(post, ['curiosity', 'discovery', 'listicle'], {}, null));
+    expect(run.prompts[0]).not.toContain('The source article confirms an exact count');
+    expect(run.prompts[0]).toContain('Choose the strongest grounded angle for each pin');
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+  });
+});
+
+test.describe('TASK-FIX-084 — integratedText: disabled elements dropped, enabled ones strict', () => {
+  const plan = () => buildListicleAnglePlan(3);
+
+  test('subtitle / cta outside integratedText are ignored', async () => {
+    const post = FIFTEEN_POST();
+    const outside = JSON.parse(integratedAnswer(post, plan())) as { pins: Array<Record<string, unknown>> };
+    outside.pins.forEach((pin) => Object.assign(pin, { subtitle: 'Soft and warm', cta: 'Save this pin' }));
+    expect((await runGenerate(post, integratedBody(3), JSON.stringify(outside))).status).toBe(201);
+  });
+
+  for (const [name, value] of [['null', null], ['an empty string', ''], ['"None"', 'None'], ['a text over the limit', 'x'.repeat(200)]] as const) {
+    test(`a disabled subtitle and cta written as ${name} are dropped, not rejected`, async () => {
+      const post = FIFTEEN_POST();
+      const run = await runGenerate(post, integratedBody(3), integratedAnswer(post, plan(), { subtitle: value, cta: value }));
+      expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+      for (const row of savedPins(run)) {
+        const integrated = JSON.parse(row.image_analysis as string)._pinterestAiIntegrated;
+        // Numbered Pins are composed by OmniFlow instead; the others keep the AI Integrated contract.
+        if (integrated) expect(integrated.text).toMatchObject({ subtitle: null, cta: null });
+      }
+    });
+  }
+
+  for (const [name, text, field, code] of [
+    ['an enabled cta = null', { cta: null }, 'pins.0.integratedText.cta', 'invalid_type'],
+    ['an enabled cta = ""', { cta: '' }, 'pins.0.integratedText.cta', 'too_small'],
+    ['an enabled cta over 60 characters', { cta: 'x'.repeat(61) }, 'pins.0.integratedText.cta', 'too_big'],
+    ['an enabled subtitle over 120 characters', { subtitle: 'x'.repeat(121), cta: 'Save it' }, 'pins.0.integratedText.subtitle', 'too_big'],
+  ] as const) {
+    test(`${name} → 422 invalid_pin_plan naming ${field}, nothing saved`, async () => {
+      const post = FIFTEEN_POST();
+      const run = await runGenerate(post, integratedBody(3, AI_INTEGRATED_ALL_ON), integratedAnswer(post, plan(), { subtitle: 'Soft and warm', ...text }));
+      expect(run.status).toBe(422);
+      expect(run.body.error).toMatchObject({ code: 'invalid_pin_plan', retryable: true });
+      // One issue per Pin (the value is on all three), each with its exact path.
+      expect(run.body.error?.issues).toEqual([0, 1, 2].map((i) => expect.objectContaining({ code, field: field.replace('pins.0.', `pins.${i}.`), pinIndex: i + 1 })));
+      expect(run.events.filter((event) => event.table === 'pins')).toEqual([]);
+      const statuses = run.events.filter((event) => event.table === 'generations' && event.op === 'update').map((event) => (event.row as { status: string }).status);
+      expect(statuses).toEqual(['failed']);
+    });
+  }
+
+  test('an unknown key inside integratedText stays rejected', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, integratedBody(3), integratedAnswer(post, plan(), { body: 'extra' }));
+    expect(run.status).toBe(422);
+    expect(run.body.error?.issues?.[0]).toEqual(expect.objectContaining({ code: 'unrecognized_keys', field: 'pins.0.integratedText' }));
+  });
+});
+
+test.describe('TASK-FIX-084 — logs carry no model text', () => {
+  test('a rejected plan logs kind, step, model, role, length, paths, codes and counts only', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, integratedBody(3, AI_INTEGRATED_ALL_ON), integratedAnswer(post, buildListicleAnglePlan(3), { subtitle: 'Soft and warm', cta: '' }));
+    const line = run.logs.find((entry) => entry.includes('Pin plan rejected'));
+    expect(line).toBeDefined();
+    const logged = JSON.parse(line!.slice(line!.indexOf('{'))) as Record<string, unknown>;
+    expect(Object.keys(logged).sort()).toEqual(['issueCount', 'issues', 'kind', 'model', 'responseLength', 'role', 'step']);
+    expect(logged).toMatchObject({ kind: 'invalid_schema', step: 'generate', role: 'FAST', issueCount: 3 });
+    expect((logged.issues as unknown[])[0]).toEqual({ path: 'pins.0.integratedText.cta', code: 'too_small' });
+    const all = run.logs.join('\n');
+    for (const generated of ['Cozy Crochet Blanket', 'Soft and warm', 'Winter crochet blanket inspiration', 'cream crochet blanket folded']) {
+      expect(all).not.toContain(generated);
+    }
+  });
+
+  test('invalid JSON: the JSON.parse message (which quotes the response) is not logged', async () => {
+    const post = FIFTEEN_POST();
+    const run = await runGenerate(post, articleBody(3), '{"pins": [ {"title": "Secret model title" ] }');
+    expect(run.status).toBe(422);
+    expect(run.logs.join('\n')).not.toContain('Secret model title');
+  });
+});
+
+test('production bundle: the compiled route carries the numbered plan and its safeguard', () => {
+  const dir = join(__dirname, '../../.next/server/chunks');
+  test.skip(!existsSync(dir), 'No production build — run `npx next build` first');
+  const sources = readdirSync(dir).filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(dir, name), 'utf8'));
+  expect(sources.some((source) => source.includes('The source article confirms an exact count'))).toBe(true);
+  expect(sources.some((source) => source.includes('LIST_NUMBER_MISSING'))).toBe(true);
+  expect(sources.some((source) => source.includes('For the other pins, choose the strongest grounded angle.'))).toBe(true);
 });
 
 // ── POST /api/pinterest/generate-images ─────────────────────────────────────

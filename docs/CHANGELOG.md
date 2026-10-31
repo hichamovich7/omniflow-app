@@ -18,7 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
-## Pinterest: number-aware titles + numbered Pins on article photos — TASK-083 (2026-10-31)
+## v3.1.1 — Fix: Pinterest numbered Pins in production — TASK-FIX-084 (2026-10-31)
+
+* Production test of v3.1.0 (4ec0bc2): one numbered title for 15 Pins on a "15 ideas" article, and a 422 `invalid_schema` on a plan carrying `subtitle` / `cta`. Causes: the numbered plan only ran with Balanced angles, while AI Integrated starts in "AI recommends"; `subtitle` / `cta` inside `integratedText` were validated even when the user had turned them off.
+* "AI recommends" now gets the numbered plan when the article states a reliable count: at least half of the Pins (3 → 2, 7 → 4, 15 → 8) use Listicle / Article Promise with the article's exact number; the other Pins keep the model's choice. Manual stays the user's explicit angle. The form's default is unchanged.
+* Invented numbers: the check no longer counts OmniFlow's own Pin plan ("Pin 1 … Pin 15"), prompt instructions or other Pins' titles as evidence — before, a title with the requested Pin count passed on an article without that number. Same for single-Pin regeneration and "Regenerate text".
+* AI Integrated: disabled `headline` / `subtitle` / `cta` are dropped before the schema check; enabled ones stay strict. A rejected plan returns a structured 422 (`invalid_pin_plan`, `retryable`, `issues` with the exact path, e.g. `pins.0.integratedText.cta`); nothing is saved.
+* Logs: no model text any more — preview / tail and the `JSON.parse` message removed; kind, step, model, role, length, paths, codes and counts only.
+* No migration, no new endpoint; Keyword and Research flows unchanged.
+
+## v3.1.0 — Pinterest: number-aware titles + numbered Pins on article photos — TASK-083 (2026-10-31)
 
 * Pinterest from an OmniFlow article or an existing WordPress post: when the article states an exact count (number in the H1's main clause, or a numbered list 1…N without gap that is not a tutorial), at least half of the Pins (3 → 2, 5 → 3, 7 → 4) get a Listicle or Article Promise title with that exact number; the others use Curiosity, Discovery or Problem → Solution. Before, the balanced plan gave 3 Pins a single Listicle angle and the prompt asked for unnumbered titles.
 * New safeguards for those batches only (422, retryable, nothing saved): `LIST_NUMBER_MISSING` (numbered angle without the number — catches "3" for a 15-item article even when "3" appears in the article as a list label), `LISTICLE_ANGLE_PLAN`, and "best / viral / most popular" (EN / DE / FR / ES) refused unless the article says it. Invented numbers, duplicates, "easy / free" claims, sections and image-subject checks unchanged.

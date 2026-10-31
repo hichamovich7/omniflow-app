@@ -477,7 +477,7 @@ test.describe('Generation route reuses the existing Pinterest pipeline', () => {
     expect(route).toContain('buildArticlePinterestContext(articleSource, keyword, articleGrounding)');
     expect(route).toContain('validateArticleGroundedPins(pinsToCheck, articleGrounding)');
     expect(route.match(/buildPinterestPinsPrompt\(/g)).toHaveLength(1);
-    expect(route).toContain('parsePinterestGenerationPlan(content)');
+    expect(route).toContain('parsePinterestGenerationPlan(content, {');
     expect(route).toContain('validatePinterestStrategyBatch(');
     expect(route).toContain('validateDistinctAngles(pinsToCheck, pinsRequested)');
   });

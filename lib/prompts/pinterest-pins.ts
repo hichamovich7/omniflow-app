@@ -48,7 +48,18 @@ interface PromptContext {
    * the angle of each Pin (at least half Listicle / Article Promise). Absent
    * = the existing angle distribution, unchanged.
    */
-  listicle?: { number: string; anglePlan: PinterestAngle[] };
+  listicle?: ListiclePromptPlan;
+}
+
+/**
+ * TASK-083 / TASK-FIX-084: `balanced` fixes every Pin's angle; `ai-recommends`
+ * fixes only the numbered slots (Listicle / Article Promise) and leaves the
+ * other Pins to the model's choice.
+ */
+interface ListiclePromptPlan {
+  number: string;
+  anglePlan: PinterestAngle[];
+  strategy?: 'balanced' | 'ai-recommends';
 }
 
 // Room/space nouns across the 4 supported content languages (en, de, es, fr).
@@ -324,13 +335,18 @@ function buildCustomAngleInstruction(pinsRequested: number): string {
  * TASK-083 — numbered listicle article: the exact angle of each pin and the
  * article's count, which every Listicle / Article Promise title carries.
  */
-function buildListicleAngleInstruction({ number, anglePlan }: { number: string; anglePlan: PinterestAngle[] }): string {
-  const plan = anglePlan.map((angle, index) => `pin ${index + 1} = "${angle}"`).join(', ');
+function buildListicleAngleInstruction({ number, anglePlan, strategy = 'balanced' }: ListiclePromptPlan): string {
   const variation = new Set(anglePlan).size < anglePlan.length
     ? ' Pins that share an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
     : ' Every pin uses a different angle.';
+  const angles = strategy === 'ai-recommends'
+    ? (() => {
+        const slots = anglePlan.flatMap((angle, index) => (angle === 'listicle' || angle === 'article-promise' ? [index + 1] : []));
+        return `At least ${slots.length} of the ${anglePlan.length} pins use the "listicle" or "article-promise" angle: pins ${slots.join(', ')} must use one of these two angles. For the other pins, choose the strongest grounded angle. Pins that share an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.`;
+      })()
+    : `Use the angles in this exact order, one per pin: ${anglePlan.map((angle, index) => `pin ${index + 1} = "${angle}"`).join(', ')}.${variation}`;
   return (
-    `Use the angles in this exact order, one per pin: ${plan}.${variation} ` +
+    `${angles} ` +
     `The source article confirms an exact count: ${number}. Every "listicle" and every "article-promise" pin must include this exact number, written as the digits "${number}", in its title, and keep the article's exact promise (what those ${number} items are). ` +
     `Never use another count, never the number of pins in this batch, and never add "best", "viral", "most popular", "easy" or any other promise the article does not make. The other pins do not need the number.`
   );

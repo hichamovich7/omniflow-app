@@ -1345,6 +1345,20 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Pinterest numbered Pins — production fixes (TASK-FIX-084, 2026-10-31)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-listicle.spec.ts tests/renderer/pinterest-generation-plan.spec.ts tests/renderer/pinterest-regenerate-text.spec.ts tests/renderer/pinterest-generate-errors.spec.ts tests/renderer/pinterest-ai-integrated.spec.ts tests/renderer/pinterest-strategy.spec.ts
+```
+
+Offline (no AI, network, WordPress write or storage). `pinterest-listicle.spec.ts` adds 25 cases: evidence — article without a number, 15 Pins requested, a title with "15" → 422 `strategy_safeguard_failed` `UNSUPPORTED_NUMBER` on Pin 3 `title`, no Pin saved (the prompt still numbers the plan "Pin 15 →", no longer evidence); a number the article gives still passes; titles with 15 on an 18-idea article refused. AI recommends — "15 ideas" with 3 / 7 / 15 Pins → ≥ 2 / 4 / 8 titles with 15, prompt "At least K of the N pins…", every Listicle / Article Promise title carries 15, one insert, no duplicate; numbered Pins anywhere and other angles free → saved; only 1 numbered of 3 (the production run) → 422 `LISTICLE_ANGLE_PLAN`, nothing saved; Manual → no numbered plan; Balanced → exact plan; no number → unchanged. integratedText — `subtitle` / `cta` outside it ignored; a disabled subtitle and cta written as null, "", "None" or a long text → dropped, saved with null; enabled `cta` null (`invalid_type`), "" (`too_small`), 61 characters (`too_big`) and `subtitle` 121 characters (`too_big`) → 422 `invalid_pin_plan`, `retryable`, one issue per Pin with the exact path (`pins.N.integratedText.cta`) and 1-based `pinIndex`, nothing saved, generation `failed`; an unknown key stays `unrecognized_keys`. Logs — the rejected-plan line has exactly `kind`, `step`, `model`, `role`, `responseLength`, `issues`, `issueCount` and none of the generated texts; invalid JSON does not log the `JSON.parse` message. Production bundle — the compiled chunks carry the numbered plan, `LIST_NUMBER_MISSING` and the AI-recommends instruction (skipped without `npx next build`). The two former `test.fail` cases are now normal passing tests. Updated: `pinterest-generation-plan.spec.ts` (diagnostics keys only kind / length / detail, no response text) and `pinterest-regenerate-text.spec.ts` (no model text in the diagnostics).
+
+Validation (2026-10-31): pinterest-listicle 68/68 (bundle case included, after `npx next build`); full renderer **1485/1486** (the one failure is the pre-existing CRLF source-text case `social-content-studio.spec.ts:829`, unchanged); TypeScript OK, ESLint (touched files) OK, `next build` OK, `git diff --check` OK. Updated for the structured 422: `pinterest-generation-plan.spec.ts` (body now `retryable: true`, issues name `pins…` paths) and `social-content-studio.spec.ts:476` (parser called with options). No migration, no `.env` change, no real AI call, no WordPress call, no commit.
+
+Real check (founder): the same "15 ideas" article, AI Integrated with the default "AI recommends", 15 Pins → ≥ 8 titles with 15 and no other count; one 3-Pin run with subtitle / CTA turned off → no `invalid_schema`. Vercel logs: no title or description text in `Pin plan rejected` lines.
+
+---
+
 # Pinterest number-aware titles + numbered Pins on article photos (TASK-083, 2026-10-31)
 
 ```txt

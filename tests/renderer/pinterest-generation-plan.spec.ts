@@ -185,7 +185,7 @@ test('rejects syntactically valid JSON that breaks the existing Zod contract', (
   );
 });
 
-test('errors are controlled: generic message, bounded diagnostics, no full response, no secrets', () => {
+test('errors are controlled: generic message, diagnostics without any part of the response, no secrets', () => {
   const truncated = truncatedInsideString();
   const error = planError(truncated);
 
@@ -196,14 +196,14 @@ test('errors are controlled: generic message, bounded diagnostics, no full respo
 
   const diagnostics = error.diagnostics();
   expect(diagnostics.responseLength).toBe(truncated.length);
-  expect(diagnostics.preview.length).toBeLessThanOrEqual(160);
-  expect(diagnostics.tail.length).toBeLessThanOrEqual(120);
-  expect(JSON.stringify(diagnostics).length).toBeLessThan(900);
-  expect(JSON.stringify(diagnostics)).not.toContain(truncated.slice(400, 520));
+  // TASK-FIX-084: no preview / tail — kind, length, fixed detail, paths and codes only.
+  expect(Object.keys(diagnostics).sort()).toEqual(['detail', 'kind', 'responseLength']);
+  expect(JSON.stringify(diagnostics)).not.toContain(truncated.slice(0, 20));
+  expect(JSON.stringify(diagnostics)).not.toContain(truncated.slice(-20));
 
   const leaky = planError('Note: Bearer abcdefghijklmnop1234 and sk-abcdefghijklmnopqrstuvwx are not JSON');
   const serialized = JSON.stringify(leaky.diagnostics());
-  expect(serialized).toContain('[redacted]');
+  expect(serialized).not.toContain('Note:');
   expect(serialized).not.toContain('abcdefghijklmnop1234');
   expect(serialized).not.toContain('sk-abcdefghijklmnopqrstuvwx');
 
@@ -476,7 +476,8 @@ test('AI Integrated: a truncated plan returns 422, writes no pin and never reach
     expect(response.status).toBe(422);
     expect(body).toEqual({
       data: null,
-      error: { message: PIN_PLAN_FAILURE_MESSAGE, code: 'invalid_pin_plan' },
+      // TASK-FIX-084: retryable; no `issues` for a truncation (no schema path at fault).
+      error: { message: PIN_PLAN_FAILURE_MESSAGE, code: 'invalid_pin_plan', retryable: true },
     });
     // The raw response never reaches the client.
     expect(JSON.stringify(body)).not.toContain(truncated.slice(30, 80));
@@ -509,10 +510,10 @@ test('Legacy Composite: the same invalid plans are rejected the same way, before
     await withRoute(modelResponse, async (harness) => {
       const response = await harness.post(legacyRequest);
       expect(response.status).toBe(422);
-      expect((await response.json()).error).toEqual({
-        message: PIN_PLAN_FAILURE_MESSAGE,
-        code: 'invalid_pin_plan',
-      });
+      const error = (await response.json()).error;
+      expect(error).toMatchObject({ message: PIN_PLAN_FAILURE_MESSAGE, code: 'invalid_pin_plan', retryable: true });
+      // Schema failures name the path at fault (TASK-FIX-084); other kinds have no issues.
+      for (const issue of error.issues ?? []) expect(issue.field).toMatch(/^pins/);
       assertNothingDownstreamHappened(harness);
     });
   }

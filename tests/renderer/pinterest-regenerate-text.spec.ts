@@ -579,7 +579,8 @@ test.describe('Regenerate text — TASK-082 text-only contract', () => {
   test('root cause: the real answer fails the generation schema, passes the text-only one', () => {
     const diagnostics = rejectionOf(() => parsePinterestGenerationPlan(REAL_TEXT_ONLY_ANSWER)).diagnostics();
     expect(diagnostics.kind).toBe('invalid_schema');
-    expect(diagnostics.preview.startsWith('{"pins":[{"title":"The Color Choice Behind This 2026 Crochet Sweater Idea"')).toBe(true);
+    // TASK-FIX-084: the model's text never reaches the diagnostics.
+    expect(JSON.stringify(diagnostics)).not.toContain('The Color Choice');
     expect(diagnostics.issues?.map((issue) => issue.path)).toEqual(
       expect.arrayContaining(['pins.0.angle', 'pins.0.keywords', 'pins.0.board', 'pins.0.image_prompt', 'pins.0.visualFormat'])
     );

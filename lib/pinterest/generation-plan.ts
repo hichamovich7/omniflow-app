@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { openRouterPinsResponseSchema } from '@/lib/validations/pinterest';
+import type { ApiErrorIssue } from '@/types/api';
 
 export type PinterestGenerationPlan = z.infer<typeof openRouterPinsResponseSchema>;
 
@@ -20,69 +21,100 @@ export type PinterestPlanFailureKind =
 export const PIN_PLAN_FAILURE_MESSAGE =
   'The AI could not create a complete Pin plan. No images were generated. Please try again.';
 
-const PREVIEW_HEAD_LENGTH = 160;
-const PREVIEW_TAIL_LENGTH = 120;
 const MAX_LOGGED_ISSUES = 10;
 
+/**
+ * What a rejected response may tell the server logs (TASK-FIX-084): its
+ * failure kind, length, a fixed-vocabulary detail and the schema paths and
+ * Zod codes at fault. Never any part of the response itself.
+ */
 export interface PinterestPlanDiagnostics {
   kind: PinterestPlanFailureKind;
   responseLength: number;
-  /** Start of the response, whitespace-collapsed and truncated. */
-  preview: string;
-  /** End of the response (only when it is longer than the preview) — shows where a truncation happened. */
-  tail: string;
+  /** Fixed vocabulary only ("unterminated_string", "mismatched brackets"…). */
   detail?: string;
   issues?: Array<{ path: string; code: string }>;
-}
-
-function redact(value: string): string {
-  return value
-    .replace(/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{12,}/g, '[redacted]')
-    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]{12,}/gi, 'Bearer [redacted]');
-}
-
-function collapse(value: string): string {
-  return redact(value.replace(/\s+/g, ' ').trim());
+  issueCount?: number;
 }
 
 /**
  * Controlled failure for a model response that is not a complete, valid Pin
- * plan. The message is generic on purpose: the raw response is never part of
- * the error, only of the size-limited `diagnostics()` meant for server logs.
+ * plan. The message is generic on purpose, and no part of the raw response
+ * is kept — not even for the server logs.
  */
 export class PinterestPlanError extends Error {
   readonly kind: PinterestPlanFailureKind;
   readonly responseLength: number;
-  private readonly head: string;
-  private readonly end: string;
   private readonly detail?: string;
   private readonly issues?: Array<{ path: string; code: string }>;
+  private readonly issueCount?: number;
 
   constructor(
     kind: PinterestPlanFailureKind,
     raw: string,
-    options: { detail?: string; issues?: Array<{ path: string; code: string }> } = {}
+    options: { detail?: string; issues?: Array<{ path: string; code: string }>; issueCount?: number } = {}
   ) {
     super(`Pinterest generation plan rejected: ${kind}`);
     this.name = 'PinterestPlanError';
     this.kind = kind;
     this.responseLength = raw.length;
-    this.head = collapse(raw.slice(0, PREVIEW_HEAD_LENGTH));
-    this.end = raw.length > PREVIEW_HEAD_LENGTH ? collapse(raw.slice(-PREVIEW_TAIL_LENGTH)) : '';
     this.detail = options.detail;
     this.issues = options.issues;
+    this.issueCount = options.issueCount;
   }
 
   diagnostics(): PinterestPlanDiagnostics {
     return {
       kind: this.kind,
       responseLength: this.responseLength,
-      preview: this.head,
-      tail: this.end,
       ...(this.detail ? { detail: this.detail } : {}),
       ...(this.issues ? { issues: this.issues } : {}),
+      ...(this.issueCount !== undefined ? { issueCount: this.issueCount } : {}),
     };
   }
+}
+
+/**
+ * The 422 issues of a rejected plan (TASK-FIX-084): one per schema path at
+ * fault ("pins.0.integratedText.cta"), with the Zod code — never the value
+ * the model wrote.
+ */
+export function planErrorIssues(error: PinterestPlanError): ApiErrorIssue[] {
+  return (error.diagnostics().issues ?? []).map((issue) => {
+    const pin = /^pins\.(\d+)\./.exec(issue.path);
+    return {
+      code: issue.code,
+      ...(pin ? { pinIndex: Number(pin[1]) + 1 } : {}),
+      field: issue.path,
+      message: `The AI returned an invalid value for ${issue.path || 'the Pin plan'} (${issue.code}).`,
+      action: 'Try again.',
+    };
+  });
+}
+
+export type IntegratedTextElement = 'headline' | 'subtitle' | 'cta';
+
+/**
+ * AI Integrated (TASK-FIX-084): an on-image element the user turned off is
+ * never used (resolveAiIntegratedText drops it), so whatever the model
+ * wrote for it — null, "", "None", a long text — is removed before the
+ * schema check instead of failing the whole plan. Enabled elements and
+ * unknown keys keep the strict validation.
+ */
+function withoutDisabledIntegratedText(value: unknown, disabled: readonly IntegratedTextElement[]): unknown {
+  if (disabled.length === 0 || !value || typeof value !== 'object' || !Array.isArray((value as { pins?: unknown }).pins)) return value;
+  const plan = value as { pins: unknown[] };
+  return {
+    ...plan,
+    pins: plan.pins.map((pin) => {
+      if (!pin || typeof pin !== 'object') return pin;
+      const text = (pin as { integratedText?: unknown }).integratedText;
+      if (!text || typeof text !== 'object' || Array.isArray(text)) return pin;
+      const kept = { ...(text as Record<string, unknown>) };
+      for (const element of disabled) delete kept[element];
+      return { ...pin, integratedText: kept };
+    }),
+  };
 }
 
 type Located =
@@ -132,10 +164,9 @@ function locateFirstJsonValue(text: string): Located {
 function parseJsonValue(text: string, raw: string): unknown {
   try {
     return JSON.parse(text);
-  } catch (error) {
-    throw new PinterestPlanError('invalid_json', raw, {
-      detail: error instanceof Error ? error.message : 'JSON.parse failed',
-    });
+  } catch {
+    // JSON.parse messages quote the response ("Unexpected token … is not valid JSON"): fixed detail only.
+    throw new PinterestPlanError('invalid_json', raw, { detail: 'JSON.parse failed' });
   }
 }
 
@@ -149,8 +180,13 @@ function parseJsonValue(text: string, raw: string): unknown {
  * artificially or completed, and no pin is ever invented. The result is
  * validated against the existing Zod contract before it is returned.
  */
-export function parsePinterestGenerationPlan(raw: string): PinterestGenerationPlan {
-  return parsePinterestPlanWith(raw, openRouterPinsResponseSchema);
+export function parsePinterestGenerationPlan(
+  raw: string,
+  options: { disabledIntegratedText?: readonly IntegratedTextElement[] } = {}
+): PinterestGenerationPlan {
+  return parsePinterestPlanWith(raw, openRouterPinsResponseSchema, (value) =>
+    withoutDisabledIntegratedText(value, options.disabledIntegratedText ?? [])
+  );
 }
 
 /**
@@ -158,7 +194,7 @@ export function parsePinterestGenerationPlan(raw: string): PinterestGenerationPl
  * validated against another contract (e.g. the text-only "Regenerate text"
  * answer, TASK-082).
  */
-export function parsePinterestPlanWith<T extends z.ZodType>(raw: string, schema: T): z.output<T> {
+export function parsePinterestPlanWith<T extends z.ZodType>(raw: string, schema: T, prepare?: (value: unknown) => unknown): z.output<T> {
   const text = raw.replace(/^﻿/, '').trim();
   if (!text) throw new PinterestPlanError('empty', raw);
 
@@ -188,13 +224,14 @@ export function parsePinterestPlanWith<T extends z.ZodType>(raw: string, schema:
     value = parseJsonValue(text.slice(located.start, located.end), raw);
   }
 
-  const validated = schema.safeParse(value);
+  const validated = schema.safeParse(prepare ? prepare(value) : value);
   if (!validated.success) {
     throw new PinterestPlanError('invalid_schema', raw, {
       issues: validated.error.issues.slice(0, MAX_LOGGED_ISSUES).map((issue) => ({
         path: issue.path.join('.'),
         code: issue.code,
       })),
+      issueCount: validated.error.issues.length,
     });
   }
 

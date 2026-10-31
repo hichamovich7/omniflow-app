@@ -227,7 +227,8 @@ export async function regeneratePinText(
           details: [angle, planned.angle],
         }]
       : []),
-    ...validatePinterestStrategyBatch([candidate], 1, `${keyword}\n${regenerationContext}`),
+    // Keyword + article only: never the prompt, the sibling titles or the replaced title (TASK-FIX-084).
+    ...validatePinterestStrategyBatch([candidate], 1, [keyword, ...evidenceLines].join('\n')),
     ...(grounding && planned.sourceSectionId !== undefined && planned.sourceSectionId !== stored?.sectionId
       ? [{
           code: 'unsupported-claim' as const,
