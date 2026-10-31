@@ -551,6 +551,8 @@ export async function POST(request: Request) {
     // TASK-FIX-085: titles too close to each other (and nothing else) get one
     // targeted repair — only those titles change — then the whole batch is
     // validated again. Every flow and strategy (Manual keeps its angle).
+    // TASK-FIX-086: each Pin's candidates are tried against this same
+    // validator; the first that passes is kept (one request, no loop).
     const titleTargets = repairTargets
       ? null
       : titleRepairTargets(strategyIssues, resolvedPins, {
@@ -567,7 +569,7 @@ export async function POST(request: Request) {
         listicleNumber: listicleNumber?.value ?? null,
         titles: resolvedPins.map((pin) => pin.title),
         evidence: sourceEvidence,
-      }, { generateText });
+      }, { generateText, validate: validateBatch });
       const retitledIssues = retitled ? validateBatch(retitled) : null;
       // Counts and fixed reasons only: no Pin text.
       console.log(

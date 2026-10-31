@@ -1345,6 +1345,20 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Pinterest near-duplicate title repair — candidates (TASK-FIX-086, 2026-10-31)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-listicle.spec.ts -g "TASK-FIX-08[56]"
+```
+
+Offline (fake AI answers in sequence, no image, network or WordPress call). 24 new cases. Targets — one remaining duplicate (Pin 11 → Pin 1) gives one target naming Pin 1's title; 12 near-identical listicle titles give 11 targets, numbered ones keep 12. Prompt — EN / DE / FR / ES label, current and related title, accepted titles, angle, focus, real count, the word-overlap measure ("in any order", "fewer than half"), first 4 words, source title, 3 candidates, the candidates JSON shape; the generation prompt asks numbered titles not to copy the article title. Selection — Pin 1's words reordered refused by the validator; the first passing candidate kept (keeps 12, other Pins unchanged); contract-breaking candidates skipped, none left → refused with the reason; 4 / 0 candidates or candidates plus a title → invalid_schema; two repaired Pins: a candidate equal to the other's new title skipped. Route — Balanced and AI recommends, 12 Pins with one duplicate: 2 text calls, 201, one insert, 12 distinct titles, ≥ 6 with 12, description / keywords / image prompt / no image / section / link / board / board section kept, no `publish_date`, log `{pins:1, parsed:true, candidates:2, fallbacks:1, accepted:true, remainingIssues:0}`; no candidate passes (reordered words, 3 still too close, no 12, viral / best) → 422 `DUPLICATE_TITLE` Pin 11 → Pin 1, one repair, nothing saved, generation failed, no model text in the logs; Keyword flow EN / DE / FR / ES with candidates → 201. TASK-FIX-085 cases updated: the prompt reads "Write new titles in …"; a candidate inventing a number is now skipped (original `DUPLICATE_TITLE` 422).
+
+Results (2026-10-31): TASK-FIX-085/086 cases 56/56; Pinterest suites (listicle, strategy, strategy-errors, generate-errors, generation-plan, regenerate-text) 230/230; full renderer suite 1541/1542 — the only failure is the pre-existing CRLF case `social-content-studio.spec.ts:829` (unrelated, unchanged); TypeScript, ESLint and `git diff --check` clean.
+
+Real check (founder): rerun the 12-Pin generation of "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts" (AI Integrated, AI recommends); expect the batch saved with 12 distinct titles, ≥ 6 with 12 (log `Title repair … accepted: true` if a repair ran), or a 422 naming the Pins still concerned.
+
+---
+
 # Pinterest near-duplicate title repair (TASK-FIX-085, 2026-10-31)
 
 ```txt

@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.1.3 — Fix: the last near-duplicate title after the repair — TASK-FIX-086 (2026-10-31)
+
+* Production (v3.1.2, 12 Pins, "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts"): the title repair ran but the new title of Pin 10 kept most words of Pin 1's title — the check compares words in any order — so the batch failed on one title (422, nothing saved).
+* The repair now names, for each Pin, the title it must not imitate, states how closeness is measured, and asks for up to 3 candidates; OmniFlow keeps the first candidate that passes the same checks as the first generation. Still one extra request; the duplicate threshold is unchanged; numbered titles keep the article's count.
+* No candidate passes → the same 422 with the Pins concerned; nothing saved. Logs carry counts only.
+* The first generation of a numbered article asks numbered titles not to all copy the article title.
+
 ## v3.1.2 — Fix: Pinterest near-duplicate titles repaired once before failing — TASK-FIX-085 (2026-10-31)
 
 * Production: a 15-Pin batch was rejected by `DUPLICATE_TITLE` (Pins 1, 3, 5, 7, 9, 11 — the same "15 … Ideas for …" pattern). The safeguard stays; when it is the only failure, OmniFlow now asks the model once for new titles for the Pins concerned only, then validates the whole batch again.

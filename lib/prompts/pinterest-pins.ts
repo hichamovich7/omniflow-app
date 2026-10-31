@@ -348,7 +348,8 @@ function buildListicleAngleInstruction({ number, anglePlan, strategy = 'balanced
   return (
     `${angles} ` +
     `The source article confirms an exact count: ${number}. Every "listicle" and every "article-promise" pin must include this exact number, written as the digits "${number}", in its title, and keep the article's exact promise (what those ${number} items are). ` +
-    `Never use another count, never the number of pins in this batch, and never add "best", "viral", "most popular", "easy" or any other promise the article does not make. The other pins do not need the number.`
+    `Never use another count, never the number of pins in this batch, and never add "best", "viral", "most popular", "easy" or any other promise the article does not make. The other pins do not need the number. ` +
+    `Numbered titles must not all copy the article title: build each one around its own pin's subject, and make it share fewer than half of its words with any other title in the batch (reordering the same words is still a near-duplicate).`
   );
 }
 
