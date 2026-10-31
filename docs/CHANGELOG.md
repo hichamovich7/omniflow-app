@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.2.0 — Pinterest numbered Pins: text treatment, with an experimental AI-generated design — TASK-088 (2026-10-31)
+
+* New "Article image text treatment" in the generator for numbered Pins on the article's photo: **OmniFlow overlay** (default, unchanged), **AI-generated design** (experimental — the article photo is sent as a reference to the configured text image model, which designs the Pin with its title and number; one image generation per Pin) and **Photo only** (the photo without text). Works with every visual format, Auto variety included; Classic, Hero and Materials & tools Pins are unchanged.
+* AI design: the model's capability to take a reference image in 2:3 is checked before the paid call (no silent text-only fallback); no OmniFlow text is added afterwards; the text in the image is marked unverified. Pinterest title, description, keywords, links, UTM, boards and dates are never changed.
+* A failed AI design saves nothing, keeps the previous image and names the Pin in the message. Contract `listicle_article_image` v2 gains optional `textTreatment` / `aiRender` in `pins.image_analysis`; no migration.
+
 ## v3.1.4 — Pinterest numbered Pins: short visual title and safe article-image crop — TASK-087 (2026-10-31)
 
 * Production check (v3.1.3, "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts"): 4 of 7 numbered images showed the same shortened H1, the panel took up to 45 % of the Pin, and two 800×600 article photos lost their subject (a landscape photo cropped to 2:3 keeps half its width).

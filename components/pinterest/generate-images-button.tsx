@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ImageIcon, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { describeImageFailures } from '@/lib/social/pin-display';
 import type { ImageStatus } from '@/types/database';
 
 interface GenerateImagesButtonProps {
@@ -63,8 +64,11 @@ export function GenerateImagesButton({
     }
 
     const { imagesGenerated, imagesFailed } = json.data;
+    const namedFailure = json.data.failedPins?.length ? describeImageFailures(json.data) : null;
 
-    if (imagesFailed > 0) {
+    if (namedFailure) {
+      toast.warning(`Generated ${imagesGenerated} images. ${namedFailure}`);
+    } else if (imagesFailed > 0) {
       toast.warning(`Generated ${imagesGenerated} images, ${imagesFailed} failed`);
     } else {
       toast.success(`${imagesGenerated} images generated`);

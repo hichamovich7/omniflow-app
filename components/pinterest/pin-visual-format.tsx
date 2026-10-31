@@ -17,6 +17,7 @@ export function PinVisualFormatBadge({ imageAnalysis }: { imageAnalysis: string 
       className="w-fit"
       title={[
         `Visual format: ${format.label}`,
+        format.textTreatment ? `Text: ${format.textTreatment}` : null,
         format.layout && format.panelCount ? `Layout: ${format.layout} · ${format.panelCount} step panels` : null,
         sources,
         ...format.warnings,
@@ -41,10 +42,20 @@ export function PinVisualFormatDetails({ imageAnalysis }: { imageAnalysis: strin
         </span>
         {format.composed && (
           <Badge variant={format.status === 'rendered' ? 'success' : 'outline'} className="w-fit text-xs">
-            {format.status === 'rendered' ? 'Composed by OmniFlow' : 'Composition pending'}
+            {format.status !== 'rendered'
+              ? 'Composition pending'
+              : format.textTreatment === 'AI-generated design'
+                ? 'Designed by AI'
+                : 'Composed by OmniFlow'}
           </Badge>
         )}
       </div>
+      {format.textTreatment && (
+        <span data-testid="pin-visual-format-text-treatment">
+          Text: <span className="font-medium text-foreground">{format.textTreatment}</span>
+          {format.textTreatment === 'AI-generated design' && ' · experimental · 1 image generation'}
+        </span>
+      )}
       {format.layout && format.panelCount && (
         <span data-testid="pin-visual-format-layout">
           Layout: {format.layout} · {format.panelCount} step panels · {format.imageCalls} image generations

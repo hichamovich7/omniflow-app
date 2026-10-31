@@ -29,6 +29,7 @@ import {
   isListicleV2,
   listicleDisplayKey,
   listicleDisplayTitleCandidates,
+  listicleTextTreatment,
   readComposerMetadata,
   verifyComposerText,
   type ComposerMetadata,
@@ -39,7 +40,9 @@ import { COMPOSER_MIN_CONTRAST, COMPOSER_PALETTE, LISTICLE_PANEL_MAX_SHARE, cont
 import { composePinImage, composerImageCallCount } from '@/lib/pinterest/composer/pipeline';
 import { ArticleImageError, downloadArticleImage, loadArticlePhoto } from '@/lib/pinterest/composer/article-image';
 import { buildPinterestPinsPrompt } from '@/lib/prompts';
-import { readPinVisualFormat } from '@/lib/social/pin-display';
+import { AI_TEXT_UNVERIFIED_WARNING, describeImageFailures, readPinVisualFormat } from '@/lib/social/pin-display';
+import { buildListicleAiDesignPrompt, prepareAiDesignReference } from '@/lib/pinterest/composer/ai-design';
+import { generatePinsSchema } from '@/lib/validations/pinterest';
 import { PINTEREST_ANGLES, type PinterestAngle } from '@/types/pinterest';
 import type { Pin } from '@/types/database';
 
@@ -1436,17 +1439,41 @@ function numberedPin(metadata: ListicleMetadata, overrides: Partial<Pin> = {}): 
   };
 }
 
+interface ImageCall {
+  prompt: string;
+  size: string;
+  visualFormat?: string;
+  reference?: { buffer: Buffer; mimeType: string };
+}
+
 interface ImageRun {
   status: number;
-  body: { data: { imageStatus: string; imagesGenerated: number; imagesFailed: number } | null };
+  body: {
+    data: {
+      imageStatus: string;
+      imagesGenerated: number;
+      imagesFailed: number;
+      failedPins?: Array<{ pinId: string; message: string }>;
+    } | null;
+  };
   ops: DbOp[];
   uploads: Array<{ key: string; body: Buffer; contentType: string }>;
   imageCalls: number;
+  imageRequests: ImageCall[];
   fetches: Array<{ url: string; method: string }>;
+  logs: string[];
 }
 
-async function runImages(pin: Pin, options: { serve: (url: string) => Promise<Response>; existingVersion?: number }): Promise<ImageRun> {
-  const run: ImageRun = { status: 0, body: { data: null }, ops: [], uploads: [], imageCalls: 0, fetches: [] };
+async function runImages(
+  pin: Pin,
+  options: {
+    serve: (url: string) => Promise<Response>;
+    existingVersion?: number;
+    /** TASK-088: a fake image model; without it any image call fails the test. */
+    generateImage?: (params: ImageCall) => Promise<Buffer>;
+  }
+): Promise<ImageRun> {
+  const run: ImageRun = { status: 0, body: { data: null }, ops: [], uploads: [], imageCalls: 0, imageRequests: [], fetches: [], logs: [] };
   const result = (rec: DbOp & { filters: string[] }, single: boolean) => {
     if (rec.table === 'generations' && rec.op === 'select') {
       return { data: { id: 'generation-1', image_status: 'completed', status: 'completed', user_id: 'user-1', project_id: PROJECT_ID }, error: null };
@@ -1519,11 +1546,15 @@ async function runImages(pin: Pin, options: { serve: (url: string) => Promise<Re
     '@/lib/rate-limit': { checkRateLimit: async () => ({ allowed: true }), rateLimitErrorResponse: () => { throw new Error('rate limited'); } },
     '@/lib/storage': { createMediaStorage: () => storage },
     '@/lib/ai/engine': {
-      generateImage: async () => {
+      generateImage: async (params: ImageCall) => {
         run.imageCalls += 1;
+        run.imageRequests.push(params);
+        if (options.generateImage) return options.generateImage(params);
         throw new Error('The image model must not be called for a numbered Pin');
       },
-      resolveImageModel: () => ({ provider: 'openrouter', model: 'test/photo-model' }),
+      // The text model (AI_IMAGE_MODEL_TEXT) for an AI-generated design, the photo model otherwise.
+      resolveImageModel: (format?: string) =>
+        ({ provider: 'openrouter', model: format === 'ai-integrated' ? 'test/text-image-model' : 'test/photo-model' }),
       generateText: async () => {
         throw new Error('Text generation must not be called');
       },
@@ -1547,7 +1578,8 @@ async function runImages(pin: Pin, options: { serve: (url: string) => Promise<Re
       run.status = response.status;
       run.body = (await response.json()) as ImageRun['body'];
     },
-    fetchFn
+    fetchFn,
+    run.logs
   );
   return run;
 }
@@ -1760,7 +1792,8 @@ test.describe('TASK-087 — rendering: dominant photo, compact panel, safe crop'
     const composed = await renderComposedPin(photo, metadata);
     expect(await sharp(composed.buffer).metadata()).toMatchObject({ width: 1000, height: 1500 });
     expect(composed.listicle).toMatchObject({ photoMode: 'fit', backdrop: 'blur', photo: { left: 0, width: 1000, height: 750 } });
-    const { photo: box, panel } = composed.listicle!;
+    const { photo: box } = composed.listicle!;
+    const panel = composed.listicle!.panel!;
     expect(panel.height / 1500).toBeLessThanOrEqual(LISTICLE_PANEL_MAX_SHARE);
     expect(box.top + box.height).toBeLessThanOrEqual(panel.top);
     expect(composed.heroPlacement).toBe('bottom');
@@ -1779,7 +1812,8 @@ test.describe('TASK-087 — rendering: dominant photo, compact panel, safe crop'
     expect(new Set(renders.map((render) => render.buffer.toString('base64'))).size).toBe(4);
     for (const render of renders) {
       expect(await redPixels(render.buffer)).toBeGreaterThan(10_000);
-      const { photo: box, panel } = render.listicle!;
+      const { photo: box } = render.listicle!;
+      const panel = render.listicle!.panel!;
       const overlaps = box.top < panel.top + panel.height && panel.top < box.top + box.height;
       expect(overlaps).toBe(false);
     }
@@ -1800,7 +1834,7 @@ test.describe('TASK-087 — rendering: dominant photo, compact panel, safe crop'
     const longest = 'Garden Caterpillar with Curved Antennae Xy';
     expect(longest.length).toBe(LISTICLE_DISPLAY_TITLE_MAX);
     const composed = await renderComposedPin(await landscapeWithSubject(), { ...metadata, text: { ...metadata.text, displayTitle: longest } });
-    expect(composed.listicle!.panel.height / 1500).toBeLessThanOrEqual(LISTICLE_PANEL_MAX_SHARE);
+    expect(composed.listicle!.panel!.height / 1500).toBeLessThanOrEqual(LISTICLE_PANEL_MAX_SHARE);
     const tooLong = { ...metadata, text: { ...metadata.text, displayTitle: 'Kuscheldeckenhäkelmusterübersichtsseite '.repeat(4).trim() } };
     await expect(renderComposedPin(await landscapeWithSubject(), tooLong)).rejects.toThrow(/does not fit/);
   });
@@ -1892,5 +1926,270 @@ test.describe('TASK-087 — routes', () => {
     expect(run.imageCalls).toBe(0);
     const stored = readComposerMetadata((opsOf(run, 'pins', 'update')[0].payload as { image_analysis: string }).image_analysis);
     expect(stored).toMatchObject({ templateVersion: 'v1', text: v1.text });
+  });
+});
+
+// ── TASK-088: text treatment of numbered Pins (OmniFlow overlay / AI-generated design / Photo only) ──
+// Offline: the image model is a fake that returns a plain 1024×1536 image; no
+// real AI call, no WordPress write, no real storage.
+
+/** What a fake image model returns: one flat colour, 2:3 — any panel or text drawn afterwards would show. */
+async function flatAiImage(width = 1024, height = 1536): Promise<Buffer> {
+  return sharp({ create: { width, height, channels: 3, background: '#3a6ea5' } }).png().toBuffer();
+}
+
+/** Standard deviation of the channels: ~0 for a flat image, high once text or a panel is drawn. */
+async function spread(image: Buffer): Promise<number> {
+  const stats = await sharp(image).stats();
+  return Math.max(...stats.channels.slice(0, 3).map((channel) => channel.stdev));
+}
+
+function aiDesignMetadata(options: { hasDestination?: boolean } = {}): ListicleV2Metadata {
+  return { ...listicleMetadata(FIFTEEN, NUMBERED_TITLES[0], { hasDestination: options.hasDestination ?? true }), textTreatment: 'ai-design' };
+}
+
+test.describe('TASK-088 — the default stays the OmniFlow overlay', () => {
+  test('request schema: no treatment → omniflow-overlay; an unknown one is refused', () => {
+    const base = { projectId: PROJECT_ID, keyword: 'crochet blankets', language: 'en', pinsRequested: 3, generationMode: 'photo-only', wordpressPost: { siteId: SITE_ID, postId: 3001 } };
+    expect(generatePinsSchema.parse(base).listicleTextTreatment).toBe('omniflow-overlay');
+    expect(generatePinsSchema.parse({ ...base, listicleTextTreatment: 'ai-design' }).listicleTextTreatment).toBe('ai-design');
+    expect(generatePinsSchema.safeParse({ ...base, listicleTextTreatment: 'neon' }).success).toBe(false);
+  });
+
+  test('contract: the overlay is not stored (Pins made before read the same); AI design / Photo only are', () => {
+    const overlay = listicleMetadata();
+    expect(overlay).not.toHaveProperty('textTreatment');
+    expect(listicleTextTreatment(overlay)).toBe('omniflow-overlay');
+    const sectionId = FIFTEEN.sections.find((section) => section.kind === 'subject')!.id;
+    const [source] = planListicleImageSources(FIFTEEN, [sectionId], HOSTS);
+    for (const treatment of ['ai-design', 'photo-only'] as const) {
+      const metadata = buildListicleComposerMetadata({ pinTitle: NUMBERED_TITLES[0], number: '15', source: source!, context: FIFTEEN, sectionId, language: 'en', hasDestination: false, ctaIndex: 0, textTreatment: treatment })!;
+      expect(metadata.textTreatment).toBe(treatment);
+      expect(readComposerMetadata(attachComposerMetadata(null, metadata))).toEqual(metadata);
+    }
+    // A v1 contract is always the overlay.
+    const v1: ComposerMetadata = { ...overlay, templateVersion: 'v1', text: { title: NUMBERED_TITLES[0], number: '15', cta: null } };
+    expect(listicleTextTreatment(v1)).toBe('omniflow-overlay');
+  });
+
+  test('POST /api/pinterest/generate: the chosen treatment is stored on numbered Pins only; texts, link, board unchanged; no image call', async () => {
+    const post = wordpressPost('12 Cozy Crochet Blanket Ideas for Winter', 12);
+    const plan = buildListicleAnglePlan(12);
+    const answer = modelAnswer(post, 12, plan, '12');
+    const original = pinsOf(answer);
+    const byDefault = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets' }, answer);
+    const ai = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets', listicleTextTreatment: 'ai-design' }, answer);
+    for (const run of [byDefault, ai]) {
+      expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+      expect(run.prompts).toHaveLength(1);
+    }
+    const defaultContracts = savedPins(byDefault).map(composerOf).filter((item): item is ComposerMetadata => Boolean(item && isListicleV2(item)));
+    expect(defaultContracts).toHaveLength(6);
+    expect(defaultContracts.every((item) => !('textTreatment' in item))).toBe(true);
+    const rows = savedPins(ai);
+    const aiContracts = rows.map(composerOf).filter((item): item is ListicleV2Metadata => Boolean(item && isListicleV2(item)));
+    expect(aiContracts).toHaveLength(6);
+    expect(aiContracts.every((item) => item.textTreatment === 'ai-design')).toBe(true);
+    // Same visual titles with either treatment; other Pins have no composer contract.
+    expect(aiContracts.map((item) => item.text)).toEqual(defaultContracts.map((item) => (item as ListicleV2Metadata).text));
+    rows.forEach((row, i) => {
+      expect(row.title).toBe(original[i].title);
+      expect(row.description).toBe(original[i].description);
+      expect(row.keywords).toBe(original[i].keywords);
+      expect(row.board).toBe('Crochet Blankets');
+      expect(row).not.toHaveProperty('publish_date');
+    });
+  });
+});
+
+test.describe('TASK-088 — the AI-generated design prompt', () => {
+  test('built from the validated contract: subject, visual title, number, language, niche; CTA only with a Destination URL', () => {
+    const metadata = aiDesignMetadata();
+    const prompt = buildListicleAiDesignPrompt({ metadata, niche: 'Crochet' });
+    const subject = metadata.sourceHeadings[0].replace(/^\s*\d+\s*[.)]\s*/, '');
+    for (const expected of [subject, metadata.text.displayTitle, '"15"', 'Content language: English', 'Crochet', '2:3', '1000×1500', 'REFERENCE PHOTO', 'Do not replace it with another object', 'no list, no steps', metadata.text.cta!]) {
+      expect(prompt).toContain(expected);
+    }
+    // No photo URL, no full Pin title, no data in the prompt.
+    expect(prompt).not.toContain(metadata.source.imageUrl);
+    expect(prompt).not.toContain(NUMBERED_TITLES[0]);
+    const withoutLink = buildListicleAiDesignPrompt({ metadata: aiDesignMetadata({ hasDestination: false }), niche: null });
+    expect(withoutLink).toContain('No call to action, no button.');
+    expect(withoutLink).not.toMatch(/Call to action: "/);
+  });
+
+  test('German article: German content language, the German visual title kept as is', () => {
+    const metadata = { ...aiDesignMetadata(), language: 'de', text: { displayTitle: 'Kuscheldecke im Moosstich', number: '15', cta: null } };
+    const prompt = buildListicleAiDesignPrompt({ metadata, niche: 'Häkeln' });
+    expect(prompt).toContain('Content language: Deutsch');
+    expect(prompt).toContain('"Kuscheldecke im Moosstich"');
+    expect(prompt).toContain('Häkeln');
+  });
+
+  test('the reference is the article photo re-encoded by OmniFlow: JPEG, no metadata, ≤ 1536 px, same framing', async () => {
+    const big = await sharp({ create: { width: 3000, height: 2000, channels: 3, background: '#8a6' } }).withMetadata({ orientation: 1 }).jpeg().toBuffer();
+    const reference = await prepareAiDesignReference(big);
+    expect(reference.mimeType).toBe('image/jpeg');
+    const meta = await sharp(reference.buffer).metadata();
+    expect(meta).toMatchObject({ format: 'jpeg', width: 1536, height: 1024 });
+    expect(meta.exif).toBeUndefined();
+    await expect(prepareAiDesignReference(Buffer.from('not an image'))).rejects.toThrow('The article photo could not be read');
+  });
+});
+
+test.describe('TASK-088 — POST /api/pinterest/generate-images, AI-generated design', () => {
+  test('one image call with the article photo as reference; the model\'s image is stored 1000×1500 with no OmniFlow overlay', async () => {
+    const metadata = aiDesignMetadata();
+    const photo = await articlePhoto();
+    const run = await runImages(numberedPin(metadata), { serve: async () => imageResponse(photo), generateImage: async () => flatAiImage() });
+    expect(run.status).toBe(200);
+    expect(run.body.data).toEqual({ imageStatus: 'completed', imagesGenerated: 1, imagesFailed: 0 });
+    // Exactly one image call, on the text-capable model route, with the reference.
+    expect(run.imageCalls).toBe(1);
+    const [call] = run.imageRequests;
+    expect(call.visualFormat).toBe('ai-integrated');
+    expect(call.reference?.mimeType).toBe('image/jpeg');
+    expect(await sharp(call.reference!.buffer).metadata()).toMatchObject({ width: 1200, height: 800 });
+    expect(call.prompt).toContain(metadata.text.displayTitle);
+    expect(call.prompt).toContain('Content language: English');
+    expect(call.prompt).toContain('Crochet');
+    // The article photo is read once (GET); nothing else is fetched.
+    expect(run.fetches).toEqual([{ url: metadata.source.imageUrl, method: 'GET' }]);
+    // The stored image is the model's image: flat, so no panel, badge or text was added.
+    expect(run.uploads).toHaveLength(1);
+    expect(await sharp(run.uploads[0].body).metadata()).toMatchObject({ format: 'jpeg', width: 1000, height: 1500 });
+    expect(await spread(run.uploads[0].body)).toBeLessThan(3);
+    expect(opsOf(run, 'pin_images', 'insert')[0].payload).toMatchObject({ image_model: 'test/text-image-model', is_active: false, version: 1 });
+    const [pinUpdate] = opsOf(run, 'pins', 'update');
+    expect(Object.keys(pinUpdate.payload as object).sort()).toEqual(['image_analysis', 'media_url']);
+    const stored = readComposerMetadata((pinUpdate.payload as { image_analysis: string }).image_analysis) as ListicleV2Metadata;
+    expect(stored).toMatchObject({
+      templateType: 'listicle_article_image',
+      templateVersion: 'v2',
+      textTreatment: 'ai-design',
+      status: 'rendered',
+      source: metadata.source,
+      text: metadata.text,
+      aiRender: { imageModel: 'test/text-image-model', aiTextUnverified: true },
+    });
+    const written = new Set(run.ops.filter((item) => item.op !== 'select').map((item) => item.table));
+    expect([...written].every((table) => ['generations', 'pin_images', 'pins'].includes(table))).toBe(true);
+    // Logs: no prompt, no image data, no photo URL.
+    const logs = run.logs.join('\n');
+    expect(logs).toContain('ai-design model=test/text-image-model');
+    for (const forbidden of ['REFERENCE PHOTO', 'STRICT TEXT', 'base64', 'data:image', metadata.source.imageUrl, metadata.text.displayTitle]) {
+      expect(logs).not.toContain(forbidden);
+    }
+  });
+
+  test('without a Destination URL the prompt has no CTA', async () => {
+    const metadata = aiDesignMetadata();
+    const run = await runImages(numberedPin(metadata, { link_url: null }), { serve: async () => imageResponse(await articlePhoto()), generateImage: async () => flatAiImage() });
+    expect(run.body.data).toMatchObject({ imagesGenerated: 1 });
+    expect(run.imageRequests[0].prompt).toContain('No call to action, no button.');
+    expect(run.imageRequests[0].prompt).not.toContain(metadata.text.cta!);
+  });
+
+  test('AI failure: one call, no retry, nothing stored, the Pin keeps its image; the error names the Pin', async () => {
+    const metadata = aiDesignMetadata();
+    const run = await runImages(numberedPin(metadata, { media_url: 'https://media.test/old.jpg' }), {
+      serve: async () => imageResponse(await articlePhoto()),
+      existingVersion: 2,
+      generateImage: async () => {
+        throw new Error('OpenRouter image generation failed: moderation_blocked');
+      },
+    });
+    expect(run.status).toBe(200);
+    expect(run.imageCalls).toBe(1);
+    expect(run.uploads).toEqual([]);
+    expect(opsOf(run, 'pin_images', 'insert')).toEqual([]);
+    expect(opsOf(run, 'pin_images', 'update')).toEqual([]);
+    expect(opsOf(run, 'pins', 'update')).toEqual([]);
+    expect(run.body.data).toMatchObject({ imageStatus: 'failed', imagesGenerated: 0, imagesFailed: 1 });
+    const [failed] = run.body.data!.failedPins!;
+    expect(failed.pinId).toBe('pin-1');
+    expect(failed.message).toContain(`"${NUMBERED_TITLES[0]}"`);
+    expect(failed.message).toContain('moderation_blocked');
+    expect(failed.message).toContain('previous image is kept');
+    expect(describeImageFailures(run.body.data)).toBe(failed.message);
+    expect(run.logs.join('\n')).not.toContain('REFERENCE PHOTO');
+  });
+
+  test('a model image that is not 2:3 is refused: nothing stored, never cropped or overlaid', async () => {
+    const run = await runImages(numberedPin(aiDesignMetadata()), { serve: async () => imageResponse(await articlePhoto()), generateImage: async () => flatAiImage(1024, 1024) });
+    expect(run.imageCalls).toBe(1);
+    expect(run.uploads).toEqual([]);
+    expect(opsOf(run, 'pins', 'update')).toEqual([]);
+    expect(run.body.data!.failedPins![0].message).toContain('expected a 2:3 Pinterest image');
+  });
+
+  test('article photo unreadable: the image model is never called', async () => {
+    const run = await runImages(numberedPin(aiDesignMetadata()), { serve: async () => imageResponse(Buffer.alloc(0), 'image/jpeg', 500), generateImage: async () => flatAiImage() });
+    expect(run.imageCalls).toBe(0);
+    expect(run.uploads).toEqual([]);
+    expect(run.body.data!.failedPins![0].pinId).toBe('pin-1');
+  });
+
+  test('the composer never draws over an AI-generated design', async () => {
+    await expect(renderComposedPin(await articlePhoto(), aiDesignMetadata())).rejects.toThrow('An AI-generated design is not composed by OmniFlow');
+  });
+});
+
+test.describe('TASK-088 — Photo only and compatibility', () => {
+  test('Photo only: the article photo with no text — a flat photo stays flat, whole, 1000×1500', async () => {
+    const flat = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#4c8a3c' } }).jpeg({ quality: 95 }).toBuffer();
+    const metadata: ListicleV2Metadata = { ...listicleMetadata(), textTreatment: 'photo-only' };
+    const composed = await renderComposedPin(flat, metadata);
+    expect(composed).toMatchObject({ width: 1000, height: 1500, heroPlacement: null });
+    expect(composed.listicle).toMatchObject({ photoMode: 'fit', panel: null, photo: { left: 0, width: 1000, height: 750 } });
+    // Only the slightly brighter blurred backdrop differs (≈ 4.5); any text or panel would exceed 20.
+    expect(await spread(composed.buffer)).toBeLessThan(8);
+    // The same photo with the overlay does carry a panel.
+    expect(await spread((await renderComposedPin(flat, listicleMetadata())).buffer)).toBeGreaterThan(20);
+  });
+
+  test('Photo only through the route: no image call, one GET, stored as rendered with its treatment', async () => {
+    const metadata: ListicleV2Metadata = { ...listicleMetadata(), textTreatment: 'photo-only' };
+    const run = await runImages(numberedPin(metadata), { serve: async () => imageResponse(await landscapeWithSubject()) });
+    expect(run.body.data).toEqual({ imageStatus: 'completed', imagesGenerated: 1, imagesFailed: 0 });
+    expect(run.imageCalls).toBe(0);
+    expect(await sharp(run.uploads[0].body).metadata()).toMatchObject({ width: 1000, height: 1500 });
+    expect(opsOf(run, 'pin_images', 'insert')[0].payload).toMatchObject({ image_model: ARTICLE_IMAGE_MODEL });
+    const stored = readComposerMetadata((opsOf(run, 'pins', 'update')[0].payload as { image_analysis: string }).image_analysis);
+    expect(stored).toMatchObject({ textTreatment: 'photo-only', status: 'rendered' });
+    expect(stored).not.toHaveProperty('aiRender');
+  });
+
+  test('display: treatment label, image calls, and the unverified-text warning only on an AI design', () => {
+    const rendered = (metadata: ComposerMetadata) => readPinVisualFormat(attachComposerMetadata(null, { ...metadata, status: 'rendered' }));
+    const overlay = rendered(listicleMetadata());
+    expect(overlay).toMatchObject({ textTreatment: 'OmniFlow overlay', imageCalls: 0 });
+    expect(overlay.warnings).not.toContain(AI_TEXT_UNVERIFIED_WARNING);
+    const ai = rendered({ ...aiDesignMetadata(), aiRender: { imageModel: 'test/text-image-model', aiTextUnverified: true } });
+    expect(ai).toMatchObject({ label: 'Numbered list (article photo)', textTreatment: 'AI-generated design', imageCalls: 1 });
+    expect(ai.warnings).toContain(AI_TEXT_UNVERIFIED_WARNING);
+    expect(rendered({ ...listicleMetadata(), textTreatment: 'photo-only' })).toMatchObject({ textTreatment: 'Photo only', imageCalls: 0 });
+    // Not a numbered Pin → no treatment.
+    expect(readPinVisualFormat(null).textTreatment).toBeNull();
+  });
+
+  test('older contracts stay readable: v2 without a treatment, v1; a malformed treatment or AI record is refused', () => {
+    const v2 = listicleMetadata();
+    expect(readComposerMetadata(attachComposerMetadata(null, v2))).toEqual(v2);
+    const v1: ComposerMetadata = { ...v2, templateVersion: 'v1', text: { title: NUMBERED_TITLES[0], number: '15', cta: null } };
+    expect(readComposerMetadata(attachComposerMetadata(null, v1))).toEqual(v1);
+    const raw = (value: unknown) => readComposerMetadata(JSON.stringify({ _pinterestComposer: value }));
+    expect(raw({ ...v2, textTreatment: 'neon' })).toBeNull();
+    expect(raw({ ...v2, aiRender: { imageModel: 'x', aiTextUnverified: false } })).toBeNull();
+    expect(raw({ ...v1, textTreatment: 'ai-design' })).toBeNull();
+  });
+
+  test('describeImageFailures: null when nothing failed, a count without a named Pin', () => {
+    expect(describeImageFailures({ imagesGenerated: 2, imagesFailed: 0 })).toBeNull();
+    expect(describeImageFailures(null)).toBeNull();
+    expect(describeImageFailures({ imagesGenerated: 1, imagesFailed: 2 })).toBe('2 images failed');
+    expect(describeImageFailures({ imagesFailed: 3, failedPins: [{ pinId: 'a', message: 'AI-generated design failed for the Pin "X".' }] })).toBe(
+      'AI-generated design failed for the Pin "X". (2 other images failed)'
+    );
   });
 });

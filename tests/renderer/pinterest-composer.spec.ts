@@ -412,7 +412,7 @@ test.describe('Guardrails and persistence', () => {
     expect(readComposerMetadata(rendered)).toEqual({ ...metadata, status: 'rendered' });
     expect(readComposerMetadata(rendered)!.sourceSections).toEqual(metadata.sourceSections);
     expect(readPinVisualFormat(rendered)).toEqual({
-      label: 'Materials & tools', composed: true, sources: ['Materials'], status: 'rendered', warnings: [], layout: null, panelCount: null, imageCalls: 1,
+      label: 'Materials & tools', composed: true, sources: ['Materials'], status: 'rendered', warnings: [], layout: null, panelCount: null, imageCalls: 1, textTreatment: null,
     });
 
     // An older Step-by-step v2 Pin: layout, panels and image calls are still read and displayed.
@@ -429,7 +429,7 @@ test.describe('Guardrails and persistence', () => {
   test('older and Classic Pins: no contract, displayed as Classic, malformed data ignored', () => {
     for (const json of [null, '', '{}', 'not json', JSON.stringify({ _pinterestStrategy: { angle: 'listicle' } })]) {
       expect(readComposerMetadata(json)).toBeNull();
-      expect(readPinVisualFormat(json)).toEqual({ label: 'Classic', composed: false, sources: [], status: null, warnings: [], layout: null, panelCount: null, imageCalls: null });
+      expect(readPinVisualFormat(json)).toEqual({ label: 'Classic', composed: false, sources: [], status: null, warnings: [], layout: null, panelCount: null, imageCalls: null, textTreatment: null });
     }
     const malformed = JSON.stringify({ _pinterestComposer: { templateType: 'collage', text: {} } });
     expect(readComposerMetadata(malformed)).toBeNull();

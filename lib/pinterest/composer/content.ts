@@ -3,7 +3,12 @@ import type { ArticleSection, WordPressArticleContext } from '@/lib/wordpress/ar
 import { pickCtaMessage } from '@/lib/pinterest/cta-messages';
 import { MATERIALS_HEADING, type PinVisualArchetype, type VisualArchetypeId } from '@/lib/pinterest/visual-archetypes';
 import { COMPOSER_METADATA_KEY } from '@/lib/social/pin-display';
-import type { PinterestVisualStyle } from '@/types/pinterest';
+import {
+  DEFAULT_LISTICLE_TEXT_TREATMENT,
+  LISTICLE_TEXT_TREATMENTS,
+  type ListicleTextTreatment,
+  type PinterestVisualStyle,
+} from '@/types/pinterest';
 
 /**
  * Pinterest Template Composer (TASK-079) — what a composed Pin says.
@@ -57,6 +62,12 @@ export const LISTICLE_TEMPLATE_VERSION = 'v2';
 export const LISTICLE_DISPLAY_TITLE_MAX = 42;
 /** `pin_images.image_model` of a Pin composed on an article photo: no image model was called. */
 export const ARTICLE_IMAGE_MODEL = 'omniflow-composer/article-image';
+/** TASK-088: labels of the text treatments of a numbered Pin (generator, Pin details). */
+export const LISTICLE_TEXT_TREATMENT_LABELS: Record<ListicleTextTreatment, string> = {
+  'omniflow-overlay': 'OmniFlow overlay',
+  'ai-design': 'AI-generated design',
+  'photo-only': 'Photo only',
+};
 
 export const COMPOSER_LIMITS = {
   title: 90,
@@ -388,6 +399,15 @@ const listicleV2TextSchema = z
   })
   .strict();
 
+// TASK-088: set after an AI-generated design — the model that drew the image;
+// the text inside it was drawn by the model, not checked by OmniFlow.
+const listicleAiRenderSchema = z
+  .object({
+    imageModel: z.string().min(1).max(200),
+    aiTextUnverified: z.literal(true),
+  })
+  .strict();
+
 const listicleV2MetadataSchema = z
   .object({
     templateType: z.literal('listicle_article_image'),
@@ -395,6 +415,9 @@ const listicleV2MetadataSchema = z
     ...commonFields,
     text: listicleV2TextSchema,
     source: listicleSourceSchema,
+    // TASK-088: absent on Pins made before — read as the OmniFlow overlay.
+    textTreatment: z.enum(LISTICLE_TEXT_TREATMENTS).optional(),
+    aiRender: listicleAiRenderSchema.optional(),
   })
   .strict();
 
@@ -427,6 +450,11 @@ export function isListicleArticleImage(metadata: ComposerMetadata): metadata is 
 
 export function isListicleV2(metadata: ComposerMetadata): metadata is ListicleV2Metadata {
   return metadata.templateType === 'listicle_article_image' && metadata.templateVersion === LISTICLE_TEMPLATE_VERSION;
+}
+
+/** TASK-088: how a numbered Pin's text is made — the OmniFlow overlay for v1 Pins and v2 Pins made before. */
+export function listicleTextTreatment(metadata: ComposerMetadata): ListicleTextTreatment {
+  return isListicleV2(metadata) ? metadata.textTreatment ?? DEFAULT_LISTICLE_TEXT_TREATMENT : DEFAULT_LISTICLE_TEXT_TREATMENT;
 }
 
 export function isStepByStepV2(metadata: ComposerMetadata): metadata is StepByStepV2Metadata {
@@ -588,6 +616,8 @@ export function buildListicleComposerMetadata(input: {
   hasDestination: boolean;
   ctaIndex: number;
   taken?: ReadonlySet<string>;
+  /** TASK-088: stored only when it is not the default overlay (Pins made before keep the same contract). */
+  textTreatment?: ListicleTextTreatment;
 }): ListicleV2Metadata | null {
   if (!numbersOf(collapse(input.pinTitle)).has(input.number)) return null;
   const section = input.context.sections.find((item) => item.id === input.sectionId) ?? null;
@@ -609,6 +639,7 @@ export function buildListicleComposerMetadata(input: {
       cta: input.hasDestination ? pickCtaMessage(input.language, input.ctaIndex) : null,
     },
     source: input.source,
+    ...(input.textTreatment && input.textTreatment !== DEFAULT_LISTICLE_TEXT_TREATMENT ? { textTreatment: input.textTreatment } : {}),
   };
 }
 

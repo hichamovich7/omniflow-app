@@ -19,6 +19,7 @@ import {
   PINS_MAX,
   DEFAULT_PINS_REQUESTED,
   DEFAULT_ARTICLE_PINS_REQUESTED,
+  DEFAULT_LISTICLE_TEXT_TREATMENT,
 } from '@/types/pinterest';
 import type {
   SupportedLanguage,
@@ -28,6 +29,7 @@ import type {
   PinterestStrategy,
   PinterestTextImportance,
   PinterestVisualStyle,
+  ListicleTextTreatment,
 } from '@/types/pinterest';
 import { getNicheVisualConvention } from '@/lib/ai/niche-visual-conventions';
 import { cn } from '@/lib/utils';
@@ -116,6 +118,31 @@ const VISUAL_STYLE_OPTIONS: Array<{ value: PinterestVisualStyle; label: string; 
     description: "A photo plus the article's own Materials / Ingredients list. Needs a list of at least 3 items.",
   },
 ];
+
+// TASK-088: text of the numbered Pins composed on an article photo
+// (`listicle_article_image`), whatever the visual format. The overlay stays
+// the default; the AI design is experimental (one image call per Pin).
+const LISTICLE_TEXT_TREATMENT_OPTIONS: Array<{ value: ListicleTextTreatment; label: string; description: string; badge?: string }> = [
+  {
+    value: 'omniflow-overlay',
+    label: 'OmniFlow overlay',
+    description: 'The article photo with a short title and the number added by OmniFlow. No extra image generation.',
+    badge: 'Recommended',
+  },
+  {
+    value: 'ai-design',
+    label: 'AI-generated design',
+    description: 'The article photo is sent to the image model, which designs the Pin with its text. One image generation per Pin.',
+    badge: 'Experimental',
+  },
+  {
+    value: 'photo-only',
+    label: 'Photo only',
+    description: 'The article photo alone, with no text added.',
+  },
+];
+const AI_DESIGN_WARNING =
+  'AI-generated design uses one image generation per Pin. Text inside the image may contain spelling or number variations.';
 
 const MODE_OPTIONS: Array<{
   value: PinterestGenerationMode;
@@ -306,6 +333,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   const [ctaImportance, setCtaImportance] = useState<PinterestTextImportance>('low');
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [visualStyle, setVisualStyle] = useState<PinterestVisualStyle>('classic');
+  const [listicleTextTreatment, setListicleTextTreatment] = useState<ListicleTextTreatment>(DEFAULT_LISTICLE_TEXT_TREATMENT);
   const [error, setError] = useState<string | null>(null);
   const [safeguardError, setSafeguardError] = useState<StrategySafeguardError | null>(null);
   const [loading, setLoading] = useState(false);
@@ -425,7 +453,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       wordpressPost: articleSource?.externalPost ?? undefined,
       destinationUrl: destinationUrl.trim() || undefined,
       // Keyword flows never send it (the schema defaults to classic).
-      ...(articleSource ? { visualStyle } : {}),
+      ...(articleSource ? { visualStyle, listicleTextTreatment } : {}),
     };
     const parsed = generatePinsSchema.safeParse(
       effectiveMode === 'ai-integrated'
@@ -856,6 +884,57 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
                   This format uses a photo without text: OmniFlow adds the title and lists from the article, so it
                   replaces the generation mode above. If the article does not have what this format needs, nothing is
                   generated and no credit is used.
+                </p>
+              )}
+            </div>
+          )}
+
+          {articleSource && (
+            <div className="space-y-1.5 border-t border-border/60 pt-4" data-testid="listicle-text-treatment">
+              <Label id="listicle-text-treatment-heading" className="text-xs font-medium text-muted-foreground">
+                Article image text treatment
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                For numbered Pins shown on the article&apos;s own photo, when the article states an exact count (for
+                example &quot;12 ideas&quot;). Other Pins are not affected.
+              </p>
+              <div role="group" aria-labelledby="listicle-text-treatment-heading" className="grid gap-2 sm:grid-cols-3">
+                {LISTICLE_TEXT_TREATMENT_OPTIONS.map((option) => {
+                  const selected = listicleTextTreatment === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      disabled={loading}
+                      onClick={() => setListicleTextTreatment(option.value)}
+                      data-testid={`listicle-text-treatment-${option.value}`}
+                      className={cn(
+                        'min-w-0 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
+                        selected
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                          : 'border-border/60 hover:border-border hover:bg-muted/30'
+                      )}
+                    >
+                      <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 text-sm font-medium">
+                        <span className="flex min-w-0 items-center gap-1.5 break-words">
+                          {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
+                          {option.label}
+                        </span>
+                        {option.badge && (
+                          <Badge variant={option.value === 'omniflow-overlay' ? 'primary' : 'neutral'} className="ml-auto">
+                            {option.badge}
+                          </Badge>
+                        )}
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {listicleTextTreatment === 'ai-design' && (
+                <p className="text-xs text-warning" role="note" data-testid="listicle-ai-design-warning">
+                  {AI_DESIGN_WARNING}
                 </p>
               )}
             </div>

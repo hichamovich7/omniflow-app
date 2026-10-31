@@ -1,7 +1,7 @@
 import { getRoleConfig } from '../config';
 import type { AIProvider } from '../types';
 import { generateImage as generateImageOpenAI } from '../providers/openai';
-import { generateImage as generateImageOpenRouter } from '../providers/openrouter';
+import { generateImage as generateImageOpenRouter, getImageModelCapabilities } from '../providers/openrouter';
 import type { PinVisualFormat } from '@/types/database';
 
 export interface ResolvedImageModel {
@@ -36,19 +36,52 @@ export function resolveImageModel(visualFormat: PinVisualFormat = 'photo'): Reso
   return getRoleConfig('IMAGE');
 }
 
+/**
+ * TASK-088: the configured model cannot receive the reference image. Raised
+ * before any paid call; the caller never retries without the reference.
+ */
+export class ImageReferenceUnsupportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ImageReferenceUnsupportedError';
+  }
+}
+
+export interface ImageReference {
+  /** Bytes the server read and re-encoded itself. */
+  buffer: Buffer;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+}
+
 interface GenerateImageParams {
   prompt: string;
   size: string;
   visualFormat?: PinVisualFormat;
+  /** TASK-088: one reference image (AI-generated design of a numbered Pin). OpenRouter only. */
+  reference?: ImageReference;
 }
 
 export async function generateImage({
   prompt,
   size,
   visualFormat = 'photo',
+  reference,
 }: GenerateImageParams): Promise<Buffer> {
   const { provider, model } = resolveImageModel(visualFormat);
   const isIntegrated = visualFormat === 'ai-integrated';
+
+  // A reference is never dropped: an unsupported model stops here, before the paid call.
+  if (reference) {
+    if (provider !== 'openrouter') {
+      throw new ImageReferenceUnsupportedError(`The configured image model (${model}) cannot receive a reference image`);
+    }
+    const capabilities = await getImageModelCapabilities(model);
+    if (capabilities.referenceLimit < 1 || !capabilities.portrait2x3) {
+      throw new ImageReferenceUnsupportedError(
+        `The configured image model (${model}) does not accept a reference image in the 2:3 format`
+      );
+    }
+  }
 
   switch (provider) {
     case 'openai':
@@ -65,6 +98,9 @@ export async function generateImage({
         size,
         ...(isIntegrated
           ? { quality: 'high' as const, aspectRatio: '2:3' as const }
+          : {}),
+        ...(reference
+          ? { inputReferences: [`data:${reference.mimeType};base64,${reference.buffer.toString('base64')}`] }
           : {}),
       });
     default:

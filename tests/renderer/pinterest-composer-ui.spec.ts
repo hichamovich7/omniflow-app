@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import Module from 'node:module';
 import { dirname, join } from 'node:path';
 import { createElement, type ComponentType, type ReactNode } from 'react';
@@ -185,5 +186,63 @@ test.describe('Visual format — Pin grid and details', () => {
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
       expect(overflow).toBe(false);
     }
+  });
+
+  // TASK-088: the text treatment of a numbered Pin, and the unverified-text warning of an AI design.
+  test('numbered Pins: the text treatment, "Designed by AI" and the unverified-text warning (desktop and mobile)', async ({ page }) => {
+    const numbered = (extra: Record<string, unknown>) =>
+      JSON.stringify({
+        _pinterestComposer: {
+          templateType: 'listicle_article_image',
+          templateVersion: 'v2',
+          renderedBy: 'omniflow-composer',
+          language: 'en',
+          status: 'rendered',
+          sourceSections: ['s2'],
+          sourceHeadings: ['3. Leaf-Imprint Trinket Dish'],
+          warnings: [],
+          text: { displayTitle: 'Leaf-Imprint Trinket Dish', number: '12', cta: null },
+          source: { imageUrl: 'https://clay.example.test/leaf.jpg', imageKey: null, origin: 'section', sectionId: 's2', fallbackUrl: null, crop: 0 },
+          ...extra,
+        },
+      });
+    const markup = renderToStaticMarkup(
+      createElement(
+        'main',
+        null,
+        createElement('section', { id: 'ai' }, createElement(PinVisualFormatDetails, { imageAnalysis: numbered({ textTreatment: 'ai-design', aiRender: { imageModel: 'vendor/model', aiTextUnverified: true } }) })),
+        createElement('section', { id: 'overlay' }, createElement(PinVisualFormatDetails, { imageAnalysis: numbered({}) })),
+        createElement('section', { id: 'photo' }, createElement(PinVisualFormatDetails, { imageAnalysis: numbered({ textTreatment: 'photo-only' }) }))
+      )
+    );
+    for (const viewport of [{ width: 1280, height: 800 }, { width: 375, height: 740 }]) {
+      await page.setViewportSize(viewport);
+      await page.setContent(`<!doctype html><html><body>${markup}</body></html>`);
+      const ai = page.locator('#ai');
+      await expect(ai).toContainText('Designed by AI');
+      await expect(ai.getByTestId('pin-visual-format-text-treatment')).toHaveText('Text: AI-generated design · experimental · 1 image generation');
+      await expect(ai).toContainText('Text drawn by the AI, not checked by OmniFlow');
+      const overlay = page.locator('#overlay');
+      await expect(overlay).toContainText('Composed by OmniFlow');
+      await expect(overlay.getByTestId('pin-visual-format-text-treatment')).toHaveText('Text: OmniFlow overlay');
+      await expect(overlay).not.toContainText('not checked by OmniFlow');
+      await expect(page.locator('#photo').getByTestId('pin-visual-format-text-treatment')).toHaveText('Text: Photo only');
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+      expect(overflow).toBe(false);
+    }
+  });
+
+  test('generator: "Article image text treatment" for article Pins, OmniFlow overlay by default, AI design warning (source level)', () => {
+    const form = readFileSync(join(process.cwd(), 'components/pinterest/pin-form.tsx'), 'utf8');
+    expect(form).toContain('Article image text treatment');
+    expect(form).toContain('useState<ListicleTextTreatment>(DEFAULT_LISTICLE_TEXT_TREATMENT)');
+    for (const label of ["label: 'OmniFlow overlay'", "label: 'AI-generated design'", "label: 'Photo only'", "badge: 'Recommended'", "badge: 'Experimental'"]) {
+      expect(form).toContain(label);
+    }
+    expect(form).toContain(
+      'AI-generated design uses one image generation per Pin. Text inside the image may contain spelling or number variations.'
+    );
+    // Sent only with an article source, never for keyword Pins.
+    expect(form).toContain('...(articleSource ? { visualStyle, listicleTextTreatment } : {}),');
   });
 });

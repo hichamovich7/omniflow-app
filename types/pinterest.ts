@@ -32,6 +32,15 @@ export const PINTEREST_VISUAL_STYLES = [
 ] as const;
 export type PinterestVisualStyle = (typeof PINTEREST_VISUAL_STYLES)[number];
 
+// TASK-088: how the text of a numbered Pin on an article photo
+// (`listicle_article_image`) is made. `omniflow-overlay` (default) = the
+// TASK-087 panel drawn by OmniFlow; `ai-design` = the image model receives
+// the article photo as a reference and draws the text itself (experimental,
+// one image call per Pin); `photo-only` = the article photo without text.
+export const LISTICLE_TEXT_TREATMENTS = ['omniflow-overlay', 'ai-design', 'photo-only'] as const;
+export type ListicleTextTreatment = (typeof LISTICLE_TEXT_TREATMENTS)[number];
+export const DEFAULT_LISTICLE_TEXT_TREATMENT: ListicleTextTreatment = 'omniflow-overlay';
+
 export const PINTEREST_CREATIVE_FORMATS = [
   'hero-pin',
   'pattern-guide',

@@ -42,16 +42,32 @@ import {
 import {
   ARTICLE_IMAGE_MODEL,
   isListicleArticleImage,
+  isListicleV2,
   isStepByStepV2,
+  listicleTextTreatment,
   markComposerRendered,
   readComposerMetadata,
   type ComposerMetadata,
 } from '@/lib/pinterest/composer/content';
-import { composePinImage, composerImagePrompt } from '@/lib/pinterest/composer/pipeline';
+import { composePinImage, composerImagePrompt, metadataForRender } from '@/lib/pinterest/composer/pipeline';
+import { buildListicleAiDesignPrompt, prepareAiDesignReference } from '@/lib/pinterest/composer/ai-design';
+import { COMPOSER_CANVAS } from '@/lib/pinterest/composer/render';
+import type { OptimizedImage } from '@/lib/media/optimize-image';
 import { loadArticlePhoto } from '@/lib/pinterest/composer/article-image';
 import { referenceImageHosts } from '@/lib/pinterest/article-vision';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * TASK-088: a Pin whose image could not be made, with a message the user may
+ * see (no prompt, no URL, no provider payload). The Pin keeps its image.
+ */
+class PinImageError extends Error {
+  constructor(readonly pinId: string, message: string) {
+    super(message);
+    this.name = 'PinImageError';
+  }
+}
 
 const requestSchema = z.object({
   generationId: z.string().uuid(),
@@ -225,6 +241,7 @@ export async function POST(request: Request) {
             userId: user.id,
             generationId,
             nextVersion,
+            niche: project?.niche ?? null,
           });
         }
         const generationMode = generationModeForVisualFormat(pin.visual_format);
@@ -417,6 +434,10 @@ export async function POST(request: Request) {
       failures.map((e) => e.message)
     );
   }
+  // TASK-088: failures that name their Pin (AI-generated design) — shown to the user.
+  const failedPins = failures
+    .filter((error): error is PinImageError => error instanceof PinImageError)
+    .map((error) => ({ pinId: error.pinId, message: error.message }));
 
   const imageStatus =
     successes.length === 0
@@ -431,12 +452,18 @@ export async function POST(request: Request) {
     .eq('id', generationId);
 
   return NextResponse.json<
-    ApiResponse<{ imageStatus: string; imagesGenerated: number; imagesFailed: number }>
+    ApiResponse<{
+      imageStatus: string;
+      imagesGenerated: number;
+      imagesFailed: number;
+      failedPins?: Array<{ pinId: string; message: string }>;
+    }>
   >({
     data: {
       imageStatus,
       imagesGenerated: successes.length,
       imagesFailed: failures.length,
+      ...(failedPins.length > 0 ? { failedPins } : {}),
     },
     error: null,
   });
@@ -468,8 +495,14 @@ async function generateComposedPin(params: {
   userId: string;
   generationId: string;
   nextVersion: number;
+  niche: string | null;
 }): Promise<string> {
-  const { supabase, mediaStorage, pin, composer, nextVersion } = params;
+  const { supabase, pin, composer, nextVersion } = params;
+  // TASK-088: a numbered Pin in "AI-generated design" is drawn whole by the image model.
+  if (isListicleV2(composer) && listicleTextTreatment(composer) === 'ai-design') {
+    const designed = await generateListicleAiDesign({ supabase, pin, composer, userId: params.userId, niche: params.niche });
+    return storeComposedPin({ ...params, ...designed });
+  }
   // TASK-083: a numbered Pin is composed on the article's own photo, read
   // (GET only) from the connected site or OmniFlow storage — no image model
   // call. Fallback: the featured image when the section photo is unreadable.
@@ -511,6 +544,86 @@ async function generateComposedPin(params: {
     ...(listicle ? { cropVariant: listicle.source.crop + nextVersion - 1 } : {}),
   });
   console.log(`[pinterest images] pin ${pin.id} composer ${metadata.templateType} ${describeOptimization(optimized)}`);
+  return storeComposedPin({ ...params, optimized, metadata, imageModel, renderWarnings });
+}
+
+/**
+ * TASK-088 — "AI-generated design" of a numbered Pin: the article photo (read
+ * like the overlay path) goes to AI_IMAGE_MODEL_TEXT as a reference, one call,
+ * no retry, no fallback. The model's image is stored as is (metadata
+ * stripped, 1000×1500): no OmniFlow text is added. Any failure throws a
+ * PinImageError before anything is stored.
+ */
+async function generateListicleAiDesign(params: {
+  supabase: SupabaseServerClient;
+  pin: Pin;
+  composer: ComposerMetadata;
+  userId: string;
+  niche: string | null;
+}): Promise<{ optimized: OptimizedImage; metadata: ComposerMetadata; imageModel: string; renderWarnings: string[] }> {
+  const { pin } = params;
+  const metadata = metadataForRender(params.composer, Boolean(pin.link_url));
+  if (!isListicleV2(metadata)) throw new PinImageError(pin.id, 'This Pin cannot use an AI-generated design');
+  const fail = (reason: string) =>
+    new PinImageError(pin.id, `AI-generated design failed for the Pin "${pin.title}": ${reason}. Its previous image is kept.`);
+  const reason = (error: unknown) => (error instanceof Error ? error.message : 'unknown error');
+
+  let imageModel: string;
+  let loaded: Awaited<ReturnType<typeof loadArticlePhoto>>;
+  try {
+    imageModel = resolveImageModel('ai-integrated').model;
+    loaded = await loadArticlePhoto(metadata.source, await articleImageHosts(params.supabase, params.userId));
+  } catch (error) {
+    throw fail(reason(error));
+  }
+  const started = Date.now();
+  let optimized: OptimizedImage;
+  try {
+    const reference = await prepareAiDesignReference(loaded.photo);
+    const raw = await generateImage({
+      prompt: buildListicleAiDesignPrompt({ metadata, niche: params.niche }),
+      size: IMAGE_CONFIG.size,
+      visualFormat: 'ai-integrated',
+      reference,
+    });
+    const sanitized = await sanitizeFinalPinterestImage(raw);
+    optimized = await optimizeImage(sanitized.buffer, 'pinterest-pin');
+    if (optimized.width !== COMPOSER_CANVAS.width || optimized.height !== COMPOSER_CANVAS.height) {
+      throw new Error(`the image is ${optimized.width}x${optimized.height}, expected 1000x1500`);
+    }
+  } catch (error) {
+    // The reason only — never the prompt, the photo URL or the image data.
+    console.warn(`[pinterest images] pin ${pin.id} ai-design failed after ${Date.now() - started} ms: ${reason(error)}`);
+    throw fail(reason(error));
+  }
+  console.log(
+    `[pinterest images] pin ${pin.id} composer listicle_article_image ai-design model=${imageModel} ${Date.now() - started} ms ${describeOptimization(optimized)}`
+  );
+  return {
+    optimized,
+    metadata: { ...metadata, aiRender: { imageModel, aiTextUnverified: true } },
+    imageModel,
+    renderWarnings: loaded.warnings,
+  };
+}
+
+/**
+ * Stores a composed Pin image: the new version is recorded inactive first and
+ * only replaces the current image once everything is saved.
+ */
+async function storeComposedPin(params: {
+  supabase: SupabaseServerClient;
+  mediaStorage: MediaStorage;
+  pin: Pin;
+  userId: string;
+  generationId: string;
+  nextVersion: number;
+  optimized: OptimizedImage;
+  metadata: ComposerMetadata;
+  imageModel: string;
+  renderWarnings: string[];
+}): Promise<string> {
+  const { supabase, mediaStorage, pin, nextVersion, optimized, metadata, imageModel, renderWarnings } = params;
 
   const composedPath = getPinImageObjectKey(mediaStorage.provider, {
     userId: params.userId,

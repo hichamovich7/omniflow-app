@@ -21,7 +21,7 @@ import {
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
 import { RegenerateTextButton } from '@/components/pinterest/regenerate-text-button';
-import { ANGLE_LABELS, NO_LINK_NOTICE, pinAsText, readPinSourceSection, readPinVisualArchetype } from '@/lib/social/pin-display';
+import { ANGLE_LABELS, describeImageFailures, NO_LINK_NOTICE, pinAsText, readPinSourceSection, readPinVisualArchetype } from '@/lib/social/pin-display';
 import { PinVisualFormatBadge, PinVisualFormatDetails } from '@/components/pinterest/pin-visual-format';
 import type { Pin } from '@/types/database';
 import type { ApiError } from '@/types/api';
@@ -80,7 +80,9 @@ export function ArticlePinResults({ pins, generationId, regenerateSource, boardN
         toast.error(json.error?.message ?? 'Image generation failed');
         return;
       }
-      toast.success('Images generated');
+      const failure = describeImageFailures(json.data);
+      if (failure) toast.warning(failure);
+      else toast.success('Images generated');
       setConfirmAllOpen(false);
       router.refresh();
     } catch {
@@ -251,6 +253,13 @@ function ArticlePinCard({
       const json = await readJson(res);
       if (!res.ok || json.error) {
         toast.error(json.error?.message ?? 'Image generation failed');
+        return;
+      }
+      // TASK-088: a failed Pin keeps its previous image; say which one and why.
+      const failure = describeImageFailures(json.data);
+      if (failure) {
+        toast.error(failure);
+        router.refresh();
         return;
       }
       toast.success('Image generated');

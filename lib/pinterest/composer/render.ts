@@ -395,7 +395,8 @@ export interface ListicleLayout {
   backdrop: 'blur' | 'plain' | null;
   /** Where the sharp photo sits on the canvas (the whole canvas for `cover`). */
   photo: { left: number; top: number; width: number; height: number };
-  panel: { top: number; height: number };
+  /** The text panel; null for a "Photo only" numbered Pin (TASK-088). */
+  panel: { top: number; height: number } | null;
 }
 
 /** The share of the photo a centred cover crop to the Pin's 2:3 keeps (1 = nothing cut). */
@@ -567,6 +568,39 @@ async function renderListicleV2(photo: Buffer, text: ComposerListicleV2Text, var
   return {
     ...composed,
     listicle: { photoMode: mode, backdrop: mode === 'fit' ? backdrop : null, photo: box, panel: { top: panelTop, height: panel.height } },
+  };
+}
+
+/**
+ * TASK-088 — numbered Pin, "Photo only": the article photo with no text. A
+ * photo close to 2:3 fills the Pin from the centre; any other is shown whole
+ * on a blurred copy of itself (or the panel colour, per variant).
+ */
+async function renderListiclePhotoOnly(photo: Buffer, variant: number): Promise<ComposedPin> {
+  const size = await coverKeep(photo);
+  const preferred: ListiclePhotoMode = size.keep >= LISTICLE_SAFE_COVER_KEEP ? 'cover' : 'fit';
+  const { mode, backdrop } = listicleVariant(preferred, variant);
+  let background: Buffer;
+  let box: ListicleLayout['photo'];
+  if (mode === 'cover') {
+    try {
+      background = await sharp(photo).rotate().resize({ width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height, fit: 'cover', position: 'centre' }).removeAlpha().png().toBuffer();
+    } catch {
+      throw new ComposerRenderError('The article photo could not be read');
+    }
+    box = { left: 0, top: 0, width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height };
+  } else {
+    ({ background, box } = await fitPhoto(photo, size, { top: 0, height: COMPOSER_CANVAS.height }, backdrop));
+  }
+  // No text is drawn, so no contrast pair: the ratio reported is the maximum.
+  const buffer = await sharp(background).png().toBuffer();
+  return {
+    buffer,
+    width: COMPOSER_CANVAS.width,
+    height: COMPOSER_CANVAS.height,
+    minContrast: 21,
+    heroPlacement: null,
+    listicle: { photoMode: mode, backdrop: mode === 'fit' ? backdrop : null, photo: box, panel: null },
   };
 }
 
@@ -911,7 +945,13 @@ export async function renderComposedPin(
   stepPhotos: Buffer[] = [],
   options: { cropVariant?: number } = {}
 ): Promise<ComposedPin> {
-  if (isListicleV2(metadata)) return renderListicleV2(photo, metadata.text, options.cropVariant ?? metadata.source.crop);
+  if (isListicleV2(metadata)) {
+    const variant = options.cropVariant ?? metadata.source.crop;
+    // TASK-088: an AI-generated design already carries its text — OmniFlow never draws a second one.
+    if (metadata.textTreatment === 'ai-design') throw new ComposerRenderError('An AI-generated design is not composed by OmniFlow');
+    if (metadata.textTreatment === 'photo-only') return renderListiclePhotoOnly(photo, variant);
+    return renderListicleV2(photo, metadata.text, variant);
+  }
   if (metadata.templateType === 'listicle_article_image') {
     // v1 contracts (before TASK-087) keep their own rendering.
     return renderListicle(photo, metadata.text, options.cropVariant ?? metadata.source.crop);

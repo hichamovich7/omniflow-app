@@ -29,7 +29,7 @@ import { BANNER_TEMPLATES, type BannerTemplate } from '@/lib/validations/pintere
 import { PINTEREST_ANGLES, type PinterestAngle } from '@/types/pinterest';
 import type { Pin } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
-import { readPinVisualArchetype } from '@/lib/social/pin-display';
+import { describeImageFailures, readPinVisualArchetype } from '@/lib/social/pin-display';
 import { PinVisualFormatBadge } from './pin-visual-format';
 
 interface PinTableProps {
@@ -82,8 +82,13 @@ export function PinTable({ pins, generationId, imageVersionCounts, pinsWordPress
         body: JSON.stringify({ generationId, pinIds: [pinId] }),
       });
       const json = await res.json();
+      const failure = res.ok && !json.error ? describeImageFailures(json.data) : null;
       if (!res.ok || json.error) {
         toast.error(json.error?.message ?? 'Regeneration failed');
+      } else if (failure) {
+        // TASK-088: the Pin kept its previous image.
+        toast.error(failure);
+        router.refresh();
       } else {
         toast.success('New image version generated');
         router.refresh();

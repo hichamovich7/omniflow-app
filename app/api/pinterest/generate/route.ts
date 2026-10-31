@@ -207,6 +207,7 @@ export async function POST(request: Request) {
     wordpressPost,
     destinationUrl,
     visualStyle,
+    listicleTextTreatment,
   } = parsed.data;
   // The schema already rejects a reference for the other modes; this is a
   // second guard so the Vision step below can only ever run for Legacy
@@ -673,6 +674,7 @@ export async function POST(request: Request) {
           hasDestination: Boolean(destination.linkUrl),
           ctaIndex: pinIndex,
           taken: takenDisplayTitles,
+          textTreatment: listicleTextTreatment,
         });
         const issues = metadata ? verifyComposerText(metadata, articleSource.context, { pinTitle: pin.title }) : [];
         if (metadata && issues.length === 0) {
@@ -684,7 +686,7 @@ export async function POST(request: Request) {
       });
       // Counts only: no Pin text, no URL.
       console.log(
-        `[${PROMPT_ID}] Listicle: ${JSON.stringify({ source: listicleNumber.source, pins: resolvedPins.length, numbered: numbered.length, articleImages: listicleByPin.size })}`
+        `[${PROMPT_ID}] Listicle: ${JSON.stringify({ source: listicleNumber.source, pins: resolvedPins.length, numbered: numbered.length, articleImages: listicleByPin.size, textTreatment: listicleTextTreatment })}`
       );
     }
     const composerByPin: (ComposerMetadata | null)[] = resolvedPins.map((pin, i) => {

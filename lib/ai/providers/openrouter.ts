@@ -177,12 +177,72 @@ async function chatCompletionOnce({
   }
 }
 
+export interface ImageModelCapabilities {
+  /** How many reference images the model accepts (`input_references`); 0 = none. */
+  referenceLimit: number;
+  /** Whether `aspect_ratio: "2:3"` is accepted. */
+  portrait2x3: boolean;
+}
+
+const capabilityCache = new Map<string, { value: ImageModelCapabilities; at: number }>();
+const CAPABILITY_TTL_MS = 60 * 60 * 1000;
+
+/** Tests only: forget the cached catalog answers. */
+export function resetImageModelCapabilityCache(): void {
+  capabilityCache.clear();
+}
+
+function enumAccepts(descriptor: unknown, value: string): boolean {
+  if (!descriptor || typeof descriptor !== 'object' || Array.isArray(descriptor)) return descriptor !== undefined;
+  const values = (descriptor as { values?: unknown }).values;
+  return !Array.isArray(values) || values.length === 0 || values.includes(value);
+}
+
+/**
+ * TASK-088: what an OpenRouter image model accepts, from OpenRouter's image
+ * model catalog (a free GET, cached for an hour). Throws when the catalog
+ * cannot be read or the model is absent — callers fail closed.
+ */
+export async function getImageModelCapabilities(model: string): Promise<ImageModelCapabilities> {
+  const cached = capabilityCache.get(model);
+  if (cached && Date.now() - cached.at < CAPABILITY_TTL_MS) return cached.value;
+  const apiKey = process.env.OPENROUTER_IMAGE_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENROUTER_IMAGE_API_KEY is not set');
+  }
+  const res = await fetch('https://openrouter.ai/api/v1/images/models', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    throw new Error(`OpenRouter image model catalog unavailable (HTTP ${res.status})`);
+  }
+  const json = (await res.json()) as { data?: Array<{ id?: unknown; supported_parameters?: Record<string, unknown> }> };
+  const entry = json.data?.find((item) => item.id === model);
+  if (!entry) {
+    throw new Error(`Image model ${model} is not in the OpenRouter image catalog`);
+  }
+  const parameters = entry.supported_parameters ?? {};
+  const references = parameters.input_references as { max?: unknown } | undefined;
+  const value: ImageModelCapabilities = {
+    referenceLimit: references === undefined ? 0 : typeof references?.max === 'number' ? Math.max(0, Math.floor(references.max)) : 1,
+    portrait2x3: enumAccepts(parameters.aspect_ratio, '2:3'),
+  };
+  capabilityCache.set(model, { value, at: Date.now() });
+  return value;
+}
+
 interface ImageGenerationOptions {
   model: string;
   prompt: string;
   size: string;
   quality?: 'low' | 'medium' | 'high';
   aspectRatio?: '2:3';
+  /**
+   * TASK-088: reference images as data URLs built by the server from bytes it
+   * read itself (never a storage URL). Absent → the request body is unchanged.
+   */
+  inputReferences?: string[];
 }
 
 interface OpenRouterImageResponseData {
@@ -200,6 +260,7 @@ export async function generateImage({
   size,
   quality,
   aspectRatio,
+  inputReferences,
 }: ImageGenerationOptions): Promise<Buffer> {
   const apiKey = process.env.OPENROUTER_IMAGE_API_KEY;
   if (!apiKey) {
@@ -221,13 +282,17 @@ export async function generateImage({
         prompt,
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : { size }),
         ...(quality ? { quality } : {}),
+        ...(inputReferences && inputReferences.length > 0
+          ? { input_references: inputReferences.map((url) => ({ type: 'image_url', image_url: { url } })) }
+          : {}),
       }),
       signal: controller.signal,
     });
 
     if (!res.ok) {
       const body = await res.text();
-      console.error('OpenRouter Image API error:', res.status, body);
+      // The provider's error text only (bounded) — never the request, its prompt or a reference image.
+      console.error('OpenRouter Image API error:', res.status, body.slice(0, 500));
       let message = body;
       try {
         const parsed = JSON.parse(body) as { error?: { message?: string } };

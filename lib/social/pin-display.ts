@@ -92,7 +92,19 @@ export interface PinVisualFormatDisplay {
   layout: string | null;
   panelCount: number | null;
   imageCalls: number | null;
+  /** TASK-088, numbered Pins only: "OmniFlow overlay" / "AI-generated design" / "Photo only". */
+  textTreatment: string | null;
 }
+
+const TEXT_TREATMENT_LABELS: Record<string, string> = {
+  'omniflow-overlay': 'OmniFlow overlay',
+  'ai-design': 'AI-generated design',
+  'photo-only': 'Photo only',
+};
+
+/** TASK-088: shown on a numbered Pin whose text was drawn by the image model. */
+export const AI_TEXT_UNVERIFIED_WARNING =
+  'Text drawn by the AI, not checked by OmniFlow: it may contain spelling or number variations. The Pin title and description stay the official text.';
 
 const STEP_LAYOUT_LABELS: Record<string, string> = {
   'vertical-progression': 'Vertical progression',
@@ -112,31 +124,72 @@ function describeComposerWarning(code: string): string {
 export function readPinVisualFormat(imageAnalysisJson: string | null): PinVisualFormatDisplay {
   const classic: PinVisualFormatDisplay = {
     label: 'Classic', composed: false, sources: [], status: null, warnings: [], layout: null, panelCount: null, imageCalls: null,
+    textTreatment: null,
   };
   if (!imageAnalysisJson) return classic;
   try {
     const value = (JSON.parse(imageAnalysisJson) as Record<string, unknown>)?.[COMPOSER_METADATA_KEY] as
-      | { templateType?: unknown; sourceHeadings?: unknown; status?: unknown; warnings?: unknown; layout?: unknown; panelCount?: unknown }
+      | {
+          templateType?: unknown;
+          sourceHeadings?: unknown;
+          status?: unknown;
+          warnings?: unknown;
+          layout?: unknown;
+          panelCount?: unknown;
+          textTreatment?: unknown;
+          aiRender?: { aiTextUnverified?: unknown };
+        }
       | undefined;
     const label = typeof value?.templateType === 'string' ? VISUAL_FORMAT_LABELS[value.templateType] : undefined;
     if (!value || !label) return classic;
     const strings = (list: unknown) => (Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string' && item.trim() !== '') : []);
     const layout = typeof value.layout === 'string' ? STEP_LAYOUT_LABELS[value.layout] ?? null : null;
     const panelCount = typeof value.panelCount === 'number' && Number.isInteger(value.panelCount) ? value.panelCount : null;
+    const listicle = value.templateType === 'listicle_article_image';
+    const treatment = listicle
+      ? (typeof value.textTreatment === 'string' ? value.textTreatment : 'omniflow-overlay')
+      : null;
+    const aiDesign = treatment === 'ai-design';
     return {
       label,
       composed: true,
       sources: strings(value.sourceHeadings),
       status: value.status === 'rendered' ? 'rendered' : 'planned',
-      warnings: strings(value.warnings).map(describeComposerWarning),
+      warnings: [
+        ...strings(value.warnings).map(describeComposerWarning),
+        ...(aiDesign && value.aiRender?.aiTextUnverified === true ? [AI_TEXT_UNVERIFIED_WARNING] : []),
+      ],
       layout,
       panelCount,
-      // One finished-project photo + one per step panel; a numbered Pin uses the article photo (no call); others make one.
-      imageCalls: panelCount ? panelCount + 1 : value.templateType === 'listicle_article_image' ? 0 : 1,
+      // One finished-project photo + one per step panel; a numbered Pin uses the article photo (no call,
+      // one with an AI-generated design); others make one.
+      imageCalls: panelCount ? panelCount + 1 : listicle ? (aiDesign ? 1 : 0) : 1,
+      textTreatment: treatment ? TEXT_TREATMENT_LABELS[treatment] ?? null : null,
     };
   } catch {
     return classic;
   }
+}
+
+/**
+ * TASK-088: the message to show after POST /api/pinterest/generate-images
+ * when Pins failed — the first Pin-specific reason, else a count. Null when
+ * every image was made.
+ */
+export function describeImageFailures(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const { imagesFailed, failedPins } = data as { imagesFailed?: unknown; failedPins?: unknown };
+  if (typeof imagesFailed !== 'number' || imagesFailed < 1) return null;
+  const named = Array.isArray(failedPins)
+    ? failedPins
+        .map((item: unknown) => (item && typeof item === 'object' ? (item as { message?: unknown }).message : null))
+        .find((message): message is string => typeof message === 'string' && message.trim() !== '')
+    : undefined;
+  if (named) {
+    const others = imagesFailed - 1;
+    return others > 0 ? `${named} (${others} other image${others > 1 ? 's' : ''} failed)` : named;
+  }
+  return `${imagesFailed} image${imagesFailed > 1 ? 's' : ''} failed`;
 }
 
 /** "Source: Materials" / "Sources: Step 1, Step 2 and Step 3". */

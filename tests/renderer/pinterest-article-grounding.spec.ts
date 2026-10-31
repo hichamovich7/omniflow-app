@@ -767,10 +767,16 @@ test.describe('Safety and compatibility (source level)', () => {
   const generateRoute = read('app/api/pinterest/generate/route.ts');
   const imagesRoute = read('app/api/pinterest/generate-images/route.ts');
 
-  test('no article image is ever an image-model reference; images stay 1024x1536 → 1000x1500', () => {
-    for (const file of [generateRoute, imagesRoute, read('lib/ai/services/image.ts'), read('lib/ai/providers/openrouter.ts'), read('lib/pinterest/article-vision.ts')]) {
+  test('an article image is an image-model reference only for an opt-in AI-generated design; images stay 1024x1536 → 1000x1500', () => {
+    for (const file of [generateRoute, imagesRoute, read('lib/ai/services/image.ts'), read('lib/pinterest/article-vision.ts')]) {
       expect(file).not.toContain('input_references');
     }
+    // TASK-088: the only reference sent is the numbered Pin's article photo, in "AI-generated design".
+    const passed = /^\s+reference,\r?$/m;
+    expect(imagesRoute.match(new RegExp(passed.source, 'gm'))).toHaveLength(1);
+    const aiDesign = imagesRoute.slice(imagesRoute.indexOf('async function generateListicleAiDesign('));
+    expect(aiDesign.search(passed)).toBeGreaterThan(0);
+    expect(aiDesign.search(passed)).toBeLessThan(aiDesign.indexOf('async function storeComposedPin('));
     expect(IMAGE_CONFIG.size).toBe('1024x1536');
     expect(imagesRoute).toContain("optimizeImage(imageBuffer, 'pinterest-pin')");
     expect(MEDIA_PROFILES['pinterest-pin'].resize).toMatchObject({ width: 1000, height: 1500 });

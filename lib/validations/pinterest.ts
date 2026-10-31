@@ -8,6 +8,7 @@ import {
   PINTEREST_STRATEGIES,
   PINTEREST_TEXT_IMPORTANCE,
   PINTEREST_VISUAL_STYLES,
+  LISTICLE_TEXT_TREATMENTS,
   SUPPORTED_LANGUAGES,
   PINS_MIN,
   PINS_MAX,
@@ -108,6 +109,12 @@ const generatePinsBaseSchema = z.object({
   // TASK-079: hero / materials-and-tools are composed by OmniFlow on a
   // photo without text, so they require Photo only.
   visualStyle: z.enum(PINTEREST_VISUAL_STYLES, { message: 'Invalid visual style' }).default('classic'),
+  // TASK-088: text of the numbered Pins on an article photo, whatever the
+  // visual style. Only read with an article source; the default keeps the
+  // TASK-087 overlay.
+  listicleTextTreatment: z
+    .enum(LISTICLE_TEXT_TREATMENTS, { message: 'Invalid article image text treatment' })
+    .default('omniflow-overlay'),
 });
 
 // websiteUrl / pinterestUrl are Research source URLs (provenance), not the
