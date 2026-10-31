@@ -1,8 +1,10 @@
 import sharp from 'sharp';
 import { RENDERER_FONT_PATHS } from '@/lib/pinterest/text-layout';
 import {
+  LISTICLE_CROP_VARIANTS,
   isStepByStepV2,
   type ComposerHeroText,
+  type ComposerListicleText,
   type ComposerMaterialsText,
   type ComposerMetadata,
   type ComposerStepsText,
@@ -50,7 +52,7 @@ export interface ComposedPin {
   height: number;
   /** Lowest WCAG contrast ratio among the drawn text/background pairs. */
   minContrast: number;
-  /** Where the Hero title panel was placed; null for the other templates. */
+  /** Where the Hero / numbered-list title panel was placed; null for the other templates. */
   heroPlacement: 'top' | 'bottom' | null;
 }
 
@@ -291,6 +293,81 @@ async function renderHero(photo: Buffer, text: ComposerHeroText): Promise<Compos
     cursor += gap + 6;
     rects.push({ x: MARGIN_X + pad, y: cursor, width: cta.width + 56, height: ctaHeight, fill: COMPOSER_PALETTE.accent, radius: ctaHeight / 2 });
     placed.push({ text: cta, left: MARGIN_X + pad + 28, top: cursor + 12 });
+  }
+  return finish(background, rects, placed, contrast, placement);
+}
+
+// ── Numbered list on the article's photo (TASK-083) ─────────────────────────
+
+/**
+ * One of four crops of the article photo: the full photo (attention-cropped),
+ * two 1.2× zooms anchored at opposite corners, a 1.4× centred zoom. Two Pins
+ * sharing one photo never get the same pixels. The source file is only read.
+ */
+export async function cropArticlePhoto(photo: Buffer, variant: number): Promise<Buffer> {
+  const index = ((variant % LISTICLE_CROP_VARIANTS) + LISTICLE_CROP_VARIANTS) % LISTICLE_CROP_VARIANTS;
+  if (index === 0) return coverPhoto(photo, COMPOSER_CANVAS.width, COMPOSER_CANVAS.height);
+  const zoom = index === 3 ? 1.4 : 1.2;
+  const width = Math.round(COMPOSER_CANVAS.width * zoom);
+  const height = Math.round(COMPOSER_CANVAS.height * zoom);
+  const scaled = await coverPhoto(photo, width, height);
+  const [left, top] =
+    index === 1 ? [0, 0] : index === 2 ? [width - COMPOSER_CANVAS.width, height - COMPOSER_CANVAS.height] : [Math.round((width - COMPOSER_CANVAS.width) / 2), Math.round((height - COMPOSER_CANVAS.height) / 2)];
+  return sharp(scaled).extract({ left, top, width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height }).png().toBuffer();
+}
+
+/** The title with its number drawn larger in the accent colour; a leading number gets its own line. */
+function listicleTitleMarkup(title: string, number: string, numberSize: number): string {
+  const match = new RegExp(`(?<![\\p{N}])${number}(?![\\p{N}])`, 'u').exec(title);
+  if (!match) return escapeMarkup(title);
+  const before = title.slice(0, match.index);
+  const after = title.slice(match.index + number.length);
+  const big = `<span foreground="${COMPOSER_PALETTE.accent}" size="${numberSize * 1024}">${number}</span>`;
+  if (!before.trim()) return `${big}\n${escapeMarkup(after.replace(/^[\s:.,–—-]+/, ''))}`;
+  return `${escapeMarkup(before)}<span foreground="${COMPOSER_PALETTE.accent}">${number}</span>${escapeMarkup(after)}`;
+}
+
+async function renderListicle(photo: Buffer, text: ComposerListicleText, variant: number): Promise<ComposedPin> {
+  const background = await cropArticlePhoto(photo, variant);
+  // Even variants carry the panel at the bottom, odd ones at the top.
+  const placement: 'top' | 'bottom' = variant % 2 === 0 ? 'bottom' : 'top';
+  const contrast = new ContrastLog();
+  const pad = 44;
+  const innerWidth = CONTENT_WIDTH - pad * 2;
+  const gap = 26;
+
+  let title: RenderedText | null = null;
+  for (let size = 72; size >= 40 && !title; size -= 4) {
+    try {
+      title = await renderMarkup(
+        listicleTitleMarkup(text.title, text.number, Math.round(size * 1.9)),
+        { width: innerWidth, maxHeight: 440, maxSize: size, minSize: size, weight: 700, color: COMPOSER_PALETTE.ink, leading: 0.06 },
+        'Numbered title'
+      );
+    } catch (error) {
+      if (!(error instanceof ComposerRenderError)) throw error;
+    }
+  }
+  if (!title) throw new ComposerRenderError('Numbered title does not fit its area at the minimum font size');
+  contrast.use(COMPOSER_PALETTE.ink, COMPOSER_PALETTE.panel);
+  contrast.use(COMPOSER_PALETTE.accent, COMPOSER_PALETTE.panel);
+  const cta = text.cta
+    ? await renderText(text.cta, { width: innerWidth - 56, maxHeight: 44, maxSize: 30, minSize: 22, weight: 700, color: COMPOSER_PALETTE.onAccent }, 'Numbered CTA')
+    : null;
+  if (cta) contrast.use(COMPOSER_PALETTE.onAccent, COMPOSER_PALETTE.accent);
+
+  const ctaHeight = cta ? cta.height + 24 : 0;
+  const cardHeight = pad + title.height + (cta ? gap + ctaHeight : 0) + pad;
+  if (cardHeight > COMPOSER_CANVAS.height * 0.45) {
+    throw new ComposerRenderError('The numbered title panel would cover too much of the photo');
+  }
+  const cardY = placement === 'top' ? MARGIN_Y : COMPOSER_CANVAS.height - MARGIN_Y - cardHeight;
+  const rects: Rect[] = [{ x: MARGIN_X, y: cardY, width: CONTENT_WIDTH, height: cardHeight, fill: COMPOSER_PALETTE.panel, radius: 28 }];
+  const placed: Placed[] = [{ text: title, left: MARGIN_X + pad, top: cardY + pad }];
+  if (cta) {
+    const ctaTop = cardY + pad + title.height + gap;
+    rects.push({ x: MARGIN_X + pad, y: ctaTop, width: cta.width + 56, height: ctaHeight, fill: COMPOSER_PALETTE.accent, radius: ctaHeight / 2 });
+    placed.push({ text: cta, left: MARGIN_X + pad + 28, top: ctaTop + 12 });
   }
   return finish(background, rects, placed, contrast, placement);
 }
@@ -630,9 +707,18 @@ async function renderStepsV2(main: Buffer, steps: Buffer[], metadata: StepByStep
  * The final Pin image for a composer contract. Step-by-step v2 also needs one
  * photo per step panel. Throws ComposerRenderError — never a partial image.
  */
-export async function renderComposedPin(photo: Buffer, metadata: ComposerMetadata, stepPhotos: Buffer[] = []): Promise<ComposedPin> {
+export async function renderComposedPin(
+  photo: Buffer,
+  metadata: ComposerMetadata,
+  stepPhotos: Buffer[] = [],
+  options: { cropVariant?: number } = {}
+): Promise<ComposedPin> {
+  if (metadata.templateType === 'listicle_article_image') {
+    return renderListicle(photo, metadata.text, options.cropVariant ?? metadata.source.crop);
+  }
   if (metadata.templateType === 'hero') return renderHero(photo, metadata.text);
   if (metadata.templateType === 'materials_and_tools') return renderMaterials(photo, metadata.text);
   if (isStepByStepV2(metadata)) return renderStepsV2(photo, stepPhotos, metadata);
-  return renderSteps(photo, metadata.text);
+  if (metadata.templateType === 'step_by_step') return renderSteps(photo, metadata.text);
+  throw new ComposerRenderError('Unknown composer template');
 }

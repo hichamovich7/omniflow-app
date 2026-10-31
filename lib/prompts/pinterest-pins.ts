@@ -5,7 +5,7 @@ import { getNicheVisualConvention, DEFAULT_NICHE_CONVENTION } from '@/lib/ai/nic
 import { BANNER_TEMPLATES, isIntegratedTextEnabled } from '@/lib/validations/pinterest';
 import type { TextOverlayMode } from '@/lib/validations/pinterest';
 import type { AiIntegratedSettings } from '@/lib/pinterest/ai-integrated';
-import type { PinterestGenerationMode } from '@/types/pinterest';
+import type { PinterestAngle, PinterestGenerationMode } from '@/types/pinterest';
 import { BANNER_TEMPLATE_DESCRIPTIONS } from '@/lib/pinterest/banner-templates';
 import { resolveNicheContext } from '@/lib/niche/resolve';
 import type { NicheSettings } from '@/lib/niche/settings';
@@ -43,6 +43,12 @@ interface PromptContext {
    * image is kept. Absent = full generation contract, unchanged.
    */
   textOnlyRewrite?: boolean;
+  /**
+   * Numbered listicle article (TASK-083): the count the article states and
+   * the angle of each Pin (at least half Listicle / Article Promise). Absent
+   * = the existing angle distribution, unchanged.
+   */
+  listicle?: { number: string; anglePlan: PinterestAngle[] };
 }
 
 // Room/space nouns across the 4 supported content languages (en, de, es, fr).
@@ -173,7 +179,9 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
       ? `\n- Do not include titleBannerTemplate. The server selects the Headline template deterministically from angle and the niche's allowed templates.`
       : '');
 
-  const angleDistributionInstruction = ctx.aiIntegrated?.strategy === 'manual'
+  const angleDistributionInstruction = ctx.listicle
+    ? buildListicleAngleInstruction(ctx.listicle)
+    : ctx.aiIntegrated?.strategy === 'manual'
     ? `Use the "${ctx.aiIntegrated.manualAngle}" angle for every pin.`
     : ctx.aiIntegrated?.strategy === 'ai-recommends'
       ? 'Choose the strongest grounded angle for each pin. Diversity is desirable, but do not force equal distribution.'
@@ -310,6 +318,22 @@ function buildCustomAngleInstruction(pinsRequested: number): string {
     ? ' Pins that share an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
     : ' Every pin uses a different angle.';
   return `Use the angles in this exact order, one per pin: ${plan}.${variation}`;
+}
+
+/**
+ * TASK-083 — numbered listicle article: the exact angle of each pin and the
+ * article's count, which every Listicle / Article Promise title carries.
+ */
+function buildListicleAngleInstruction({ number, anglePlan }: { number: string; anglePlan: PinterestAngle[] }): string {
+  const plan = anglePlan.map((angle, index) => `pin ${index + 1} = "${angle}"`).join(', ');
+  const variation = new Set(anglePlan).size < anglePlan.length
+    ? ' Pins that share an angle must use different hook structures, promises, descriptions, and image scenes — not synonym swaps.'
+    : ' Every pin uses a different angle.';
+  return (
+    `Use the angles in this exact order, one per pin: ${plan}.${variation} ` +
+    `The source article confirms an exact count: ${number}. Every "listicle" and every "article-promise" pin must include this exact number, written as the digits "${number}", in its title, and keep the article's exact promise (what those ${number} items are). ` +
+    `Never use another count, never the number of pins in this batch, and never add "best", "viral", "most popular", "easy" or any other promise the article does not make. The other pins do not need the number.`
+  );
 }
 
 // AI Integrated asks for an extra `integratedText` object (headline, subtitle,

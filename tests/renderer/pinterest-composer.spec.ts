@@ -118,7 +118,9 @@ const NO_LISTS_EN = article(
 );
 
 const SINGLE_TEMPLATES = ['hero', 'materials_and_tools'] as const;
-const TEMPLATES: ComposerTemplateType[] = ['hero', 'materials_and_tools', 'step_by_step'];
+// TASK-083's listicle_article_image is composed on an article photo: covered in pinterest-listicle.spec.ts.
+type ProviderPhotoTemplate = Exclude<ComposerTemplateType, 'listicle_article_image'>;
+const TEMPLATES: ProviderPhotoTemplate[] = ['hero', 'materials_and_tools', 'step_by_step'];
 
 function build(
   template: (typeof SINGLE_TEMPLATES)[number],
@@ -172,7 +174,7 @@ function historicalV2(): StepByStepV2Metadata {
   };
 }
 
-function anyTemplate(template: ComposerTemplateType, context: WordPressArticleContext): ComposerMetadata {
+function anyTemplate(template: ProviderPhotoTemplate, context: WordPressArticleContext): ComposerMetadata {
   return template === 'step_by_step' ? historicalV2() : build(template, context, { hasDestination: true });
 }
 

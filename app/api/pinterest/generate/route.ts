@@ -50,12 +50,20 @@ import {
   COMPOSER_INELIGIBLE_MESSAGES,
   attachComposerMetadata,
   buildComposerMetadata,
+  buildListicleComposerMetadata,
   composerEligibility,
   composerTemplateForStyle,
   verifyComposerText,
   type ComposerMetadata,
 } from '@/lib/pinterest/composer/content';
 import { describeSectionImages, referenceImageHosts } from '@/lib/pinterest/article-vision';
+import {
+  buildListicleAnglePlan,
+  detectListicleNumber,
+  isNumberedAngle,
+  planListicleImageSources,
+  validateListicleBatch,
+} from '@/lib/pinterest/listicle';
 import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
 import { generationSourceColumns, loadWordPressPostPinterestSource } from '@/lib/social/pinterest-from-wordpress-post';
 import { WordPressReadError } from '@/lib/wordpress/post-reader';
@@ -299,6 +307,14 @@ export async function POST(request: Request) {
     ? buildArticlePinterestContext(articleSource, keyword, articleGrounding)
     : null;
 
+  // TASK-083: an article that states an exact count (H1, else a reliable
+  // numbered list) gets at least half numbered Pins. Never with a manual or
+  // AI-recommended angle strategy; Keyword and Research flows never get here.
+  const listicleNumber = articleSource && (!aiIntegrated || aiIntegrated.strategy === 'balanced')
+    ? detectListicleNumber(articleSource.context)
+    : null;
+  const listicleAnglePlan = listicleNumber ? buildListicleAnglePlan(pinsRequested) : null;
+
   if (analysisId) {
     const { data: analysis } = await supabase
       .from('content_analyses')
@@ -403,6 +419,9 @@ export async function POST(request: Request) {
       analysisContext: analysisContext ?? undefined,
       referenceStyleGuidance,
       articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
+      ...(listicleNumber && listicleAnglePlan
+        ? { listicle: { number: listicleNumber.value, anglePlan: listicleAnglePlan } }
+        : {}),
     });
 
     const content = await generateText({
@@ -452,13 +471,18 @@ export async function POST(request: Request) {
     });
 
     const enforceBalancedAngles = !aiIntegrated || aiIntegrated.strategy === 'balanced';
+    const sourceEvidence = [keyword, analysisContext].filter(Boolean).join('\n');
     const validateBatch = (pinsToCheck: typeof resolvedPins) => [
       ...validatePinterestStrategyBatch(
         pinsToCheck,
         pinsRequested,
-        [keyword, analysisContext].filter(Boolean).join('\n'),
-        { enforceBalancedAngles }
+        sourceEvidence,
+        // A numbered batch follows its own plan instead of the even balance.
+        { enforceBalancedAngles: enforceBalancedAngles && !listicleAnglePlan }
       ),
+      ...(listicleNumber && listicleAnglePlan
+        ? validateListicleBatch(pinsToCheck, listicleAnglePlan, listicleNumber.value, sourceEvidence)
+        : []),
       ...(articleSource && enforceBalancedAngles
         ? validateDistinctAngles(pinsToCheck, pinsRequested)
         : []),
@@ -550,7 +574,44 @@ export async function POST(request: Request) {
     const pinTemplates = articleGrounding?.pinTemplates
       ? assignPinArchetypes(articleGrounding.sectionPlan, articleGrounding.pinTemplates, resolvedPins.map((pin) => pin.sourceSectionId))
       : null;
+    // TASK-083: every numbered Pin (Listicle / Article Promise, number checked
+    // above) is composed on one of the article's own photos — no image model.
+    // Without a usable photo it keeps the path it would have had.
+    const listicleByPin = new Map<number, ComposerMetadata>();
+    if (listicleNumber && articleSource) {
+      const numbered = resolvedPins.flatMap((pin, i) => (isNumberedAngle(pin.angle) ? [i] : []));
+      const sources = planListicleImageSources(
+        articleSource.context,
+        numbered.map((i) => resolvedPins[i].sourceSectionId),
+        referenceImageHosts(articleSource.siteUrl ?? null)
+      );
+      numbered.forEach((pinIndex, k) => {
+        const source = sources[k];
+        if (!source) return;
+        const pin = resolvedPins[pinIndex];
+        const metadata = buildListicleComposerMetadata({
+          pinTitle: pin.title,
+          number: listicleNumber.value,
+          source,
+          context: articleSource.context,
+          sectionId: pin.sourceSectionId,
+          language,
+          hasDestination: Boolean(destination.linkUrl),
+          ctaIndex: pinIndex,
+        });
+        const issues = metadata ? verifyComposerText(metadata, articleSource.context, { pinTitle: pin.title }) : [];
+        if (metadata && issues.length === 0) listicleByPin.set(pinIndex, metadata);
+        // Codes and fields only — never the text or the image URL.
+        else console.warn(`[${PROMPT_ID}] Numbered Pin composition rejected: ${JSON.stringify({ pin: pinIndex + 1, issues })}`);
+      });
+      // Counts only: no Pin text, no URL.
+      console.log(
+        `[${PROMPT_ID}] Listicle: ${JSON.stringify({ source: listicleNumber.source, pins: resolvedPins.length, numbered: numbered.length, articleImages: listicleByPin.size })}`
+      );
+    }
     const composerByPin: (ComposerMetadata | null)[] = resolvedPins.map((pin, i) => {
+      const listicle = listicleByPin.get(i);
+      if (listicle) return listicle;
       const template = pinTemplates?.[i];
       if (!template || !articleSource) return null;
       const metadata = buildComposerMetadata(template, articleSource.context, {

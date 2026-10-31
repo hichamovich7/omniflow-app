@@ -104,11 +104,14 @@ function homeDecorPlan(curtainPrompt: string, sectionIds: string[]) {
     'A modern living room with a chrome bar cart on wheels and two glass shelves, wide shot, photorealistic.',
     curtainPrompt,
   ];
-  const titles = ['Was ein Samtsofa mit dem Raumgefühl macht', 'Barwagen im Alltag: Wo er wirklich hilft', 'Samtvorhänge im Wohnzimmer: Welche Farbe wirkt?'];
+  // Its three numbered ideas (1., 2., 3.) are a reliable list (TASK-083): two
+  // of three Pins carry the count "3" (Listicle / Article Promise).
+  const angles = ['listicle', 'curiosity', 'article-promise'] as const;
+  const titles = ['3 elegante Neo-Deco-Ideen fürs Wohnzimmer', 'Barwagen im Alltag: Wo er wirklich hilft', 'Samtvorhänge im Wohnzimmer: eine von 3 Neo-Deco-Ideen'];
   return JSON.stringify({
     pins: sectionIds.map((sourceSectionId, index) => ({
       sourceSectionId,
-      angle: ANGLES[index],
+      angle: angles[index],
       title: titles[index],
       description: 'Eine Idee aus dem Neo-Deco-Wohnzimmer, die den Raum ruhiger und eleganter wirken lässt. Merke dir den Pin für dein nächstes Projekt.',
       keywords: 'neo deco, wohnzimmer, art deco',
@@ -133,11 +136,14 @@ function catPlan(kittenPrompt: string, sectionIds: string[]) {
     'A flat heart-shaped crochet ornament with an embroidered cat face, overhead on a plain light gray surface, soft natural light, photorealistic.',
     'A ginger amigurumi crochet toy cat with a Santa hat and a scarf, worked in the round, plain white backdrop, soft natural light, photorealistic.',
   ];
-  const titles = ['What Makes a Crochet Kitten Feel Festive?', 'A Flat Cat Ornament for Quick Holiday Gifts', 'Christmas Cat Amigurumi You Can Follow Round by Round'];
+  // Post 2119 states "6 Festive Crochet Cat Patterns" (TASK-083): two of three
+  // Pins are numbered (Listicle / Article Promise), the third is Curiosity.
+  const angles = ['listicle', 'curiosity', 'article-promise'] as const;
+  const titles = ['6 Festive Crochet Cat Patterns to Make for the Tree', 'A Flat Cat Ornament for Quick Holiday Gifts', 'Christmas Cat Amigurumi: All 6 Patterns Round by Round'];
   return JSON.stringify({
     pins: sectionIds.map((sourceSectionId, index) => ({
       sourceSectionId,
-      angle: ANGLES[index],
+      angle: angles[index],
       title: titles[index],
       description: 'A festive crochet cat idea from this Christmas pattern roundup. Save this Pin for your next holiday crochet session.',
       keywords: 'crochet cat, christmas crochet, amigurumi',

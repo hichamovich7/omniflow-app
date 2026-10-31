@@ -1,5 +1,5 @@
 import { optimizeImage, type OptimizedImage } from '@/lib/media/optimize-image';
-import { composerPhotoInstruction, isStepByStepV2, STEP_PANEL_COUNT, type ComposerMetadata } from './content';
+import { composerPhotoInstruction, isListicleArticleImage, isStepByStepV2, STEP_PANEL_COUNT, type ComposerMetadata } from './content';
 import { COMPOSER_CANVAS, ComposerRenderError, renderComposedPin, type ComposedPin } from './render';
 
 /**
@@ -29,8 +29,9 @@ export function composerImagePrompt(basePrompt: string, metadata: ComposerMetada
   return [basePrompt, '', instruction].join('\n');
 }
 
-/** Image calls one composed Pin makes: 1, or 1 + one per step panel for Step-by-step v2. */
+/** Image calls one composed Pin makes: 1, 1 + one per step panel for Step-by-step v2, none on an article photo (TASK-083). */
 export function composerImageCallCount(metadata: ComposerMetadata): number {
+  if (isListicleArticleImage(metadata)) return 0;
   return isStepByStepV2(metadata) ? 1 + STEP_PANEL_COUNT : 1;
 }
 
@@ -40,6 +41,9 @@ export function composerImageCallCount(metadata: ComposerMetadata): number {
  * Destination URL (never added when one appears later).
  */
 export function metadataForRender(metadata: ComposerMetadata, hasDestination: boolean): ComposerMetadata {
+  if (metadata.templateType === 'listicle_article_image') {
+    return hasDestination || metadata.text.cta === null ? metadata : { ...metadata, text: { ...metadata.text, cta: null } };
+  }
   if (metadata.templateType !== 'hero' || hasDestination || metadata.text.cta === null) return metadata;
   return { ...metadata, text: { ...metadata.text, cta: null } };
 }
@@ -50,9 +54,11 @@ export async function composePinImage(input: {
   stepPhotos?: Buffer[];
   metadata: ComposerMetadata;
   hasDestination: boolean;
+  /** Numbered list on an article photo: the crop / layout variant to render (defaults to the planned one). */
+  cropVariant?: number;
 }): Promise<ComposedPinImage> {
   const metadata = metadataForRender(input.metadata, input.hasDestination);
-  const composed = await renderComposedPin(input.photo, metadata, input.stepPhotos ?? []);
+  const composed = await renderComposedPin(input.photo, metadata, input.stepPhotos ?? [], { cropVariant: input.cropVariant });
   const optimized = await optimizeImage(composed.buffer, 'pinterest-pin');
   if (optimized.width !== COMPOSER_CANVAS.width || optimized.height !== COMPOSER_CANVAS.height) {
     throw new ComposerRenderError(`Composed Pin is ${optimized.width}x${optimized.height}, expected 1000x1500`);

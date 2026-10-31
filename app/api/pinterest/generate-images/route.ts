@@ -40,12 +40,16 @@ import {
   sanitizeFinalPinterestImage,
 } from '@/lib/pinterest/ai-integrated';
 import {
+  ARTICLE_IMAGE_MODEL,
+  isListicleArticleImage,
   isStepByStepV2,
   markComposerRendered,
   readComposerMetadata,
   type ComposerMetadata,
 } from '@/lib/pinterest/composer/content';
 import { composePinImage, composerImagePrompt } from '@/lib/pinterest/composer/pipeline';
+import { loadArticlePhoto } from '@/lib/pinterest/composer/article-image';
+import { referenceImageHosts } from '@/lib/pinterest/article-vision';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -439,6 +443,17 @@ export async function POST(request: Request) {
 }
 
 /**
+ * Hosts an article photo may be read from at render time: OmniFlow media
+ * storage and the user's own connected WordPress sites — checked again here
+ * rather than trusting the URL stored on the Pin.
+ */
+async function articleImageHosts(supabase: SupabaseServerClient, userId: string): Promise<string[]> {
+  const { data } = await supabase.from('wordpress_sites').select('site_url').eq('user_id', userId);
+  const sites = ((data ?? []) as Array<{ site_url: string | null }>).map((site) => site.site_url);
+  return [...new Set([...referenceImageHosts(null), ...sites.flatMap((siteUrl) => referenceImageHosts(siteUrl, {}))])];
+}
+
+/**
  * TASK-079: a composed Pin — one photo without text (photo model; Step-by-step
  * v2: plus one per step panel, at most 4 calls), then the stored article text
  * rendered by OmniFlow. Nothing is stored unless the
@@ -455,12 +470,26 @@ async function generateComposedPin(params: {
   nextVersion: number;
 }): Promise<string> {
   const { supabase, mediaStorage, pin, composer, nextVersion } = params;
-  const { model: imageModel } = resolveImageModel('photo-only');
-  const photo = await generateImage({
-    prompt: composerImagePrompt(appendArticleVisualBrief(buildImagePrompt(pin, nextVersion), pin.image_analysis), composer),
-    size: IMAGE_CONFIG.size,
-    visualFormat: 'photo-only',
-  });
+  // TASK-083: a numbered Pin is composed on the article's own photo, read
+  // (GET only) from the connected site or OmniFlow storage — no image model
+  // call. Fallback: the featured image when the section photo is unreadable.
+  const listicle = isListicleArticleImage(composer) ? composer : null;
+  let imageModel: string;
+  let photo: Buffer;
+  let renderWarnings: string[] = [];
+  if (listicle) {
+    imageModel = ARTICLE_IMAGE_MODEL;
+    const loaded = await loadArticlePhoto(listicle.source, await articleImageHosts(supabase, params.userId));
+    photo = loaded.photo;
+    renderWarnings = loaded.warnings;
+  } else {
+    imageModel = resolveImageModel('photo-only').model;
+    photo = await generateImage({
+      prompt: composerImagePrompt(appendArticleVisualBrief(buildImagePrompt(pin, nextVersion), pin.image_analysis), composer),
+      size: IMAGE_CONFIG.size,
+      visualFormat: 'photo-only',
+    });
+  }
   // Step-by-step v2: one photo per step panel, from its stored deterministic
   // prompt, one after the other, in memory. Any failure stores nothing.
   const stepPhotos: Buffer[] = [];
@@ -473,7 +502,14 @@ async function generateComposedPin(params: {
       }
     }
   }
-  const { optimized, metadata } = await composePinImage({ photo, stepPhotos, metadata: composer, hasDestination: Boolean(pin.link_url) });
+  const { optimized, metadata } = await composePinImage({
+    photo,
+    stepPhotos,
+    metadata: composer,
+    hasDestination: Boolean(pin.link_url),
+    // Each "Regenerate image" of a numbered Pin moves to the next crop / layout of the same photo.
+    ...(listicle ? { cropVariant: listicle.source.crop + nextVersion - 1 } : {}),
+  });
   console.log(`[pinterest images] pin ${pin.id} composer ${metadata.templateType} ${describeOptimization(optimized)}`);
 
   const composedPath = getPinImageObjectKey(mediaStorage.provider, {
@@ -533,7 +569,7 @@ async function generateComposedPin(params: {
     .from('pins')
     .update({
       media_url: storedComposed.publicUrl,
-      image_analysis: markComposerRendered(pin.image_analysis, metadata, []),
+      image_analysis: markComposerRendered(pin.image_analysis, metadata, renderWarnings),
     })
     .eq('id', pin.id);
   if (pinError) {

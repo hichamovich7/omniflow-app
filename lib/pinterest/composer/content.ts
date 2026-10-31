@@ -16,15 +16,16 @@ import type { PinterestVisualStyle } from '@/types/pinterest';
  * Destination URL. Pure and offline: no AI, storage or network call.
  */
 
-export const COMPOSER_TEMPLATE_TYPES = ['hero', 'materials_and_tools', 'step_by_step'] as const;
+export const COMPOSER_TEMPLATE_TYPES = ['hero', 'materials_and_tools', 'step_by_step', 'listicle_article_image'] as const;
 export type ComposerTemplateType = (typeof COMPOSER_TEMPLATE_TYPES)[number];
 /**
- * The formats a new Pin may get. `step_by_step` was withdrawn (2026-10-29,
- * replaced by the planned Pinterest Detailed Tutorial Infographic, TASK-080):
- * it stays a stored type only, so older Pins are still read, shown and
- * regenerated.
+ * The formats a visual style may ask for. `step_by_step` was withdrawn
+ * (2026-10-29, replaced by the planned Pinterest Detailed Tutorial
+ * Infographic, TASK-080): it stays a stored type only, so older Pins are
+ * still read, shown and regenerated. `listicle_article_image` (TASK-083) is
+ * never chosen by a style: it is given automatically to numbered Pins.
  */
-export type OfferedTemplateType = Exclude<ComposerTemplateType, 'step_by_step'>;
+export type OfferedTemplateType = Exclude<ComposerTemplateType, 'step_by_step' | 'listicle_article_image'>;
 export const COMPOSER_TEMPLATE_VERSION = 'v1';
 /** Historical Step-by-step v2 contracts (one photo per step panel); v1 = one photo + step cards. Never created any more. */
 export const STEP_BY_STEP_TEMPLATE_VERSION = 'v2';
@@ -41,7 +42,13 @@ export const COMPOSER_TEMPLATE_LABELS: Record<ComposerTemplateType, string> = {
   hero: 'Hero',
   materials_and_tools: 'Materials & tools',
   step_by_step: 'Step-by-step',
+  listicle_article_image: 'Numbered list (article photo)',
 };
+
+/** TASK-083: crop / layout variants of a numbered Pin's article photo. */
+export const LISTICLE_CROP_VARIANTS = 4;
+/** `pin_images.image_model` of a Pin composed on an article photo: no image model was called. */
+export const ARTICLE_IMAGE_MODEL = 'omniflow-composer/article-image';
 
 export const COMPOSER_LIMITS = {
   title: 90,
@@ -339,20 +346,52 @@ const stepsV2MetadataSchema = z
   })
   .strict();
 
+// TASK-083: the validated Pin title (with the article's number) on the article's own photo.
+const listicleTextSchema = z
+  .object({
+    title: shortText(120),
+    number: z.string().regex(/^[1-9]\d{0,3}$/),
+    cta: shortText(60).nullable(),
+  })
+  .strict();
+
+const listicleSourceSchema = z
+  .object({
+    imageUrl: z.string().url().max(2048),
+    imageKey: z.string().max(2048).nullable(),
+    origin: z.enum(['section', 'featured']),
+    sectionId: z.string().min(1).max(40).nullable(),
+    fallbackUrl: z.string().url().max(2048).nullable(),
+    crop: z.number().int().min(0).max(LISTICLE_CROP_VARIANTS - 1),
+  })
+  .strict();
+
+const listicleMetadataSchema = z
+  .object({ templateType: z.literal('listicle_article_image'), ...v1, text: listicleTextSchema, source: listicleSourceSchema })
+  .strict();
+
 const composerMetadataSchema = z.union([
   z.object({ templateType: z.literal('hero'), ...v1, text: heroTextSchema }).strict(),
   z.object({ templateType: z.literal('materials_and_tools'), ...v1, text: materialsTextSchema }).strict(),
   z.object({ templateType: z.literal('step_by_step'), ...v1, text: stepsTextSchema }).strict(),
   stepsV2MetadataSchema,
+  listicleMetadataSchema,
 ]);
 
 export type ComposerMetadata = z.infer<typeof composerMetadataSchema>;
 export type StepByStepV2Metadata = z.infer<typeof stepsV2MetadataSchema>;
+export type ListicleMetadata = z.infer<typeof listicleMetadataSchema>;
+export type ComposerListicleText = z.infer<typeof listicleTextSchema>;
+export type ListicleSource = z.infer<typeof listicleSourceSchema>;
 export type ComposerStepPanel = z.infer<typeof stepPanelSchema>;
 export type ComposerHeroText = z.infer<typeof heroTextSchema>;
 export type ComposerMaterialsText = z.infer<typeof materialsTextSchema>;
 export type ComposerStepsText = z.infer<typeof stepsTextSchema>;
 export type ComposerStepsV2Text = z.infer<typeof stepsV2TextSchema>;
+
+export function isListicleArticleImage(metadata: ComposerMetadata): metadata is ListicleMetadata {
+  return metadata.templateType === 'listicle_article_image';
+}
 
 export function isStepByStepV2(metadata: ComposerMetadata): metadata is StepByStepV2Metadata {
   return metadata.templateType === 'step_by_step' && metadata.templateVersion === STEP_BY_STEP_TEMPLATE_VERSION;
@@ -428,8 +467,79 @@ export function buildComposerMetadata(
   };
 }
 
+const LISTICLE_TITLE_SHORT = 70;
+
+function numbersOf(text: string): Set<string> {
+  return new Set((text.match(/\p{Number}+/gu) ?? []).map((digits) => String(Number(digits))));
+}
+
+/**
+ * The words a numbered Pin shows: its validated title, shortened at a
+ * separator ("15 Crochet Blankets: Cozy Ideas…" → "15 Crochet Blankets")
+ * only while the number stays in it.
+ */
+export function listicleDisplayTitle(pinTitle: string, number: string): string | null {
+  const full = collapse(pinTitle);
+  if (!full || !numbersOf(full).has(number)) return null;
+  const short = shorten(full, LISTICLE_TITLE_SHORT);
+  if (short && numbersOf(short).has(number)) return short;
+  return full.length <= 120 ? full : null;
+}
+
+/**
+ * TASK-083: the contract of a numbered Pin — its validated title and the
+ * article's number on one of the article's own photos. Null when the title
+ * does not carry the number.
+ */
+export function buildListicleComposerMetadata(input: {
+  pinTitle: string;
+  number: string;
+  source: ListicleSource;
+  context: WordPressArticleContext;
+  sectionId?: string | null;
+  language: string;
+  hasDestination: boolean;
+  ctaIndex: number;
+}): ListicleMetadata | null {
+  const title = listicleDisplayTitle(input.pinTitle, input.number);
+  if (!title) return null;
+  const section = input.context.sections.find((item) => item.id === input.sectionId) ?? null;
+  return {
+    templateType: 'listicle_article_image',
+    templateVersion: COMPOSER_TEMPLATE_VERSION,
+    renderedBy: COMPOSER_RENDERED_BY,
+    language: input.language,
+    status: 'planned',
+    sourceSections: [section?.id ?? input.context.sections[0]?.id ?? 's0'],
+    sourceHeadings: section ? [section.heading || section.subject] : [],
+    warnings: [],
+    text: {
+      title,
+      number: input.number,
+      cta: input.hasDestination ? pickCtaMessage(input.language, input.ctaIndex) : null,
+    },
+    source: input.source,
+  };
+}
+
+/** Every image URL the article shows (featured + in-body): the only photos a numbered Pin may use. */
+function articleImageUrlSet(context: WordPressArticleContext): Set<string> {
+  return new Set(
+    [
+      context.featuredImage?.url,
+      ...context.internalImages.map((image) => image.url),
+      ...context.sections.flatMap((section) => section.images.map((image) => image.url)),
+    ].filter((url): url is string => Boolean(url))
+  );
+}
+
 export interface ComposerTextIssue {
-  code: 'COMPOSER_TEXT_NOT_IN_ARTICLE' | 'COMPOSER_CTA_NOT_ALLOWED' | 'COMPOSER_SOURCE_SECTION_UNKNOWN';
+  code:
+    | 'COMPOSER_TEXT_NOT_IN_ARTICLE'
+    | 'COMPOSER_CTA_NOT_ALLOWED'
+    | 'COMPOSER_SOURCE_SECTION_UNKNOWN'
+    | 'COMPOSER_TEXT_NOT_IN_TITLE'
+    | 'COMPOSER_SOURCE_IMAGE_UNKNOWN';
   field: string;
 }
 
@@ -441,7 +551,11 @@ function ctaVariants(language: string): string[] {
  * Every word a composed Pin shows must be in the article (numbers included);
  * the CTA must be one of the fixed localized phrases. An empty list = valid.
  */
-export function verifyComposerText(metadata: ComposerMetadata, context: WordPressArticleContext): ComposerTextIssue[] {
+export function verifyComposerText(
+  metadata: ComposerMetadata,
+  context: WordPressArticleContext,
+  options: { pinTitle?: string } = {}
+): ComposerTextIssue[] {
   const corpus = articleCorpus(context);
   const issues: ComposerTextIssue[] = [];
   const check = (field: string, text: string | null) => {
@@ -452,7 +566,27 @@ export function verifyComposerText(metadata: ComposerMetadata, context: WordPres
     if (!known.has(id)) issues.push({ code: 'COMPOSER_SOURCE_SECTION_UNKNOWN', field: `sourceSections.${index}` });
   });
 
-  if (metadata.templateType === 'hero') {
+  if (metadata.templateType === 'listicle_article_image') {
+    // The number comes from the article (H1 or its numbered list), the words
+    // from the Pin's validated title, the photo is one the article shows.
+    const articleNumbers = numbersOf([context.title, ...context.sections.map((section) => section.heading)].join('\n'));
+    if (!articleNumbers.has(metadata.text.number)) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'number' });
+    const titleNumbers = numbersOf(metadata.text.title);
+    if (!titleNumbers.has(metadata.text.number)) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title.number' });
+    const corpusNumbers = numbersOf(corpus);
+    if ([...titleNumbers].some((value) => !corpusNumbers.has(value))) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'title.numbers' });
+    if (options.pinTitle === undefined || !normalizeForMatch(options.pinTitle).includes(normalizeForMatch(metadata.text.title))) {
+      issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title' });
+    }
+    if (metadata.text.cta !== null && !ctaVariants(metadata.language).includes(metadata.text.cta)) {
+      issues.push({ code: 'COMPOSER_CTA_NOT_ALLOWED', field: 'cta' });
+    }
+    const images = articleImageUrlSet(context);
+    if (!images.has(metadata.source.imageUrl)) issues.push({ code: 'COMPOSER_SOURCE_IMAGE_UNKNOWN', field: 'source.imageUrl' });
+    if (metadata.source.fallbackUrl !== null && !images.has(metadata.source.fallbackUrl)) {
+      issues.push({ code: 'COMPOSER_SOURCE_IMAGE_UNKNOWN', field: 'source.fallbackUrl' });
+    }
+  } else if (metadata.templateType === 'hero') {
     check('title', metadata.text.title);
     check('subtitle', metadata.text.subtitle);
     if (metadata.text.cta !== null && !ctaVariants(metadata.language).includes(metadata.text.cta)) {

@@ -49,6 +49,8 @@ const RETRYABLE: Record<PinterestSafeguardReason, boolean> = {
   IMAGE_SUBJECT_MISMATCH: true,
   UNGROUNDED_IMAGE_ELEMENTS: true,
   UNGROUNDED_TEXT_ELEMENTS: true,
+  LISTICLE_ANGLE_PLAN: true,
+  LIST_NUMBER_MISSING: true,
 };
 
 const FALLBACK_REASON: Record<PinterestStrategyIssueCode, PinterestSafeguardReason> = {
@@ -166,6 +168,20 @@ function describe(issue: PinterestStrategyIssue, scope: StrategySafeguardScope):
         message:
           `${pin}'s ${field} names elements the article never mentions` +
           (details.length ? `: ${details.join(', ')}.` : '.'),
+        action: 'Try again.',
+      };
+    case 'LISTICLE_ANGLE_PLAN': {
+      const [expected, ...found] = details;
+      return {
+        message:
+          'The Pins do not follow the numbered-list plan (half of them Listicle or Article Promise)' +
+          (expected ? ` — expected ${expected}${found.length ? `; got ${found.join(', ')}` : ''}.` : '.'),
+        action: 'Try again — a new attempt usually follows the plan.',
+      };
+    }
+    case 'LIST_NUMBER_MISSING':
+      return {
+        message: `${pin}'s title must include the article's number${details[0] ? ` (${details[0]})` : ''}.`,
         action: 'Try again.',
       };
   }

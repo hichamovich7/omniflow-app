@@ -77,6 +77,7 @@ const VISUAL_FORMAT_LABELS: Record<string, string> = {
   hero: 'Hero',
   materials_and_tools: 'Materials & tools',
   step_by_step: 'Step-by-step',
+  listicle_article_image: 'Numbered list (article photo)',
 };
 
 export interface PinVisualFormatDisplay {
@@ -100,6 +101,7 @@ const STEP_LAYOUT_LABELS: Record<string, string> = {
 };
 
 function describeComposerWarning(code: string): string {
+  if (code === 'SOURCE_FALLBACK_FEATURED') return "Section photo unavailable: the article's featured image was used";
   const truncated = /^STEPS_TRUNCATED:(\d+)\/(\d+)$/.exec(code);
   if (truncated) return `Shows the first ${truncated[1]} of ${truncated[2]} steps`;
   const selected = /^STEPS_SELECTED:(\d+)\/(\d+)$/.exec(code);
@@ -129,8 +131,8 @@ export function readPinVisualFormat(imageAnalysisJson: string | null): PinVisual
       warnings: strings(value.warnings).map(describeComposerWarning),
       layout,
       panelCount,
-      // One finished-project photo + one per step panel; every other composed Pin makes one call.
-      imageCalls: panelCount ? panelCount + 1 : 1,
+      // One finished-project photo + one per step panel; a numbered Pin uses the article photo (no call); others make one.
+      imageCalls: panelCount ? panelCount + 1 : value.templateType === 'listicle_article_image' ? 0 : 1,
     };
   } catch {
     return classic;

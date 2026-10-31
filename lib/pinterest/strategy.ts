@@ -40,7 +40,10 @@ export type PinterestSafeguardReason =
   | 'DUPLICATE_SOURCE_SECTION'
   | 'IMAGE_SUBJECT_MISMATCH'
   | 'UNGROUNDED_IMAGE_ELEMENTS'
-  | 'UNGROUNDED_TEXT_ELEMENTS';
+  | 'UNGROUNDED_TEXT_ELEMENTS'
+  // TASK-083 — numbered listicle batches only.
+  | 'LISTICLE_ANGLE_PLAN'
+  | 'LIST_NUMBER_MISSING';
 
 export type PinterestSafeguardField = 'angle' | 'title' | 'description' | 'keywords' | 'image_prompt' | 'sourceSectionId';
 
