@@ -246,7 +246,7 @@ test.describe('Templates — content comes from the article only', () => {
     expect(readComposerMetadata(attachComposerMetadata(null, v2))).toEqual(v2);
     expect(verifyComposerText(v2, CROCHET_EN)).toEqual([]);
     expect(readPinVisualFormat(attachComposerMetadata(null, v2)).warnings).toEqual(["Shows 3 of the article's 4 steps (first, middle and last)"]);
-    const v1: ComposerMetadata = { ...build('hero', CROCHET_EN), templateType: 'step_by_step', text: { title: v2.text.title, steps: v2.text.steps.map((step) => ({ label: step.label ?? '', title: step.title })) } };
+    const v1: ComposerMetadata = { ...(build('hero', CROCHET_EN) as Extract<ComposerMetadata, { templateType: 'hero' }>), templateType: 'step_by_step', text: { title: v2.text.title, steps: v2.text.steps.map((step) => ({ label: step.label ?? '', title: step.title })) } };
     expect(readComposerMetadata(attachComposerMetadata(null, v1))).toEqual(v1);
     expect(readPinVisualFormat(attachComposerMetadata(null, v1)).label).toBe('Step-by-step');
   });

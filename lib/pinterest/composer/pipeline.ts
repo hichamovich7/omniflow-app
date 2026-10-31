@@ -1,5 +1,5 @@
 import { optimizeImage, type OptimizedImage } from '@/lib/media/optimize-image';
-import { composerPhotoInstruction, isListicleArticleImage, isStepByStepV2, STEP_PANEL_COUNT, type ComposerMetadata } from './content';
+import { composerPhotoInstruction, isListicleArticleImage, isListicleV2, isStepByStepV2, STEP_PANEL_COUNT, type ComposerMetadata } from './content';
 import { COMPOSER_CANVAS, ComposerRenderError, renderComposedPin, type ComposedPin } from './render';
 
 /**
@@ -41,6 +41,9 @@ export function composerImageCallCount(metadata: ComposerMetadata): number {
  * Destination URL (never added when one appears later).
  */
 export function metadataForRender(metadata: ComposerMetadata, hasDestination: boolean): ComposerMetadata {
+  if (isListicleV2(metadata)) {
+    return hasDestination || metadata.text.cta === null ? metadata : { ...metadata, text: { ...metadata.text, cta: null } };
+  }
   if (metadata.templateType === 'listicle_article_image') {
     return hasDestination || metadata.text.cta === null ? metadata : { ...metadata, text: { ...metadata.text, cta: null } };
   }

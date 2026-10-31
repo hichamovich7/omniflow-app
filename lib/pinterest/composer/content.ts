@@ -47,6 +47,14 @@ export const COMPOSER_TEMPLATE_LABELS: Record<ComposerTemplateType, string> = {
 
 /** TASK-083: crop / layout variants of a numbered Pin's article photo. */
 export const LISTICLE_CROP_VARIANTS = 4;
+/**
+ * TASK-087: numbered Pins created from now on — a short per-idea title, the
+ * number in a badge, a safe crop. v1 contracts (the shortened Pin title on a
+ * cover crop) stay readable and keep their own rendering.
+ */
+export const LISTICLE_TEMPLATE_VERSION = 'v2';
+/** The visual title of a v2 numbered Pin: two lines at most on the panel. */
+export const LISTICLE_DISPLAY_TITLE_MAX = 42;
 /** `pin_images.image_model` of a Pin composed on an article photo: no image model was called. */
 export const ARTICLE_IMAGE_MODEL = 'omniflow-composer/article-image';
 
@@ -370,18 +378,42 @@ const listicleMetadataSchema = z
   .object({ templateType: z.literal('listicle_article_image'), ...v1, text: listicleTextSchema, source: listicleSourceSchema })
   .strict();
 
+// TASK-087: the full Pin title stays in `pins.title` (Pinterest, CSV); the
+// image shows a short visual title and the number in its own badge.
+const listicleV2TextSchema = z
+  .object({
+    displayTitle: shortText(LISTICLE_DISPLAY_TITLE_MAX),
+    number: z.string().regex(/^[1-9]\d{0,3}$/),
+    cta: shortText(60).nullable(),
+  })
+  .strict();
+
+const listicleV2MetadataSchema = z
+  .object({
+    templateType: z.literal('listicle_article_image'),
+    templateVersion: z.literal(LISTICLE_TEMPLATE_VERSION),
+    ...commonFields,
+    text: listicleV2TextSchema,
+    source: listicleSourceSchema,
+  })
+  .strict();
+
 const composerMetadataSchema = z.union([
   z.object({ templateType: z.literal('hero'), ...v1, text: heroTextSchema }).strict(),
   z.object({ templateType: z.literal('materials_and_tools'), ...v1, text: materialsTextSchema }).strict(),
   z.object({ templateType: z.literal('step_by_step'), ...v1, text: stepsTextSchema }).strict(),
   stepsV2MetadataSchema,
   listicleMetadataSchema,
+  listicleV2MetadataSchema,
 ]);
 
 export type ComposerMetadata = z.infer<typeof composerMetadataSchema>;
 export type StepByStepV2Metadata = z.infer<typeof stepsV2MetadataSchema>;
-export type ListicleMetadata = z.infer<typeof listicleMetadataSchema>;
+export type ListicleV1Metadata = z.infer<typeof listicleMetadataSchema>;
+export type ListicleV2Metadata = z.infer<typeof listicleV2MetadataSchema>;
+export type ListicleMetadata = ListicleV1Metadata | ListicleV2Metadata;
 export type ComposerListicleText = z.infer<typeof listicleTextSchema>;
+export type ComposerListicleV2Text = z.infer<typeof listicleV2TextSchema>;
 export type ListicleSource = z.infer<typeof listicleSourceSchema>;
 export type ComposerStepPanel = z.infer<typeof stepPanelSchema>;
 export type ComposerHeroText = z.infer<typeof heroTextSchema>;
@@ -391,6 +423,10 @@ export type ComposerStepsV2Text = z.infer<typeof stepsV2TextSchema>;
 
 export function isListicleArticleImage(metadata: ComposerMetadata): metadata is ListicleMetadata {
   return metadata.templateType === 'listicle_article_image';
+}
+
+export function isListicleV2(metadata: ComposerMetadata): metadata is ListicleV2Metadata {
+  return metadata.templateType === 'listicle_article_image' && metadata.templateVersion === LISTICLE_TEMPLATE_VERSION;
 }
 
 export function isStepByStepV2(metadata: ComposerMetadata): metadata is StepByStepV2Metadata {
@@ -467,29 +503,80 @@ export function buildComposerMetadata(
   };
 }
 
-const LISTICLE_TITLE_SHORT = 70;
-
 function numbersOf(text: string): Set<string> {
   return new Set((text.match(/\p{Number}+/gu) ?? []).map((digits) => String(Number(digits))));
 }
 
-/**
- * The words a numbered Pin shows: its validated title, shortened at a
- * separator ("15 Crochet Blankets: Cozy Ideas…" → "15 Crochet Blankets")
- * only while the number stays in it.
- */
-export function listicleDisplayTitle(pinTitle: string, number: string): string | null {
-  const full = collapse(pinTitle);
-  if (!full || !numbersOf(full).has(number)) return null;
-  const short = shorten(full, LISTICLE_TITLE_SHORT);
-  if (short && numbersOf(short).has(number)) return short;
-  return full.length <= 120 ? full : null;
+// ── Visual title of a numbered Pin (TASK-087) ──────────────────────────────
+
+// A list label in front of a heading or title part: "1.", "No. 3", "#4", "Idea 2:", "Idee 5 –".
+const LEADING_NUMBERING = /^\s*(?:(?:idea|ideas|idee|idée|ideia|tip|tipp|astuce|consejo|no\.?|nr\.?|n[°º]\.?|n\.|número|numéro|nummer|number|#)\s*)?\d+\s*(?:[.):\-–—]+\s*|\s+)/iu;
+// Linking words that a visual title never starts or ends with (EN / DE / FR / ES).
+const EDGE_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'with', 'for', 'from', 'of', 'in', 'on', 'to', 'at', 'by', 'plus', 'featuring', 'including', 'include', 'includes', 'meet',
+  'ein', 'eine', 'einen', 'einem', 'der', 'die', 'das', 'den', 'dem', 'und', 'oder', 'mit', 'für', 'von', 'im', 'zum', 'zur', 'zu', 'inklusive',
+  'un', 'une', 'le', 'la', 'les', "l'", 'et', 'ou', 'avec', 'pour', 'de', 'du', 'des', 'à', 'au', 'aux', 'en', 'sur', 'dont',
+  'una', 'el', 'los', 'las', 'y', 'o', 'con', 'para', 'del', 'al', 'por', 'incluyendo',
+]);
+
+function trimEdgeWords(words: string[]): string[] {
+  const out = [...words];
+  const edge = (word: string | undefined) => word !== undefined && EDGE_WORDS.has(word.toLowerCase().replace(/[.,;:!?]+$/, ''));
+  while (edge(out[0])) out.shift();
+  while (edge(out[out.length - 1])) out.pop();
+  return out;
+}
+
+/** A phrase as a short visual title: no list label, no linking word at either end, at most `max` characters cut between words. */
+function visualTitle(text: string, number: string, max = LISTICLE_DISPLAY_TITLE_MAX): string | null {
+  const cleaned = collapse(text.replace(/\s*\([^)]*\)/g, '').replace(LEADING_NUMBERING, '')).replace(/[\s.;:,!?–—-]+$/, '');
+  // The article's number belongs in the badge, never in the visual title.
+  if (!cleaned || numbersOf(cleaned).has(number)) return null;
+  let words = trimEdgeWords(cleaned.split(' '));
+  while (words.length > 0 && words.join(' ').length > max) words = trimEdgeWords(words.slice(0, -1));
+  const value = words.join(' ').replace(/[\s.;:,!?–—-]+$/, '');
+  return value.length >= 3 ? value : null;
 }
 
 /**
- * TASK-083: the contract of a numbered Pin — its validated title and the
- * article's number on one of the article's own photos. Null when the title
- * does not carry the number.
+ * The possible visual titles of a numbered Pin, best first, all taken from
+ * the source (no AI): its article section's subject, then the specific part
+ * of its title (after ":", "—", "–" or a comma), then the title without the
+ * number. Every candidate is a run of words of the section or the title.
+ */
+export function listicleDisplayTitleCandidates(input: {
+  pinTitle: string;
+  number: string;
+  section: { heading: string; subject: string } | null;
+}): string[] {
+  const parts = collapse(input.pinTitle).split(/\s*[:|]\s+|\s+[–—-]\s+|,\s+/).filter(Boolean);
+  const titleWords = collapse(input.pinTitle).split(' ');
+  const numberAt = titleWords.findIndex((word) => numbersOf(word).has(input.number));
+  const raw = [
+    input.section?.subject,
+    input.section?.heading,
+    // The specific part usually follows the article's promise: "12 … Ideas: Meet the Garden Caterpillar".
+    ...parts.slice(1).reverse(),
+    parts[0],
+    numberAt >= 0 ? titleWords.slice(numberAt + 1).join(' ') : null,
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const candidate of raw) {
+    const value = candidate ? visualTitle(candidate, input.number) : null;
+    if (!value || seen.has(normalizeForMatch(value))) continue;
+    seen.add(normalizeForMatch(value));
+    out.push(value);
+  }
+  return out;
+}
+
+/**
+ * The contract of a numbered Pin — a short visual title of its own idea, the
+ * article's number in a badge, one of the article's own photos (TASK-087,
+ * v2). `taken`: visual titles of the batch's other Pins (normalized), so two
+ * Pins on different sections never show the same words. Null when the title
+ * does not carry the number or no visual title can be taken from the source.
  */
 export function buildListicleComposerMetadata(input: {
   pinTitle: string;
@@ -500,13 +587,16 @@ export function buildListicleComposerMetadata(input: {
   language: string;
   hasDestination: boolean;
   ctaIndex: number;
-}): ListicleMetadata | null {
-  const title = listicleDisplayTitle(input.pinTitle, input.number);
-  if (!title) return null;
+  taken?: ReadonlySet<string>;
+}): ListicleV2Metadata | null {
+  if (!numbersOf(collapse(input.pinTitle)).has(input.number)) return null;
   const section = input.context.sections.find((item) => item.id === input.sectionId) ?? null;
+  const candidates = listicleDisplayTitleCandidates({ pinTitle: input.pinTitle, number: input.number, section });
+  const displayTitle = candidates.find((candidate) => !input.taken?.has(normalizeForMatch(candidate))) ?? candidates[0];
+  if (!displayTitle) return null;
   return {
     templateType: 'listicle_article_image',
-    templateVersion: COMPOSER_TEMPLATE_VERSION,
+    templateVersion: LISTICLE_TEMPLATE_VERSION,
     renderedBy: COMPOSER_RENDERED_BY,
     language: input.language,
     status: 'planned',
@@ -514,12 +604,17 @@ export function buildListicleComposerMetadata(input: {
     sourceHeadings: section ? [section.heading || section.subject] : [],
     warnings: [],
     text: {
-      title,
+      displayTitle,
       number: input.number,
       cta: input.hasDestination ? pickCtaMessage(input.language, input.ctaIndex) : null,
     },
     source: input.source,
   };
+}
+
+/** Comparison key of a visual title (the `taken` set of `buildListicleComposerMetadata`). */
+export function listicleDisplayKey(displayTitle: string): string {
+  return normalizeForMatch(displayTitle);
 }
 
 /** Every image URL the article shows (featured + in-body): the only photos a numbered Pin may use. */
@@ -571,12 +666,24 @@ export function verifyComposerText(
     // from the Pin's validated title, the photo is one the article shows.
     const articleNumbers = numbersOf([context.title, ...context.sections.map((section) => section.heading)].join('\n'));
     if (!articleNumbers.has(metadata.text.number)) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'number' });
-    const titleNumbers = numbersOf(metadata.text.title);
-    if (!titleNumbers.has(metadata.text.number)) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title.number' });
     const corpusNumbers = numbersOf(corpus);
-    if ([...titleNumbers].some((value) => !corpusNumbers.has(value))) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'title.numbers' });
-    if (options.pinTitle === undefined || !normalizeForMatch(options.pinTitle).includes(normalizeForMatch(metadata.text.title))) {
-      issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title' });
+    if ('displayTitle' in metadata.text) {
+      // v2: the Pin's title carries the number; the visual title is a run of
+      // words of that title or of the article (its section heading).
+      const display = metadata.text.displayTitle;
+      if (options.pinTitle === undefined || !numbersOf(options.pinTitle).has(metadata.text.number)) {
+        issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title.number' });
+      }
+      if ([...numbersOf(display)].some((value) => !corpusNumbers.has(value))) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'displayTitle.numbers' });
+      const inTitle = options.pinTitle !== undefined && normalizeForMatch(options.pinTitle).includes(normalizeForMatch(display));
+      if (!inTitle && !inSource(display, corpus)) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'displayTitle' });
+    } else {
+      const titleNumbers = numbersOf(metadata.text.title);
+      if (!titleNumbers.has(metadata.text.number)) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title.number' });
+      if ([...titleNumbers].some((value) => !corpusNumbers.has(value))) issues.push({ code: 'COMPOSER_TEXT_NOT_IN_ARTICLE', field: 'title.numbers' });
+      if (options.pinTitle === undefined || !normalizeForMatch(options.pinTitle).includes(normalizeForMatch(metadata.text.title))) {
+        issues.push({ code: 'COMPOSER_TEXT_NOT_IN_TITLE', field: 'title' });
+      }
     }
     if (metadata.text.cta !== null && !ctaVariants(metadata.language).includes(metadata.text.cta)) {
       issues.push({ code: 'COMPOSER_CTA_NOT_ALLOWED', field: 'cta' });

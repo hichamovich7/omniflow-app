@@ -55,6 +55,7 @@ import {
   buildListicleComposerMetadata,
   composerEligibility,
   composerTemplateForStyle,
+  listicleDisplayKey,
   verifyComposerText,
   type ComposerMetadata,
 } from '@/lib/pinterest/composer/content';
@@ -656,6 +657,8 @@ export async function POST(request: Request) {
         numbered.map((i) => resolvedPins[i].sourceSectionId),
         referenceImageHosts(articleSource.siteUrl ?? null)
       );
+      // TASK-087: two numbered Pins never show the same visual title.
+      const takenDisplayTitles = new Set<string>();
       numbered.forEach((pinIndex, k) => {
         const source = sources[k];
         if (!source) return;
@@ -669,9 +672,13 @@ export async function POST(request: Request) {
           language,
           hasDestination: Boolean(destination.linkUrl),
           ctaIndex: pinIndex,
+          taken: takenDisplayTitles,
         });
         const issues = metadata ? verifyComposerText(metadata, articleSource.context, { pinTitle: pin.title }) : [];
-        if (metadata && issues.length === 0) listicleByPin.set(pinIndex, metadata);
+        if (metadata && issues.length === 0) {
+          listicleByPin.set(pinIndex, metadata);
+          takenDisplayTitles.add(listicleDisplayKey(metadata.text.displayTitle));
+        }
         // Codes and fields only — never the text or the image URL.
         else console.warn(`[${PROMPT_ID}] Numbered Pin composition rejected: ${JSON.stringify({ pin: pinIndex + 1, issues })}`);
       });

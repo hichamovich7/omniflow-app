@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.1.4 — Pinterest numbered Pins: short visual title and safe article-image crop — TASK-087 (2026-10-31)
+
+* Production check (v3.1.3, "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts"): 4 of 7 numbered images showed the same shortened H1, the panel took up to 45 % of the Pin, and two 800×600 article photos lost their subject (a landscape photo cropped to 2:3 keeps half its width).
+* The image now shows a short title of the Pin's own idea, taken from the article (its section, else the specific part of the Pin title), on two lines at most, with the article's number in a small badge. The full Pin title, description, keywords, links, UTM, boards and dates are unchanged.
+* The photo dominates: a compact panel (≤ 30 % of the height, about 17–18 %). A landscape photo is shown whole on a blurred copy of itself instead of being cropped; a photo close to 2:3 is cropped from the centre. Variants for a reused photo change the panel side and backdrop, never a corner zoom.
+* No AI or Vision call added; Pins made before keep their layout. Contract `listicle_article_image` v2 in `pins.image_analysis`; no migration.
+
 ## v3.1.3 — Fix: the last near-duplicate title after the repair — TASK-FIX-086 (2026-10-31)
 
 * Production (v3.1.2, 12 Pins, "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts"): the title repair ran but the new title of Pin 10 kept most words of Pin 1's title — the check compares words in any order — so the batch failed on one title (422, nothing saved).

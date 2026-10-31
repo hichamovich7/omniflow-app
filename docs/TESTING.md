@@ -1345,6 +1345,22 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Pinterest numbered Pins — visual title and safe crop (TASK-087, 2026-10-31)
+
+```txt
+npx playwright test --project=renderer tests/renderer/pinterest-listicle.spec.ts tests/renderer/pinterest-composer.spec.ts
+```
+
+Offline (fake photos and AI answers; no AI, Vision, network or WordPress write). `pinterest-listicle.spec.ts` adds 21 cases. Visual title — a 12-idea article ("12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts", the 7 production titles): 7 different titles, each its section's idea, never the H1, no 12, ≤ 42 characters; number in the badge, the full title not stored in the contract, read back from `pins.image_analysis`, label "Numbered list (article photo)"; without a section the specific title part ("Garden Caterpillar", "Smiling Cactus", "Leaf Dish to Frog", "Lime Slice Magnet") or the title without its number; list labels removed ("1.", "No. 3", "#4", "Idea 2:", "Idee 5 –"); a long source cut between words, no linking word at the end; DE / FR / ES / EN words kept; a taken title moves to the next candidate; an invented title or a number absent from the article rejected. Rendering — 800×600 photo with its subject at 85 % of the width: whole photo (1000×750), subject fully visible, panel ≤ 30 % and never over the photo, contrast ≥ 4.5:1; 4 variants of a reused photo: no corner crop, panel bottom / top, blur / plain backdrop, 4 different images, subject kept in each; a photo close to 2:3: centred cover crop, panel sides differ, subject visible; the longest visual title (42 characters) fits 2 lines, a longer text fails (no partial Pin); reference render (long H1, 800×600 photo, 3 numbered Pins → 3 × 1000×1500 JPEG, contact sheet `test-results/…/task-087-reference.png`); a v1 numbered Pin keeps its layout; Hero unchanged (no numbered layout, one image call). Routes — `POST /api/pinterest/generate` on a 12-idea article: 6 numbered Pins, 6 different visual titles, titles / descriptions / keywords / link / board / section unchanged, no `publish_date`, one AI call; `POST /api/pinterest/generate-images`: v2 Pin → no image model, one GET of the article photo, 1000×1500, only `media_url` + `image_analysis` written, OmniFlow tables only; a v1 Pin still regenerated with its stored contract. TASK-083 cases updated: the contract text is `{ displayTitle, number, cta }`; the reused-photo variants are panel bottom / top with another backdrop.
+
+Preview on the real Clay photos (local, read-only GET of the 7 public article images, not committed): every subject whole (clover and frog included), panel 17–18 % of the height, 7 different visual titles.
+
+Results (2026-10-31): TASK-087 cases 21/21; pinterest-listicle + pinterest-composer 187/187; full renderer suite 1562/1563 — the only failure is the pre-existing CRLF case `social-content-studio.spec.ts:829` (unchanged); TypeScript, ESLint, `next build` and `git diff --check` clean.
+
+Real check (founder): generate the 12 Clay Pins again (AI Integrated, AI recommends), then "Generate image" on each numbered Pin only; expect 1000×1500, the idea's photo whole, a short title per idea, the number badge, the full titles unchanged.
+
+---
+
 # Pinterest near-duplicate title repair — candidates (TASK-FIX-086, 2026-10-31)
 
 ```txt
@@ -1355,7 +1371,9 @@ Offline (fake AI answers in sequence, no image, network or WordPress call). 24 n
 
 Results (2026-10-31): TASK-FIX-085/086 cases 56/56; Pinterest suites (listicle, strategy, strategy-errors, generate-errors, generation-plan, regenerate-text) 230/230; full renderer suite 1541/1542 — the only failure is the pre-existing CRLF case `social-content-studio.spec.ts:829` (unrelated, unchanged); TypeScript, ESLint and `git diff --check` clean.
 
-Real check (founder): rerun the 12-Pin generation of "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts" (AI Integrated, AI recommends); expect the batch saved with 12 distinct titles, ≥ 6 with 12 (log `Title repair … accepted: true` if a repair ran), or a 422 naming the Pins still concerned.
+Production validation (2026-10-31, v3.1.3 / `0ae19e2`): "12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts" (Clay Idea Lab, post 513), AI Integrated, AI recommends, 12 Pins, one click → 201 in 44 s, 12 Pins saved, 12 distinct titles, 7 containing 12 (Listicle / Article Promise), no `DUPLICATE_TITLE`, descriptions and keywords on every Pin, one request (`POST /api/pinterest/generate`), no image, no WordPress write. Request `cdg1::iad1::kvml6-1793459092407-953df5fd3cae`; the `Title repair` log line was not read. The previous run on v3.1.2 (`cdg1::iad1::vtd47-1793456438628-d9681e360414`) ended in 422 `DUPLICATE_TITLE` Pin 10 → Pin 1.
+
+Images of the 7 numbered Pins (Generate image per Pin, same session): 7 × 1000×1500 JPEG, article photo + readable panel, no image-model call. Pins 1, 3, 5, 7, 9 show their idea; Pins 10 (clover) and 11 (lily-pad dish with frog) miss the subject — their 800×600 landscape photos, cover-cropped to 2:3 (attention crop, variant 0), keep only half their width. Panel text of Pins 5, 7, 9, 11 is the same shortened H1. Follow-up: TASK-087 (short visual title, safe crop); more varied numbered titles still open.
 
 ---
 

@@ -21,13 +21,21 @@ import { strategySafeguardView } from '@/components/pinterest/strategy-safeguard
 import type { StrategySafeguardError } from '@/lib/pinterest/strategy-errors';
 import {
   ARTICLE_IMAGE_MODEL,
+  LISTICLE_DISPLAY_TITLE_MAX,
+  LISTICLE_TEMPLATE_VERSION,
   attachComposerMetadata,
+  buildComposerMetadata,
   buildListicleComposerMetadata,
+  isListicleV2,
+  listicleDisplayKey,
+  listicleDisplayTitleCandidates,
   readComposerMetadata,
   verifyComposerText,
+  type ComposerMetadata,
   type ListicleMetadata,
+  type ListicleV2Metadata,
 } from '@/lib/pinterest/composer/content';
-import { COMPOSER_MIN_CONTRAST, COMPOSER_PALETTE, contrastRatio, renderComposedPin } from '@/lib/pinterest/composer/render';
+import { COMPOSER_MIN_CONTRAST, COMPOSER_PALETTE, LISTICLE_PANEL_MAX_SHARE, contrastRatio, renderComposedPin } from '@/lib/pinterest/composer/render';
 import { composePinImage, composerImageCallCount } from '@/lib/pinterest/composer/pipeline';
 import { ArticleImageError, downloadArticleImage, loadArticlePhoto } from '@/lib/pinterest/composer/article-image';
 import { buildPinterestPinsPrompt } from '@/lib/prompts';
@@ -307,7 +315,7 @@ test.describe('Article image of each numbered Pin', () => {
   });
 });
 
-function listicleMetadata(context = FIFTEEN, pinTitle = NUMBERED_TITLES[0], options: { hasDestination?: boolean; crop?: number } = {}): ListicleMetadata {
+function listicleMetadata(context = FIFTEEN, pinTitle = NUMBERED_TITLES[0], options: { hasDestination?: boolean; crop?: number } = {}): ListicleV2Metadata {
   const sectionId = context.sections.find((section) => section.kind === 'subject')!.id;
   const [source] = planListicleImageSources(context, [sectionId], HOSTS);
   const metadata = buildListicleComposerMetadata({
@@ -327,7 +335,8 @@ function listicleMetadata(context = FIFTEEN, pinTitle = NUMBERED_TITLES[0], opti
 test.describe('Composer contract: the visible text comes from the validated title and the article', () => {
   test('number from the article, words from the Pin title, photo from the article; read back from pins.image_analysis', () => {
     const metadata = listicleMetadata();
-    expect(metadata.text).toEqual({ title: NUMBERED_TITLES[0], number: '15', cta: null });
+    // TASK-087: the image shows the Pin's own idea (its section), the number in a badge.
+    expect(metadata.text).toEqual({ displayTitle: 'Moss Stitch Blanket', number: '15', cta: null });
     expect(verifyComposerText(metadata, FIFTEEN, { pinTitle: NUMBERED_TITLES[0] })).toEqual([]);
     const stored = attachComposerMetadata(JSON.stringify({ _pinterestStrategy: { angle: 'listicle' } }), metadata);
     expect(readComposerMetadata(stored)).toEqual(metadata);
@@ -336,18 +345,18 @@ test.describe('Composer contract: the visible text comes from the validated titl
     expect(composerImageCallCount(metadata)).toBe(0);
   });
 
-  test('a long title is shortened at a separator only while it keeps the number', () => {
+  test('the visual title is the section\'s idea whatever the Pin title; a title without the number gets no numbered image', () => {
     const title = '15 Cozy Crochet Blanket Ideas: Textures, Stitches and Colors for Every Sofa in Winter';
-    expect(listicleMetadata(FIFTEEN, title).text.title).toBe('15 Cozy Crochet Blanket Ideas');
+    expect(listicleMetadata(FIFTEEN, title).text.displayTitle).toBe('Moss Stitch Blanket');
     expect(buildListicleComposerMetadata({ ...baseInput(), pinTitle: 'Cozy Crochet Blanket Ideas' })).toBeNull();
   });
 
   test('an invented number, a text not from the Pin title, a CTA outside the fixed phrases or a foreign photo is rejected', () => {
     const metadata = listicleMetadata();
-    const codes = (value: ListicleMetadata, pinTitle = NUMBERED_TITLES[0]) => verifyComposerText(value, FIFTEEN, { pinTitle }).map((issue) => issue.field);
-    expect(codes({ ...metadata, text: { ...metadata.text, number: '16', title: '16 Cozy Crochet Blanket Ideas' } }, '16 Cozy Crochet Blanket Ideas')).toEqual(['number', 'title.numbers']);
-    expect(codes({ ...metadata, text: { ...metadata.text, title: '15 Viral Blankets Everyone Loves' } })).toEqual(['title']);
-    expect(verifyComposerText(metadata, FIFTEEN).map((issue) => issue.field)).toEqual(['title']);
+    const codes = (value: ListicleV2Metadata, pinTitle = NUMBERED_TITLES[0]) => verifyComposerText(value, FIFTEEN, { pinTitle }).map((issue) => issue.field);
+    expect(codes({ ...metadata, text: { ...metadata.text, number: '16' } }, '16 Cozy Crochet Blanket Ideas')).toEqual(['number']);
+    expect(codes({ ...metadata, text: { ...metadata.text, displayTitle: 'Viral Blankets Everyone Loves' } })).toEqual(['displayTitle']);
+    expect(verifyComposerText(metadata, FIFTEEN).map((issue) => issue.field)).toEqual(['title.number']);
     expect(codes({ ...metadata, text: { ...metadata.text, cta: 'Buy now' } })).toEqual(['cta']);
     expect(codes({ ...metadata, source: { ...metadata.source, imageUrl: `${SITE}/wp-content/uploads/not-in-article.jpg` } })).toEqual(['source.imageUrl']);
   });
@@ -410,7 +419,7 @@ test.describe('Rendering — 1000×1500, readable, no text from an image model',
     }
   });
 
-  test('the same article photo with another crop variant gives a different composition (panel top / bottom, other pixels)', async () => {
+  test('the same article photo with another crop variant gives a different composition (panel bottom / top, other backdrop)', async () => {
     const photo = await articlePhoto();
     const metadata = listicleMetadata();
     const renders = await Promise.all([0, 1, 2, 3].map((cropVariant) => renderComposedPin(photo, metadata, [], { cropVariant })));
@@ -423,7 +432,7 @@ test.describe('Rendering — 1000×1500, readable, no text from an image model',
 
   test('a title that cannot fit fails — never a partial or overflowing Pin', async () => {
     const metadata = listicleMetadata();
-    const huge = { ...metadata, text: { ...metadata.text, title: `15 ${'Kuscheldeckenhäkelmusterübersichtsseite '.repeat(4).trim()}` } };
+    const huge = { ...metadata, text: { ...metadata.text, displayTitle: 'Kuscheldeckenhäkelmusterübersichtsseite '.repeat(4).trim() } };
     await expect(renderComposedPin(await articlePhoto(), huge)).rejects.toThrow(/does not fit|too much/);
   });
 });
@@ -699,11 +708,12 @@ test.describe('POST /api/pinterest/generate — numbered article', () => {
         expect(row).not.toHaveProperty('publish_date');
         if (isNumberedAngle(angle)) {
           expect(composer?.templateType).toBe('listicle_article_image');
-          const listicle = composer as ListicleMetadata;
+          const listicle = composer as ListicleV2Metadata;
           expect(row.visual_format).toBe('photo-only');
           expect(articleImages.has(listicle.source.imageUrl)).toBe(true);
           expect(listicle.text.number).toBe(String(count));
-          expect(row.title as string).toContain(listicle.text.title);
+          // TASK-087: the image shows the Pin's idea; the full title stays the Pin's.
+          expect(listicle.text.displayTitle).not.toMatch(new RegExp(`\\b${count}\\b`));
           expect(listicle.text.cta).not.toBeNull();
         } else {
           expect(['curiosity', 'discovery', 'problem-solution']).toContain(angle);
@@ -1601,5 +1611,286 @@ test.describe('POST /api/pinterest/generate-images — numbered Pin on the artic
     expect(second.uploads[0].body.equals(first.uploads[0].body)).toBe(false);
     const stored = readComposerMetadata((opsOf(second, 'pins', 'update')[0].payload as { image_analysis: string }).image_analysis);
     expect(stored).toMatchObject({ source: metadata.source, text: metadata.text });
+  });
+});
+
+// ── TASK-087: visual hierarchy and safe article-image crop ─────────────────
+// Production (v3.1.3, "12 Green Air-Dry Clay Ideas for Cute DIY Decor and
+// Crafts"): 4 of 7 numbered images showed the same shortened H1, the panel
+// took up to 45 % of the height, and two 800×600 photos lost their subject
+// (the whole photo cover-cropped to 2:3 keeps only half its width).
+
+const CLAY_H1 = '12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts';
+const CLAY_IDEAS = [
+  'Smiling Cactus in a Mini Pot', 'Kawaii Avocado Half Magnet', 'Leaf-Imprint Trinket Dish', 'Tiny Green Dinosaur Figurine',
+  'Garden Caterpillar with Curved Antennae', 'Smiling Broccoli Fridge Magnet', 'Layered Lime-Slice Magnet', 'Watermelon Wedge Decor Magnet',
+  'Kiwi Slice Pair for a Mini Display', 'Four-Leaf Clover Magnet', 'Lily-Pad Dish with a Tiny Frog', 'Mossy Green Mushroom Sculpture',
+];
+const CLAY = article(
+  CLAY_H1,
+  [
+    '<p>Green air-dry clay makes cute decor and small crafts for every room.</p>',
+    ...CLAY_IDEAS.map((idea, i) => `<h2>${i + 1}. ${idea}</h2><figure><img src="${SITE}/wp-content/uploads/clay-${i + 1}.jpg" alt="${idea}"></figure><p>Shape the ${idea.toLowerCase()} from green air-dry clay and let it dry for a day.</p>`),
+  ].join('\n')
+);
+/** The production titles of the 7 numbered Pins (sections 1, 3, 5, 7, 9, 10, 11). */
+const CLAY_NUMBERED: Array<[number, string]> = [
+  [1, '12 Green Air-Dry Clay Ideas for Cute DIY Decor, Featuring a Smiling Cactus'],
+  [3, '12 Green Air-Dry Clay Crafts Include a Leaf-Imprint Trinket Dish'],
+  [5, '12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts: Meet the Garden Caterpillar'],
+  [7, '12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts, Including a Lime Magnet'],
+  [9, '12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts, With Kiwi Slices'],
+  [10, 'Explore 12 botanical air-dry clay projects, including a four-leaf clover fridge magnet'],
+  [11, '12 Green Air-Dry Clay Ideas for Cute DIY Decor and Crafts, From Leaf Dish to Frog'],
+];
+
+function clayMetadata(): ListicleV2Metadata[] {
+  const taken = new Set<string>();
+  return CLAY_NUMBERED.map(([idea, pinTitle]) => {
+    const sectionId = CLAY.sections.find((section) => section.subject === CLAY_IDEAS[idea - 1])!.id;
+    const [source] = planListicleImageSources(CLAY, [sectionId], HOSTS);
+    const metadata = buildListicleComposerMetadata({ pinTitle, number: '12', source: source!, context: CLAY, sectionId, language: 'en', hasDestination: true, ctaIndex: idea, taken })!;
+    taken.add(listicleDisplayKey(metadata.text.displayTitle));
+    expect(verifyComposerText(metadata, CLAY, { pinTitle })).toEqual([]);
+    return metadata;
+  });
+}
+
+/** An 800×600 WordPress-like photo: saturated plants on the left, the red subject near the right edge (like the frog). */
+async function landscapeWithSubject(subjectX = 680): Promise<Buffer> {
+  const leaves = Array.from({ length: 14 }, (_, i) => `<ellipse cx="${40 + (i % 4) * 70}" cy="${60 + Math.floor(i / 4) * 140}" rx="46" ry="26" fill="#2f9e3f"/>`).join('');
+  return sharp({ create: { width: 800, height: 600, channels: 3, background: '#e9e1d2' } })
+    .composite([{ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">${leaves}<rect x="420" y="380" width="380" height="220" fill="#c8a77a"/><circle cx="${subjectX}" cy="330" r="50" fill="#e01010"/></svg>`) }])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+}
+
+async function portraitWithSubject(): Promise<Buffer> {
+  return sharp({ create: { width: 1000, height: 1400, channels: 3, background: '#e9e1d2' } })
+    .composite([{ input: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1400"><circle cx="500" cy="700" r="120" fill="#e01010"/></svg>') }])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+}
+
+/** Pixels of the red subject visible in a rendered Pin. */
+async function redPixels(png: Buffer): Promise<number> {
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let count = 0;
+  for (let i = 0; i < data.length; i += info.channels) if (data[i] > 190 && data[i + 1] < 70 && data[i + 2] < 70) count++;
+  return count;
+}
+
+test.describe('TASK-087 — the short visual title of a numbered Pin', () => {
+  test('a 12-idea article: 7 numbered Pins get 7 different visual titles — each its own idea, never the H1, no number', () => {
+    const titles = clayMetadata().map((metadata) => metadata.text.displayTitle);
+    expect(titles).toEqual(['Smiling Cactus in a Mini Pot', 'Leaf-Imprint Trinket Dish', 'Garden Caterpillar with Curved Antennae', 'Layered Lime-Slice Magnet', 'Kiwi Slice Pair for a Mini Display', 'Four-Leaf Clover Magnet', 'Lily-Pad Dish with a Tiny Frog']);
+    expect(new Set(titles).size).toBe(7);
+    for (const title of titles) {
+      expect(title).not.toContain(CLAY_H1);
+      expect(title).not.toMatch(/\b12\b/);
+      expect(title.length).toBeLessThanOrEqual(LISTICLE_DISPLAY_TITLE_MAX);
+    }
+  });
+
+  test('the number goes to its badge; the full Pin title is not stored in the composer contract', () => {
+    const [metadata] = clayMetadata();
+    expect(metadata).toMatchObject({ templateType: 'listicle_article_image', templateVersion: LISTICLE_TEMPLATE_VERSION, text: { number: '12' } });
+    expect(Object.keys(metadata.text).sort()).toEqual(['cta', 'displayTitle', 'number']);
+    expect(readComposerMetadata(attachComposerMetadata(null, metadata))).toEqual(metadata);
+    expect(readPinVisualFormat(attachComposerMetadata(null, metadata))).toMatchObject({ label: 'Numbered list (article photo)', imageCalls: 0 });
+  });
+
+  const candidates = (pinTitle: string, heading: string | null, number = '12') =>
+    listicleDisplayTitleCandidates({ pinTitle, number, section: heading === null ? null : { heading, subject: heading.replace(/^\d+\.\s*/, '') } });
+
+  test('without a section: the specific part of the title (after ":", "—", "–" or a comma), linking words dropped', () => {
+    expect(candidates(CLAY_NUMBERED[2][1], null)[0]).toBe('Garden Caterpillar');
+    expect(candidates(CLAY_NUMBERED[0][1], null)[0]).toBe('Smiling Cactus');
+    expect(candidates(CLAY_NUMBERED[6][1], null)[0]).toBe('Leaf Dish to Frog');
+    expect(candidates('12 Green Air-Dry Clay Ideas — Lime Slice Magnet', null)[0]).toBe('Lime Slice Magnet');
+    // Nothing specific: the title without its number, never the number itself.
+    expect(candidates('12 Green Air-Dry Clay Ideas', null)).toEqual(['Green Air-Dry Clay Ideas']);
+  });
+
+  test('list labels are removed ("1.", "No. 3", "#4", "Idea 2:", "Idee 5 –")', () => {
+    for (const heading of ['1. Lime Slice Magnet', 'No. 3 Lime Slice Magnet', '#4 Lime Slice Magnet', 'Idea 2: Lime Slice Magnet', 'Idee 5 – Lime Slice Magnet']) {
+      expect(listicleDisplayTitleCandidates({ pinTitle: '12 Clay Ideas', number: '12', section: { heading, subject: heading } })[0], heading).toBe('Lime Slice Magnet');
+    }
+  });
+
+  test('a long source is cut between words, never inside one, and never ends on a linking word', () => {
+    const [title] = candidates('12 Clay Ideas', 'Garden Caterpillar with Curved Antennae and Painted Spots on the Back');
+    expect(title).toBe('Garden Caterpillar with Curved Antennae');
+    expect(title.length).toBeLessThanOrEqual(LISTICLE_DISPLAY_TITLE_MAX);
+    expect(candidates('12 Clay Ideas', 'Green Air-Dry Clay Mushroom Sculpture for the Garden')[0]).toBe('Green Air-Dry Clay Mushroom Sculpture');
+  });
+
+  for (const [language, pinTitle, expected] of [
+    ['de', '15 Häkeldecken-Ideen – mit der Waffeldecke', 'Waffeldecke'],
+    ['fr', '15 idées de couvertures au crochet : la couverture gaufrée', 'couverture gaufrée'],
+    ['es', '15 ideas de mantas de ganchillo, con la manta de ondas', 'manta de ondas'],
+    ['en', '15 Cozy Crochet Blanket Ideas: The Waffle Blanket', 'Waffle Blanket'],
+  ] as const) {
+    test(`the article's language is kept (${language}): words of the source only`, () => {
+      expect(listicleDisplayTitleCandidates({ pinTitle, number: '15', section: null })[0]).toBe(expected);
+    });
+  }
+
+  test('two Pins on different sections never show the same words; a taken title moves to the next candidate', () => {
+    const sectionId = CLAY.sections.find((section) => section.subject === CLAY_IDEAS[4])!.id;
+    const [source] = planListicleImageSources(CLAY, [sectionId], HOSTS);
+    const input = { pinTitle: CLAY_NUMBERED[2][1], number: '12', source: source!, context: CLAY, sectionId, language: 'en', hasDestination: false, ctaIndex: 0 };
+    expect(buildListicleComposerMetadata(input)!.text.displayTitle).toBe('Garden Caterpillar with Curved Antennae');
+    expect(buildListicleComposerMetadata({ ...input, taken: new Set([listicleDisplayKey('Garden Caterpillar with Curved Antennae')]) })!.text.displayTitle).toBe('Garden Caterpillar');
+  });
+
+  test('an invented visual title or a number outside the article is rejected', () => {
+    const [metadata] = clayMetadata();
+    const pinTitle = CLAY_NUMBERED[0][1];
+    expect(verifyComposerText({ ...metadata, text: { ...metadata.text, displayTitle: 'Viral Clay Bestsellers' } }, CLAY, { pinTitle }).map((issue) => issue.field)).toEqual(['displayTitle']);
+    expect(verifyComposerText({ ...metadata, text: { ...metadata.text, displayTitle: '40 Clay Magnets' } }, CLAY, { pinTitle }).map((issue) => issue.field)).toEqual(['displayTitle.numbers', 'displayTitle']);
+    expect(verifyComposerText(metadata, CLAY, { pinTitle: 'Smiling Cactus in a Mini Pot' }).map((issue) => issue.field)).toEqual(['title.number']);
+  });
+});
+
+test.describe('TASK-087 — rendering: dominant photo, compact panel, safe crop', () => {
+  test('an 800×600 photo used once: the whole photo is shown (subject near the edge kept), panel ≤ 30 %, never over the photo', async () => {
+    const photo = await landscapeWithSubject();
+    const [metadata] = clayMetadata();
+    const composed = await renderComposedPin(photo, metadata);
+    expect(await sharp(composed.buffer).metadata()).toMatchObject({ width: 1000, height: 1500 });
+    expect(composed.listicle).toMatchObject({ photoMode: 'fit', backdrop: 'blur', photo: { left: 0, width: 1000, height: 750 } });
+    const { photo: box, panel } = composed.listicle!;
+    expect(panel.height / 1500).toBeLessThanOrEqual(LISTICLE_PANEL_MAX_SHARE);
+    expect(box.top + box.height).toBeLessThanOrEqual(panel.top);
+    expect(composed.heroPlacement).toBe('bottom');
+    expect(composed.minContrast).toBeGreaterThanOrEqual(COMPOSER_MIN_CONTRAST);
+    // The red subject (x = 85 % of the photo) is fully visible: π·50² × 1.25² ≈ 12 270 px.
+    expect(await redPixels(composed.buffer)).toBeGreaterThan(10_000);
+  });
+
+  test('no corner crop by default, and every variant of a reused photo keeps the subject', async () => {
+    const photo = await landscapeWithSubject(740);
+    const [metadata] = clayMetadata();
+    const renders = await Promise.all([0, 1, 2, 3].map((cropVariant) => renderComposedPin(photo, metadata, [], { cropVariant })));
+    expect(renders.map((render) => [render.listicle!.photoMode, render.listicle!.backdrop, render.heroPlacement])).toEqual([
+      ['fit', 'blur', 'bottom'], ['fit', 'blur', 'top'], ['fit', 'plain', 'bottom'], ['fit', 'plain', 'top'],
+    ]);
+    expect(new Set(renders.map((render) => render.buffer.toString('base64'))).size).toBe(4);
+    for (const render of renders) {
+      expect(await redPixels(render.buffer)).toBeGreaterThan(10_000);
+      const { photo: box, panel } = render.listicle!;
+      const overlaps = box.top < panel.top + panel.height && panel.top < box.top + box.height;
+      expect(overlaps).toBe(false);
+    }
+  });
+
+  test('a photo close to 2:3: centred cover crop with the panel on an edge; the subject in the middle stays visible', async () => {
+    const photo = await portraitWithSubject();
+    const [metadata] = clayMetadata();
+    const renders = await Promise.all([0, 1, 2, 3].map((cropVariant) => renderComposedPin(photo, metadata, [], { cropVariant })));
+    expect(renders.map((render) => render.listicle!.photoMode)).toEqual(['cover', 'cover', 'fit', 'fit']);
+    expect(renders[0].listicle!.photo).toEqual({ left: 0, top: 0, width: 1000, height: 1500 });
+    expect(renders[0].heroPlacement).not.toBe(renders[1].heroPlacement);
+    for (const render of renders) expect(await redPixels(render.buffer)).toBeGreaterThan(20_000);
+  });
+
+  test('the visual title stays on 2 lines at most: the longest allowed one fits, a longer text fails (never a partial Pin)', async () => {
+    const [metadata] = clayMetadata();
+    const longest = 'Garden Caterpillar with Curved Antennae Xy';
+    expect(longest.length).toBe(LISTICLE_DISPLAY_TITLE_MAX);
+    const composed = await renderComposedPin(await landscapeWithSubject(), { ...metadata, text: { ...metadata.text, displayTitle: longest } });
+    expect(composed.listicle!.panel.height / 1500).toBeLessThanOrEqual(LISTICLE_PANEL_MAX_SHARE);
+    const tooLong = { ...metadata, text: { ...metadata.text, displayTitle: 'Kuscheldeckenhäkelmusterübersichtsseite '.repeat(4).trim() } };
+    await expect(renderComposedPin(await landscapeWithSubject(), tooLong)).rejects.toThrow(/does not fit/);
+  });
+
+  test('reference render: long H1, 800×600 photo, 3 numbered Pins with different ideas → 3 × 1000×1500, no repeated text', async () => {
+    const photo = await landscapeWithSubject();
+    const metadata = clayMetadata().slice(0, 3);
+    const outputs = await Promise.all(metadata.map((item) => composePinImage({ photo, metadata: item, hasDestination: true })));
+    for (const { optimized } of outputs) expect(await sharp(optimized.buffer).metadata()).toMatchObject({ format: 'jpeg', width: 1000, height: 1500 });
+    expect(new Set(outputs.map(({ optimized }) => optimized.buffer.toString('base64'))).size).toBe(3);
+    expect(new Set(metadata.map((item) => item.text.displayTitle)).size).toBe(3);
+    // A contact sheet for a visual review (test-results/, not committed).
+    const tiles = await Promise.all(outputs.map(({ optimized }) => sharp(optimized.buffer).resize(400, 600).toBuffer()));
+    await sharp({ create: { width: 1200, height: 600, channels: 3, background: '#ffffff' } })
+      .composite(tiles.map((input, i) => ({ input, left: i * 400, top: 0 })))
+      .png()
+      .toFile(test.info().outputPath('task-087-reference.png'));
+  });
+
+  test('a numbered Pin created before TASK-087 (v1) keeps its own rendering', async () => {
+    const [v2] = clayMetadata();
+    const v1: ComposerMetadata = { ...v2, templateVersion: 'v1', text: { title: CLAY_NUMBERED[0][1], number: '12', cta: null } };
+    expect(readComposerMetadata(attachComposerMetadata(null, v1))).toEqual(v1);
+    const photo = await articlePhoto();
+    const renders = await Promise.all([0, 1].map((cropVariant) => renderComposedPin(photo, v1, [], { cropVariant })));
+    expect(renders.map((render) => [render.heroPlacement, render.listicle])).toEqual([['bottom', undefined], ['top', undefined]]);
+  });
+
+  test('Hero and Materials & tools are not touched: no numbered layout, same contract', async () => {
+    const hero = buildComposerMetadata('hero', FIFTEEN, { sectionId: FIFTEEN.sections[1].id, language: 'en', hasDestination: false, ctaIndex: 0 })!;
+    expect(hero.templateVersion).toBe('v1');
+    const composed = await renderComposedPin(await articlePhoto(), hero);
+    expect(composed.listicle).toBeUndefined();
+    expect(composerImageCallCount(hero)).toBe(1);
+  });
+});
+
+test.describe('TASK-087 — routes', () => {
+  test('POST /api/pinterest/generate on a 12-idea article: different visual titles, full titles unchanged, one AI call', async () => {
+    const post = wordpressPost('12 Cozy Crochet Blanket Ideas for Winter', 12);
+    const plan = buildListicleAnglePlan(12);
+    const answer = modelAnswer(post, 12, plan, '12');
+    const run = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets', boardSection: 'Winter' }, answer);
+    expect(run.status, JSON.stringify(run.body.error)).toBe(201);
+    expect(run.prompts).toHaveLength(1);
+    const rows = savedPins(run);
+    const original = pinsOf(answer);
+    const numbered = rows.flatMap((row) => {
+      const composer = composerOf(row);
+      return composer && isListicleV2(composer) ? [composer] : [];
+    });
+    expect(numbered).toHaveLength(6);
+    expect(new Set(numbered.map((item) => item.text.displayTitle)).size).toBe(6);
+    for (const item of numbered) {
+      expect(item.text.number).toBe('12');
+      expect(item.text.displayTitle).not.toMatch(/\b12\b/);
+      expect(item.text.displayTitle).not.toBe(post.title);
+    }
+    rows.forEach((row, i) => {
+      expect(row.title).toBe(original[i].title);
+      expect(row.description).toBe(original[i].description);
+      expect(row.keywords).toBe(original[i].keywords);
+      expect(row.link_url).toBe(`${SITE}/blankets/`);
+      expect(row.board).toBe('Crochet Blankets');
+      expect(row.board_section).toBe('Winter');
+      expect(row).not.toHaveProperty('publish_date');
+    });
+  });
+
+  test('POST /api/pinterest/generate-images: a v2 numbered Pin → no image model, one GET of the article photo, the Pin\'s title / link / UTM / board / dates untouched', async () => {
+    const metadata = listicleMetadata(FIFTEEN, NUMBERED_TITLES[0], { hasDestination: true });
+    expect(metadata.templateVersion).toBe(LISTICLE_TEMPLATE_VERSION);
+    const run = await runImages(numberedPin(metadata), { serve: async () => imageResponse(await landscapeWithSubject()) });
+    expect(run.body.data).toEqual({ imageStatus: 'completed', imagesGenerated: 1, imagesFailed: 0 });
+    expect(run.imageCalls).toBe(0);
+    expect(run.fetches).toEqual([{ url: metadata.source.imageUrl, method: 'GET' }]);
+    expect(await sharp(run.uploads[0].body).metadata()).toMatchObject({ width: 1000, height: 1500 });
+    const [pinUpdate] = opsOf(run, 'pins', 'update');
+    expect(Object.keys(pinUpdate.payload as object).sort()).toEqual(['image_analysis', 'media_url']);
+    const written = new Set(run.ops.filter((item) => item.op !== 'select').map((item) => item.table));
+    expect([...written].every((table) => ['generations', 'pin_images', 'pins'].includes(table))).toBe(true);
+  });
+
+  test('POST /api/pinterest/generate-images: a v1 numbered Pin is still regenerated (stored contract unchanged)', async () => {
+    const v2 = listicleMetadata();
+    const v1: ComposerMetadata = { ...v2, templateVersion: 'v1', text: { title: NUMBERED_TITLES[0], number: '15', cta: null } };
+    const run = await runImages(numberedPin(v1), { serve: async () => imageResponse(await articlePhoto()), existingVersion: 1 });
+    expect(run.body.data).toEqual({ imageStatus: 'completed', imagesGenerated: 1, imagesFailed: 0 });
+    expect(run.imageCalls).toBe(0);
+    const stored = readComposerMetadata((opsOf(run, 'pins', 'update')[0].payload as { image_analysis: string }).image_analysis);
+    expect(stored).toMatchObject({ templateVersion: 'v1', text: v1.text });
   });
 });

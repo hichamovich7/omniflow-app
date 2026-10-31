@@ -2,9 +2,11 @@ import sharp from 'sharp';
 import { RENDERER_FONT_PATHS } from '@/lib/pinterest/text-layout';
 import {
   LISTICLE_CROP_VARIANTS,
+  isListicleV2,
   isStepByStepV2,
   type ComposerHeroText,
   type ComposerListicleText,
+  type ComposerListicleV2Text,
   type ComposerMaterialsText,
   type ComposerMetadata,
   type ComposerStepsText,
@@ -54,6 +56,8 @@ export interface ComposedPin {
   minContrast: number;
   /** Where the Hero / numbered-list title panel was placed; null for the other templates. */
   heroPlacement: 'top' | 'bottom' | null;
+  /** v2 numbered Pin only (TASK-087): where the photo and the text panel sit. */
+  listicle?: ListicleLayout;
 }
 
 // ── Colour contrast ────────────────────────────────────────────────────────
@@ -370,6 +374,200 @@ async function renderListicle(photo: Buffer, text: ComposerListicleText, variant
     placed.push({ text: cta, left: MARGIN_X + pad + 28, top: ctaTop + 12 });
   }
   return finish(background, rects, placed, contrast, placement);
+}
+
+// ── Numbered list on the article's photo, v2 (TASK-087) ─────────────────────
+
+/** The text panel of a v2 numbered Pin never covers more than this share of the height. */
+export const LISTICLE_PANEL_MAX_SHARE = 0.3;
+/**
+ * A cover crop to 2:3 must keep at least this share of the photo's width (or
+ * height); below it (a 4:3 or square WordPress photo keeps 50–67 %) the whole
+ * photo is shown instead, so its subject is never cut.
+ */
+export const LISTICLE_SAFE_COVER_KEEP = 0.8;
+
+export type ListiclePhotoMode = 'cover' | 'fit';
+
+export interface ListicleLayout {
+  photoMode: ListiclePhotoMode;
+  /** `fit` only: a blurred copy of the same photo, or the plain panel colour, around it. */
+  backdrop: 'blur' | 'plain' | null;
+  /** Where the sharp photo sits on the canvas (the whole canvas for `cover`). */
+  photo: { left: number; top: number; width: number; height: number };
+  panel: { top: number; height: number };
+}
+
+/** The share of the photo a centred cover crop to the Pin's 2:3 keeps (1 = nothing cut). */
+async function coverKeep(photo: Buffer): Promise<{ keep: number; width: number; height: number }> {
+  let meta: sharp.Metadata;
+  try {
+    meta = await sharp(photo).metadata();
+  } catch {
+    throw new ComposerRenderError('The article photo could not be read');
+  }
+  // EXIF orientations 5–8 swap width and height once rotated.
+  const swap = (meta.orientation ?? 1) >= 5;
+  const width = (swap ? meta.height : meta.width) ?? 0;
+  const height = (swap ? meta.width : meta.height) ?? 0;
+  if (!width || !height) throw new ComposerRenderError('The article photo could not be read');
+  const target = COMPOSER_CANVAS.width / COMPOSER_CANVAS.height;
+  const aspect = width / height;
+  return { keep: Math.min(target / aspect, aspect / target), width, height };
+}
+
+/**
+ * Variant → composition. Every variant is safe: a centred cover crop only for
+ * a photo close to 2:3, otherwise the whole photo. Variants (a photo reused in
+ * the batch, or "Regenerate image") change the panel side and the backdrop —
+ * never a zoom into a corner.
+ */
+function listicleVariant(preferred: ListiclePhotoMode, variant: number): { mode: ListiclePhotoMode; backdrop: 'blur' | 'plain'; flip: boolean } {
+  const index = ((variant % LISTICLE_CROP_VARIANTS) + LISTICLE_CROP_VARIANTS) % LISTICLE_CROP_VARIANTS;
+  const fit = [
+    { mode: 'fit', backdrop: 'blur', flip: false },
+    { mode: 'fit', backdrop: 'blur', flip: true },
+    { mode: 'fit', backdrop: 'plain', flip: false },
+    { mode: 'fit', backdrop: 'plain', flip: true },
+  ] as const;
+  if (preferred === 'fit') return fit[index];
+  return [
+    { mode: 'cover', backdrop: 'blur', flip: false },
+    { mode: 'cover', backdrop: 'blur', flip: true },
+    fit[0],
+    fit[3],
+  ][index] as { mode: ListiclePhotoMode; backdrop: 'blur' | 'plain'; flip: boolean };
+}
+
+async function listicleV2Panel(text: ComposerListicleV2Text): Promise<{ height: number; draw: (top: number) => { rects: Rect[]; placed: Placed[] }; contrast: ContrastLog }> {
+  const contrast = new ContrastLog();
+  const pad = 32;
+  const gap = 20;
+  const innerWidth = CONTENT_WIDTH - pad * 2;
+
+  // The article's number, compact, in its own badge.
+  const number = await renderText(text.number, { width: 220, maxHeight: 64, maxSize: 48, minSize: 36, weight: 700, color: COMPOSER_PALETTE.onAccent }, 'Number badge');
+  contrast.use(COMPOSER_PALETTE.onAccent, COMPOSER_PALETTE.accent);
+  const badge = { width: number.width + 44, height: number.height + 20 };
+
+  // The visual title: two lines at most, at the largest size that allows it.
+  const titleWidth = innerWidth - badge.width - 28;
+  let title: RenderedText | null = null;
+  for (let size = 60; size >= 38 && !title; size -= 2) {
+    try {
+      title = await renderText(
+        text.displayTitle,
+        { width: titleWidth, maxHeight: Math.floor(size * 2.75), maxSize: size, minSize: size, weight: 700, color: COMPOSER_PALETTE.ink },
+        'Numbered title'
+      );
+    } catch (error) {
+      if (!(error instanceof ComposerRenderError)) throw error;
+    }
+  }
+  if (!title) throw new ComposerRenderError('Numbered title does not fit two lines at the minimum font size');
+  contrast.use(COMPOSER_PALETTE.ink, COMPOSER_PALETTE.panel);
+
+  const cta = text.cta
+    ? await renderText(text.cta, { width: innerWidth - 48, maxHeight: 40, maxSize: 26, minSize: 20, weight: 700, color: COMPOSER_PALETTE.onAccent }, 'Numbered CTA')
+    : null;
+  const ctaHeight = cta ? cta.height + 18 : 0;
+  const rowHeight = Math.max(badge.height, title.height);
+  const height = pad + rowHeight + (cta ? gap + ctaHeight : 0) + pad;
+  if (height > COMPOSER_CANVAS.height * LISTICLE_PANEL_MAX_SHARE) {
+    throw new ComposerRenderError('The numbered title panel would cover too much of the photo');
+  }
+  const finalTitle = title;
+  return {
+    height,
+    contrast,
+    draw: (top) => {
+      const rowTop = top + pad;
+      const badgeTop = rowTop + Math.round((rowHeight - badge.height) / 2);
+      const titleLeft = MARGIN_X + pad + badge.width + 28;
+      const rects: Rect[] = [
+        { x: MARGIN_X, y: top, width: CONTENT_WIDTH, height, fill: COMPOSER_PALETTE.panel, radius: 28 },
+        { x: MARGIN_X + pad, y: badgeTop, width: badge.width, height: badge.height, fill: COMPOSER_PALETTE.accent, radius: badge.height / 2 },
+      ];
+      const placed: Placed[] = [
+        { text: number, left: MARGIN_X + pad + Math.round((badge.width - number.width) / 2), top: badgeTop + Math.round((badge.height - number.height) / 2) },
+        { text: finalTitle, left: titleLeft, top: rowTop + Math.round((rowHeight - finalTitle.height) / 2) },
+      ];
+      if (cta) {
+        const ctaTop = rowTop + rowHeight + gap;
+        rects.push({ x: MARGIN_X + pad, y: ctaTop, width: cta.width + 48, height: ctaHeight, fill: COMPOSER_PALETTE.accent, radius: ctaHeight / 2 });
+        placed.push({ text: cta, left: MARGIN_X + pad + 24, top: ctaTop + 9 });
+      }
+      return { rects, placed };
+    },
+  };
+}
+
+/** The whole photo, as large as the area above / below the panel allows, on a backdrop of the same photo (blurred) or the panel colour. */
+async function fitPhoto(
+  photo: Buffer,
+  size: { width: number; height: number },
+  area: { top: number; height: number },
+  backdrop: 'blur' | 'plain'
+): Promise<{ background: Buffer; box: ListicleLayout['photo'] }> {
+  const scale = Math.min(COMPOSER_CANVAS.width / size.width, area.height / size.height);
+  const width = Math.min(COMPOSER_CANVAS.width, Math.round(size.width * scale));
+  const height = Math.min(area.height, Math.round(size.height * scale));
+  const box = { left: Math.round((COMPOSER_CANVAS.width - width) / 2), top: area.top + Math.round((area.height - height) / 2), width, height };
+  try {
+    const sharpPhoto = await sharp(photo).rotate().resize({ width, height, fit: 'fill' }).removeAlpha().png().toBuffer();
+    const base =
+      backdrop === 'blur'
+        ? await sharp(photo).rotate().resize({ width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height, fit: 'cover', position: 'centre' }).removeAlpha().blur(28).modulate({ brightness: 1.06 }).png().toBuffer()
+        : await sharp({ create: { width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height, channels: 3, background: COMPOSER_PALETTE.panel } }).png().toBuffer();
+    const background = await sharp(base).composite([{ input: sharpPhoto, left: box.left, top: box.top }]).png().toBuffer();
+    return { background, box };
+  } catch {
+    throw new ComposerRenderError('The article photo could not be read');
+  }
+}
+
+/**
+ * TASK-087 — numbered Pin, v2: the photo dominates, a compact panel (≤ 30 %
+ * of the height) carries the number badge, the short visual title (≤ 2
+ * lines) and a small CTA. A photo close to 2:3 is cover-cropped from the
+ * centre with the panel on its calmer edge; any other photo (e.g. 800×600)
+ * is shown whole above or below the panel, never covered by it.
+ */
+async function renderListicleV2(photo: Buffer, text: ComposerListicleV2Text, variant: number): Promise<ComposedPin> {
+  const size = await coverKeep(photo);
+  const preferred: ListiclePhotoMode = size.keep >= LISTICLE_SAFE_COVER_KEEP ? 'cover' : 'fit';
+  const { mode, backdrop, flip } = listicleVariant(preferred, variant);
+  const panel = await listicleV2Panel(text);
+  const panelGap = 24;
+
+  let background: Buffer;
+  let placement: 'top' | 'bottom';
+  let box: ListicleLayout['photo'];
+  if (mode === 'cover') {
+    // Centred (not attention-driven): the attention crop can pick a saturated background over the subject.
+    try {
+      background = await sharp(photo).rotate().resize({ width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height, fit: 'cover', position: 'centre' }).removeAlpha().png().toBuffer();
+    } catch {
+      throw new ComposerRenderError('The article photo could not be read');
+    }
+    const calm = await quieterEdge(background);
+    placement = flip ? (calm === 'top' ? 'bottom' : 'top') : calm;
+    box = { left: 0, top: 0, width: COMPOSER_CANVAS.width, height: COMPOSER_CANVAS.height };
+  } else {
+    placement = flip ? 'top' : 'bottom';
+    const area =
+      placement === 'bottom'
+        ? { top: 0, height: COMPOSER_CANVAS.height - MARGIN_Y - panel.height - panelGap }
+        : { top: MARGIN_Y + panel.height + panelGap, height: COMPOSER_CANVAS.height - MARGIN_Y - panel.height - panelGap };
+    ({ background, box } = await fitPhoto(photo, size, area, backdrop));
+  }
+  const panelTop = placement === 'top' ? MARGIN_Y : COMPOSER_CANVAS.height - MARGIN_Y - panel.height;
+  const { rects, placed } = panel.draw(panelTop);
+  const composed = await finish(background, rects, placed, panel.contrast, placement);
+  return {
+    ...composed,
+    listicle: { photoMode: mode, backdrop: mode === 'fit' ? backdrop : null, photo: box, panel: { top: panelTop, height: panel.height } },
+  };
 }
 
 /** One list block (stable line spacing), accent bullets, one line per item whenever a size allows it. */
@@ -713,7 +911,9 @@ export async function renderComposedPin(
   stepPhotos: Buffer[] = [],
   options: { cropVariant?: number } = {}
 ): Promise<ComposedPin> {
+  if (isListicleV2(metadata)) return renderListicleV2(photo, metadata.text, options.cropVariant ?? metadata.source.crop);
   if (metadata.templateType === 'listicle_article_image') {
+    // v1 contracts (before TASK-087) keep their own rendering.
     return renderListicle(photo, metadata.text, options.cropVariant ?? metadata.source.crop);
   }
   if (metadata.templateType === 'hero') return renderHero(photo, metadata.text);
