@@ -9,6 +9,7 @@ import {
   PINTEREST_TEXT_IMPORTANCE,
   PINTEREST_VISUAL_STYLES,
   LISTICLE_TEXT_TREATMENTS,
+  DEFAULT_LISTICLE_TEXT_TREATMENT,
   SUPPORTED_LANGUAGES,
   PINS_MIN,
   PINS_MAX,
@@ -110,11 +111,11 @@ const generatePinsBaseSchema = z.object({
   // photo without text, so they require Photo only.
   visualStyle: z.enum(PINTEREST_VISUAL_STYLES, { message: 'Invalid visual style' }).default('classic'),
   // TASK-088: text of the numbered Pins on an article photo, whatever the
-  // visual style. Only read with an article source; the default keeps the
-  // TASK-087 overlay.
+  // visual style. Only read with an article source. v3.3.0: the default is
+  // the AI-generated design; an explicit choice is always kept.
   listicleTextTreatment: z
     .enum(LISTICLE_TEXT_TREATMENTS, { message: 'Invalid article image text treatment' })
-    .default('omniflow-overlay'),
+    .default(DEFAULT_LISTICLE_TEXT_TREATMENT),
 });
 
 // websiteUrl / pinterestUrl are Research source URLs (provenance), not the

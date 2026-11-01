@@ -1948,21 +1948,23 @@ function aiDesignMetadata(options: { hasDestination?: boolean } = {}): ListicleV
   return { ...listicleMetadata(FIFTEEN, NUMBERED_TITLES[0], { hasDestination: options.hasDestination ?? true }), textTreatment: 'ai-design' };
 }
 
-test.describe('TASK-088 — the default stays the OmniFlow overlay', () => {
-  test('request schema: no treatment → omniflow-overlay; an unknown one is refused', () => {
+test.describe('v3.3.0 — AI-generated design by default; stored modes and explicit choices kept', () => {
+  test('request schema: no treatment → ai-design; explicit modes kept; an unknown one is refused', () => {
     const base = { projectId: PROJECT_ID, keyword: 'crochet blankets', language: 'en', pinsRequested: 3, generationMode: 'photo-only', wordpressPost: { siteId: SITE_ID, postId: 3001 } };
-    expect(generatePinsSchema.parse(base).listicleTextTreatment).toBe('omniflow-overlay');
+    expect(generatePinsSchema.parse(base).listicleTextTreatment).toBe('ai-design');
+    expect(generatePinsSchema.parse({ ...base, listicleTextTreatment: 'omniflow-overlay' }).listicleTextTreatment).toBe('omniflow-overlay');
+    expect(generatePinsSchema.parse({ ...base, listicleTextTreatment: 'photo-only' }).listicleTextTreatment).toBe('photo-only');
     expect(generatePinsSchema.parse({ ...base, listicleTextTreatment: 'ai-design' }).listicleTextTreatment).toBe('ai-design');
     expect(generatePinsSchema.safeParse({ ...base, listicleTextTreatment: 'neon' }).success).toBe(false);
   });
 
-  test('contract: the overlay is not stored (Pins made before read the same); AI design / Photo only are', () => {
+  test('contract: a Pin stored without a mode (made before) stays the overlay; every chosen mode is stored', () => {
     const overlay = listicleMetadata();
     expect(overlay).not.toHaveProperty('textTreatment');
     expect(listicleTextTreatment(overlay)).toBe('omniflow-overlay');
     const sectionId = FIFTEEN.sections.find((section) => section.kind === 'subject')!.id;
     const [source] = planListicleImageSources(FIFTEEN, [sectionId], HOSTS);
-    for (const treatment of ['ai-design', 'photo-only'] as const) {
+    for (const treatment of ['ai-design', 'omniflow-overlay', 'photo-only'] as const) {
       const metadata = buildListicleComposerMetadata({ pinTitle: NUMBERED_TITLES[0], number: '15', source: source!, context: FIFTEEN, sectionId, language: 'en', hasDestination: false, ctaIndex: 0, textTreatment: treatment })!;
       expect(metadata.textTreatment).toBe(treatment);
       expect(readComposerMetadata(attachComposerMetadata(null, metadata))).toEqual(metadata);
@@ -1972,26 +1974,27 @@ test.describe('TASK-088 — the default stays the OmniFlow overlay', () => {
     expect(listicleTextTreatment(v1)).toBe('omniflow-overlay');
   });
 
-  test('POST /api/pinterest/generate: the chosen treatment is stored on numbered Pins only; texts, link, board unchanged; no image call', async () => {
+  test('POST /api/pinterest/generate: AI design by default, explicit overlay / Photo only kept, stored on numbered Pins only; texts, link, board unchanged; no image call', async () => {
     const post = wordpressPost('12 Cozy Crochet Blanket Ideas for Winter', 12);
     const plan = buildListicleAnglePlan(12);
     const answer = modelAnswer(post, 12, plan, '12');
     const original = pinsOf(answer);
     const byDefault = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets' }, answer);
-    const ai = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets', listicleTextTreatment: 'ai-design' }, answer);
-    for (const run of [byDefault, ai]) {
+    const overlay = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets', listicleTextTreatment: 'omniflow-overlay' }, answer);
+    const photo = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets', listicleTextTreatment: 'photo-only' }, answer);
+    for (const run of [byDefault, overlay, photo]) {
       expect(run.status, JSON.stringify(run.body.error)).toBe(201);
       expect(run.prompts).toHaveLength(1);
     }
-    const defaultContracts = savedPins(byDefault).map(composerOf).filter((item): item is ComposerMetadata => Boolean(item && isListicleV2(item)));
-    expect(defaultContracts).toHaveLength(6);
-    expect(defaultContracts.every((item) => !('textTreatment' in item))).toBe(true);
-    const rows = savedPins(ai);
-    const aiContracts = rows.map(composerOf).filter((item): item is ListicleV2Metadata => Boolean(item && isListicleV2(item)));
+    const contractsOf = (run: GenerateRun) => savedPins(run).map(composerOf).filter((item): item is ListicleV2Metadata => Boolean(item && isListicleV2(item)));
+    const aiContracts = contractsOf(byDefault);
     expect(aiContracts).toHaveLength(6);
     expect(aiContracts.every((item) => item.textTreatment === 'ai-design')).toBe(true);
-    // Same visual titles with either treatment; other Pins have no composer contract.
-    expect(aiContracts.map((item) => item.text)).toEqual(defaultContracts.map((item) => (item as ListicleV2Metadata).text));
+    expect(contractsOf(overlay).every((item) => item.textTreatment === 'omniflow-overlay')).toBe(true);
+    expect(contractsOf(photo).every((item) => item.textTreatment === 'photo-only')).toBe(true);
+    // Same visual titles with every treatment; other Pins have no composer contract.
+    expect(contractsOf(overlay).map((item) => item.text)).toEqual(aiContracts.map((item) => item.text));
+    const rows = savedPins(byDefault);
     rows.forEach((row, i) => {
       expect(row.title).toBe(original[i].title);
       expect(row.description).toBe(original[i].description);

@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'playwright/test';
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import type { Pin } from '@/types/database';
+import { DEFAULT_LISTICLE_TEXT_TREATMENT } from '@/types/pinterest';
 
 // Same runtime redirect as pinterest-visual-archetypes-ui.spec.ts: .tsx is
 // rendered with React's JSX runtime for this spec only.
@@ -220,7 +221,7 @@ test.describe('Visual format — Pin grid and details', () => {
       await page.setContent(`<!doctype html><html><body>${markup}</body></html>`);
       const ai = page.locator('#ai');
       await expect(ai).toContainText('Designed by AI');
-      await expect(ai.getByTestId('pin-visual-format-text-treatment')).toHaveText('Text: AI-generated design · experimental · 1 image generation');
+      await expect(ai.getByTestId('pin-visual-format-text-treatment')).toHaveText('Text: AI-generated design · 1 paid image generation');
       await expect(ai).toContainText('Text drawn by the AI, not checked by OmniFlow');
       const overlay = page.locator('#overlay');
       await expect(overlay).toContainText('Composed by OmniFlow');
@@ -232,17 +233,35 @@ test.describe('Visual format — Pin grid and details', () => {
     }
   });
 
-  test('generator: "Article image text treatment" for article Pins, OmniFlow overlay by default, AI design warning (source level)', () => {
+  test('generator: "Article image text treatment" — AI-generated design by default and Recommended, overlay / Photo only under Advanced (source level)', () => {
     const form = readFileSync(join(process.cwd(), 'components/pinterest/pin-form.tsx'), 'utf8');
     expect(form).toContain('Article image text treatment');
     expect(form).toContain('useState<ListicleTextTreatment>(DEFAULT_LISTICLE_TEXT_TREATMENT)');
-    for (const label of ["label: 'OmniFlow overlay'", "label: 'AI-generated design'", "label: 'Photo only'", "badge: 'Recommended'", "badge: 'Experimental'"]) {
-      expect(form).toContain(label);
-    }
+    expect(DEFAULT_LISTICLE_TEXT_TREATMENT).toBe('ai-design');
+    expect(form).toMatch(/RECOMMENDED_TEXT_TREATMENT: TreatmentOption = \{\s*value: 'ai-design',\s*label: 'AI-generated design',[\s\S]*?badge: 'Recommended',/);
+    expect(form).toMatch(/ADVANCED_TEXT_TREATMENTS: TreatmentOption\[\] = \[[\s\S]*label: 'OmniFlow overlay'[\s\S]*label: 'Photo only'/);
+    expect(form).toContain('data-testid="listicle-text-treatment-advanced"');
+    expect(form).not.toContain("badge: 'Experimental'");
     expect(form).toContain(
-      'AI-generated design uses one image generation per Pin. Text inside the image may contain spelling or number variations.'
+      'AI-generated design uses one paid image generation per numbered Pin. Text inside the image may contain spelling or number variations.'
     );
-    // Sent only with an article source, never for keyword Pins.
-    expect(form).toContain('...(articleSource ? { visualStyle, listicleTextTreatment } : {}),');
+    // Sent only with an article source, never for keyword Pins (TASK-FIX-089: the default when the options are hidden).
+    expect(form).toContain('...(articleSource ? { visualStyle, listicleTextTreatment: showListicleTreatment ? listicleTextTreatment : DEFAULT_LISTICLE_TEXT_TREATMENT } : {}),');
+  });
+
+  test('generator: a tips guide hides the article-photo options, stays on AI Integrated and warns about paid image calls (TASK-FIX-089, source level)', () => {
+    const form = readFileSync(join(process.cwd(), 'components/pinterest/pin-form.tsx'), 'utf8');
+    expect(form).toContain("const tipsGuide = articleSource?.articleKind === 'tips_guide';");
+    expect(form).toContain("(!articleSource?.articleKind || articleSource.articleKind === 'project_listicle')");
+    expect(form).toContain('{showListicleTreatment && (');
+    expect(form).toContain("useState<PinterestGenerationMode>('ai-integrated')");
+    expect(form).toContain('data-testid="tips-guide-image-warning"');
+    expect(form).toContain('paid image generations (one per Pin)');
+    const summary = readFileSync(join(process.cwd(), 'components/social/article-source-summary.tsx'), 'utf8');
+    expect(summary).toContain('data-testid="article-kind-badge"');
+    expect(summary).toContain('ARTICLE_KIND_LABELS[source.articleKind]');
+    for (const page of ['app/(dashboard)/pinterest/from-wordpress/page.tsx', 'app/(dashboard)/pinterest/create/page.tsx']) {
+      expect(readFileSync(join(process.cwd(), page), 'utf8')).toContain('articleKind: classifyArticleKind(article.context),');
+    }
   });
 });

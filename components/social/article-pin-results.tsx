@@ -21,7 +21,16 @@ import {
 import { readPinterestStrategyAngle } from '@/lib/pinterest/strategy';
 import { toastApiError } from '@/components/pinterest/strategy-safeguard-alert';
 import { RegenerateTextButton } from '@/components/pinterest/regenerate-text-button';
-import { ANGLE_LABELS, describeImageFailures, NO_LINK_NOTICE, pinAsText, readPinSourceSection, readPinVisualArchetype } from '@/lib/social/pin-display';
+import {
+  ANGLE_LABELS,
+  describeImageFailures,
+  NO_LINK_NOTICE,
+  paidImageCalls,
+  paidImagesConfirmation,
+  pinAsText,
+  readPinSourceSection,
+  readPinVisualArchetype,
+} from '@/lib/social/pin-display';
 import { PinVisualFormatBadge, PinVisualFormatDetails } from '@/components/pinterest/pin-visual-format';
 import type { Pin } from '@/types/database';
 import type { ApiError } from '@/types/api';
@@ -66,6 +75,8 @@ export function ArticlePinResults({ pins, generationId, regenerateSource, boardN
   const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const [allImagesLoading, setAllImagesLoading] = useState(false);
   const pinsWithoutImages = pins.filter((pin) => !pin.media_url).length;
+  // v3.3.0: the exact number of paid image calls, from each Pin's own mode.
+  const paidCalls = paidImageCalls(pins.filter((pin) => !pin.media_url));
 
   async function generateAllImages() {
     setAllImagesLoading(true);
@@ -142,9 +153,9 @@ export function ArticlePinResults({ pins, generationId, regenerateSource, boardN
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Generate {pinsWithoutImages} images?</DialogTitle>
-            <DialogDescription>
-              This consumes AI image credits and Storage space: one image is generated and stored for each Pin
-              without an image. The article&apos;s featured image is never changed.
+            <DialogDescription data-testid="paid-images-confirmation">
+              {paidImagesConfirmation(paidCalls)} One image is stored for each Pin without an image, in the mode it
+              was created with. The article&apos;s featured image is never changed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

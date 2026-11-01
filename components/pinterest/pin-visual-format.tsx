@@ -53,7 +53,7 @@ export function PinVisualFormatDetails({ imageAnalysis }: { imageAnalysis: strin
       {format.textTreatment && (
         <span data-testid="pin-visual-format-text-treatment">
           Text: <span className="font-medium text-foreground">{format.textTreatment}</span>
-          {format.textTreatment === 'AI-generated design' && ' · experimental · 1 image generation'}
+          {format.textTreatment === 'AI-generated design' && ' · 1 paid image generation'}
         </span>
       )}
       {format.layout && format.panelCount && (

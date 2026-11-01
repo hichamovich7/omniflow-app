@@ -4,7 +4,7 @@ import type { ImageReference } from '@/lib/ai/services/image';
 import type { ListicleV2Metadata } from './content';
 
 /**
- * TASK-088 — "AI-generated design" of a numbered Pin (experimental). The
+ * TASK-088 — "AI-generated design" of a numbered Pin (the default since v3.3.0). The
  * article photo goes to the image model as a reference; the model draws the
  * whole Pin, text included, and OmniFlow adds no overlay afterwards. The
  * Pinterest title, description and keywords stay the official text: what the

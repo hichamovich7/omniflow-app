@@ -18,6 +18,21 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.3.0 — Pinterest: AI-generated designs by default, tips articles no longer treated as project galleries — TASK-088 + TASK-FIX-089 (2026-11-01)
+
+* **AI-generated design is now the default** for the numbered Pins of a real project gallery: the article photo is sent to the image model as a reference, which keeps the subject and draws the visual title, the number and the CTA (only with a Destination URL); OmniFlow adds no overlay afterwards. One paid image generation per numbered Pin. It is marked Recommended; **OmniFlow overlay** and **Photo only** stay available under "Advanced" and are always respected when chosen.
+* Pins made before keep the mode they were made with (a numbered Pin without a stored mode stays the overlay); every new Pin stores its mode, so "Regenerate image" reuses it. No silent fallback between modes; a failed image saves nothing and keeps the previous image.
+* Every "Generate images" for several Pins asks first: "This action will generate N paid images. Continue?", with the exact number of paid images from each Pin's own mode (overlay and Photo only Pins cost none).
+* Tips guides: titles and text written into the image call the items tips / advice / techniques in the article language — never "ideas".
+* Keyword and Research flows unchanged. No migration.
+
+### TASK-FIX-089 — tips articles are no longer treated as project galleries
+
+* Reported case: "25 Air Dry Clay Tips for Beginners to Get Better Results" was handled as a gallery of 25 projects (numbered article-photo Pins) and the generation stopped with `IMAGE_SUBJECT_MISMATCH` "no recognizable project": its sections are tips and actions, not objects.
+* Every article source is now classified before the visual format: **Project ideas** (`project_listicle` — a stated count and several distinct projects), **Tips & tricks** (`tips_guide` — tips, tricks, mistakes, techniques… in English, French, German and Spanish) or **Article** (`generic_article`). A number in the title alone never makes a project gallery. The type is shown as a badge on the source card.
+* Only project galleries get numbered Pins composed on the article photos (`listicle_article_image`, unchanged for them). A tips guide keeps the number in its titles, but each Pin image is created by AI Integrated from its tip; the brief and the prompt ask for the tip, action or technique of the section, and the check now verifies that the image shows that tip (fixed action vocabulary in four languages, or the heading's own words in English) instead of a project. The invented-element check and every other safeguard still run; `IMAGE_SUBJECT_MISMATCH` stays active.
+* Generator: for a tips guide the article-photo text options are hidden, AI Integrated stays selected, and a note warns that each Pin uses one paid image generation. Titles, descriptions, links, UTM, boards, sections and dates unchanged; no migration.
+
 ## v3.2.0 — Pinterest numbered Pins: text treatment, with an experimental AI-generated design — TASK-088 (2026-10-31)
 
 * New "Article image text treatment" in the generator for numbered Pins on the article's photo: **OmniFlow overlay** (default, unchanged), **AI-generated design** (experimental — the article photo is sent as a reference to the configured text image model, which designs the Pin with its title and number; one image generation per Pin) and **Photo only** (the photo without text). Works with every visual format, Auto variety included; Classic, Hero and Materials & tools Pins are unchanged.

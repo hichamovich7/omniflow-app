@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { LANGUAGE_LABELS } from '@/types/pinterest';
+import { ARTICLE_KIND_LABELS, LANGUAGE_LABELS } from '@/types/pinterest';
 import { wordpressPostPinterestHref } from '@/lib/social/pin-display';
-import type { SupportedLanguage } from '@/types/pinterest';
+import type { ArticleKind, SupportedLanguage } from '@/types/pinterest';
 
 /**
  * What the Pinterest form shows and pre-fills from a WordPress article
@@ -20,6 +20,8 @@ export interface ArticleFormSource {
   postMeta?: { date: string; status: string; categories: string[] } | null;
   /** Subjects (patterns / projects) detected in the article — what Pins are built from. */
   subjects?: string[];
+  /** TASK-FIX-089: detected article kind (lib/pinterest/article-kind.ts) — shown as a badge, drives the form defaults. */
+  articleKind?: ArticleKind;
   projectId: string;
   title: string;
   metaTitle: string;
@@ -67,6 +69,11 @@ export function ArticleSourceSummary({ source }: { source: ArticleFormSource }) 
           <span className="font-medium">Meta:</span> {source.metaTitle} — {source.metaDescription}
         </p>
         <div className="flex flex-wrap items-center gap-1.5">
+          {source.articleKind && (
+            <Badge variant="primary" data-testid="article-kind-badge" data-kind={source.articleKind}>
+              {ARTICLE_KIND_LABELS[source.articleKind]}
+            </Badge>
+          )}
           <Badge variant="outline">{LANGUAGE_LABELS[source.language]}</Badge>
           <Badge variant="outline">Keyword: {source.primaryKeyword}</Badge>
           {source.seoKeywords.slice(0, 5).map((keyword) => (
@@ -90,7 +97,8 @@ export function ArticleSourceSummary({ source }: { source: ArticleFormSource }) 
         {source.subjects && source.subjects.length > 0 && (
           <p className="line-clamp-3 text-xs text-muted-foreground" data-testid="article-source-subjects">
             <span className="font-medium">
-              {source.subjects.length} subject{source.subjects.length > 1 ? 's' : ''} in the article — each Pin shows one of them:
+              {source.subjects.length} {source.articleKind === 'tips_guide' ? 'tip' : 'subject'}
+              {source.subjects.length > 1 ? 's' : ''} in the article — each Pin shows one of them:
             </span>{' '}
             {source.subjects.join(' · ')}
           </p>

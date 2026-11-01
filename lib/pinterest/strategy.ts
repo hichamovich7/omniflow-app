@@ -71,6 +71,8 @@ export interface PinterestSubjectReport {
   missing: string[];
   /** The visual subject contract's primary subject, when the section has one. */
   required?: string;
+  /** TASK-FIX-089: a tips_guide section — checked on its tip / action (fixed actions or heading words), not on a project. */
+  tip?: boolean;
 }
 
 const TITLE_SIMILARITY_LIMIT = 0.8;

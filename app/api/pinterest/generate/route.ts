@@ -67,6 +67,7 @@ import {
   planListicleImageSources,
   validateListicleBatch,
 } from '@/lib/pinterest/listicle';
+import { classifyArticleKind, type ArticleKind } from '@/lib/pinterest/article-kind';
 import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
 import { repairTitles, titleRepairTargets } from '@/lib/pinterest/title-repair';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
@@ -293,6 +294,10 @@ export async function POST(request: Request) {
   // visual brief. Article photos only ever become text (alt text first, then
   // VISION) — never an image-model reference. Best-effort: without Vision the
   // brief uses the article text alone.
+  // TASK-FIX-089: the article kind decides the visual path before anything
+  // else — only a project gallery gets article-photo numbered Pins; a tips
+  // guide gets AI Integrated images of each tip, never a project check.
+  const articleKind: ArticleKind | null = articleSource ? classifyArticleKind(articleSource.context) : null;
   let articleGrounding: ArticleGrounding | null = null;
   if (articleSource) {
     const sectionPlan = planArticlePinSections(articleSource.context, pinsRequested);
@@ -306,7 +311,10 @@ export async function POST(request: Request) {
     articleGrounding = buildArticleGrounding(articleSource.context, pinsRequested, descriptions, {
       niche: articleSource.niche,
       visualStyle,
+      articleKind: articleKind ?? undefined,
     });
+    // Fixed value only: no article content.
+    console.log(`[${PROMPT_ID}] Article kind: ${JSON.stringify({ kind: articleKind })}`);
   }
 
   let analysisContext: string | null = articleSource
@@ -429,6 +437,7 @@ export async function POST(request: Request) {
       analysisContext: analysisContext ?? undefined,
       referenceStyleGuidance,
       articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
+      tipsGuide: articleKind === 'tips_guide',
       ...(listicleNumber && listicleAnglePlan
         ? {
             listicle: {
@@ -650,8 +659,10 @@ export async function POST(request: Request) {
     // TASK-083: every numbered Pin (Listicle / Article Promise, number checked
     // above) is composed on one of the article's own photos — no image model.
     // Without a usable photo it keeps the path it would have had.
+    // TASK-FIX-089: project galleries only — a tips guide or another article
+    // keeps its number in the titles, never `listicle_article_image`.
     const listicleByPin = new Map<number, ComposerMetadata>();
-    if (listicleNumber && articleSource) {
+    if (listicleNumber && articleSource && articleKind === 'project_listicle') {
       const numbered = resolvedPins.flatMap((pin, i) => (isNumberedAngle(pin.angle) ? [i] : []));
       const sources = planListicleImageSources(
         articleSource.context,
@@ -830,6 +841,7 @@ export async function POST(request: Request) {
       pinsGenerated: number;
       linkUrl: string | null;
       destinationWarning: string | null;
+      articleKind: ArticleKind | null;
     }>>(
       {
         data: {
@@ -838,6 +850,7 @@ export async function POST(request: Request) {
           pinsGenerated,
           linkUrl: destination.linkUrl,
           destinationWarning: destination.warning,
+          articleKind,
         },
         error: null,
       },

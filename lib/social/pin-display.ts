@@ -172,6 +172,21 @@ export function readPinVisualFormat(imageAnalysisJson: string | null): PinVisual
 }
 
 /**
+ * v3.3.0: paid image generations "Generate images" will make for these Pins —
+ * each Pin's own mode (an AI design or AI Integrated image = 1, a Step-by-step
+ * Pin = 1 + its panels, an overlay / Photo only numbered Pin = 0). Classic
+ * and legacy Pins make one.
+ */
+export function paidImageCalls(pins: ReadonlyArray<{ image_analysis: string | null }>): number {
+  return pins.reduce((total, pin) => total + (readPinVisualFormat(pin.image_analysis).imageCalls ?? 1), 0);
+}
+
+/** The confirmation shown before a global image generation. */
+export function paidImagesConfirmation(calls: number): string {
+  return `This action will generate ${calls} paid image${calls === 1 ? '' : 's'}. Continue?`;
+}
+
+/**
  * TASK-088: the message to show after POST /api/pinterest/generate-images
  * when Pins failed — the first Pin-specific reason, else a count. Null when
  * every image was made.

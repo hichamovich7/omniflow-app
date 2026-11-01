@@ -4,8 +4,8 @@ import { pickCtaMessage } from '@/lib/pinterest/cta-messages';
 import { MATERIALS_HEADING, type PinVisualArchetype, type VisualArchetypeId } from '@/lib/pinterest/visual-archetypes';
 import { COMPOSER_METADATA_KEY } from '@/lib/social/pin-display';
 import {
-  DEFAULT_LISTICLE_TEXT_TREATMENT,
   LISTICLE_TEXT_TREATMENTS,
+  STORED_LISTICLE_TEXT_TREATMENT_FALLBACK,
   type ListicleTextTreatment,
   type PinterestVisualStyle,
 } from '@/types/pinterest';
@@ -452,9 +452,13 @@ export function isListicleV2(metadata: ComposerMetadata): metadata is ListicleV2
   return metadata.templateType === 'listicle_article_image' && metadata.templateVersion === LISTICLE_TEMPLATE_VERSION;
 }
 
-/** TASK-088: how a numbered Pin's text is made — the OmniFlow overlay for v1 Pins and v2 Pins made before. */
+/**
+ * TASK-088: how a numbered Pin's text is made — its stored mode, else the
+ * OmniFlow overlay (v1 Pins and v2 Pins stored without a mode). Never the
+ * request default: an existing Pin keeps the mode it was made with.
+ */
 export function listicleTextTreatment(metadata: ComposerMetadata): ListicleTextTreatment {
-  return isListicleV2(metadata) ? metadata.textTreatment ?? DEFAULT_LISTICLE_TEXT_TREATMENT : DEFAULT_LISTICLE_TEXT_TREATMENT;
+  return isListicleV2(metadata) ? metadata.textTreatment ?? STORED_LISTICLE_TEXT_TREATMENT_FALLBACK : STORED_LISTICLE_TEXT_TREATMENT_FALLBACK;
 }
 
 export function isStepByStepV2(metadata: ComposerMetadata): metadata is StepByStepV2Metadata {
@@ -616,7 +620,7 @@ export function buildListicleComposerMetadata(input: {
   hasDestination: boolean;
   ctaIndex: number;
   taken?: ReadonlySet<string>;
-  /** TASK-088: stored only when it is not the default overlay (Pins made before keep the same contract). */
+  /** TASK-088: the chosen mode. v3.3.0: always stored when given, so a Pin keeps its mode whatever the default becomes. */
   textTreatment?: ListicleTextTreatment;
 }): ListicleV2Metadata | null {
   if (!numbersOf(collapse(input.pinTitle)).has(input.number)) return null;
@@ -639,7 +643,7 @@ export function buildListicleComposerMetadata(input: {
       cta: input.hasDestination ? pickCtaMessage(input.language, input.ctaIndex) : null,
     },
     source: input.source,
-    ...(input.textTreatment && input.textTreatment !== DEFAULT_LISTICLE_TEXT_TREATMENT ? { textTreatment: input.textTreatment } : {}),
+    ...(input.textTreatment ? { textTreatment: input.textTreatment } : {}),
   };
 }
 

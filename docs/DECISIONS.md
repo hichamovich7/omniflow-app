@@ -1799,6 +1799,30 @@ Facebook was declared `coming_soon` in the Social Content Studio and already acc
 * Rotating `SOCIAL_TOKEN_ENCRYPTION_KEY` disconnects every Page (users reconnect).
 * The first-comment link is an editorial choice: OmniFlow never claims it improves reach.
 
+## 2026-11-01
+
+### Decision
+
+AI-generated design becomes the default for article Pins (v3.3.0), and every article is classified before its visual format (TASK-FIX-089).
+
+### Context
+
+The TASK-088 real test showed AI designs that keep the article photo's subject with readable integrated text; the overlay stayed the default only while the mode was experimental. A tips article ("25 Air Dry Clay Tips…") was treated as a project gallery because its title had a number, and failed on "no recognizable project".
+
+### Decision Taken
+
+1. Article kinds: `project_listicle` (a count and several distinct projects), `tips_guide` (tips / tricks / mistakes / techniques, EN/FR/DE/ES), `generic_article`. A number alone never makes a gallery.
+2. Only `project_listicle` numbered Pins use the article photo (`listicle_article_image`), now in **AI-generated design** by default (photo as reference, one paid image call, no OmniFlow overlay afterwards). OmniFlow overlay and Photo only stay available as advanced choices.
+3. Tips guides and other articles use AI Integrated; tips images show the tip / action, checked on the tip instead of a project; titles and image text say "tips", never "ideas".
+4. Stored Pins keep their mode: a numbered Pin without a stored mode stays the overlay; every new Pin stores its mode explicitly. No silent fallback between modes.
+5. Every global image generation asks for confirmation with the exact number of paid images.
+
+### Consequences
+
+* Article Pins cost more by default (one image call per numbered Pin instead of none); the confirmation and the form notes make this visible.
+* Text drawn by the image model is not checked by OmniFlow (`aiTextUnverified`); the Pin title and description stay the official text.
+* Keyword and Research flows are unchanged.
+
 ---
 
 # Idées futures

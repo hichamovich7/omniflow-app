@@ -833,7 +833,8 @@ test.describe('Result cards and CSV', () => {
     expect(cards).toContain("fetch(`/api/pinterest/pins/${pin.id}`, {\n        method: 'PATCH'");
     expect(cards).toContain('fetch(`/api/pinterest/pins/${pin.id}/regenerate`');
     expect(cards).toContain("JSON.stringify({ generationId, pinIds: [pin.id] })");
-    expect(cards).toMatch(/<Dialog open=\{confirmAllOpen\}[\s\S]*credits and Storage/);
+    // v3.3.0: the confirmation states the exact number of paid image calls.
+    expect(cards).toMatch(/<Dialog open=\{confirmAllOpen\}[\s\S]*paidImagesConfirmation\(paidCalls\)/);
     expect(cards).not.toMatch(/useEffect/);
   });
 

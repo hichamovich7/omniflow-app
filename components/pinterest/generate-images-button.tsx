@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 import { ImageIcon, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { describeImageFailures } from '@/lib/social/pin-display';
+import { describeImageFailures, paidImagesConfirmation } from '@/lib/social/pin-display';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { ImageStatus } from '@/types/database';
 
 interface GenerateImagesButtonProps {
@@ -14,6 +22,8 @@ interface GenerateImagesButtonProps {
   pinsWithoutImages: number;
   selectedPinIds?: Set<string>;
   allPinsHaveImages?: boolean;
+  /** v3.3.0: paid image calls of the Pins this click generates (paidImageCalls) — asked for confirmation first. */
+  paidImages: number;
 }
 
 export function GenerateImagesButton({
@@ -22,9 +32,11 @@ export function GenerateImagesButton({
   pinsWithoutImages,
   selectedPinIds,
   allPinsHaveImages,
+  paidImages,
 }: GenerateImagesButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(imageStatus === 'processing');
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const hasSelection = selectedPinIds && selectedPinIds.size > 0;
   const isRegeneration = hasSelection && allPinsHaveImages;
@@ -41,6 +53,7 @@ export function GenerateImagesButton({
   const count = hasSelection ? selectedPinIds.size : pinsWithoutImages;
 
   async function handleGenerate() {
+    setConfirmOpen(false);
     setLoading(true);
 
     const body: Record<string, unknown> = { generationId };
@@ -79,23 +92,46 @@ export function GenerateImagesButton({
   }
 
   return (
-    <Button size="sm" loading={loading} onClick={handleGenerate} disabled={loading || count === 0}>
-      {isRegeneration ? (
-        <>
-          <RefreshCw data-icon="inline-start" />
-          Regenerate ({count})
-        </>
-      ) : imageStatus === 'partial' || imageStatus === 'failed' ? (
-        <>
-          <AlertTriangle data-icon="inline-start" />
-          Retry ({count})
-        </>
-      ) : (
-        <>
-          <ImageIcon data-icon="inline-start" />
-          Generate Images ({count})
-        </>
-      )}
-    </Button>
+    <>
+      <Button
+        size="sm"
+        loading={loading}
+        onClick={() => (paidImages > 0 ? setConfirmOpen(true) : handleGenerate())}
+        disabled={loading || count === 0}
+      >
+        {isRegeneration ? (
+          <>
+            <RefreshCw data-icon="inline-start" />
+            Regenerate ({count})
+          </>
+        ) : imageStatus === 'partial' || imageStatus === 'failed' ? (
+          <>
+            <AlertTriangle data-icon="inline-start" />
+            Retry ({count})
+          </>
+        ) : (
+          <>
+            <ImageIcon data-icon="inline-start" />
+            Generate Images ({count})
+          </>
+        )}
+      </Button>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate images?</DialogTitle>
+            <DialogDescription data-testid="paid-images-confirmation">
+              {paidImagesConfirmation(paidImages)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleGenerate}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

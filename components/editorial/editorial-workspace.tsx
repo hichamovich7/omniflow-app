@@ -14,6 +14,7 @@ import { DestinationUrlDialog } from '@/components/pinterest/destination-url-dia
 import { BulkRegenerateTextDialog } from '@/components/pinterest/bulk-regenerate-text-dialog';
 import type { Pin, ImageStatus } from '@/types/database';
 import type { WordPressUsageArticle } from '@/lib/queries/wordpress-usage';
+import { paidImageCalls } from '@/lib/social/pin-display';
 
 interface EditorialWorkspaceProps {
   pins: Pin[];
@@ -64,6 +65,10 @@ function EditorialWorkspaceContent({
     });
   }, [selectedIds, selectedCount, pins]);
 
+  // v3.3.0: paid calls of what each button generates — Pins without an image, or the selection.
+  const paidWithoutImages = useMemo(() => paidImageCalls(pins.filter((pin) => !pin.media_url)), [pins]);
+  const paidSelected = useMemo(() => paidImageCalls(pins.filter((pin) => selectedIds.has(pin.id))), [pins, selectedIds]);
+
   return (
     <>
       {isCompleted && pins.length > 0 && (
@@ -75,6 +80,7 @@ function EditorialWorkspaceContent({
                 generationId={generationId}
                 imageStatus={imageStatus}
                 pinsWithoutImages={pinsWithoutImages}
+                paidImages={paidWithoutImages}
               />
               <ScheduleDialog
                 generationId={generationId}
@@ -94,6 +100,7 @@ function EditorialWorkspaceContent({
               pinsWithoutImages={pinsWithoutImages}
               selectedPinIds={selectedIds}
               allPinsHaveImages={allSelectedHaveImages}
+              paidImages={paidSelected}
             />
             <ScheduleDialog
               generationId={generationId}

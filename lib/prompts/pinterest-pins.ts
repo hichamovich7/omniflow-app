@@ -38,6 +38,12 @@ interface PromptContext {
    */
   articleGrounded?: boolean;
   /**
+   * TASK-FIX-089: a tips / techniques article (`tips_guide`) — each article-
+   * grounded image_prompt shows its section's tip or action instead of a
+   * project. Absent = project scenes, unchanged.
+   */
+  tipsGuide?: boolean;
+  /**
    * "Regenerate text" (TASK-082): the answer carries only title, description
    * and keywords (array) of one Pin — the image fields are not asked for, the
    * image is kept. Absent = full generation contract, unchanged.
@@ -144,11 +150,17 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
   // Keyword flow: free art direction (unchanged). Article flow: the scene is
   // the assigned section's project, described only with its visual brief —
   // no invented supporting objects, materials or palette.
-  const imagePromptSubjectInstruction = ctx.articleGrounded
+  const imagePromptSubjectInstruction = ctx.articleGrounded && ctx.tipsGuide
+    ? `- sourceSectionId: the id of the article section this pin is built from, copied exactly from <pin_plan> (e.g. "s2"). Follow the <pin_plan> assignment in order.
+- image_prompt: a hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). This article gives tips and techniques: the image must clearly represent the tip, action or technique of the pin's assigned section ("Tip, action or technique represented" in its visual brief) — name that action explicitly (for example hands smoothing the clay, filling a crack, testing a color, applying varnish, checking the thickness, letting a piece dry on a rack). Show the hands, tools and material at that stage, described only with the materials, colors and details of that brief; do not invent a finished project the section does not name. Never use anything listed under the brief's Forbidden elements. The setting is limited to a plain neutral surface or backdrop (white, cream, beige, light gray or natural wood), soft natural light and at most one or two text-free props. State the camera angle (${cameraAngles}).`
+    : ctx.articleGrounded
     ? `- sourceSectionId: the id of the article section this pin is built from, copied exactly from <pin_plan> (e.g. "s2"). Follow the <pin_plan> assignment in order.
 - image_prompt: a hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). The main subject, front and center, is the exact project of the pin's assigned section ("Pattern or project represented" in its visual brief), described only with the materials, colors, techniques, shape, texture and visual details of that brief. When the brief leaves a detail unspecified, keep it plain instead of inventing one. Never add another project, garment or object type, and never use anything listed under the brief's Forbidden elements. The setting is limited to a plain neutral surface or backdrop (white, cream, beige, light gray or natural wood), soft natural light and at most one or two text-free props. State the camera angle (${cameraAngles}).`
     : `- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}).`;
-  const imageVariationRule = ctx.articleGrounded
+  const imageVariationRule = ctx.articleGrounded && ctx.tipsGuide
+    ? `- Image prompts must each show their own assigned section's tip or action. Vary the camera angle (choosing only from: ${cameraAngles}), framing and neutral backdrop between pins. Never describe the same scene twice.
+- This article gives tips, not project ideas: in every title, description and text written into the image (headline, subtitle, CTA), call its items tips, advice or techniques — in the article language (French: conseils, astuces, techniques; German: Tipps, Techniken; Spanish: consejos, trucos, técnicas). Never call them "ideas" or "projects".`
+    : ctx.articleGrounded
     ? `- Image prompts must each show their own assigned section's project. Vary only the camera angle (choosing only from: ${cameraAngles}), framing and neutral backdrop between pins — never the facts of the project. Never describe the same scene twice.`
     : `- Image prompts must describe a single concrete visual scene that a photographer could set up and shoot. Every image prompt must vary the setting, objects, color palette, and camera angle across pins, choosing only from: ${cameraAngles}. Never describe the same scene twice.`;
 

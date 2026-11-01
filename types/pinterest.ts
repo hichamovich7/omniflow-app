@@ -33,13 +33,32 @@ export const PINTEREST_VISUAL_STYLES = [
 export type PinterestVisualStyle = (typeof PINTEREST_VISUAL_STYLES)[number];
 
 // TASK-088: how the text of a numbered Pin on an article photo
-// (`listicle_article_image`) is made. `omniflow-overlay` (default) = the
-// TASK-087 panel drawn by OmniFlow; `ai-design` = the image model receives
-// the article photo as a reference and draws the text itself (experimental,
-// one image call per Pin); `photo-only` = the article photo without text.
+// (`listicle_article_image`) is made. `ai-design` (default since v3.3.0) =
+// the image model receives the article photo as a reference and draws the
+// text itself (one image call per Pin); `omniflow-overlay` = the TASK-087
+// panel drawn by OmniFlow; `photo-only` = the article photo without text.
 export const LISTICLE_TEXT_TREATMENTS = ['omniflow-overlay', 'ai-design', 'photo-only'] as const;
 export type ListicleTextTreatment = (typeof LISTICLE_TEXT_TREATMENTS)[number];
-export const DEFAULT_LISTICLE_TEXT_TREATMENT: ListicleTextTreatment = 'omniflow-overlay';
+/**
+ * v3.3.0: new numbered article Pins default to the AI-generated design (the
+ * article photo as a reference, one paid image call per Pin). The overlay and
+ * Photo only stay available when chosen explicitly.
+ */
+export const DEFAULT_LISTICLE_TEXT_TREATMENT: ListicleTextTreatment = 'ai-design';
+/** What a stored numbered Pin without `textTreatment` was made with (every Pin made before v3.3.0 that kept the overlay). */
+export const STORED_LISTICLE_TEXT_TREATMENT_FALLBACK: ListicleTextTreatment = 'omniflow-overlay';
+
+/**
+ * TASK-FIX-089: what an article is, decided before the visual format —
+ * lib/pinterest/article-kind.ts. Only `project_listicle` gets numbered Pins
+ * composed on the article's photos.
+ */
+export type ArticleKind = 'project_listicle' | 'tips_guide' | 'generic_article';
+export const ARTICLE_KIND_LABELS: Record<ArticleKind, string> = {
+  project_listicle: 'Project ideas',
+  tips_guide: 'Tips & tricks',
+  generic_article: 'Article',
+};
 
 export const PINTEREST_CREATIVE_FORMATS = [
   'hero-pin',

@@ -18,6 +18,7 @@ import {
 } from '@/lib/social/pinterest-from-article';
 import { getGenerationWithPins } from '@/lib/queries/generations';
 import { subjectSections } from '@/lib/wordpress/article-context';
+import { classifyArticleKind } from '@/lib/pinterest/article-kind';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
 import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
@@ -105,6 +106,7 @@ export default async function PinterestCreatePage({
     articleId,
     externalPost: null,
     subjects: subjectSections(article.context).map((section) => section.subject),
+    articleKind: classifyArticleKind(article.context),
     projectId: article.projectId,
     title: article.title,
     metaTitle: article.metaTitle,

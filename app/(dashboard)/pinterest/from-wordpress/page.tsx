@@ -21,6 +21,7 @@ import {
 } from '@/lib/social/pinterest-from-wordpress-post';
 import { WordPressReadError } from '@/lib/wordpress/post-reader';
 import { subjectSections } from '@/lib/wordpress/article-context';
+import { classifyArticleKind } from '@/lib/pinterest/article-kind';
 import { wordpressPostSourceSchema } from '@/lib/validations/wordpress-post-source';
 import { wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import { getGenerationWithPins } from '@/lib/queries/generations';
@@ -156,6 +157,7 @@ export default async function PinterestFromWordPressPage({
     externalPost: { siteId: parsedSource.data.siteId, postId: parsedSource.data.postId },
     postMeta: { date: article.post.date, status: article.post.status, categories: article.post.categories },
     subjects: subjectSections(article.context).map((section) => section.subject),
+    articleKind: classifyArticleKind(article.context),
     projectId: article.projectId,
     title: article.title,
     metaTitle: article.metaTitle,

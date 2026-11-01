@@ -119,30 +119,39 @@ const VISUAL_STYLE_OPTIONS: Array<{ value: PinterestVisualStyle; label: string; 
   },
 ];
 
-// TASK-088: text of the numbered Pins composed on an article photo
-// (`listicle_article_image`), whatever the visual format. The overlay stays
-// the default; the AI design is experimental (one image call per Pin).
-const LISTICLE_TEXT_TREATMENT_OPTIONS: Array<{ value: ListicleTextTreatment; label: string; description: string; badge?: string }> = [
+// TASK-088: text of the numbered Pins made from an article photo
+// (`listicle_article_image`), whatever the visual format. v3.3.0: the AI
+// design is the default (one paid image call per Pin); the overlay and Photo
+// only stay available under the advanced options.
+type TreatmentOption = { value: ListicleTextTreatment; label: string; description: string; badge?: string };
+const RECOMMENDED_TEXT_TREATMENT: TreatmentOption = {
+  value: 'ai-design',
+  label: 'AI-generated design',
+  description:
+    'The article photo is sent to the image model as a reference: it keeps the subject and designs the Pin with its title, number and CTA. One paid image generation per Pin.',
+  badge: 'Recommended',
+};
+const ADVANCED_TEXT_TREATMENTS: TreatmentOption[] = [
   {
     value: 'omniflow-overlay',
     label: 'OmniFlow overlay',
-    description: 'The article photo with a short title and the number added by OmniFlow. No extra image generation.',
-    badge: 'Recommended',
-  },
-  {
-    value: 'ai-design',
-    label: 'AI-generated design',
-    description: 'The article photo is sent to the image model, which designs the Pin with its text. One image generation per Pin.',
-    badge: 'Experimental',
+    description: 'The article photo with a short title and the number added by OmniFlow. No image generation.',
   },
   {
     value: 'photo-only',
     label: 'Photo only',
-    description: 'The article photo alone, with no text added.',
+    description: 'The article photo alone, with no text added. No image generation.',
   },
 ];
 const AI_DESIGN_WARNING =
-  'AI-generated design uses one image generation per Pin. Text inside the image may contain spelling or number variations.';
+  'AI-generated design uses one paid image generation per numbered Pin. Text inside the image may contain spelling or number variations.';
+
+// TASK-FIX-089: a tips guide has no project photos to compose on.
+const TIPS_GUIDE_NOTE =
+  'Tips & tricks article: each Pin shows one tip, with an image created by AI Integrated. Article-photo options do not apply.';
+function tipsImageWarning(pins: number): string {
+  return `${pins} Pins = ${pins} paid image generations (one per Pin), used when you generate their images.`;
+}
 
 const MODE_OPTIONS: Array<{
   value: PinterestGenerationMode;
@@ -352,6 +361,43 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   // TASK-079: a composed format replaces the generation mode — a photo
   // without text, every word added by OmniFlow (AI Integrated settings hidden).
   const composedFormat = Boolean(articleSource) && COMPOSED_VISUAL_STYLES.includes(visualStyle);
+  // TASK-FIX-089: the article kind is detected on the server. A tips guide
+  // starts on AI Integrated (the default mode) and never shows the
+  // article-photo (numbered listicle) options; advanced settings stay open.
+  const tipsGuide = articleSource?.articleKind === 'tips_guide';
+  const showListicleTreatment = Boolean(articleSource) && (!articleSource?.articleKind || articleSource.articleKind === 'project_listicle');
+  const plannedPins = validatePinsRequested(pinsChoice === CUSTOM_PINS_VALUE ? customPins : pinsChoice);
+
+  function renderTreatmentOption(option: TreatmentOption) {
+    const selected = listicleTextTreatment === option.value;
+    return (
+      <button
+        key={option.value}
+        type="button"
+        aria-pressed={selected}
+        disabled={loading}
+        onClick={() => setListicleTextTreatment(option.value)}
+        data-testid={`listicle-text-treatment-${option.value}`}
+        className={cn(
+          'w-full min-w-0 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
+          selected ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border/60 hover:border-border hover:bg-muted/30'
+        )}
+      >
+        <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 text-sm font-medium">
+          <span className="flex min-w-0 items-center gap-1.5 break-words">
+            {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
+            {option.label}
+          </span>
+          {option.badge && (
+            <Badge variant="primary" className="ml-auto">
+              {option.badge}
+            </Badge>
+          )}
+        </span>
+        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
+      </button>
+    );
+  }
   const effectiveMode: PinterestGenerationMode = composedFormat ? 'photo-only' : generationMode;
   const languageInherited = generationMode === 'ai-integrated' && !articleSource;
   const nicheConvention = getNicheVisualConvention(selectedProject?.niche);
@@ -453,7 +499,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       wordpressPost: articleSource?.externalPost ?? undefined,
       destinationUrl: destinationUrl.trim() || undefined,
       // Keyword flows never send it (the schema defaults to classic).
-      ...(articleSource ? { visualStyle, listicleTextTreatment } : {}),
+      // A tips guide never has numbered article-photo Pins: the default treatment is sent.
+      ...(articleSource ? { visualStyle, listicleTextTreatment: showListicleTreatment ? listicleTextTreatment : DEFAULT_LISTICLE_TEXT_TREATMENT } : {}),
     };
     const parsed = generatePinsSchema.safeParse(
       effectiveMode === 'ai-integrated'
@@ -889,48 +936,39 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
             </div>
           )}
 
-          {articleSource && (
+          {tipsGuide && (
+            <div className="space-y-1 border-t border-border/60 pt-4" data-testid="tips-guide-note">
+              <p className="text-xs text-muted-foreground">{TIPS_GUIDE_NOTE}</p>
+              {plannedPins.ok && plannedPins.value > 1 && !composedFormat && (
+                <p className="text-xs text-warning" role="note" data-testid="tips-guide-image-warning">
+                  {tipsImageWarning(plannedPins.value)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {showListicleTreatment && (
             <div className="space-y-1.5 border-t border-border/60 pt-4" data-testid="listicle-text-treatment">
               <Label id="listicle-text-treatment-heading" className="text-xs font-medium text-muted-foreground">
                 Article image text treatment
               </Label>
               <p className="text-xs text-muted-foreground">
-                For numbered Pins shown on the article&apos;s own photo, when the article states an exact count (for
-                example &quot;12 ideas&quot;). Other Pins are not affected.
+                For numbered Pins made from the article&apos;s own photo, when the article lists an exact number of
+                projects (for example &quot;12 ideas&quot;). The other Pins use AI Integrated. Every AI image is one paid
+                image generation, made only when you generate the Pin&apos;s image.
               </p>
-              <div role="group" aria-labelledby="listicle-text-treatment-heading" className="grid gap-2 sm:grid-cols-3">
-                {LISTICLE_TEXT_TREATMENT_OPTIONS.map((option) => {
-                  const selected = listicleTextTreatment === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={selected}
-                      disabled={loading}
-                      onClick={() => setListicleTextTreatment(option.value)}
-                      data-testid={`listicle-text-treatment-${option.value}`}
-                      className={cn(
-                        'min-w-0 rounded-xl border p-3 text-left outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50',
-                        selected
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
-                          : 'border-border/60 hover:border-border hover:bg-muted/30'
-                      )}
-                    >
-                      <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 text-sm font-medium">
-                        <span className="flex min-w-0 items-center gap-1.5 break-words">
-                          {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />}
-                          {option.label}
-                        </span>
-                        {option.badge && (
-                          <Badge variant={option.value === 'omniflow-overlay' ? 'primary' : 'neutral'} className="ml-auto">
-                            {option.badge}
-                          </Badge>
-                        )}
-                      </span>
-                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
-                    </button>
-                  );
-                })}
+              <div role="group" aria-labelledby="listicle-text-treatment-heading" className="space-y-2">
+                {renderTreatmentOption(RECOMMENDED_TEXT_TREATMENT)}
+                <details
+                  className="rounded-xl border border-border/60 p-3"
+                  open={listicleTextTreatment !== RECOMMENDED_TEXT_TREATMENT.value}
+                  data-testid="listicle-text-treatment-advanced"
+                >
+                  <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                    Advanced: OmniFlow overlay or Photo only (no image generation)
+                  </summary>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">{ADVANCED_TEXT_TREATMENTS.map(renderTreatmentOption)}</div>
+                </details>
               </div>
               {listicleTextTreatment === 'ai-design' && (
                 <p className="text-xs text-warning" role="note" data-testid="listicle-ai-design-warning">
