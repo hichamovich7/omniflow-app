@@ -80,6 +80,14 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 ### Planned
 
+* **TASK-091 — Multi-board Content Streams (planned 2026-11-02, not started).** Goal: one Content Stream publishes to several Pinterest boards and board sections. Scope:
+  * **Extend the existing `content_stream_boards`** instead of creating a second table. Checked 2026-11-02 (migrations 030 / 031, DATABASE.md): columns `content_stream_id`, `board_id`, `user_id`, `created_at`; PK `(content_stream_id, board_id)`; indexes on `board_id` and `user_id`; RLS hardened in 031 (owner only, board in the stream's own project); already N:N, but no section, no primary and no active flag. Used by `lib/queries/content-streams.ts`, `lib/queries/command-center.ts`, `lib/queries/niche-context.ts`, `lib/wordpress/pins-context.ts`, `app/(dashboard)/pinterest/create/page.tsx`, `app/(dashboard)/pinterest/from-wordpress/page.tsx` and `app/(dashboard)/projects/[id]/page.tsx`. Sections exist today only as the free text `pins.board_section` (migration 032).
+  * Planned columns: an optional board section, a **primary** flag (at most one per stream) and an **active** flag. To decide at implementation: the key when one board is used with several sections (the current PK allows one row per board), and whether the RLS `WITH CHECK` needs a change. The migration is written **only when TASK-091 is implemented**; DATABASE.md updated with it.
+  * Several boards and sections per Content Stream; **backward compatibility** with existing single-board streams (their current link becomes the primary active destination; nothing changes for them until edited).
+  * Management of primary / active destinations in the Content Stream UI.
+  * Pin distribution across the active destinations (rule to be decided at implementation).
+  * Scheduler and Pinterest CSV updated to use each Pin's destination (board / section unchanged for single-board streams).
+  * Tests: RLS (owner only), migration (existing rows, old streams), UI, scheduler / CSV and backward compatibility; the seven readers above keep working.
 * **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook scheduling (after TASK-068 — separate task); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
 * **P2:** storage audit / archiving (read-only orphan audit first); TASK-080 (Pinterest Detailed Tutorial Infographic, after TASK-079 — replaces the withdrawn Step-by-step format); TASK-042; TASK-030; TASK-028 Option 2.
 
@@ -101,7 +109,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-29: 082 (TASK-082, Pinterest "Regenerate text" fix + bulk; TASK-FIX-081, Auto variety "context is not defined"; TASK-080 Pinterest Detailed Tutorial Infographic — planned) → **next task: 083**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-29: 082 (TASK-082, Pinterest "Regenerate text" fix + bulk; TASK-FIX-081, Auto variety "context is not defined"; TASK-080 Pinterest Detailed Tutorial Infographic — planned) → **next task: 083**. Update 2026-11-01: highest used suffix **091** (TASK-091 Multi-board Content Streams, planned) → **next task: 092**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
 * **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **next free migration: 047**.
