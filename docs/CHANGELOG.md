@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.3.1 — Pinterest: project gallery sections inherit the article's subject — TASK-FIX-090 (2026-11-01)
+
+* Reported on "10 Air-Dry Clay Pumpkin Painting Ideas for Cozy Fall Decor": ideas such as "4. Speckled Stoneware Look" and "6. Cottage-Style Wildflower Details" name a finish, not an object, so their brief never said "pumpkin" and the check stopped on `IMAGE_SUBJECT_MISMATCH`; "floral" was also refused because the article says "wildflowers".
+* In a project gallery, a section that names no project of its own now inherits the H1's subject ("air-dry clay pumpkin painting"): the brief and the image prompt carry the H1 subject, the exact section title, the allowed and the forbidden elements, and the check requires the pumpkin with the section's variation (a heading word such as "speckled", or a synonym the section documents). Another object (a stoneware mug) is still rejected.
+* Documented synonyms: "floral" is accepted only when the source itself says floral, florals, wildflower(s) or flower details; the invented-element check is otherwise unchanged.
+* Tips guides, other articles, galleries whose H1 names no object ("12 Green Air-Dry Clay Ideas") and non-English articles are unchanged. No migration.
+
 ## v3.3.0 — Pinterest: AI-generated designs by default, tips articles no longer treated as project galleries — TASK-088 + TASK-FIX-089 (2026-11-01)
 
 * **AI-generated design is now the default** for the numbered Pins of a real project gallery: the article photo is sent to the image model as a reference, which keeps the subject and draws the visual title, the number and the CTA (only with a Destination URL); OmniFlow adds no overlay afterwards. One paid image generation per numbered Pin. It is marked Recommended; **OmniFlow overlay** and **Photo only** stay available under "Advanced" and are always respected when chosen.

@@ -79,6 +79,20 @@ export interface PinVisualBrief {
   archetype?: PinVisualArchetype;
   /** TASK-FIX-089: a tips_guide section — the image shows the tip / action, not a project. Absent = project brief. */
   focus?: 'tip';
+  /**
+   * TASK-FIX-090: a project_listicle section that names no project of its own
+   * ("4. Speckled Stoneware Look") inherits the H1's global subject ("air-dry
+   * clay pumpkin painting", anchor "pumpkin"). Absent = former checks.
+   */
+  globalSubject?: ArticleGlobalSubject;
+}
+
+/** The subject every section of a project gallery shares, read from its H1 (English only). */
+export interface ArticleGlobalSubject {
+  /** "air-dry clay pumpkin painting" — the H1 without its count, gallery word and audience clause. */
+  label: string;
+  /** Object words the image prompt must show ("pumpkin"). */
+  anchors: string[];
 }
 
 /**
@@ -185,6 +199,116 @@ const FIXED_FORBIDDEN = [
   'text, letters, numbers, logos, brand names, labels or packaging',
   'a pattern page, chart, diagram or written instructions',
 ];
+
+/**
+ * TASK-FIX-090 — documented synonyms of a checked term. A term in an image
+ * prompt is grounded when the source contains one of its `source` spellings
+ * ("floral" ← "wildflowers"); the prompt-side vocabulary is unchanged, so a
+ * synonym never counts without proof in the article.
+ */
+const DOCUMENTED_SYNONYMS: ReadonlyArray<{ term: string; category: AttributeCategory; source: readonly string[]; prompt: readonly string[] }> = [
+  {
+    term: 'floral',
+    category: 'patterns',
+    source: ['floral', 'florals', 'wildflower', 'wildflowers', 'flower detail', 'flower details', 'flower motif', 'flower motifs'],
+    prompt: ['floral', 'florals', 'wildflower', 'wildflowers', 'flower', 'flowers', 'flower detail', 'flower details', 'flower motif', 'flower motifs'],
+  },
+];
+
+function hasSpellingIn(normalizedText: string, spelling: string): boolean {
+  const needle = normalizeForMatch(spelling);
+  return needle.trim().length > 0 && normalizedText.includes(needle);
+}
+
+/** Checked terms of `category` the text proves through a documented synonym. */
+function documentedSynonymTerms(text: string, category: AttributeCategory): string[] {
+  const normalized = normalizeForMatch(text);
+  return DOCUMENTED_SYNONYMS.filter((group) => group.category === category && group.source.some((spelling) => hasSpellingIn(normalized, spelling))).map(
+    (group) => group.term
+  );
+}
+
+// Words of an H1 that are not the object itself: materials, crafts, audiences, seasons, sizes.
+const GLOBAL_SUBJECT_STOP_WORDS = new Set([
+  'air', 'dry', 'clay', 'polymer', 'ceramic', 'ceramics', 'pottery', 'crochet', 'crocheted', 'knit', 'knitted', 'knitting', 'sewing', 'sewn',
+  'painting', 'painted', 'paint', 'sculpting', 'sculpted', 'handmade', 'homemade', 'easy', 'cute', 'simple', 'mini', 'small', 'tiny', 'big',
+  'cozy', 'cosy', 'best', 'beginner', 'beginners', 'free', 'quick', 'modern', 'rustic', 'boho', 'fall', 'autumn', 'winter', 'spring', 'summer',
+  'christmas', 'halloween', 'holiday', 'festive', 'diy', 'decor', 'decorating', 'decoration', 'decorations', 'home', 'kids', 'gift', 'gifts',
+  'top', 'new', 'unique', 'creative', 'beautiful', 'pretty', 'stylish', 'look', 'looks', 'style', 'styles', 'finish', 'finishes',
+]);
+const GALLERY_WORDS = /\b(?:ideas?|projects?|patterns?|crafts?|designs?|makes|inspirations?|diys?)\b/gi;
+
+/**
+ * The H1's global subject: "10 Air-Dry Clay Pumpkin Painting Ideas for Cozy
+ * Fall Decor" → "air-dry clay pumpkin painting", anchor "pumpkin". Null for a
+ * non-English article or when no object word is left ("12 Green Air-Dry
+ * Clay Ideas") — the former checks then apply.
+ */
+export function articleGlobalSubject(title: string, language: string | null | undefined): ArticleGlobalSubject | null {
+  if ((language ?? 'en').toLowerCase().slice(0, 2) !== 'en') return null;
+  const head = (title.split(/\s*[:|]\s*|\s+[–—-]\s+/)[0] ?? title).split(/\s+(?:for|to|with|that|you|from|in|on|of|this|your|and)\s+/i)[0] ?? '';
+  const label = head
+    .replace(/^\s*(?:top\s+)?\d+\s+/i, '')
+    .replace(GALLERY_WORDS, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleLowerCase('en');
+  if (!label) return null;
+  const anchors = uniq(
+    normalizeForMatch(label)
+      .trim()
+      .split(' ')
+      .filter((word) => word.length >= 3 && !/^\d+$/.test(word) && !GLOBAL_SUBJECT_STOP_WORDS.has(word))
+      .filter((word) => findTerms(word, 'colors').length === 0 && findTerms(word, 'materials').length === 0)
+  );
+  return anchors.length ? { label, anchors } : null;
+}
+
+// Heading words that describe nothing visible on their own.
+const VARIATION_STOP_WORDS = new Set(['look', 'looks', 'style', 'styled', 'details', 'detail', 'finish', 'idea', 'ideas', 'with', 'and', 'the', 'for', 'from', 'into', 'your', 'this']);
+
+function promptWordShows(promptWords: readonly string[], word: string): boolean {
+  return promptWords.some(
+    (candidate) => candidate === word || candidate === `${word}s` || candidate === `${word}es` || (candidate.length >= 5 && word.length >= 5 && candidate.slice(0, 5) === word.slice(0, 5))
+  );
+}
+
+/**
+ * The global-subject check (TASK-FIX-090): the image prompt shows the H1's
+ * object ("pumpkin") and this section's variation — a word of its heading
+ * ("speckled", "stoneware"), or a documented synonym the section itself
+ * names ("floral" for "Wildflower Details"). Another object is not enough.
+ */
+export function checkGlobalSubject(imagePrompt: string, brief: PinVisualBrief, sectionText: string): PinterestSubjectReport & { ok: boolean } {
+  const global = brief.globalSubject!;
+  const promptWords = normalizeForMatch(imagePrompt).trim().split(' ');
+  const anchorsShown = global.anchors.filter((anchor) => promptWordShows(promptWords, anchor));
+  const heading = brief.sourceSection.replace(/^\s*\d+\s*[.):\-–—]\s*/, '');
+  const variation = uniq(
+    normalizeForMatch(heading)
+      .trim()
+      .split(' ')
+      .filter((word) => word.length >= 4 && !VARIATION_STOP_WORDS.has(word) && !global.anchors.includes(word))
+  );
+  const shown = variation.filter((word) => promptWordShows(promptWords, word));
+  const normalizedSection = normalizeForMatch(sectionText);
+  const normalizedPrompt = normalizeForMatch(imagePrompt);
+  const synonyms = DOCUMENTED_SYNONYMS.filter(
+    (group) =>
+      group.source.some((spelling) => hasSpellingIn(normalizedSection, spelling)) &&
+      group.prompt.some((spelling) => hasSpellingIn(normalizedPrompt, spelling))
+  ).map((group) => group.term);
+  const variationOk = variation.length === 0 || shown.length > 0 || synonyms.length > 0;
+  const ok = anchorsShown.length > 0 && variationOk;
+  const detected = uniq([...anchorsShown, ...shown, ...synonyms]);
+  return {
+    ok,
+    expected: [global.anchors[0], ...variation],
+    detected: detected.length ? detected : ['no recognizable project'],
+    missing: [...(anchorsShown.length ? [] : [global.anchors[0]]), ...(variationOk ? [] : variation)],
+    required: global.anchors[0],
+  };
+}
 
 function uniq(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
@@ -378,11 +502,22 @@ export function buildPinVisualBrief(
   // Project check only (never Home Decor): a step heading without a project
   // noun is shown as a step of the article's main project.
   const articleObject = contract?.inheritedFromTitle ? contract.primarySubjectId : null;
+  // TASK-FIX-090: a project gallery section without its own project inherits
+  // the H1's global subject ("air-dry clay pumpkin painting — Speckled
+  // Stoneware Look"). Tips guides and other articles are unchanged.
+  const global =
+    !tip && !contract && options.articleKind === 'project_listicle' && subjectCheck === 'project' && section.kind === 'subject'
+      ? articleGlobalSubject(context.title, context.language)
+      : null;
   const represented = section.kind === 'intro'
     ? context.title
     : articleObject
       ? articleStepRepresented(articleObject, section.subject)
-      : section.subject;
+      : global
+        ? `${global.label} — ${section.subject}`
+        : section.subject;
+  // Synonyms this section documents itself ("wildflowers" → floral details).
+  const documented = global ? documentedSynonymTerms(sectionText, 'patterns') : [];
 
   return {
     sectionId: section.id,
@@ -399,7 +534,10 @@ export function buildPinVisualBrief(
     allowedElements: uniq([
       tip
         ? `hands, tools and material clearly demonstrating this tip, action or technique: ${represented}`
-        : `the ${represented} as the single main subject, shown as described here`,
+        : global
+          ? `the article's ${global.label} (a ${global.anchors[0]}) as the single main subject, with this section's variation "${section.subject}" shown on it`
+          : `the ${represented} as the single main subject, shown as described here`,
+      ...documented.map((term) => `${term} details (documented in this section)`),
       ...attributes.objects.map((object) => `${object} (as presented in this section)`),
       'a plain neutral surface or backdrop (white, cream, beige, light gray or natural wood)',
       'soft natural light',
@@ -412,6 +550,7 @@ export function buildPinVisualBrief(
     ]),
     ...(contract ? { subjectContract: contract } : {}),
     ...(tip ? { focus: 'tip' as const } : {}),
+    ...(global ? { globalSubject: global } : {}),
   };
 }
 
@@ -438,8 +577,14 @@ export function formatVisualBrief(brief: PinVisualBrief): string {
           `Tip, action or technique represented: ${brief.represented}`,
           'Required subject: the image must clearly represent the tip, action or technique of this section (hands at work, the tool, the material at that stage); it does not need a finished project and must not invent one',
         ]
-      : [`Pattern or project represented: ${brief.represented}`]),
-    ...(brief.focus === 'tip' ? [] : contract ? subjectContractLines(contract) : stepObject
+      : brief.globalSubject
+        ? [
+            `Article global subject (from the H1): ${brief.globalSubject.label}`,
+            `Pattern or project represented: ${brief.represented}`,
+            `Required subject: the image description must explicitly mention ${brief.globalSubject.anchors[0]} and must show the article's ${brief.globalSubject.label} — a ${brief.globalSubject.anchors[0]} — as the visible main subject, with this section's variation ("${brief.sourceSection}") on it; another object is not enough`,
+          ]
+        : [`Pattern or project represented: ${brief.represented}`]),
+    ...(brief.focus === 'tip' || brief.globalSubject ? [] : contract ? subjectContractLines(contract) : stepObject
       ? [`Required subject: the image description must explicitly mention ${stepObject} and must show a ${stepObject} — this step may be shown on it (a detail, a work in progress), but a sample, tool or material alone is not enough`]
       : []),
     ...(brief.archetype ? formatArchetypeLines(brief.archetype) : []),
@@ -587,13 +732,20 @@ function withoutNegatedClauses(value: string): string {
  * accessory of another section is never proof. Other categories stay
  * article-wide.
  */
-export function findUngroundedVisualTerms(imagePrompt: string, evidence: string, objectEvidence?: string): string[] {
+export function findUngroundedVisualTerms(
+  imagePrompt: string,
+  evidence: string,
+  objectEvidence?: string,
+  options: { documentedSynonyms?: boolean } = {}
+): string[] {
   const checked = withoutNegatedClauses(imagePrompt);
   const ungrounded: string[] = [];
   for (const [category, terms] of Object.entries(CHECKED_TERMS) as Array<[AttributeCategory, readonly string[]]>) {
     const inPrompt = findTerms(checked, category).filter((term) => terms.includes(term));
     if (inPrompt.length === 0) continue;
-    const inEvidence = new Set(findTerms(category === 'objects' && objectEvidence !== undefined ? objectEvidence : evidence, category));
+    const proof = category === 'objects' && objectEvidence !== undefined ? objectEvidence : evidence;
+    // TASK-FIX-090 (project galleries): a documented synonym in the source proves the term ("wildflowers" → floral).
+    const inEvidence = new Set([...findTerms(proof, category), ...(options.documentedSynonyms ? documentedSynonymTerms(proof, category) : [])]);
     ungrounded.push(...inPrompt.filter((term) => !inEvidence.has(term)));
   }
   return uniq(ungrounded);
@@ -756,6 +908,19 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
           subject: { expected, detected, missing, tip: true },
         });
       }
+    } else if (brief?.globalSubject) {
+      // TASK-FIX-090: the H1's object with this section's variation on it.
+      const { ok, ...subject } = checkGlobalSubject(shown, brief, sectionText);
+      if (!ok) {
+        issues.push({
+          code: 'unsupported-claim',
+          message: `Pin ${index + 1} image does not show its source section's project (the article's ${brief.globalSubject.anchors[0]} with this section's variation)`,
+          reason: 'IMAGE_SUBJECT_MISMATCH',
+          pinIndex: index,
+          field: 'image_prompt',
+          subject,
+        });
+      }
     } else if (brief && !mentionsSubject(pin.image_prompt, brief)) {
       issues.push({
         code: 'unsupported-claim',
@@ -769,7 +934,9 @@ export function validateArticleGroundedPins(pins: GroundedPinCandidate[], ground
     const ungrounded = uniq([
       // Objects (projects, accessories) need proof in the Pin's own section; the rest is article-wide.
       ...(grounding.enforceVocabulary
-        ? findUngroundedVisualTerms(pin.image_prompt, grounding.evidence, brief ? objectEvidenceOf(sectionText, brief.subjectContract) : undefined)
+        ? findUngroundedVisualTerms(pin.image_prompt, grounding.evidence, brief ? objectEvidenceOf(sectionText, brief.subjectContract) : undefined, {
+            documentedSynonyms: grounding.articleKind === 'project_listicle',
+          })
         : []),
       // Home Decor: controlled English/German vocabulary, so German articles are checked too.
       // Furniture is checked against the Pin's own section, not the whole article.
@@ -829,6 +996,16 @@ export function readArticleSourceMetadata(imageAnalysisJson: string | null): Per
   if (!textFields.every((field) => typeof brief[field] === 'string')) return null;
   if (!listFields.every((field) => isStringArray(brief[field]))) return null;
   if (brief.focus !== undefined && brief.focus !== 'tip') return null;
+  // A malformed global subject is dropped: the Pin keeps the former brief (TASK-FIX-090).
+  const global = brief.globalSubject as unknown;
+  if (
+    global !== undefined &&
+    !(global && typeof global === 'object' && typeof (global as ArticleGlobalSubject).label === 'string' && isStringArray((global as ArticleGlobalSubject).anchors) && (global as ArticleGlobalSubject).anchors.length > 0)
+  ) {
+    const former = { ...(brief as PinVisualBrief) };
+    delete former.globalSubject;
+    return { sourceType, sectionId, brief: former };
+  }
   // A malformed archetype is dropped: the Pin keeps its classic brief.
   if (brief.archetype !== undefined && !isPinVisualArchetype(brief.archetype)) {
     const classic = { ...(brief as PinVisualBrief) };

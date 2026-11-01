@@ -5,6 +5,7 @@ import * as wordpressPostSource from '@/lib/social/pinterest-from-wordpress-post
 import { buildWordPressArticleContext, type WordPressArticleContext } from '@/lib/wordpress/article-context';
 import {
   appendArticleVisualBrief,
+  articleGlobalSubject,
   attachArticleSourceMetadata,
   buildArticleGrounding,
   formatVisualBrief,
@@ -567,5 +568,140 @@ test.describe('v3.3.0 — AI-generated design by default', () => {
     expect(tips).toContain('Never call them "ideas" or "projects".');
     expect(tips).toContain('French: conseils, astuces, techniques; German: Tipps, Techniken; Spanish: consejos, trucos, técnicas');
     expect(buildPinterestPinsPrompt(base).user).not.toContain('Never call them "ideas"');
+  });
+});
+
+// ── TASK-FIX-090: project galleries inherit the H1's global subject ─────────────
+
+// Real post 642 of clay.ciencia-y-tecnologia.com (public REST API, read once on 2026-11-01).
+const PUMPKIN = JSON.parse(readFileSync(join(__dirname, '../fixtures/pinterest/clay-pumpkin-painting-post.json'), 'utf8')) as {
+  title: string;
+  excerpt: string;
+  link: string;
+  featuredImage: { url: string; alt: string; caption: string } | null;
+  contentHtml: string;
+};
+const pumpkinContext = (html = PUMPKIN.contentHtml) =>
+  buildWordPressArticleContext({
+    sourceType: 'external_wordpress_post',
+    html,
+    title: PUMPKIN.title,
+    excerpt: PUMPKIN.excerpt,
+    language: 'en',
+    featuredImage: PUMPKIN.featuredImage,
+    permalink: PUMPKIN.link,
+  });
+function pumpkinGrounding(html?: string, kind?: 'project_listicle' | 'tips_guide' | 'generic_article') {
+  const context = pumpkinContext(html);
+  return buildArticleGrounding(context, 10, {}, { niche: CLAY_NICHE, articleKind: kind ?? classifyArticleKind(context) });
+}
+const sectionOf = (g: ReturnType<typeof pumpkinGrounding>, heading: string) => g.sectionPlan.find((id) => g.briefs[id].sourceSection === heading)!;
+const checkOne = (g: ReturnType<typeof pumpkinGrounding>, sectionId: string, prompt: string) =>
+  validateArticleGroundedPins([{ sourceSectionId: sectionId, image_prompt: prompt }], { ...g, sectionPlan: [sectionId] });
+
+const SPECKLED = '4. Speckled Stoneware Look';
+const WILDFLOWER = '6. Cottage-Style Wildflower Details';
+const SPECKLED_PROMPT = 'A speckled stoneware finish on an air-dry clay pumpkin, cream with rust and charcoal speckles, on a natural wood surface, soft natural light, eye-level, photorealistic.';
+const FLORAL_PROMPT = 'A terracotta air-dry clay pumpkin with hand-painted cream floral details and olive leaves, on linen, soft natural light, close-up, photorealistic.';
+
+test.describe('TASK-FIX-090 — project_listicle sections inherit the H1 subject', () => {
+  test('the real article: project_listicle, global subject "air-dry clay pumpkin painting" (anchor pumpkin) on sections 4 and 6', () => {
+    expect(classifyArticleKind(pumpkinContext())).toBe('project_listicle');
+    expect(articleGlobalSubject(PUMPKIN.title, 'en')).toEqual({ label: 'air-dry clay pumpkin painting', anchors: ['pumpkin'] });
+    const g = pumpkinGrounding();
+    for (const heading of [SPECKLED, WILDFLOWER]) {
+      const brief = g.briefs[sectionOf(g, heading)];
+      expect(brief.globalSubject).toEqual({ label: 'air-dry clay pumpkin painting', anchors: ['pumpkin'] });
+      const text = formatVisualBrief(brief);
+      // The image brief always carries the H1 subject, the exact section title, the allowed and the forbidden elements.
+      expect(text).toContain('Article global subject (from the H1): air-dry clay pumpkin painting');
+      expect(text).toContain(`Source section: ${heading}`);
+      expect(text).toContain(`with this section's variation ("${heading}") on it`);
+      expect(text).toMatch(/Allowed elements: the article's air-dry clay pumpkin painting \(a pumpkin\) as the single main subject/);
+      expect(text).toMatch(/Forbidden elements: .*a different project than the one represented/);
+      const stored = attachArticleSourceMetadata(null, { sourceType: 'external_wordpress_post', sectionId: brief.sectionId, brief });
+      expect(appendArticleVisualBrief('Base prompt.', stored)).toContain('Article global subject (from the H1): air-dry clay pumpkin painting');
+    }
+    expect(formatVisualBrief(g.briefs[sectionOf(g, WILDFLOWER)])).toContain('floral details (documented in this section)');
+  });
+
+  test('sections 4 and 6: a pumpkin with the section variation passes — no IMAGE_SUBJECT_MISMATCH, no ungrounded element', () => {
+    const g = pumpkinGrounding();
+    expect(checkOne(g, sectionOf(g, SPECKLED), SPECKLED_PROMPT)).toEqual([]);
+    expect(checkOne(g, sectionOf(g, SPECKLED), 'A cream air-dry clay pumpkin with tiny rust and charcoal speckles, overhead view.')).toEqual([]);
+    expect(checkOne(g, sectionOf(g, WILDFLOWER), FLORAL_PROMPT)).toEqual([]);
+    expect(checkOne(g, sectionOf(g, WILDFLOWER), 'A terracotta air-dry clay pumpkin with tiny cream wildflower details and olive leaves, close-up.')).toEqual([]);
+    expect(checkOne(g, sectionOf(g, WILDFLOWER), 'A terracotta air-dry clay pumpkin with little painted flower details, close-up.')).toEqual([]);
+  });
+
+  test('"floral" is accepted only because the source says wildflowers', () => {
+    // Same article without any wildflower / flower wording: floral is invented again.
+    const withoutFlowers = PUMPKIN.contentHtml.replace(/wild\s*flowers?/gi, 'dots').replace(/flowers?/gi, 'dots');
+    const g = pumpkinGrounding(withoutFlowers);
+    const id = g.sectionPlan.find((sectionId) => /Cottage-Style/.test(g.briefs[sectionId].sourceSection))!;
+    expect(g.briefs[id].sourceSection).toBe('6. Cottage-Style dots Details');
+    const issues = checkOne(g, id, FLORAL_PROMPT);
+    expect(issues.find((issue) => issue.reason === 'UNGROUNDED_IMAGE_ELEMENTS')?.details).toEqual(['floral']);
+    expect(formatVisualBrief(g.briefs[id])).not.toContain('floral details (documented in this section)');
+  });
+
+  test('a project really absent is still rejected: another object, or no variation of the section', () => {
+    const g = pumpkinGrounding();
+    const mug = checkOne(g, sectionOf(g, SPECKLED), 'A speckled stoneware mug on a natural wood surface, soft natural light, eye-level, photorealistic.');
+    expect(mug.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject).toMatchObject({ required: 'pumpkin', missing: ['pumpkin'] });
+    const plain = checkOne(g, sectionOf(g, WILDFLOWER), 'A terracotta air-dry clay pumpkin on linen, soft natural light, close-up.');
+    expect(plain.find((issue) => issue.reason === 'IMAGE_SUBJECT_MISMATCH')?.subject).toMatchObject({ required: 'pumpkin', missing: ['cottage', 'wildflower'] });
+    // The invented-element check still runs: a crochet hat on the pumpkin.
+    expect(checkOne(g, sectionOf(g, SPECKLED), `${SPECKLED_PROMPT} A crochet hat sits on top.`).map((issue) => issue.reason)).toContain('UNGROUNDED_IMAGE_ELEMENTS');
+  });
+
+  test('tips_guide and generic_article are unchanged: no global subject, no synonym proof', () => {
+    for (const kind of ['tips_guide', 'generic_article'] as const) {
+      const g = pumpkinGrounding(undefined, kind);
+      expect(Object.values(g.briefs).every((brief) => brief.globalSubject === undefined)).toBe(true);
+    }
+    const generic = pumpkinGrounding(undefined, 'generic_article');
+    expect(checkOne(generic, sectionOf(generic, WILDFLOWER), FLORAL_PROMPT).map((issue) => issue.reason)).toContain('UNGROUNDED_IMAGE_ELEMENTS');
+    const tips = tipsGrounding(3);
+    expect(tips.sectionPlan.every((id) => tips.briefs[id].globalSubject === undefined)).toBe(true);
+    // Galleries whose H1 names no object ("12 Green Air-Dry Clay Ideas") keep their former briefs.
+    expect(articleGlobalSubject(IDEAS_H1, 'en')).toBeNull();
+    expect(articleGlobalSubject('15 Polymer Clay Craft Ideas', 'en')).toBeNull();
+    expect(articleGlobalSubject('10 idées de citrouilles en argile', 'fr')).toBeNull();
+  });
+
+  test('a stored global subject survives the round trip; a malformed one is dropped', () => {
+    const g = pumpkinGrounding();
+    const brief = g.briefs[sectionOf(g, SPECKLED)];
+    const stored = attachArticleSourceMetadata(null, { sourceType: 'external_wordpress_post', sectionId: brief.sectionId, brief });
+    expect(readArticleSourceMetadata(stored)?.brief.globalSubject).toEqual(brief.globalSubject);
+    const broken = attachArticleSourceMetadata(null, { sourceType: 'external_wordpress_post', sectionId: brief.sectionId, brief: { ...brief, globalSubject: { label: 'x', anchors: [] } } });
+    expect(readArticleSourceMetadata(broken)?.brief).not.toHaveProperty('globalSubject');
+  });
+
+  test('POST /api/pinterest/generate on the real article: grounded Pins pass; an absent project → 422, nothing saved, no image call', async () => {
+    const post = wordpressPost(PUMPKIN.title, PUMPKIN.contentHtml);
+    const plan = buildListicleAnglePlan(2);
+    const titles = { numbered: ['10 Air-Dry Clay Pumpkin Painting Ideas for Cozy Fall Decor'], other: ['A Calmer Way to Paint a Small Clay Pumpkin'] };
+    const scene = (variant: 'ok' | 'absent') => (heading: string) => {
+      if (/Wildflower/.test(heading)) return variant === 'ok' ? FLORAL_PROMPT : 'A small terracotta vase with cream floral details on linen, close-up, photorealistic.';
+      return `An air-dry clay pumpkin with the ${heading.replace(/^\d+\.\s*/, '').toLowerCase()} finish, on a natural wood surface, soft natural light, eye-level, photorealistic.`;
+    };
+    // 2 Pins on the 10 ideas → idea 1 and idea 6 (the wildflower section).
+    const ok = await runGenerate(post, articleBody(2), modelAnswer(post, plan, scene('ok'), titles));
+    expect(ok.status, JSON.stringify(ok.body.error)).toBe(201);
+    expect(ok.body.data?.articleKind).toBe('project_listicle');
+    expect(ok.prompts[0]).toContain('Article global subject (from the H1): air-dry clay pumpkin painting');
+    expect(ok.prompts[0]).toContain(`Source section: ${WILDFLOWER}`);
+    expect(savedPins(ok).map((row) => readArticleSourceMetadata(row.image_analysis as string)?.brief.globalSubject?.anchors)).toEqual([['pumpkin'], ['pumpkin']]);
+    expect(JSON.stringify(ok.body)).not.toContain('IMAGE_SUBJECT_MISMATCH');
+    expect(ok.imageCalls).toBe(0);
+
+    const absent = await runGenerate(post, articleBody(2), modelAnswer(post, plan, scene('absent'), titles));
+    expect(absent.status).toBe(422);
+    const issues = (absent.body.error?.issues ?? []) as Array<{ code: string; message: string }>;
+    expect(issues.find((issue) => issue.code === 'IMAGE_SUBJECT_MISMATCH')?.message).toContain('Required subject: pumpkin.');
+    expect(absent.events.some((event) => event.table === 'pins')).toBe(false);
+    expect(absent.imageCalls).toBe(0);
   });
 });
