@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.5.0 — Attach an existing board instead of a duplicate-name error — TASK-093 (2026-11-02)
+
+* "Add board" on a Pinterest account now offers **New board** or **Existing board**: the second lists this project's boards without account and attaches the chosen one ("Attach board") — sections and Pins follow it.
+* Typing the name of a board that already exists in the project no longer ends on "A board with this name already exists": the dialog says where it is — a legacy board gets an "Attach to <account>" button, a board of another account is named. "Create board" stays disabled while the exact name is taken.
+* `POST /api/boards`: a duplicate name is now a 409 `duplicate_name` (was a 500 `server_error`).
+* Board names stay unique per project only — another project can reuse the same name; nothing is shared between projects. No migration.
+
 ## v3.4.0 — Pinterest accounts, board sections, multi-destination Content Streams and the one-page project workspace — TASK-091 + TASK-092 (2026-11-02)
 
 Migration `047_add_pinterest_accounts_and_sections.sql` applied by hand on Supabase on 2026-11-02 (required before deploying this version).

@@ -85,10 +85,22 @@ export async function POST(request: Request) {
     .single();
 
   if (dbError) {
+    // TASK-093: a taken name is the caller's to fix (attach the existing board), not a server failure.
+    if (dbError.code === '23505') {
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          data: null,
+          error: {
+            message: 'A board with this name already exists in this project — attach the existing board instead.',
+            code: 'duplicate_name',
+          },
+        },
+        { status: 409 }
+      );
+    }
     console.error('POST /api/boards — Supabase error:', dbError);
-    const message = dbError.code === '23505' ? 'A board with this name already exists in this project' : 'Failed to create board';
     return NextResponse.json<ApiResponse<null>>(
-      { data: null, error: { message, code: 'server_error' } },
+      { data: null, error: { message: 'Failed to create board', code: 'server_error' } },
       { status: 500 }
     );
   }

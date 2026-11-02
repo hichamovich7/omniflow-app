@@ -114,6 +114,7 @@ export function ProjectDialogsProvider({
           projectId={projectId}
           accounts={accounts}
           defaultAccountId={dialog.accountId}
+          projectBoards={boards.map((board) => ({ id: board.id, name: board.name, accountId: board.pinterestAccountId ?? null }))}
         />
       )}
     </ProjectDialogsContext.Provider>

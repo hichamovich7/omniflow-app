@@ -311,6 +311,7 @@ export function PinterestAccountsManager({
           accounts={accountOptions}
           editing={dialog.editing}
           defaultAccountId={dialog.defaultAccountId}
+          projectBoards={boards.map((board) => ({ id: board.id, name: board.name, accountId: board.pinterest_account_id }))}
         />
       )}
       {dialog?.kind === 'section' && (

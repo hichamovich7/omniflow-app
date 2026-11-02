@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { PinterestAccount, PinterestAccountStatus, PinterestAccountType } from '@/types/pinterest-accounts';
+import { attachableBoards, boardNameConflict, type BoardNameConflict, type ExistingBoard } from '@/lib/pinterest/board-attach';
 
 /** JSON request to one of the app's own routes; returns the API envelope's data or its message. */
 export async function sendJson<T>(
@@ -202,6 +203,54 @@ export interface EditingBoard {
   isActive: boolean;
 }
 
+/**
+ * TASK-093: what the typed board name points to in the project, with the fix
+ * when there is one — a legacy board is attached to the chosen account instead
+ * of re-created (board names are unique per project).
+ */
+export function BoardNameConflictNotice({
+  conflict,
+  accountName,
+  otherAccountName,
+  onAttach,
+  disabled,
+}: {
+  conflict: BoardNameConflict;
+  /** The account chosen in the dialog; null = "No account (legacy)". */
+  accountName: string | null;
+  otherAccountName?: string;
+  onAttach: () => void;
+  disabled?: boolean;
+}) {
+  const name = <span className="font-medium text-foreground">{conflict.board.name}</span>;
+  return (
+    <div className="space-y-2 rounded-lg border border-warning/25 bg-warning-soft p-3 text-sm" data-testid="board-name-conflict">
+      {conflict.kind === 'legacy' && (
+        <>
+          <p>{name} already exists in this project, without a Pinterest account.</p>
+          {accountName ? (
+            <Button type="button" size="sm" onClick={onAttach} disabled={disabled}>
+              Attach to {accountName}
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">Choose an account below to attach it.</p>
+          )}
+        </>
+      )}
+      {conflict.kind === 'same_account' && (
+        <p>
+          {name} is already a board of {accountName ?? 'this account'}.
+        </p>
+      )}
+      {conflict.kind === 'other_account' && (
+        <p>
+          {name} already belongs to {otherAccountName ?? 'another account'} in this project. Edit it from that account to move it.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function BoardFormDialog({
   open,
   onOpenChange,
@@ -209,6 +258,7 @@ export function BoardFormDialog({
   accounts,
   editing,
   defaultAccountId,
+  projectBoards = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -216,24 +266,61 @@ export function BoardFormDialog({
   accounts: { id: string; name: string; status: string }[];
   editing?: EditingBoard;
   defaultAccountId?: string | null;
+  /** Every board of the project (TASK-093): name conflicts and "Existing board". */
+  projectBoards?: ExistingBoard[];
 }) {
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [name, setName] = useState(editing?.name ?? '');
+  const [existingId, setExistingId] = useState('');
   const [accountId, setAccountId] = useState(editing?.accountId ?? defaultAccountId ?? NO_ACCOUNT);
   const [isActive, setIsActive] = useState(editing?.isActive ?? true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectable = accounts.filter((account) => account.status !== 'archived' || account.id === accountId);
+  const pinterestAccountId = accountId === NO_ACCOUNT ? null : accountId;
+  const accountName = accounts.find((account) => account.id === pinterestAccountId)?.name ?? null;
+
+  // Creation only: an edited board keeps its own name.
+  const attachable = editing ? [] : attachableBoards(projectBoards);
+  const conflict = editing ? null : boardNameConflict(projectBoards, name, pinterestAccountId);
+  const existing = attachable.find((board) => board.id === existingId);
+
+  async function attach(board: ExistingBoard) {
+    setError(null);
+    if (!pinterestAccountId) {
+      setError('Choose the Pinterest account to attach it to');
+      return;
+    }
+    setLoading(true);
+    const result = await sendJson(`/api/boards/${board.id}`, 'PATCH', { pinterestAccountId });
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.message);
+      toast.error(result.message);
+      return;
+    }
+    toast.success(`"${board.name}" attached to ${accountName}`);
+    onOpenChange(false);
+    router.refresh();
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    if (mode === 'existing') {
+      if (!existing) {
+        setError('Choose a board');
+        return;
+      }
+      await attach(existing);
+      return;
+    }
     if (!name.trim()) {
       setError('Name is required');
       return;
     }
-    const pinterestAccountId = accountId === NO_ACCOUNT ? null : accountId;
     setLoading(true);
     const result = editing
       ? await sendJson(`/api/boards/${editing.id}`, 'PATCH', { name, pinterestAccountId, isActive })
@@ -249,6 +336,26 @@ export function BoardFormDialog({
     router.refresh();
   }
 
+  const accountField = (
+    <div className="space-y-1.5">
+      <Label htmlFor="board-account">Pinterest account</Label>
+      <Select value={accountId} onValueChange={(value) => value && setAccountId(value)}>
+        <SelectTrigger id="board-account" className="w-full" disabled={loading}>
+          <span className="min-w-0 truncate text-sm">{accountName ?? 'No account (legacy)'}</span>
+        </SelectTrigger>
+        <SelectContent>
+          {mode === 'new' && <SelectItem value={NO_ACCOUNT}>No account (legacy)</SelectItem>}
+          {selectable.map((account) => (
+            <SelectItem key={account.id} value={account.id}>
+              {account.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">A board belongs to one account only.</p>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={(next) => !loading && onOpenChange(next)}>
       <DialogContent className="max-w-md" initialFocus={nameRef}>
@@ -258,42 +365,85 @@ export function BoardFormDialog({
             <DialogDescription>Use the exact board name shown on Pinterest — it is written as is in the CSV.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="board-name-input">Board name</Label>
-              <Input ref={nameRef} id="board-name-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={loading} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="board-account">Pinterest account</Label>
-              <Select value={accountId} onValueChange={(value) => value && setAccountId(value)}>
-                <SelectTrigger id="board-account" className="w-full" disabled={loading}>
-                  <span className="min-w-0 truncate text-sm">
-                    {accounts.find((account) => account.id === accountId)?.name ?? 'No account (legacy)'}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_ACCOUNT}>No account (legacy)</SelectItem>
-                  {selectable.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">A board belongs to one account only.</p>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} disabled={loading} />
-              Active — offered for new Pins
-            </label>
+            {attachable.length > 0 && (
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1" role="group" aria-label="New or existing board">
+                {(['new', 'existing'] as const).map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={mode === value ? 'outline' : 'ghost'}
+                    aria-pressed={mode === value}
+                    className={mode === value ? 'bg-card' : undefined}
+                    onClick={() => {
+                      setMode(value);
+                      setError(null);
+                    }}
+                    disabled={loading}
+                  >
+                    {value === 'new' ? 'New board' : `Existing board (${attachable.length})`}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {mode === 'new' ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="board-name-input">Board name</Label>
+                  <Input ref={nameRef} id="board-name-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={loading} />
+                </div>
+                {conflict && (
+                  <BoardNameConflictNotice
+                    conflict={conflict}
+                    accountName={accountName}
+                    otherAccountName={accounts.find((account) => account.id === conflict.board.accountId)?.name}
+                    onAttach={() => attach(conflict.board)}
+                    disabled={loading}
+                  />
+                )}
+                {accountField}
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} disabled={loading} />
+                  Active — offered for new Pins
+                </label>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="board-existing">Board without account (legacy)</Label>
+                  <Select value={existingId} onValueChange={(value) => value && setExistingId(value)}>
+                    <SelectTrigger id="board-existing" className="w-full" disabled={loading}>
+                      <span className="min-w-0 truncate text-sm">{existing?.name ?? 'Choose a board'}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {attachable.map((board) => (
+                        <SelectItem key={board.id} value={board.id}>
+                          {board.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Its sections and Pins follow it. Only this project&apos;s boards are listed.</p>
+                </div>
+                {accountField}
+              </>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !name.trim()}>
-              {loading ? 'Saving...' : editing ? 'Save changes' : 'Create board'}
-            </Button>
+            {mode === 'existing' ? (
+              <Button type="submit" disabled={loading || !existing || !pinterestAccountId}>
+                {loading ? 'Saving...' : 'Attach board'}
+              </Button>
+            ) : (
+              <Button type="submit" disabled={loading || !name.trim() || Boolean(conflict?.exact)}>
+                {loading ? 'Saving...' : editing ? 'Save changes' : 'Create board'}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

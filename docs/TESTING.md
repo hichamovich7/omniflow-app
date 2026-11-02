@@ -1345,6 +1345,16 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Attach an existing board from "Add board" (TASK-093, 2026-11-02)
+
+```txt
+npx playwright test tests/renderer/board-attach.spec.ts --project=renderer --reporter=list
+```
+
+Offline (9): name conflicts (legacy board offered, case-insensitive with `exact` only for the stored spelling; same account; another account; new or empty name = none); "Existing board" lists only legacy boards, by name; conflict notice ("Attach to <account>" button, "Choose an account below" without one, the other account named, no button); `POST /api/boards` — Postgres 23505 → 409 `duplicate_name` pointing to the existing board, any other error still 500 `server_error`.
+
+**Manual check:** Pinterest Accounts → an account → "Board": type the name of a legacy board → amber notice → "Attach to <account>" → the board moves under the account (sections kept); "Existing board" → choose a legacy board → "Attach board"; type a board of another account → that account is named, "Create board" disabled. Same from the project workspace's "+ Board".
+
 # One-page project workspace (TASK-092, 2026-11-02)
 
 ```txt

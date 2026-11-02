@@ -1941,6 +1941,8 @@ Create a board.
 
 TASK-091: `pinterestAccountId`, `isActive`, `externalId` optional. The account must be the caller's, in the same project and not archived (400 `account_forbidden` / `account_archived`).
 
+TASK-093: a name already used in the project (unique per project — another project may reuse it) → 409 `duplicate_name` "A board with this name already exists in this project — attach the existing board instead." (attach it with `PATCH /api/boards/[id]` `{ "pinterestAccountId": "…" }`).
+
 ## Response
 
 ```json
@@ -1960,7 +1962,8 @@ forbidden
 invalid_json
 invalid_request
 invalid_project
-server_error (duplicate name within the same project)
+duplicate_name (409, TASK-093 — was server_error before)
+server_error
 ```
 
 ---
