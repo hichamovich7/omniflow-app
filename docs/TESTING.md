@@ -1345,6 +1345,16 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Visual readability pass (TASK-095, 2026-11-02)
+
+```txt
+npx playwright test tests/renderer/pinterest-accounts-ui.spec.ts tests/renderer/project-workspace.spec.ts --project=renderer --reporter=list
+```
+
+Offline: account counts rendered as tiles (value + label, "add one" only for an active account without stream), section chips with their own delete, "Sections · N", legacy boards with "Attach to an account" and the warning message. Every existing aria-label is unchanged (tests and screen readers).
+
+**Manual check (light and dark):** Pinterest Accounts → sections are blue chips, the × of each one is inside its chip; Edit / Archive / Delete readable on the account; board icon actions have a visible border and a tooltip; the canvas is grey and cards stand out; project page → Pinterest block streams and destinations readable; any other page (Dashboard, histories, forms) → buttons and inputs now have a visible border, nothing unreadable. Phone width: card actions become icons, no horizontal scroll.
+
 # Delete accounts, boards, sections and archived Content Streams (TASK-094, 2026-11-02)
 
 ```txt

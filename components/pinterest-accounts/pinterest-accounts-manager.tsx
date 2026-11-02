@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Archive, ArchiveRestore, ExternalLink, Pencil, Plus, Power, PowerOff, Trash2, UserRound, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ExternalLink, Info, LayoutGrid, Pencil, Plus, Power, PowerOff, Trash2, TriangleAlert, UserRound, X } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/status';
+import { cn } from '@/lib/utils';
 import { DeleteBoardsDialog } from '@/components/boards/delete-boards-dialog';
 import {
   AccountFormDialog,
@@ -81,34 +83,56 @@ export function PinterestAccountsManager({
   const legacyBoards = boards.filter((board) => !board.pinterest_account_id);
   const accountOptions = accounts.map((view) => view.account);
 
-  function boardList(list: DestinationBoardOption[]) {
-    if (list.length === 0) return <p className="text-xs text-muted-foreground">No board yet.</p>;
+  // TASK-095 (validated mockup): every action has a visible boundary, deletes
+  // are red, sections are tinted chips with their own ×, counts are tiles.
+  function boardList(list: DestinationBoardOption[], legacy = false) {
+    if (list.length === 0) return <p className="text-sm text-muted-foreground">No board yet.</p>;
     return (
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {list.map((board) => (
-          <li key={board.id} className="rounded-lg border border-border/60 bg-card p-3" data-testid="account-board">
+          <li key={board.id} className="rounded-xl border border-border-strong/45 bg-surface-muted p-3 sm:p-3.5" data-testid="account-board">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-sm font-medium">{board.name}</span>
-                {!board.is_active && <Badge variant="outline">Inactive</Badge>}
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground" aria-hidden="true">
+                  <LayoutGrid className="size-3.5" />
+                </span>
+                <span className="truncate text-[0.9375rem] font-semibold">{board.name}</span>
+                {board.is_active ? <Badge variant="success">Active</Badge> : <Badge variant="outline">Inactive</Badge>}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1.5">
+                {legacy && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      open({
+                        kind: 'board',
+                        editing: { id: board.id, name: board.name, accountId: board.pinterest_account_id, isActive: board.is_active },
+                      })
+                    }
+                  >
+                    Attach to an account
+                  </Button>
+                )}
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="icon-sm"
+                  title={board.is_active ? 'Deactivate board' : 'Activate board'}
                   aria-label={board.is_active ? `Deactivate board "${board.name}"` : `Activate board "${board.name}"`}
                   disabled={busy === `/api/boards/${board.id}`}
                   onClick={() =>
                     patch(`/api/boards/${board.id}`, { isActive: !board.is_active }, board.is_active ? 'Board deactivated' : 'Board activated')
                   }
                 >
-                  {board.is_active ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
+                  {board.is_active ? <PowerOff /> : <Power />}
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="icon-sm"
+                  title="Edit board"
                   aria-label={`Edit board "${board.name}"`}
                   onClick={() =>
                     open({
@@ -117,63 +141,76 @@ export function PinterestAccountsManager({
                     })
                   }
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  <Pencil />
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="destructive-outline"
                   size="icon-sm"
-                  className="text-muted-foreground hover:text-destructive"
+                  title="Delete board"
                   aria-label={`Delete board "${board.name}"`}
                   onClick={() => open({ kind: 'delete-board', id: board.id, name: board.name })}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 />
                 </Button>
               </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {board.sections.length === 0 && <span className="text-xs text-muted-foreground">No section</span>}
-              {board.sections.map((section) => (
-                <span key={section.id} className="inline-flex items-center gap-0.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    className={section.is_active ? undefined : 'text-muted-foreground line-through'}
-                    aria-label={`Edit section "${section.name}"${section.is_active ? '' : ' (inactive)'}`}
-                    onClick={() =>
-                      open({
-                        kind: 'section',
-                        boardId: board.id,
-                        boardName: board.name,
-                        editing: { id: section.id, name: section.name, isActive: section.is_active },
-                      })
-                    }
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-bold tracking-wide text-muted-foreground uppercase">Sections · {board.sections.length}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {board.sections.map((section) => (
+                  <span
+                    key={section.id}
+                    className={cn(
+                      'inline-flex h-8 items-stretch overflow-hidden rounded-full border text-[0.8125rem] font-semibold',
+                      section.is_active
+                        ? 'border-primary/40 bg-selected text-primary-hover dark:text-info-foreground'
+                        : 'border-dashed border-border-strong bg-card text-muted-foreground'
+                    )}
+                    data-testid="section-chip"
                   >
-                    {section.name}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label={`Delete section "${section.name}"`}
-                    onClick={() => open({ kind: 'delete-section', id: section.id, name: section.name, boardName: board.name })}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </span>
-              ))}
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                onClick={() => open({ kind: 'section', boardId: board.id, boardName: board.name })}
-              >
-                <Plus className="h-3 w-3" />
-                Section
-              </Button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'cursor-pointer px-3 outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                        !section.is_active && 'line-through'
+                      )}
+                      aria-label={`Edit section "${section.name}"${section.is_active ? '' : ' (inactive)'}`}
+                      onClick={() =>
+                        open({
+                          kind: 'section',
+                          boardId: board.id,
+                          boardName: board.name,
+                          editing: { id: section.id, name: section.name, isActive: section.is_active },
+                        })
+                      }
+                    >
+                      {section.name}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex w-7 cursor-pointer items-center justify-center border-l outline-none hover:bg-destructive-soft hover:text-destructive-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                        section.is_active ? 'border-primary/40' : 'border-dashed border-border-strong'
+                      )}
+                      title="Delete section"
+                      aria-label={`Delete section "${section.name}"`}
+                      onClick={() => open({ kind: 'delete-section', id: section.id, name: section.name, boardName: board.name })}
+                    >
+                      <X className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-full border border-dashed border-primary bg-card px-3 text-[0.8125rem] font-semibold text-primary-hover outline-none hover:bg-selected focus-visible:ring-2 focus-visible:ring-ring dark:text-info"
+                  onClick={() => open({ kind: 'section', boardId: board.id, boardName: board.name })}
+                >
+                  <Plus className="size-3.5" aria-hidden="true" />
+                  Section
+                </button>
+              </div>
             </div>
           </li>
         ))}
@@ -187,23 +224,24 @@ export function PinterestAccountsManager({
     const accountBoards = boards.filter((board) => board.pinterest_account_id === account.id);
     const languageMarket = [account.language, account.market].filter(Boolean).join(' · ');
     return (
-      <section key={account.id} className="rounded-2xl border border-border/60 bg-surface p-4 sm:p-5" data-testid="pinterest-account-card">
+      <section key={account.id} className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-5" data-testid="pinterest-account-card">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold">{account.name}</h2>
+            <h2 className="truncate text-lg font-bold">{account.name}</h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <StatusBadge status={account.status} />
-              <Badge variant="outline">{account.account_type === 'business' ? 'Business' : 'Personal'}</Badge>
+              <StatusBadge status={account.status} showDot />
+              <Badge variant="neutral">{account.account_type === 'business' ? 'Business' : 'Personal'}</Badge>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit "${account.name}"`} onClick={() => open({ kind: 'account', editing: account })}>
-              <Pencil className="h-3.5 w-3.5" />
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            <Button type="button" variant="outline" size="sm" aria-label={`Edit "${account.name}"`} onClick={() => open({ kind: 'account', editing: account })}>
+              <Pencil />
+              <span className="max-sm:sr-only">Edit</span>
             </Button>
             <Button
               type="button"
-              variant="ghost"
-              size="icon-sm"
+              variant="outline"
+              size="sm"
               aria-label={isArchived ? `Restore "${account.name}"` : `Archive "${account.name}"`}
               disabled={busy === `/api/pinterest-accounts/${account.id}`}
               onClick={() =>
@@ -214,31 +252,32 @@ export function PinterestAccountsManager({
                 )
               }
             >
-              {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              {isArchived ? <ArchiveRestore /> : <Archive />}
+              <span className="max-sm:sr-only">{isArchived ? 'Restore' : 'Archive'}</span>
             </Button>
             <Button
               type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground hover:text-destructive"
+              variant="destructive-outline"
+              size="sm"
               aria-label={`Delete "${account.name}"`}
               onClick={() => open({ kind: 'delete-account', account, counts })}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 />
+              <span className="max-sm:sr-only">Delete</span>
             </Button>
           </div>
         </div>
 
-        <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
+        <dl className="mt-4 grid grid-cols-1 gap-x-7 gap-y-1.5 text-[0.8125rem] sm:grid-cols-2">
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Username</dt>
-            <dd className="truncate text-right">{account.username ?? '—'}</dd>
+            <dd className="truncate text-right font-medium">{account.username ?? '—'}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Profile</dt>
             <dd className="min-w-0 truncate text-right">
               {account.profile_url ? (
-                <a href={account.profile_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                <a href={account.profile_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary-hover hover:underline dark:text-info">
                   Open <ExternalLink className="h-3 w-3" aria-hidden="true" />
                 </a>
               ) : (
@@ -248,23 +287,27 @@ export function PinterestAccountsManager({
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Main niche</dt>
-            <dd className="truncate text-right">{account.main_keyword ?? '—'}</dd>
+            <dd className="truncate text-right font-medium">{account.main_keyword ?? '—'}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Website</dt>
-            <dd className="min-w-0 truncate text-right">{account.website_url ?? '—'}</dd>
+            <dd className="min-w-0 truncate text-right font-medium">{account.website_url ?? '—'}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Language / market</dt>
-            <dd className="truncate text-right">{languageMarket || '—'}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">Streams · Boards · Sections</dt>
-            <dd className="text-right tabular-nums" data-testid="account-counts">
-              {counts.contentStreams} · {counts.boards} · {counts.sections}
-            </dd>
+            <dd className="truncate text-right font-medium">{languageMarket || '—'}</dd>
           </div>
         </dl>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-2.5" data-testid="account-counts">
+          <CountTile
+            value={counts.contentStreams}
+            label={counts.contentStreams === 0 && !isArchived ? 'Content Streams — add one' : 'Content Streams'}
+            attention={counts.contentStreams === 0 && !isArchived}
+          />
+          <CountTile value={counts.boards} label={counts.boards === 1 ? 'Board' : 'Boards'} />
+          <CountTile value={counts.sections} label={counts.sections === 1 ? 'Section' : 'Sections'} />
+        </div>
 
         {streamNames.length > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -273,12 +316,12 @@ export function PinterestAccountsManager({
         )}
         {account.notes && <p className="mt-2 whitespace-pre-line text-xs text-muted-foreground">{account.notes}</p>}
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Boards</h3>
+            <h3 className="text-xs font-bold tracking-wide text-secondary-foreground uppercase">Boards</h3>
             {!isArchived && (
               <Button type="button" variant="outline" size="sm" onClick={() => open({ kind: 'board', defaultAccountId: account.id })}>
-                <Plus className="h-3.5 w-3.5" />
+                <Plus />
                 Board
               </Button>
             )}
@@ -291,20 +334,26 @@ export function PinterestAccountsManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {live.length} account{live.length === 1 ? '' : 's'} · Content Streams are linked to an account in the project page.
-        </p>
-        <Button type="button" size="sm" onClick={() => open({ kind: 'account' })}>
-          <Plus className="h-3.5 w-3.5" />
+      <div className="flex flex-wrap items-center gap-3">
+        <Alert variant="info" className="min-w-0 flex-1">
+          <Info aria-hidden="true" />
+          <span>
+            <strong className="font-semibold">
+              {live.length} account{live.length === 1 ? '' : 's'}
+            </strong>{' '}
+            · Content Streams are linked to an account in the project page.
+          </span>
+        </Alert>
+        <Button type="button" onClick={() => open({ kind: 'account' })}>
+          <Plus />
           Add account
         </Button>
       </div>
 
       {live.length === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 py-10 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-            <UserRound className="h-4.5 w-4.5 text-muted-foreground" />
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border-strong bg-card py-10 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-selected">
+            <UserRound className="h-4.5 w-4.5 text-primary-hover" />
           </div>
           <p className="max-w-sm text-sm text-muted-foreground">
             No Pinterest account in this project yet. Existing boards and streams keep working as legacy until you link them.
@@ -315,18 +364,22 @@ export function PinterestAccountsManager({
       {live.map(accountCard)}
 
       {legacyBoards.length > 0 && (
-        <section className="rounded-2xl border border-dashed border-border/60 p-4 sm:p-5" data-testid="legacy-boards">
-          <h2 className="text-sm font-medium">Boards without an account (legacy)</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            They keep working as before. Edit a board to attach it to an account — never done automatically.
-          </p>
-          <div className="mt-3">{boardList(legacyBoards)}</div>
+        <section className="space-y-3 rounded-2xl border border-dashed border-border-strong bg-card p-4 sm:p-5" data-testid="legacy-boards">
+          <h2 className="text-sm font-bold">Boards without an account (legacy)</h2>
+          <Alert variant="warning">
+            <TriangleAlert aria-hidden="true" />
+            <span>
+              {legacyBoards.length} board{legacyBoards.length === 1 ? ' has' : 's have'} no account yet. They keep working as before; attach each one
+              to its account — never done automatically.
+            </span>
+          </Alert>
+          {boardList(legacyBoards, true)}
         </section>
       )}
 
       {archived.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">Archived accounts</h2>
+          <h2 className="text-sm font-bold text-secondary-foreground">Archived accounts</h2>
           {archived.map(accountCard)}
         </div>
       )}
@@ -394,6 +447,21 @@ export function PinterestAccountsManager({
           editing={dialog.editing}
         />
       )}
+    </div>
+  );
+}
+
+/** TASK-095: one count per tile; amber when the account still needs it (no stream). */
+function CountTile({ value, label, attention = false }: { value: number; label: string; attention?: boolean }) {
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-0.5 rounded-xl border px-3 py-2.5',
+        attention ? 'border-warning/45 bg-warning-soft text-warning' : 'border-border bg-surface-muted'
+      )}
+    >
+      <span className="text-xl leading-6 font-bold tabular-nums">{value}</span>
+      <span className={cn('truncate text-xs font-semibold', !attention && 'text-muted-foreground')}>{label}</span>
     </div>
   );
 }

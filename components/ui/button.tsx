@@ -23,13 +23,19 @@ const buttonVariants = cva(
           'bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover',
           filledDisabled
         ),
+        // TASK-095: control boundary on `--border-strong` (3:1), darker on hover.
         outline: cn(
-          'border-border bg-card text-foreground shadow-xs hover:border-input hover:bg-muted aria-expanded:border-input aria-expanded:bg-muted',
+          'border-border-strong bg-card text-foreground shadow-xs hover:border-secondary-foreground hover:bg-muted aria-expanded:border-secondary-foreground aria-expanded:bg-muted',
           'disabled:border-border disabled:bg-card disabled:text-muted-foreground aria-disabled:border-border aria-disabled:bg-card aria-disabled:text-muted-foreground'
         ),
         secondary: cn(
-          'border-border bg-secondary text-secondary-foreground hover:border-input hover:bg-muted aria-expanded:border-input aria-expanded:bg-muted',
+          'border-border-strong bg-secondary text-secondary-foreground hover:border-secondary-foreground hover:bg-muted aria-expanded:border-secondary-foreground aria-expanded:bg-muted',
           filledDisabled
+        ),
+        // TASK-095: a delete that is not the final confirmation — red text on a soft red surface.
+        'destructive-outline': cn(
+          'border-destructive/45 bg-destructive-soft text-destructive-hover hover:border-destructive hover:bg-destructive-soft focus-visible:ring-destructive dark:text-destructive',
+          'disabled:border-border disabled:bg-card disabled:text-muted-foreground aria-disabled:border-border aria-disabled:bg-card aria-disabled:text-muted-foreground'
         ),
         ghost: cn(
           'text-foreground hover:bg-muted aria-expanded:bg-muted',

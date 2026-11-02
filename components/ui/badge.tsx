@@ -8,13 +8,15 @@ import { cn } from '@/lib/utils';
 // text, 6 px radius (`radius-xs`, compact tags), tinted surface + semantic text
 // + subtle border. Text colors are the AA-safe (>= 4.5:1 at 12 px) shade of
 // each role on its soft surface, in both themes.
-const neutral = 'border-border bg-muted text-secondary-foreground [a]:hover:bg-secondary';
-const primary = 'border-primary/20 bg-selected text-primary-hover [a]:hover:border-primary/40';
+// TASK-095: same-hue borders strengthened (≈ 40 %) and 600 text so a badge
+// reads as a badge, not as plain text.
+const neutral = 'border-border-strong/50 bg-muted text-secondary-foreground [a]:hover:bg-secondary';
+const primary = 'border-primary/40 bg-selected text-primary-hover [a]:hover:border-primary/60';
 const danger =
-  'border-destructive/20 bg-destructive-soft text-destructive-hover [a]:hover:border-destructive/40';
+  'border-destructive/40 bg-destructive-soft text-destructive-hover [a]:hover:border-destructive/60';
 
 const badgeVariants = cva(
-  'group/badge inline-flex h-5.5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-xs border px-2 text-xs leading-4 font-medium whitespace-nowrap transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!',
+  'group/badge inline-flex h-5.5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-xs border px-2 text-xs leading-4 font-semibold whitespace-nowrap transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!',
   {
     variants: {
       variant: {
@@ -22,13 +24,13 @@ const badgeVariants = cva(
         neutral,
         primary,
         success:
-          'border-success/20 bg-success-soft text-[color-mix(in_oklab,var(--color-success),black_22%)] dark:text-success [a]:hover:border-success/40',
-        warning: 'border-warning/25 bg-warning-soft text-warning [a]:hover:border-warning/45',
+          'border-success/40 bg-success-soft text-[color-mix(in_oklab,var(--color-success),black_22%)] dark:text-success [a]:hover:border-success/60',
+        warning: 'border-warning/45 bg-warning-soft text-warning [a]:hover:border-warning/65',
         danger,
         purple:
-          'border-brand-accent/20 bg-brand-accent-soft text-brand-accent [a]:hover:border-brand-accent/40',
+          'border-brand-accent/40 bg-brand-accent-soft text-brand-accent [a]:hover:border-brand-accent/60',
         // Neutral with no fill, for metadata (counts, categories, sources).
-        outline: 'border-border bg-transparent text-secondary-foreground [a]:hover:bg-muted',
+        outline: 'border-border-strong/60 bg-transparent text-secondary-foreground [a]:hover:bg-muted',
         // Kept for API compatibility: aliases of the official roles.
         default: primary,
         secondary: neutral,

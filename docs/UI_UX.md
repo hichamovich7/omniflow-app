@@ -244,7 +244,7 @@ Route:
 
 Purpose:
 
-**One-page project workspace (TASK-092, mockup validated 2026-11-02).** Everything about a project on one page (`PageContainer` full width):
+**One-page project workspace (TASK-092, mockup validated 2026-11-02).** TASK-095 look: Pinterest block account panels with a border and a muted header, streams in bordered muted blocks, outlined Edit / Archive icons with tooltips and a red Delete on archived streams, status badges with dot, destinations as bordered rows (primary row tinted blue and bold), "no category" / "No Pinterest destination yet" in amber, free boards as dashed blue buttons, the legacy group framed in amber with a "Legacy" warning badge. Everything about a project on one page (`PageContainer` full width):
 
 1. **Header** (`ResourceHeader`): name, niche / language / Default badges; actions **Generate Pins** (`/pinterest?projectId=`), **Generate article** (`/wordpress/blog-post`), **Edit Project**.
 2. **Health strip** (`data-testid="project-health"`, 5 cards, 1 column on phone, 2 on tablet, 5 on desktop), each an anchor link: Brand Profile (Set / Not set), WordPress (Connected / Not connected, categories · articles), Niche settings (Customized / Recommended), Pinterest (accounts, streams · boards · sections), Needs attention (count). Amber when something needs action.
@@ -1045,6 +1045,8 @@ Empty state: no projects yet → prompt to create a project first (a category mu
 ---
 
 # Pinterest Accounts (`/pinterest-accounts`, TASK-091)
+
+**Look (TASK-095, validated mockup):** an `info` Alert "N accounts · Content Streams are linked to an account in the project page." beside "Add account"; account cards white with a visible border, title 18 px bold, status badge with dot + Business / Personal badge, card actions **Edit / Archive / Delete** as outlined buttons with labels (labels screen-reader-only on phones; Delete in `destructive-outline`); details in two columns; **three count tiles** (Content Streams — amber "add one" when an active account has none —, Boards, Sections); each board in its own block (grid icon, name, Active / Inactive badge, outlined icon actions with tooltips, red delete), "SECTIONS · N" then section **chips** (see DESIGN.md, Chips) and a dashed "+ Section" chip; legacy boards: a `warning` Alert plus "Attach to an account" on each board (opens the board dialog).
 
 Sidebar "Pinterest → Accounts". Header "Pinterest Accounts" + "Project → Pinterest Account → Content Stream → Board → Section. Entered by hand — no Pinterest login." With several projects, a row of project buttons (`?project=`, default project first); no project → empty state with "Create Project". Also linked from a project's Quick Links ("Pinterest Accounts").
 

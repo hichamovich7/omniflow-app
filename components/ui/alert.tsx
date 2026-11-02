@@ -11,9 +11,12 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        danger: 'border-destructive/20 bg-destructive-soft text-destructive-hover',
-        warning: 'border-warning/25 bg-warning-soft text-warning',
-        info: 'border-primary/20 bg-selected text-secondary-foreground [&>svg]:text-primary-hover',
+        // TASK-095: one color + icon per role, borders at ≈ 40 % so the box is visible.
+        danger: 'border-destructive/40 bg-destructive-soft text-destructive-hover dark:text-destructive',
+        warning: 'border-warning/45 bg-warning-soft text-warning',
+        info: 'border-info/40 bg-info-soft text-info-foreground [&>svg]:text-info',
+        success:
+          'border-success/40 bg-success-soft text-[color-mix(in_oklab,var(--color-success),black_22%)] dark:text-success [&>svg]:text-success',
       },
     },
     defaultVariants: {

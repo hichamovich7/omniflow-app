@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.7.0 — Visual readability pass — TASK-095 (2026-11-02)
+
+* **Whole app** (validated mockup): a slightly darker page background so cards stand out, visible card borders, a visible border on every button and input (≥ 3:1), darker secondary text, stronger status badges, an "info" color, and messages with one color and icon per type (info, success, warning, error). Same blue, same font, same layout. Dark mode adjusted the same way.
+* **Pinterest Accounts**: sections are blue chips with their own ×; Edit / Archive / Delete written on the account (Delete in red); board actions outlined with a tooltip; counts become three tiles (amber when an account has no Content Stream yet); legacy boards are shown as a warning with "Attach to an account".
+* **Project page — Pinterest block**: outlined actions, red delete, the primary destination highlighted, missing category / destination in amber, free boards as blue dashed buttons.
+* No behavior change, no migration.
+
 ## v3.6.0 — Delete Pinterest accounts, boards, sections and archived Content Streams — TASK-094 (2026-11-02)
 
 * **Pinterest Accounts**: trash icon on each account (archived ones too) and on each board, small × on each section. Deleting an account keeps its boards and Content Streams — they become "without account" (legacy); only the account is deleted.

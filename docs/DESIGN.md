@@ -73,32 +73,36 @@ The palette is blue-first, neutral-led, and compatible with semantic CSS variabl
 
 ### Core tokens
 
+**TASK-095 (2026-11-02, validated mockup "OmniFlow lisibilité visuelle"):** contrast pass — the canvas is darker so white cards stand out, card borders are visible, every control boundary (outline / secondary buttons, inputs) uses `--border-strong` at ≥ 3:1, secondary text is ≥ 5:1, and an `info` role exists. Values below are the current ones.
+
 | Token                              | Light value | Use                                                         |
 | ---------------------------------- | ----------- | ----------------------------------------------------------- |
-| `--background` / `--canvas`        | `#F7F9FC`   | Application canvas                                          |
+| `--background` / `--canvas`        | `#EEF2F7`   | Application canvas (was `#F7F9FC`)                          |
 | `--foreground`                     | `#172033`   | Primary text and icons                                      |
 | `--surface` / `--card`             | `#FFFFFF`   | Cards and primary surfaces                                  |
 | `--surface-muted` / `--muted`      | `#F1F5FA`   | Secondary regions and quiet hover                           |
 | `--surface-elevated` / `--popover` | `#FFFFFF`   | Menus, popovers, dialogs                                    |
-| `--muted-foreground`               | `#687386`   | Secondary text; do not reduce opacity further for body copy |
-| `--subtle-foreground`              | `#7F8A9D`   | Metadata at 12 px or larger only                            |
-| `--border`                         | `#E8EDF4`   | Subtle separators and card borders                          |
-| `--input`                          | `#D9E2EC`   | Input boundary                                              |
+| `--muted-foreground`               | `#566174`   | Secondary text (≥ 5:1 on canvas and cards; was `#687386`)   |
+| `--subtle-foreground`              | `#626C7C`   | Metadata at 12 px or larger only (≥ 4.5:1)                  |
+| `--border`                         | `#D5DDE8`   | Separators and card borders (was `#E8EDF4`, ≈ 1.2:1)        |
+| `--border-strong`                  | `#8592A5`   | Control boundaries — outline / secondary buttons (3.2:1)    |
+| `--input`                          | `#8592A5`   | Input boundary (same as `--border-strong`; was `#D9E2EC`)   |
 | `--primary`                        | `#1570EF`   | Primary CTA, active navigation, links                       |
 | `--primary-hover`                  | `#0F5ECB`   | Primary hover/pressed                                       |
 | `--primary-foreground`             | `#FFFFFF`   | Text/icons on primary                                       |
-| `--selected`                       | `#EAF3FF`   | Selected and active soft background                         |
+| `--selected`                       | `#E6F0FF`   | Selected / active soft background; section chips            |
 | `--ring`                           | `#2583FF`   | Focus ring                                                  |
 | `--secondary`                      | `#EEF3F8`   | Secondary controls                                          |
 | `--secondary-foreground`           | `#344054`   | Text on secondary controls                                  |
 | `--brand-accent`                   | `#7C3CFF`   | Rare AI/special-feature accent                              |
 | `--brand-accent-soft`              | `#F2ECFF`   | Soft purple context surface                                 |
 | `--success`                        | `#168A45`   | Positive and completed state                                |
-| `--success-soft`                   | `#ECFDF3`   | Success surface                                             |
+| `--success-soft`                   | `#E3F6EA`   | Success surface                                             |
 | `--warning`                        | `#B54708`   | Warning text/icon                                           |
-| `--warning-soft`                   | `#FFF7E8`   | Warning surface                                             |
+| `--warning-soft`                   | `#FFF1D6`   | Warning surface                                             |
+| `--info` / `--info-soft`           | `#0B6BCB` / `#E8F2FD` | Info icon / surface (TASK-095); text `--info-foreground` `#0A4A8F` |
 | `--destructive`                    | `#D92D20`   | Error and destructive action                                |
-| `--destructive-soft`               | `#FEF3F2`   | Error surface                                               |
+| `--destructive-soft`               | `#FDE9E7`   | Error surface                                               |
 
 The original `#2583FF` remains the vivid brand blue for rings and graphical highlights. `#1570EF` is used for solid buttons because it provides stronger contrast with white text. Muted text must not be implemented with repeated opacity reductions; use a dedicated token when a quieter tier is necessary.
 
@@ -130,7 +134,7 @@ Future direction, not yet validated on a real chart: grid lines use `--border`; 
 
 ### Dark mode
 
-Dark mode already exists and must be preserved. Do not derive it by inverting the light palette. Map the same semantic roles to dark surfaces and verify text, border, focus, selected, semantic, and chart contrast independently. No dark-mode redesign is part of the first implementation batch.
+Dark mode already exists and must be preserved. Do not derive it by inverting the light palette. TASK-095 dark values: canvas `#0A101C`, card `#131D2E`, `--border` `#2C3A50`, `--border-strong` / `--input` `#5D6D85` (3.2:1 on cards), `--muted-foreground` `#AAB4C3`, `--info` `#8CC0FF` on `--info-soft` `#10294A` (text `#CFE2FF`), `--selected` `#16325A`. Map the same semantic roles to dark surfaces and verify text, border, focus, selected, semantic, and chart contrast independently. No dark-mode redesign is part of the first implementation batch.
 
 ## Typography
 
@@ -225,7 +229,8 @@ Do not use `rounded-2xl` or `rounded-full` as a generic decorative choice. The s
 
 ### Borders
 
-- Default: 1 px `--border`.
+- Default: 1 px `--border` (cards, separators).
+- Controls: 1 px `--border-strong` — outline and secondary buttons, icon buttons, inputs (`--input`). A clickable thing always has a visible boundary (TASK-095).
 - Inputs: 1 px `--input`; focus moves to `--ring` plus a subtle 3 px ring.
 - Use horizontal separators in tables; avoid vertical cell borders.
 - Prefer whitespace or a surface shift before adding another border.
@@ -253,7 +258,7 @@ Cards should usually use a border with no shadow or `shadow-xs`, never a heavy f
 
 ### Buttons
 
-Variants: primary, secondary, outline, ghost, destructive, link, and icon. Sizes: small 32 px, medium 40 px, large 44 px. On touch layouts, interactive hit areas are at least 44 × 44 px even when the visible icon is smaller.
+Variants: primary, secondary, outline, ghost, destructive, destructive-outline, link, and icon. `destructive-outline` (TASK-095) is a delete that opens a confirmation: red text on `--destructive-soft` with a red border; the solid `destructive` is kept for the final "Delete" inside the dialog. Icon-only actions in lists and cards use `outline` (never `ghost`) with a `title` and an `aria-label` naming the action; card-level actions show their text label from `sm` up (Edit, Archive, Delete). Sizes: small 32 px, medium 40 px, large 44 px. On touch layouts, interactive hit areas are at least 44 × 44 px even when the visible icon is smaller.
 
 Primary uses blue with white text and a darker hover. Destructive uses a solid or soft red treatment according to consequence and context, never the primary blue. Every button needs hover, active, focus-visible, loading, and disabled states. Loading must preserve width.
 
@@ -295,7 +300,7 @@ Headers are typographic blocks, not cards: no surface, border, shadow, gradient,
 
 Variants: neutral, primary, success, warning, danger, and purple. Badges are compact; reserve pills for short statuses. Every status includes text and may add a dot/icon—color is never the only signal. `StatusBadge` is the canonical workflow-status component.
 
-Badges are soft, never solid fills: a tinted semantic surface, semantic text that meets 4.5:1 at 12 px, and a subtle same-hue border. They are 22 px tall with 12 px / 500 text, 8 px horizontal padding, and a 6 px radius (`radius-xs`). Text is never smaller than 12 px. Blue marks in-progress or planned states (processing, scheduled), and amber is reserved for states that need attention (at risk, warming).
+Badges are soft, never solid fills: a tinted semantic surface, semantic text that meets 4.5:1 at 12 px, and a same-hue border at ≈ 40 % (TASK-095, was 20 %). They are 22 px tall with 12 px / 600 text (TASK-095, was 500), 8 px horizontal padding, and a 6 px radius (`radius-xs`). Text is never smaller than 12 px. Blue marks in-progress or planned states (processing, scheduled), and amber is reserved for states that need attention (at risk, warming).
 
 Workflow statuses have one source, `lib/utils/status.ts`. It maps a stored value to a label and a tone; the stored values never change.
 
@@ -420,9 +425,14 @@ Short, supplemental, and never required to complete an action. Use a dark neutra
 - Inline messages use `Alert` (`components/ui/alert`), never a hand-drawn box:
   - `danger` for submit and validation errors, announced with `role="alert"`;
   - `warning` for consequences to know before acting (for example deleting pins used by articles);
-  - `info` for neutral guidance.
-  - A soft semantic surface with a subtle same-hue border, 14 px text in the AA-safe shade, and an optional leading 16 px icon. There is no `success` variant: success is a toast.
+  - `info` for neutral guidance (TASK-095: its own `--info` colors, no longer the selected blue);
+  - `success` (TASK-095) for a persistent positive state shown in the page (for example "Everything is linked."); a confirmation after an action is still a toast.
+  - A soft semantic surface with a same-hue border at ≈ 40 %, 14 px text in the AA-safe shade, and a leading 16 px icon (info, check, triangle, x-circle) — one color and one icon per role.
 - Success: feedback is a sonner toast (icon + text) and is concise. Completed or published work is a workflow status, not a success page.
+
+### Chips (TASK-095)
+
+Small named items a user acts on — board sections today — are pill chips, 32 px tall: `--selected` surface, `primary/40` border, 13 px / 600 text in `--primary-hover`; the label is one button (edit) and a joined × is a second button (delete, red on hover), separated by the chip's own border. Inactive: dashed `--border-strong`, muted text, struck through. "Add" is a dashed primary chip ("+ Section").
 
 ### Charts
 

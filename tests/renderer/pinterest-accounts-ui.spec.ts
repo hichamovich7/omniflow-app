@@ -107,7 +107,16 @@ test('account page: every account field, counts, boards with sections, legacy bo
   for (const text of ['Air Dry Clay Projects', '@airdryclayprojects', 'air dry clay', 'https://clayidealab.com', 'en · US', 'Business', 'Pinned daily at 9am', 'Pumpkins', 'Retired']) {
     expect(html).toContain(text);
   }
-  expect(html).toContain('1 · 1 · 2');
+  // TASK-095: counts are tiles (value + label); an archived account with no stream is not flagged.
+  expect(html).toMatch(/>1<\/span><span[^>]*>Content Streams<\/span>/);
+  expect(html).toMatch(/>1<\/span><span[^>]*>Board<\/span>/);
+  expect(html).toMatch(/>2<\/span><span[^>]*>Sections<\/span>/);
+  expect(html).not.toContain('Content Streams — add one');
+  // TASK-095: sections are chips with their own delete; deletes use the red outline variant; legacy boards get an attach action.
+  expect(html.match(/data-testid="section-chip"/g)).toHaveLength(2);
+  expect(html).toContain('Sections · 2');
+  expect(html).toContain('Attach to an account');
+  expect(html).toContain('no account yet');
   expect(html).toContain('Content Streams: <span class="text-foreground">Air Dry Clay</span>');
   expect(html).toContain('Boards without an account (legacy)');
   expect(html).toContain('Legacy Board');
