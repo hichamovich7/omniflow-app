@@ -114,6 +114,12 @@ test('account page: every account field, counts, boards with sections, legacy bo
   expect(html).toContain('Archived accounts');
   expect(html).toContain('aria-label="Restore &quot;Old account&quot;"');
   expect(html).toContain('aria-label="Archive &quot;Air Dry Clay Projects&quot;"');
+  // TASK-094: delete for accounts (archived too), boards and sections.
+  expect(html).toContain('aria-label="Delete &quot;Air Dry Clay Projects&quot;"');
+  expect(html).toContain('aria-label="Delete &quot;Old account&quot;"');
+  expect(html).toContain('aria-label="Delete board &quot;Air Dry Clay Projects&quot;"');
+  expect(html).toContain('aria-label="Delete board &quot;Legacy Board&quot;"');
+  expect(html).toContain('aria-label="Delete section &quot;Pumpkins&quot;"');
   // A board of account 2 is not listed under account 1 (only account 1 is live here).
   expect(html).not.toContain('Polymer Clay Jewelry');
 });

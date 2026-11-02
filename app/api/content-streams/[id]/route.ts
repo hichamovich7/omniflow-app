@@ -200,3 +200,67 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     error: null,
   });
 }
+
+/**
+ * TASK-094: delete a Content Stream — only once it is archived (archive
+ * first, then delete). Its destinations and publishing activity go with it
+ * (ON DELETE CASCADE); tasks and social publications only lose the link
+ * (SET NULL). Boards, sections and Pins are untouched.
+ */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Unauthorized', code: 'unauthorized' } },
+      { status: 401 }
+    );
+  }
+
+  const { id } = await params;
+
+  if (!isValidUuid(id)) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Invalid content stream ID', code: 'invalid_id' } },
+      { status: 400 }
+    );
+  }
+
+  const { data: existingStream } = await supabase.from('content_streams').select('id, user_id, status').eq('id', id).single();
+
+  if (!existingStream) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Content stream not found', code: 'not_found' } },
+      { status: 404 }
+    );
+  }
+
+  if (existingStream.user_id !== user.id) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'You do not have access to this content stream', code: 'forbidden' } },
+      { status: 403 }
+    );
+  }
+
+  if (existingStream.status !== 'archived') {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Archive this content stream before deleting it.', code: 'stream_not_archived' } },
+      { status: 409 }
+    );
+  }
+
+  const { error: dbError } = await supabase.from('content_streams').delete().eq('id', id).eq('user_id', user.id);
+
+  if (dbError) {
+    console.error('DELETE /api/content-streams/[id] — Supabase error:', dbError);
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Failed to delete content stream', code: 'server_error' } },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json<ApiResponse<{ success: boolean }>>({ data: { success: true }, error: null });
+}

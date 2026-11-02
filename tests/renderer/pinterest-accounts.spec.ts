@@ -916,6 +916,64 @@ test.describe('Account, board and section routes', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7b. Deletes (TASK-094)
+// ---------------------------------------------------------------------------
+
+test.describe('Delete routes (TASK-094)', () => {
+  test('DELETE /api/pinterest-accounts/[id] detaches its streams and boards (legacy), then deletes only the account', async () => {
+    await withRoute('@/app/api/pinterest-accounts/[id]/route', clayTables(), async (call, supabase) => {
+      const res = await call(undefined, 'DELETE', { id: ACC_AIR });
+      expect(res.status).toBe(200);
+      expect((await res.json()).data).toEqual({ detachedStreams: 2, detachedBoards: 4 });
+      expect(supabase.tables.pinterest_accounts.map((a) => a.id)).not.toContain(ACC_AIR);
+      // Streams and boards kept, without account; the other account untouched.
+      for (const id of [S_AIR, S_EMPTY]) expect(supabase.tables.content_streams.find((s) => s.id === id)!.pinterest_account_id).toBeNull();
+      for (const id of [B_PROJECTS, B_EASY, B_DECOR, B_INACTIVE]) expect(supabase.tables.boards.find((b) => b.id === id)!.pinterest_account_id).toBeNull();
+      expect(supabase.tables.boards.find((b) => b.id === B_POLY)!.pinterest_account_id).toBe(ACC_POLY);
+      expect(supabase.tables.content_stream_boards).toHaveLength(7);
+      expect(supabase.tables.pinterest_board_sections).toHaveLength(4);
+      // Streams are detached before boards.
+      const writes = supabase.events.filter((e) => e.op !== 'insert').map((e) => `${e.op}:${e.table}`);
+      expect(writes).toEqual(['update:content_streams', 'update:boards', 'delete:pinterest_accounts']);
+    });
+  });
+
+  test('DELETE /api/pinterest-accounts/[id]: another user\'s account is refused, nothing written', async () => {
+    const tables = clayTables();
+    tables.pinterest_accounts.push({ id: '50000000-0000-4000-8000-0000000000bb', project_id: OTHER_PROJECT, user_id: OTHER_USER, name: 'Not mine', status: 'active' });
+    await withRoute('@/app/api/pinterest-accounts/[id]/route', tables, async (call, supabase) => {
+      expect((await call(undefined, 'DELETE', { id: '50000000-0000-4000-8000-0000000000bb' })).status).toBe(403);
+      expect((await call(undefined, 'DELETE', { id: 'not-a-uuid' })).status).toBe(400);
+      expect(supabase.events).toEqual([]);
+    });
+  });
+
+  test('DELETE /api/board-sections/[id] deletes the section only', async () => {
+    await withRoute('@/app/api/board-sections/[id]/route', clayTables(), async (call, supabase) => {
+      expect((await call(undefined, 'DELETE', { id: SEC_COASTERS })).status).toBe(200);
+      expect(supabase.tables.pinterest_board_sections.map((s) => s.id)).not.toContain(SEC_COASTERS);
+      expect(supabase.tables.pinterest_board_sections).toHaveLength(3);
+      expect(supabase.tables.boards.find((b) => b.id === B_PROJECTS)).toBeTruthy();
+    });
+  });
+
+  test('DELETE /api/content-streams/[id] refuses a stream that is not archived, deletes an archived one', async () => {
+    const tables = clayTables();
+    await withRoute('@/app/api/content-streams/[id]/route', tables, async (call, supabase) => {
+      const refused = await call(undefined, 'DELETE', { id: S_AIR });
+      expect(refused.status).toBe(409);
+      expect((await refused.json()).error.code).toBe('stream_not_archived');
+      expect(supabase.tables.content_streams.find((s) => s.id === S_AIR)).toBeTruthy();
+
+      supabase.tables.content_streams.find((s) => s.id === S_EMPTY)!.status = 'archived';
+      expect((await call(undefined, 'DELETE', { id: S_EMPTY })).status).toBe(200);
+      expect(supabase.tables.content_streams.map((s) => s.id)).not.toContain(S_EMPTY);
+      expect(supabase.tables.boards).toHaveLength(7);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 8. Form lists (Account → Stream → Board → Section)
 // ---------------------------------------------------------------------------
 

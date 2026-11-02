@@ -3,13 +3,17 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Archive, ArchiveRestore, ExternalLink, Pencil, Plus, Power, PowerOff, UserRound } from 'lucide-react';
+import { Archive, ArchiveRestore, ExternalLink, Pencil, Plus, Power, PowerOff, Trash2, UserRound, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/status';
+import { DeleteBoardsDialog } from '@/components/boards/delete-boards-dialog';
 import {
   AccountFormDialog,
+  accountDeleteConsequences,
   BoardFormDialog,
+  DeleteConfirmDialog,
+  SECTION_DELETE_CONSEQUENCES,
   SectionFormDialog,
   sendJson,
   type EditingBoard,
@@ -29,6 +33,10 @@ type DialogState =
   | { kind: 'account'; editing?: PinterestAccount }
   | { kind: 'board'; editing?: EditingBoard; defaultAccountId?: string | null }
   | { kind: 'section'; boardId: string; boardName: string; editing?: EditingSection }
+  // TASK-094: permanent deletes, each behind a typed confirmation.
+  | { kind: 'delete-account'; account: PinterestAccount; counts: PinterestAccountCounts }
+  | { kind: 'delete-board'; id: string; name: string }
+  | { kind: 'delete-section'; id: string; name: string; boardName: string }
   | null;
 
 /**
@@ -111,6 +119,16 @@ export function PinterestAccountsManager({
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  aria-label={`Delete board "${board.name}"`}
+                  onClick={() => open({ kind: 'delete-board', id: board.id, name: board.name })}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
 
@@ -134,6 +152,16 @@ export function PinterestAccountsManager({
                     }
                   >
                     {section.name}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Delete section "${section.name}"`}
+                    onClick={() => open({ kind: 'delete-section', id: section.id, name: section.name, boardName: board.name })}
+                  >
+                    <X className="h-3 w-3" />
                   </Button>
                 </span>
               ))}
@@ -187,6 +215,16 @@ export function PinterestAccountsManager({
               }
             >
               {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-destructive"
+              aria-label={`Delete "${account.name}"`}
+              onClick={() => open({ kind: 'delete-account', account, counts })}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -312,6 +350,38 @@ export function PinterestAccountsManager({
           editing={dialog.editing}
           defaultAccountId={dialog.defaultAccountId}
           projectBoards={boards.map((board) => ({ id: board.id, name: board.name, accountId: board.pinterest_account_id }))}
+        />
+      )}
+      {dialog?.kind === 'delete-account' && (
+        <DeleteConfirmDialog
+          key={session}
+          open
+          onOpenChange={(next) => !next && setDialog(null)}
+          title="Delete Pinterest account"
+          itemName={dialog.account.name}
+          consequences={accountDeleteConsequences(dialog.counts)}
+          url={`/api/pinterest-accounts/${dialog.account.id}`}
+          successMessage="Pinterest account deleted"
+        />
+      )}
+      {dialog?.kind === 'delete-board' && (
+        <DeleteBoardsDialog
+          key={session}
+          open
+          onOpenChange={(next) => !next && setDialog(null)}
+          boards={[{ id: dialog.id, name: dialog.name }]}
+        />
+      )}
+      {dialog?.kind === 'delete-section' && (
+        <DeleteConfirmDialog
+          key={session}
+          open
+          onOpenChange={(next) => !next && setDialog(null)}
+          title={`Delete section of "${dialog.boardName}"`}
+          itemName={dialog.name}
+          consequences={SECTION_DELETE_CONSEQUENCES}
+          url={`/api/board-sections/${dialog.id}`}
+          successMessage="Section deleted"
         />
       )}
       {dialog?.kind === 'section' && (

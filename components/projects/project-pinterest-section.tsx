@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Archive, Layers, Pencil, Plus, Star } from 'lucide-react';
+import { Archive, Layers, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/status';
@@ -117,6 +117,18 @@ export function ProjectPinterestSection({
             {stream.status !== 'archived' && (
               <Button type="button" variant="ghost" size="icon-sm" onClick={() => dialogs.archiveStream(stream.id, stream.name)} aria-label={`Archive "${stream.name}"`}>
                 <Archive className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {stream.status === 'archived' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => dialogs.deleteStream(stream.id, stream.name)}
+                aria-label={`Delete "${stream.name}"`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>

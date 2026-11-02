@@ -9,13 +9,19 @@ import {
   type EditingContentStream,
 } from '@/components/projects/content-stream-form-dialog';
 import { ArchiveContentStreamDialog } from '@/components/projects/archive-content-stream-dialog';
-import { AccountFormDialog, BoardFormDialog } from '@/components/pinterest-accounts/structure-dialogs';
+import {
+  AccountFormDialog,
+  BoardFormDialog,
+  DeleteConfirmDialog,
+  STREAM_DELETE_CONSEQUENCES,
+} from '@/components/pinterest-accounts/structure-dialogs';
 import type { StreamDraft } from '@/lib/projects/project-dashboard';
 
 type DialogState =
   | { kind: 'create-stream'; draft?: StreamDraft }
   | { kind: 'edit-stream'; editing: EditingContentStream }
   | { kind: 'archive-stream'; id: string; name: string }
+  | { kind: 'delete-stream'; id: string; name: string }
   | { kind: 'account' }
   | { kind: 'board'; accountId: string | null }
   | null;
@@ -24,6 +30,8 @@ interface ProjectDialogs {
   createStream: (draft?: StreamDraft) => void;
   editStream: (editing: EditingContentStream) => void;
   archiveStream: (id: string, name: string) => void;
+  /** TASK-094: archived streams only (the API refuses the others). */
+  deleteStream: (id: string, name: string) => void;
   createAccount: () => void;
   createBoard: (accountId: string | null) => void;
 }
@@ -68,6 +76,7 @@ export function ProjectDialogsProvider({
       createStream: (draft) => open({ kind: 'create-stream', draft }),
       editStream: (editing) => open({ kind: 'edit-stream', editing }),
       archiveStream: (id, name) => open({ kind: 'archive-stream', id, name }),
+      deleteStream: (id, name) => open({ kind: 'delete-stream', id, name }),
       createAccount: () => open({ kind: 'account' }),
       createBoard: (accountId) => open({ kind: 'board', accountId }),
     }),
@@ -103,6 +112,18 @@ export function ProjectDialogsProvider({
           contentStreamName={dialog.name}
           open
           onOpenChange={close}
+        />
+      )}
+      {dialog?.kind === 'delete-stream' && (
+        <DeleteConfirmDialog
+          key={session}
+          open
+          onOpenChange={close}
+          title="Delete Content Stream"
+          itemName={dialog.name}
+          consequences={STREAM_DELETE_CONSEQUENCES}
+          url={`/api/content-streams/${dialog.id}`}
+          successMessage="Content stream deleted"
         />
       )}
       {dialog?.kind === 'account' && <AccountFormDialog key={session} open onOpenChange={close} projectId={projectId} />}

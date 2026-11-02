@@ -2168,6 +2168,12 @@ server_error
 
 ---
 
+# DELETE /api/content-streams/[id]
+
+TASK-094. Permanently delete one of the caller's Content Streams — **only once archived** (archive with `PATCH` `{ "status": "archived" }` first). Its destinations (`content_stream_boards`) and publishing activity are deleted with it (`ON DELETE CASCADE`); tasks and social publications lose only the link (`SET NULL`); boards, sections and Pins are untouched. `200` — `{ "data": { "success": true } }`. Errors: `unauthorized`, `invalid_id`, `not_found`, `forbidden`, `stream_not_archived` (409), `server_error`.
+
+---
+
 # PUT /api/content-streams/[id]/publishing-activity
 
 Records — or updates — how many Pins were published outside OmniFlow for this content stream on one day, or how many are expected from another tool on a future day (TASK-FIX-043, `status` TASK-FIX-053; table `content_stream_publishing_activity`). Upsert on `(user_id, content_stream_id, activity_date)`: saving the same day again updates the row — this is also how an expected entry is edited, or confirmed as published once its day has come. Never writes to `pins`.
@@ -2305,7 +2311,7 @@ server_error
 
 # PATCH /api/pinterest-accounts/[id]
 
-TASK-091. Edit any field above except `projectId`. Archive = `{ "status": "archived" }` (restore = `active`). Accounts are never deleted by the app; archiving changes nothing on boards, streams or Pins.
+TASK-091. Edit any field above except `projectId`. Archive = `{ "status": "archived" }` (restore = `active`). Archiving changes nothing on boards, streams or Pins (deleting: `DELETE` below, TASK-094).
 
 ## Possible Errors
 
@@ -2319,6 +2325,14 @@ forbidden
 duplicate_name
 server_error
 ```
+
+---
+
+# DELETE /api/pinterest-accounts/[id]
+
+TASK-094. Permanently delete one of the caller's accounts (archived or not). Its Content Streams (archived ones too) and its boards are **detached first** — `pinterest_account_id = null`, they become legacy and keep their sections, destinations and Pins — then the account row is deleted; Pins lose only their account link (`ON DELETE SET NULL`). Order: streams, boards, account (each step harmless alone; no transaction).
+
+`200` — `{ "data": { "detachedStreams": 2, "detachedBoards": 4 } }`. Errors: `unauthorized`, `invalid_id`, `not_found`, `forbidden`, `server_error`.
 
 ---
 
@@ -2337,6 +2351,12 @@ Name kept as typed (trimmed), ≤ 100 characters, no `/`, `\` or line break. `20
 # PATCH /api/board-sections/[id]
 
 TASK-091. `{ "name"?: string, "externalId"?: string | null, "isActive"?: boolean }` — rename or (de)activate. Pins keep the section name they were generated with. Errors: as above plus `invalid_id`.
+
+---
+
+# DELETE /api/board-sections/[id]
+
+TASK-094. Permanently delete one of the caller's sections. Content Stream destinations on it are removed with it (`ON DELETE CASCADE`; a stream left without primary uses its first active destination, as everywhere). Pins keep their section name (`pins.board_section`, still exported in the CSV) and lose only `pinterest_section_id` (`SET NULL`). `200` — `{ "data": { "success": true } }`. Errors: `unauthorized`, `invalid_id`, `not_found`, `forbidden`, `server_error`.
 
 ---
 

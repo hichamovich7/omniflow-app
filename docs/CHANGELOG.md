@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.6.0 — Delete Pinterest accounts, boards, sections and archived Content Streams — TASK-094 (2026-11-02)
+
+* **Pinterest Accounts**: trash icon on each account (archived ones too) and on each board, small × on each section. Deleting an account keeps its boards and Content Streams — they become "without account" (legacy); only the account is deleted.
+* **Project page**: archived Content Streams get a trash icon. A stream must be archived before it can be deleted; its destinations and publishing activity go with it, boards / sections / Pins are kept.
+* Deleting a section removes it from the streams that used it; Pins keep their section name in the CSV.
+* Every delete lists its consequences and asks to type SUPPRIMER. New routes: `DELETE /api/pinterest-accounts/[id]`, `DELETE /api/board-sections/[id]`, `DELETE /api/content-streams/[id]` (archived only). No migration.
+
 ## v3.5.0 — Attach an existing board instead of a duplicate-name error — TASK-093 (2026-11-02)
 
 * "Add board" on a Pinterest account now offers **New board** or **Existing board**: the second lists this project's boards without account and attaches the chosen one ("Attach board") — sections and Pins follow it.

@@ -23,11 +23,14 @@ import { attachableBoards, boardNameConflict, type BoardNameConflict, type Exist
 /** JSON request to one of the app's own routes; returns the API envelope's data or its message. */
 export async function sendJson<T>(
   url: string,
-  method: 'POST' | 'PATCH',
-  body: unknown
+  method: 'POST' | 'PATCH' | 'DELETE',
+  body?: unknown
 ): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
   try {
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await fetch(
+      url,
+      body === undefined ? { method } : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
     const json = await res.json();
     if (!res.ok || json.error) return { ok: false, message: json.error?.message ?? 'Something went wrong' };
     return { ok: true, data: json.data as T };
@@ -35,6 +38,117 @@ export async function sendJson<T>(
     return { ok: false, message: 'Network error — try again.' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Delete (TASK-094)
+// ---------------------------------------------------------------------------
+
+/** Same typed confirmation as the board and project delete dialogs. */
+export const DELETE_CONFIRMATION_KEYWORD = 'SUPPRIMER';
+
+/**
+ * TASK-094: permanent delete of an account, a section or an archived Content
+ * Stream. `consequences` says what happens to what depends on it; the API
+ * route re-checks ownership (and, for a stream, that it is archived).
+ */
+export function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  itemName,
+  consequences,
+  url,
+  successMessage,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  itemName: string;
+  consequences: string[];
+  url: string;
+  successMessage: string;
+}) {
+  const router = useRouter();
+  const [confirmText, setConfirmText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isMatch = confirmText.trim() === DELETE_CONFIRMATION_KEYWORD;
+
+  async function handleDelete() {
+    if (!isMatch) return;
+    setError(null);
+    setLoading(true);
+    const result = await sendJson(url, 'DELETE');
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.message);
+      toast.error(result.message);
+      return;
+    }
+    toast.success(successMessage);
+    onOpenChange(false);
+    router.refresh();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !loading && onOpenChange(next)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            This will permanently delete &quot;{itemName}&quot;. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground" data-testid="delete-consequences">
+          {consequences.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <div className="space-y-1.5">
+          <Label htmlFor="delete-confirm-input" className="text-xs text-muted-foreground">
+            Type <span className="font-semibold text-foreground">{DELETE_CONFIRMATION_KEYWORD}</span> to confirm
+          </Label>
+          <Input
+            id="delete-confirm-input"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="Tapez SUPPRIMER pour confirmer"
+            autoComplete="off"
+            disabled={loading}
+          />
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="button" variant="destructive" onClick={handleDelete} disabled={!isMatch || loading}>
+            {loading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** What deleting each kind of item does to what depends on it (shown in the dialog). */
+export function accountDeleteConsequences(counts: { contentStreams: number; boards: number }): string[] {
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  return [
+    `Its ${plural(counts.boards, 'board')} and its Content Streams (${counts.contentStreams} not archived) stay in the project without account (legacy) — attach them to another account later.`,
+    'Sections, destinations and Pins are kept; Pins only lose their account link.',
+  ];
+}
+
+export const SECTION_DELETE_CONSEQUENCES = [
+  'Content Stream destinations on this section are removed.',
+  'Pins keep their section name in the CSV; they only lose the section link.',
+];
+
+export const STREAM_DELETE_CONSEQUENCES = [
+  'Its Pinterest destinations and its publishing activity history are deleted.',
+  'Boards, sections and Pins are kept; tasks only lose the stream link.',
+];
 
 const ACCOUNT_TYPE_LABELS: Record<PinterestAccountType, string> = { business: 'Business', personal: 'Personal' };
 const ACCOUNT_STATUS_LABELS: Record<PinterestAccountStatus, string> = { active: 'Active', paused: 'Paused', archived: 'Archived' };

@@ -276,6 +276,9 @@ test('Pinterest block: account with its stream, ★ primary "Board / Section", w
   expect(html).toContain('Content Streams without account');
   expect(html).toContain('no category');
   expect(html).toContain('Archived streams (1)');
+  // TASK-094: only an archived stream can be deleted.
+  expect(html).toContain('aria-label="Delete &quot;Old Jewelry&quot;"');
+  expect(html).not.toContain('aria-label="Delete &quot;Air Dry Clay&quot;"');
   expect(html).toContain('1 archived account hidden.');
   expect(html).toContain('href="/pinterest-accounts?project=p1"');
 });

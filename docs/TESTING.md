@@ -1345,6 +1345,16 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Delete accounts, boards, sections and archived Content Streams (TASK-094, 2026-11-02)
+
+```txt
+npx playwright test tests/renderer/pinterest-accounts.spec.ts tests/renderer/pinterest-accounts-ui.spec.ts tests/renderer/project-workspace.spec.ts --project=renderer --reporter=list
+```
+
+Offline: `DELETE /api/pinterest-accounts/[id]` detaches the account's streams then boards (legacy), deletes only the account, other account untouched, destinations and sections kept, writes in order streams → boards → account; another user's account → 403, bad id → 400, nothing written; `DELETE /api/board-sections/[id]` deletes the section only; `DELETE /api/content-streams/[id]` → 409 `stream_not_archived` for an active stream, 200 for an archived one, boards untouched. Rendering: Delete icons on accounts (archived too), boards and sections (Pinterest Accounts page); Delete only on archived streams (project workspace). Cascades (destinations, publishing activity) are the database's existing foreign keys.
+
+**Manual check:** Pinterest Accounts → × on a test section → dialog lists the consequences → type SUPPRIMER → deleted; trash on a test board → "Delete Board"; trash on a test account with boards → its boards appear under "Boards without an account (legacy)"; project page → archive a test stream → "Archived streams" → trash → deleted; an active stream shows no trash.
+
 # Attach an existing board from "Add board" (TASK-093, 2026-11-02)
 
 ```txt

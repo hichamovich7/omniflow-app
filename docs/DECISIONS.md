@@ -1839,7 +1839,7 @@ The real Pinterest strategy is one project with several Pinterest accounts, each
 2. `content_stream_boards` is **extended** (section, primary, active, weight, surrogate `id`) — no second destination table. `pins.board_id` stays the board reference (no `pinterest_board_id`).
 3. Same-project rules are composite foreign keys; "a linked stream only uses its account's boards" is RLS + the API; a legacy stream (no account) keeps the project-only rule.
 4. Distribution is deterministic (smooth weighted round-robin, primary first) — no AI request picks a board, no Pin is duplicated, Pins / day stays a stream target.
-5. Nothing is linked automatically: old boards and streams stay "legacy" until the user links them; old free-text sections stay as they are. Accounts are archived, never deleted.
+5. Nothing is linked automatically: old boards and streams stay "legacy" until the user links them; old free-text sections stay as they are. Accounts are archived, never deleted. *(Superseded 2026-11-02 by TASK-094, below: accounts can now be deleted, detaching — not deleting — their boards and streams.)*
 6. Section names are unique per board case-insensitively; the "one board per active stream" rule is kept.
 7. The CSV keeps Pinterest's bulk format (no account column — one CSV per account is the user's choice of Pins).
 
@@ -1848,6 +1848,24 @@ The real Pinterest strategy is one project with several Pinterest accounts, each
 * Migration 047 must be applied before the code is deployed (stream saves write the new columns).
 * Destination edits are several requests, not one transaction: a failure after the stream is saved is reported as a partial success (as before).
 * TASK-078 Phase B, which had planned migration 047, takes the next free number.
+
+## 2026-11-02 — Delete for Pinterest accounts, sections and Content Streams (TASK-094)
+
+### Context
+
+The founder asked for the basic actions everywhere — create, add, edit, delete, archive. Pinterest accounts, board sections and Content Streams could be archived or deactivated but not deleted; boards could be deleted only from `/boards`.
+
+### Decision Taken (choices made by the founder)
+
+1. **Pinterest account → delete detaches.** Its Content Streams and boards become legacy (no account) and keep their sections, destinations and Pins; only the account row is deleted. Supersedes "accounts are archived, never deleted" (TASK-091 point 5).
+2. **Content Stream → delete only once archived** (archive first, then delete): its destinations and publishing activity go with it; boards, sections and Pins are kept.
+3. **Section → delete**: destinations on it go with it, Pins keep their section name for the CSV.
+4. Every delete is permanent and behind the same typed confirmation as boards and projects (SUPPRIMER), with the consequences listed in the dialog. No trash / soft delete (see "Corbeille 15 jours" below — still deferred).
+
+### Consequences
+
+* No migration: the existing foreign keys already give these effects (CASCADE / SET NULL); the account detach is done by the API (streams, then boards, then the account — no transaction, each step harmless alone).
+* Board delete is now also offered on Pinterest Accounts (same dialog and route as `/boards`).
 
 ---
 

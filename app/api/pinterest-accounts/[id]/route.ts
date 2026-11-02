@@ -11,8 +11,8 @@ function fail(message: string, code: string, status: number) {
 
 /**
  * TASK-091: edit a Pinterest account, or archive it (`status: "archived"`).
- * Accounts are never deleted from the app: archiving keeps its boards,
- * streams and Pins untouched and only stops offering it for new Pins.
+ * Archiving keeps its boards, streams and Pins untouched and only stops
+ * offering it for new Pins (deleting it: DELETE below, TASK-094).
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
@@ -58,4 +58,60 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json<ApiResponse<{ account: PinterestAccount }>>({ data: { account: account as PinterestAccount }, error: null });
+}
+
+/**
+ * TASK-094: delete a Pinterest account. Its Content Streams and boards are
+ * detached first — they become legacy (no account) and keep their sections,
+ * destinations and Pins; Pins only lose their account link (ON DELETE SET
+ * NULL). Streams before boards, so a linked stream never points at a board
+ * of no account. Each step is harmless on its own if a later one fails.
+ */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return fail('Unauthorized', 'unauthorized', 401);
+
+  const { id } = await params;
+  if (!isValidUuid(id)) return fail('Invalid Pinterest account ID', 'invalid_id', 400);
+
+  const { data: existing } = await supabase.from('pinterest_accounts').select('id, user_id').eq('id', id).single();
+  if (!existing) return fail('Pinterest account not found', 'not_found', 404);
+  if (existing.user_id !== user.id) return fail('You do not have access to this Pinterest account', 'forbidden', 403);
+
+  const { data: streams, error: streamError } = await supabase
+    .from('content_streams')
+    .update({ pinterest_account_id: null })
+    .eq('pinterest_account_id', id)
+    .eq('user_id', user.id)
+    .select('id');
+  if (streamError) {
+    console.error('DELETE /api/pinterest-accounts/[id] — detach streams:', streamError);
+    return fail('Failed to detach the Content Streams of this account', 'server_error', 500);
+  }
+
+  const { data: boards, error: boardError } = await supabase
+    .from('boards')
+    .update({ pinterest_account_id: null })
+    .eq('pinterest_account_id', id)
+    .eq('user_id', user.id)
+    .select('id');
+  if (boardError) {
+    console.error('DELETE /api/pinterest-accounts/[id] — detach boards:', boardError);
+    return fail('Failed to detach the boards of this account', 'server_error', 500);
+  }
+
+  const { error } = await supabase.from('pinterest_accounts').delete().eq('id', id).eq('user_id', user.id);
+  if (error) {
+    console.error('DELETE /api/pinterest-accounts/[id] — Supabase error:', error);
+    return fail('Failed to delete Pinterest account', 'server_error', 500);
+  }
+
+  return NextResponse.json<ApiResponse<{ detachedStreams: number; detachedBoards: number }>>({
+    data: { detachedStreams: streams?.length ?? 0, detachedBoards: boards?.length ?? 0 },
+    error: null,
+  });
 }
