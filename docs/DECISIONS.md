@@ -1823,6 +1823,32 @@ The TASK-088 real test showed AI designs that keep the article photo's subject w
 * Text drawn by the image model is not checked by OmniFlow (`aiTextUnverified`); the Pin title and description stay the official text.
 * Keyword and Research flows are unchanged.
 
+## 2026-11-02
+
+### Decision
+
+Pinterest accounts become a real entity, and a Content Stream publishes to several boards and sections (TASK-091).
+
+### Context
+
+The real Pinterest strategy is one project with several Pinterest accounts, each account with its sub-niche Content Streams, boards and sections (e.g. Clay Idea Lab → "Air Dry Clay Projects" and "Polymer Clay Ideas"). Until now a board played the account's role (§1.3a of TASK-COMMAND-CENTER-PHASE-2) and sections were free text on each Pin.
+
+### Decision Taken
+
+1. Hierarchy **Project → Pinterest Account → Content Stream → Board → Section → Pin**, entered by hand. No Pinterest API, no credential stored; `external_id` columns only prepare a future sync.
+2. `content_stream_boards` is **extended** (section, primary, active, weight, surrogate `id`) — no second destination table. `pins.board_id` stays the board reference (no `pinterest_board_id`).
+3. Same-project rules are composite foreign keys; "a linked stream only uses its account's boards" is RLS + the API; a legacy stream (no account) keeps the project-only rule.
+4. Distribution is deterministic (smooth weighted round-robin, primary first) — no AI request picks a board, no Pin is duplicated, Pins / day stays a stream target.
+5. Nothing is linked automatically: old boards and streams stay "legacy" until the user links them; old free-text sections stay as they are. Accounts are archived, never deleted.
+6. Section names are unique per board case-insensitively; the "one board per active stream" rule is kept.
+7. The CSV keeps Pinterest's bulk format (no account column — one CSV per account is the user's choice of Pins).
+
+### Consequences
+
+* Migration 047 must be applied before the code is deployed (stream saves write the new columns).
+* Destination edits are several requests, not one transaction: a failure after the stream is saved is reported as a partial success (as before).
+* TASK-078 Phase B, which had planned migration 047, takes the next free number.
+
 ---
 
 # Idées futures

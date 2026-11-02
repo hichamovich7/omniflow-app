@@ -1345,6 +1345,60 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# One-page project workspace (TASK-092, 2026-11-02)
+
+```txt
+npx playwright test tests/renderer/project-workspace.spec.ts tests/renderer/pinterest-accounts-ui.spec.ts --project=renderer --reporter=list
+npx playwright test --project=renderer
+npx playwright test tests/playwright/project-workspace.spec.ts tests/playwright/content-streams.spec.ts tests/playwright/niche-settings.spec.ts   # needs PLAYWRIGHT_STORAGE_STATE
+```
+
+Offline. `project-workspace.spec.ts` (14): category table (streams, accounts — "No account" for legacy — and article counts, archived streams ignored); Needs attention kinds and order (legacy board, stream without account, stream without category, categories without stream) and empty once everything is linked; free boards (inactive boards and boards of another live stream excluded, an archived stream frees its board, a stream's own boards free for itself); category suggestion (longest name, case-insensitive, none); "+ Stream" prefill (account, every free board, first primary, weight 1, suggested category; empty list when no board is free); "Create a stream" from a category; collapsible block (anchor, `<h2>` + `aria-expanded` button, folded body `hidden`); Pinterest block (account, stream, ★ primary "Board / Section", ×weight, one-click free-board button, Edit / Archive labels, legacy group, archived streams folded, archived accounts note, link to Pinterest Accounts; empty state); Needs attention (one action per kind, "Add a Pinterest account first", "Everything is linked."); page source: blocks Brand Profile → WordPress → Niche settings → Pinterest → Needs attention → Quick links, Niche folded, every anchor in the navigation, no write from the page. The TASK-091 stream-card render test was removed with the card (replaced by the Pinterest block tests).
+
+Gated browser specs (desktop + mobile, read-only, skipped without a session): `project-workspace.spec.ts` (block order, navigation, side column, no horizontal scroll; Niche settings unfolds; "+ Stream" opens a prefilled dialog and Cancel saves nothing); `content-streams.spec.ts`, `niche-settings.spec.ts` and `pinterest-accounts.spec.ts` adapted to the workspace (Pinterest heading; Niche block unfolded first).
+
+Validation (2026-11-02): see the TASK-092 entry in TASKS.md for the run results.
+
+**Manual check:** open a project → the 5 status cards jump to their block; fold / unfold each block; WordPress table shows each category's stream and account; "+ Stream" on an account → dialog with the account's free boards (first ★), suggested category → Cancel; Needs attention: attach a legacy board to an account, link a stream to a category; phone width: side column below, no horizontal scroll.
+
+# Pinterest Accounts, sections and multi-destination Content Streams (TASK-091, 2026-11-02)
+
+```txt
+npx playwright test tests/renderer/pinterest-accounts.spec.ts tests/renderer/pinterest-accounts-ui.spec.ts --project=renderer --reporter=list
+npx playwright test --project=renderer
+npx playwright test tests/playwright/pinterest-accounts.spec.ts            # chromium + mobile-chrome, needs PLAYWRIGHT_STORAGE_STATE
+npx tsc --noEmit && npx eslint <changed files> && npx next build && git diff --check
+```
+
+Offline, no AI / image / WordPress / network call (fetch stubbed, AI engine replaced). `pinterest-accounts.spec.ts` (65), Clay Idea Lab fixture (accounts "Air Dry Clay Projects" and "Polymer Clay Ideas", boards, sections, streams) on an in-memory Supabase fake:
+
+* **Accounts**: create (Business / Active defaults, every field mapped, blanks → null, invalid URL / type / status refused, no credential column ever written), update / archive, `isAccountInProject` (same user + same project).
+* **Boards / sections**: board account / active / external id mapping (name-only update unchanged); section name kept as typed, `/` `\` line breaks / empty / > 100 refused; (de)activation; `findBlockingStream` (a board cannot move away from an account whose stream uses it); per-account counts.
+* **Destinations**: several boards, same board with several sections; duplicate board + section refused (with and without section); one primary, primary active; weights 1–100; first active becomes primary; legacy `boardId` → one primary destination; `checkStreamDestinations` refuses a board of another account, a legacy board on a linked stream, a section of another board, a board of another project, and keeps the project-only rule for a legacy stream.
+* **Distribution**: primary first and wins ties; 2 / 1 weights → 4 of 6; one destination per Pin, count preserved; deterministic.
+* **Resolver** (`resolveGenerationDestinations`): board + section → every Pin with the exact names; stream Auto → weighted, inactive row never used; fallback to the primary when it is the only active one; inactive section skipped; refusals `board_account_mismatch`, `section_board_mismatch`, `board_inactive`, `section_inactive`, `board_not_found`, `stream_account_mismatch`, `board_not_in_stream`, `account_archived`, `account_not_found`, `no_active_destination`, `destination_required`.
+* **`POST /api/pinterest/generate`**: stream Auto → 3 Pins on Pumpkins / Coasters / Easy board with `board_id`, `pinterest_account_id`, `pinterest_section_id`, one text call only, the model's "Invented Board" ignored, no board / section created; board + section → every Pin, CSV row "Air Dry Clay Projects/Coasters"; invalid destination → 400 before the generation row and the AI call, no insert; legacy free board + section unchanged and no new column written.
+* **Routes**: Content Stream POST (account + destinations, primary written last, one primary), board of another account / section of another board refused before any insert, legacy `boardId`; PATCH account change refused while old boards stay (`destination_account_mismatch`), accepted with matching destinations, primary switch keeps row ids and one primary; account of another project refused. Accounts POST (project of another user → 403) / PATCH archive; sections POST (two in one board, foreign board 403) / PATCH deactivate; boards POST under an account, PATCH (de)activate, account of another project refused.
+* **Form lists**: archived accounts hidden, boards / streams filtered by account (never another account's or an inactive board), stream boards = active destinations (primary first, once each), sections by board (inactive hidden), ids-only request, Legacy when no account, suggested board selects its account, blocking messages.
+* **CSV / legacy**: exact "Board/Section", older free-text `pins.board_section` still exported, header unchanged (Pinterest's bulk format has no account column), UTM unchanged.
+* **Migration 047 (static)**: extends `content_stream_boards` (no `content_stream_destinations`), partial unique indexes, one primary, primary active, composite FKs, no DROP TABLE / DELETE / TRUNCATE / DROP COLUMN, RLS on the new tables, no credential column.
+
+`pinterest-accounts-ui.spec.ts` (4, offline render): account card fields, counts "1 · 1 · 2", stream names, legacy boards, archived accounts with Restore; stream card (account, ★ primary "Board / Section", ×weight, "Legacy — no account"); destination picker in account mode (lists + "Add a section"), Auto explanation, Legacy renders the former fields only.
+
+Mutation check: making the distribution's ties go to the last destination fails 2 tests (primary-first and the route's Pin order).
+
+**Migration 047 on a real Postgres** (2026-11-02, PGlite 0.2.17 in a scratch folder — no project dependency; script `tests/sql/047-pinterest-accounts.verify.mjs`, how to run in its header): minimal schema + migrations 007 / 030 / 031 / 032 + legacy rows, then 047 — **44 / 44 checks pass**: applies in one transaction; the 3 existing links kept, oldest per stream primary, all active weight 1; `pins.board_section` kept; no account created; account name unique per project (case-insensitive); type / status CHECK; board / stream → account of another project refused (FK); several sections per board, name unique per board (case-insensitive), no "/" or blank; same board with several sections in a stream; duplicates (with / without section) refused; section of another board refused (FK); second primary and inactive primary refused; weight 0 / 101 refused; account with boards cannot be deleted. RLS as `authenticated`: account in another user's project or for another user refused; section on another user's board refused; board of another account / board without account refused for a linked stream; same-account board + section accepted; legacy stream still links any board of its project; board of another project / foreign board refused; board moved to another user's project refused; stream linked to an account of another user refused; user B sees none of user A's accounts, sections or destinations; project delete still cascades with nothing left.
+
+Validation (2026-11-02): TASK-091 specs 69 / 69; full renderer **1688 passed** (was 1619); `tests/playwright/pinterest-accounts.spec.ts` 8 skipped (no `PLAYWRIGHT_STORAGE_STATE` here — desktop + mobile, read-only); TypeScript OK; ESLint (changed files) OK; production build OK; `git diff --check` OK. No AI generation, image or WordPress call.
+
+**Manual checks (after applying 047 by hand):**
+
+1. `/pinterest-accounts`: create "Air Dry Clay Projects" and "Polymer Clay Ideas"; add boards and sections; deactivate / reactivate one; archive / restore an account; desktop and phone width (no horizontal scroll).
+2. Project page: link the "Air Dry Clay" stream to its account; add 3 destinations (same board with 2 sections + another board), set primary and weights; save, reopen — the order, primary and weights are kept. Try to change the account without changing the boards → error.
+3. Old single-board stream: shows "Legacy — no account", its board as the ★ primary destination, Command Center unchanged.
+4. `/pinterest`: Account → Stream → Board "Auto" → generate 3 Pins (one text call): Pins spread over the stream's destinations; then a board + section; then "+" adds a section and selects it; Legacy still shows the free-text fields.
+5. Export the CSV: "Pinterest board" = "Board/Section" with the exact names; links and UTM unchanged.
+
 # Pinterest project gallery global subject (TASK-FIX-090, 2026-11-01)
 
 ```txt

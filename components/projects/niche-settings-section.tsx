@@ -51,6 +51,8 @@ interface NicheSettingsSectionProps {
   streams: NicheSettingsStream[];
   categories: CategoryOption[];
   boards: BoardOption[];
+  /** TASK-092: rendered inside the project page's collapsible "Niche settings" block (no own card or title). */
+  embedded?: boolean;
 }
 
 function sameSettings(a: NicheSettings | null, b: NicheSettings | null): boolean {
@@ -63,7 +65,15 @@ function sameSettings(a: NicheSettings | null, b: NicheSettings | null): boolean
  * Only customizations are saved (PUT /api/projects/[id]/niche-settings).
  * Sub-niches are Content Streams: new ones go through the existing dialog.
  */
-export function NicheSettingsSection({ projectId, niche, initialSettings, streams, categories, boards }: NicheSettingsSectionProps) {
+export function NicheSettingsSection({
+  projectId,
+  niche,
+  initialSettings,
+  streams,
+  categories,
+  boards,
+  embedded = false,
+}: NicheSettingsSectionProps) {
   const router = useRouter();
   const [saved, setSaved] = useState<NicheSettings | null>(initialSettings);
   const [settings, setSettings] = useState<NicheSettings | null>(initialSettings);
@@ -124,11 +134,11 @@ export function NicheSettingsSection({ projectId, niche, initialSettings, stream
       : 'No niche set — general recommendations, fully editable.';
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-6" data-testid="niche-settings">
+    <div className={embedded ? undefined : 'rounded-2xl border border-border/60 bg-card p-6'} data-testid={embedded ? undefined : 'niche-settings'}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-medium">Niche settings</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          {!embedded && <h2 className="text-sm font-medium">Niche settings</h2>}
+          <p className={embedded ? 'text-sm text-muted-foreground' : 'mt-1 text-sm text-muted-foreground'}>
             {intro} Used by every WordPress and Pinterest generation of this project, after your source facts and the options you choose.
           </p>
         </div>

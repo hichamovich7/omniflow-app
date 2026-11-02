@@ -31,6 +31,7 @@ import {
 } from '@/lib/pinterest/generation-plan';
 import type { PinterestGenerationPlan } from '@/lib/pinterest/generation-plan';
 import { findOrCreateBoardIds } from '@/lib/queries/boards';
+import { DestinationError, resolveGenerationDestinations, type ResolvedDestinations } from '@/lib/pinterest/destinations';
 import {
   articleClaimEvidence,
   buildArticlePinterestContext,
@@ -200,6 +201,10 @@ export async function POST(request: Request) {
     pinsRequested,
     board,
     boardSection,
+    pinterestAccountId,
+    contentStreamId,
+    boardId,
+    boardSectionId,
     websiteUrl,
     pinterestUrl,
     analysisId,
@@ -242,6 +247,29 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  // TASK-091: structured destination (account → stream → board → section),
+  // checked before any AI call or write. The Pins' boards and sections come
+  // from here, never from the model.
+  let structuredDestinations: ResolvedDestinations | null = null;
+  if (pinterestAccountId) {
+    try {
+      structuredDestinations = await resolveGenerationDestinations(supabase, user.id, projectId, {
+        pinterestAccountId,
+        contentStreamId,
+        boardId,
+        boardSectionId,
+      });
+    } catch (err) {
+      if (!(err instanceof DestinationError)) throw err;
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: err.message, code: err.code } },
+        { status: 400 }
+      );
+    }
+  }
+  // Prompt context only (sub-niche): the board the Pins are for.
+  const contextBoardName = structuredDestinations ? structuredDestinations.candidates[0]?.boardName : board;
 
   // Social Content Studio (TASK-044 phase 2): an owned, completed article of
   // this same project becomes the prompt context. Read-only; its permalink
@@ -386,9 +414,10 @@ export async function POST(request: Request) {
   // Sub-niche context: the Content Stream of the board the user chose, then
   // (article flow) the Streams of the article's WordPress category.
   const contentStreams = [
-    ...(await listContentStreamNamesForBoard(supabase, user.id, projectId, board)),
+    ...(structuredDestinations?.contentStreamName ? [structuredDestinations.contentStreamName] : []),
+    ...(await listContentStreamNamesForBoard(supabase, user.id, projectId, contextBoardName)),
     ...(articleSource?.contentStreams ?? []),
-  ];
+  ].filter((name, index, names) => names.indexOf(name) === index);
   // Project niche settings (migration 041) — best-effort, defaults when absent.
   const nicheSettings = articleSource
     ? articleSource.nicheSettings ?? null
@@ -629,15 +658,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const boardNames = board
-      ? resolvedPins.map(() => board)
-      : resolvedPins.map((pin) => pin.board);
+    // TASK-091: one configured destination per Pin (weighted, primary first);
+    // the model's board suggestion is ignored in this mode.
+    const pinDestinations = structuredDestinations ? structuredDestinations.plan(resolvedPins.length) : null;
+
+    const boardNames = pinDestinations
+      ? pinDestinations.map((destination) => destination.boardName)
+      : board
+        ? resolvedPins.map(() => board)
+        : resolvedPins.map((pin) => pin.board);
 
     // Article flow: boards are only matched, never created — an AI-suggested
     // name with no real board stays free text on the Pin (board_id null).
-    const boardIdByName = await findOrCreateBoardIds(supabase, projectId, user.id, boardNames, {
-      create: !articleSource,
-    });
+    // Structured destinations already carry their real board ids.
+    const boardIdByName = pinDestinations
+      ? new Map<string, string>()
+      : await findOrCreateBoardIds(supabase, projectId, user.id, boardNames, {
+          create: !articleSource,
+        });
 
     const allowedBannerTemplates =
       getNicheVisualConvention(project.niche)?.allowedBannerTemplates ??
@@ -768,10 +806,18 @@ export async function POST(request: Request) {
         description: pin.description,
         keywords: pin.keywords,
         board: boardNames[i],
-        board_id: boardIdByName.get(boardNames[i].trim()) ?? null,
+        board_id: pinDestinations ? pinDestinations[i].boardId : boardIdByName.get(boardNames[i].trim()) ?? null,
         // Zod already rejects a boardSection without a manually-set board,
         // so this only ever applies when every pin shares the same board.
-        board_section: boardSection ?? null,
+        board_section: pinDestinations ? pinDestinations[i].sectionName : boardSection ?? null,
+        // Only set for structured destinations, so legacy inserts stay
+        // valid on a database without migration 047.
+        ...(pinDestinations
+          ? {
+              pinterest_account_id: pinDestinations[i].accountId,
+              pinterest_section_id: pinDestinations[i].sectionId,
+            }
+          : {}),
         link_url: destination.linkUrl,
         image_prompt: pin.image_prompt,
         visual_format: visualFormat,

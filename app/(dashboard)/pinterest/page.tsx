@@ -7,6 +7,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
 import { hasWordPressSite } from '@/lib/queries/wordpress-sites';
+import { loadPinterestStructure } from '@/lib/queries/pinterest-accounts';
 import { Plus, Sparkles } from 'lucide-react';
 
 export default async function PinterestPage() {
@@ -26,6 +27,11 @@ export default async function PinterestPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const wordpressConnected = user ? await hasWordPressSite(supabase, user.id) : false;
+  // TASK-091: Account → Content Stream → Board → Section lists of the form.
+  const pinterestStructure = await loadPinterestStructure(
+    supabase,
+    list.map((project) => project.id)
+  );
 
   return (
     <PageContainer narrow>
@@ -44,6 +50,7 @@ export default async function PinterestPage() {
         <PinForm
           projects={list}
           boards={boards ?? []}
+          pinterestStructure={pinterestStructure}
           sourceChooser={<PinterestSourceChooser active="keyword" hasWordPressSite={wordpressConnected} />}
         />
       )}

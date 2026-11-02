@@ -23,6 +23,7 @@ import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
 import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
 import { hasWordPressSite } from '@/lib/queries/wordpress-sites';
+import { loadPinterestStructure } from '@/lib/queries/pinterest-accounts';
 
 /**
  * Social Content Studio phase 2 (TASK-044): the Pinterest form pre-filled
@@ -92,6 +93,9 @@ export default async function PinterestCreatePage({
     redirect('/pinterest');
   }
 
+  // TASK-091: Account → Content Stream → Board → Section lists of the form.
+  const pinterestStructure = await loadPinterestStructure(supabase, [project.id]);
+
   const boardList = boards ?? [];
   const contentStreams: ContentStreamOption[] = (
     (streams ?? []) as Array<{ id: string; name: string; content_stream_boards: Array<{ board_id: string }> | null }>
@@ -136,6 +140,7 @@ export default async function PinterestCreatePage({
         boards={boardList}
         articleSource={formSource}
         contentStreams={contentStreams}
+        pinterestStructure={pinterestStructure}
         sourceChooser={
           <PinterestSourceChooser active="omniflow-article" hasWordPressSite={await hasWordPressSite(supabase, user.id)} />
         }

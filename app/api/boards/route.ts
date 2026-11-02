@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createBoardSchema } from '@/lib/validations/board';
+import { boardRow, createBoardSchema } from '@/lib/validations/board';
+import { getOwnedAccount, PinterestStructureError } from '@/lib/queries/pinterest-accounts';
 import type { ApiResponse } from '@/types/api';
 
 export async function POST(request: Request) {
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectId, name } = parsed.data;
+  const { projectId } = parsed.data;
 
   const { data: project } = await supabase
     .from('projects')
@@ -57,12 +58,28 @@ export async function POST(request: Request) {
     );
   }
 
+  // TASK-091: an optional Pinterest account, which must be one of this project's.
+  if (parsed.data.pinterestAccountId) {
+    try {
+      const account = await getOwnedAccount(supabase, user.id, projectId, parsed.data.pinterestAccountId);
+      if (account.status === 'archived') {
+        throw new PinterestStructureError('account_archived', 'This Pinterest account is archived.');
+      }
+    } catch (err) {
+      if (!(err instanceof PinterestStructureError)) throw err;
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: err.message, code: err.code } },
+        { status: 400 }
+      );
+    }
+  }
+
   const { data: board, error: dbError } = await supabase
     .from('boards')
     .insert({
       project_id: projectId,
       user_id: user.id,
-      name,
+      ...boardRow(parsed.data),
     })
     .select()
     .single();

@@ -27,12 +27,13 @@ test.describe('Content Streams (project page, Phase 2a.1)', () => {
     await page.goto('/projects');
     const firstProjectLink = page.locator('a[href^="/projects/"]').first();
     await firstProjectLink.click();
-    await expect(page.getByRole('heading', { name: 'Content Streams' })).toBeVisible();
+    // TASK-092: Content Streams live in the project workspace's Pinterest block.
+    await expect(page.getByRole('heading', { name: 'Pinterest', exact: true })).toBeVisible();
   }
 
   test('shows the empty state with "No content streams yet" and an "Add content stream" button when a project has none', async ({ page }) => {
     await gotoFirstProject(page);
-    const section = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Content Streams' }) }).first();
+    const section = page.locator('#pinterest');
     const emptyState = section.getByText('No content streams yet');
     // Only assert the empty-state copy when it's genuinely empty — a project
     // that already has streams from a prior run of this suite is not a failure.

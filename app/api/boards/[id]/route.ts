@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { updateBoardSchema } from '@/lib/validations/board';
+import { boardRow, updateBoardSchema } from '@/lib/validations/board';
+import { findBlockingStream, getOwnedAccount, listStreamsUsingBoard, PinterestStructureError } from '@/lib/queries/pinterest-accounts';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 
@@ -50,7 +51,7 @@ export async function PATCH(
 
   const { data: existingBoard } = await supabase
     .from('boards')
-    .select('id, user_id')
+    .select('id, user_id, project_id')
     .eq('id', id)
     .single();
 
@@ -68,9 +69,37 @@ export async function PATCH(
     );
   }
 
+  // TASK-091: a board belongs to one account of its own project, and cannot
+  // move away from an account while a stream of that account still uses it.
+  if (parsed.data.pinterestAccountId !== undefined) {
+    const nextAccountId = parsed.data.pinterestAccountId;
+    try {
+      if (nextAccountId) await getOwnedAccount(supabase, user.id, existingBoard.project_id, nextAccountId);
+    } catch (err) {
+      if (!(err instanceof PinterestStructureError)) throw err;
+      return NextResponse.json<ApiResponse<null>>(
+        { data: null, error: { message: err.message, code: err.code } },
+        { status: 400 }
+      );
+    }
+    const blocking = findBlockingStream(await listStreamsUsingBoard(supabase, id), nextAccountId);
+    if (blocking) {
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          data: null,
+          error: {
+            message: `This board is used by the Content Stream "${blocking}" of another Pinterest account. Remove it from that stream first.`,
+            code: 'board_in_use_by_other_account',
+          },
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const { data: board, error: dbError } = await supabase
     .from('boards')
-    .update(parsed.data)
+    .update(boardRow(parsed.data))
     .eq('id', id)
     .eq('user_id', user.id)
     .select()

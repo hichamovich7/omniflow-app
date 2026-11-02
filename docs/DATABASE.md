@@ -26,7 +26,8 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * Grants, RLS policies, triggers and SQL functions (e.g. 003, 010, 023, 031) are not visible through this check — they are assumed applied with their migration.
 * **Migration 045** (`045_add_social_content_generations.sql`, TASK-063) — written 2026-10-12, **not applied yet**: to apply by hand in the Supabase SQL Editor. Before it, Medium summaries are generated but not saved (warning), and `/medium` shows a "not available yet" notice.
 * **Migration 046** (`046_add_social_connections_and_publications.sql`, TASK-068) — written 2026-10-15, **not applied yet** (needs 045 first): to apply by hand in the Supabase SQL Editor. Before it, Facebook posts are generated but not saved (warning), `/facebook` shows "not available yet" notices, and no Page can be connected.
-* **Next free migration: 047**.
+* **Migration 047** (`047_add_pinterest_accounts_and_sections.sql`, TASK-091) — written 2026-11-02, **applied by hand on 2026-11-02** (Supabase SQL Editor, one transaction; new columns checked through PostgREST). Required before deploying TASK-091 (v3.4.0): Content Stream saves write the new `content_stream_boards` columns. Before it, pages still load (no account, no section, every stream link read as primary + active). Verified on a real Postgres (PGlite) — see TESTING.md (TASK-091).
+* **Next free migration: 048** (TASK-078 Phase B, which had planned 047, takes the next free number).
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -65,11 +66,17 @@ auth.users
   └── wordpress_categories (TASK-032, scoped to project like boards)
   └── wordpress_sites → wordpress_media_assets (TASK-FIX-060, migration 043 — WordPress attachment per site + source image)
 
+  └── pinterest_accounts (TASK-091, migration 047 — manual entry, no credential)
+        └── boards.pinterest_account_id (nullable — null = legacy board)
+              └── pinterest_board_sections (unique name per board)
+
   └── content_streams (TASK-FIX-039 Phase 2a, scoped to project)
         │
         │  wordpress_category_id references wordpress_categories, nullable
+        │  pinterest_account_id references pinterest_accounts, nullable (TASK-091 — null = legacy stream)
         │
-        ├── content_stream_boards (join table) → boards
+        ├── content_stream_boards (Pinterest destinations: board + optional section,
+        │     primary / active / weight — extended by migration 047) → boards, pinterest_board_sections
         └── content_stream_publishing_activity (TASK-FIX-043, one row per stream + local day; status published/expected — TASK-FIX-053)
 ```
 
@@ -243,7 +250,9 @@ Stores generated Pinterest pins.
 | keywords       | text                     | Comma separated keywords   |
 | board          | text                     | Suggested board (AI free text, denormalized) |
 | board_id       | uuid nullable FK → boards.id | Real board entity, auto-linked at generation time (TASK-025). ON DELETE SET NULL |
-| board_section  | text nullable            | Optional free-text Pinterest section inside `board` (migration 032). Set only when the user manually typed a `board` at generation time — never AI-suggested, never derived from `board_id`. No DB CHECK — max length and forbidden characters (`/`, `\`, line breaks — `/` is Pinterest's own Board/Section separator) validated at the Zod layer (`lib/validations/pinterest.ts`). Exported as `Board/Section` in the CSV's existing `Pinterest board` column (`lib/csv/pinterest.ts`), never a separate column |
+| pinterest_account_id | uuid nullable FK → pinterest_accounts.id | TASK-091 (migration 047): the account the Pin was generated for (account mode only). ON DELETE SET NULL. Null for every older Pin and for legacy generations |
+| pinterest_section_id | uuid nullable FK → pinterest_board_sections.id | TASK-091 (migration 047): the configured section the Pin was generated for. ON DELETE SET NULL. `board_section` keeps the section's exact name at generation time (CSV, history) |
+| board_section  | text nullable            | Optional free-text Pinterest section inside `board` (migration 032). Since TASK-091 also written, with the exact configured name, when the Pin's destination comes from a Pinterest account (`pinterest_section_id` set). Older free-text values stay as legacy data and are still read and exported. Set only when the user manually typed a `board` at generation time — never AI-suggested, never derived from `board_id`. No DB CHECK — max length and forbidden characters (`/`, `\`, line breaks — `/` is Pinterest's own Board/Section separator) validated at the Zod layer (`lib/validations/pinterest.ts`). Exported as `Board/Section` in the CSV's existing `Pinterest board` column (`lib/csv/pinterest.ts`), never a separate column |
 | image_prompt   | text                     | Prompt for image generation |
 | image_analysis | text nullable            | JSON-stringified `ImageStyleAnalysis` plus private Pinterest metadata keys for the structured angle (`_pinterestStrategy`) and latest accepted Quality Gate result (`_pinterestCreativeDiagnostics`: status/warnings/template/position) and — for `visual_format = ai-integrated` only — the resolved AI Integrated contract (`_pinterestAiIntegrated`: effective `language`, validated `settings`, final `text` headline/subtitle/cta; TASK-041 Phase 2) and — for composed Pins only (TASK-079) — the Template Composer contract (`_pinterestComposer`: `templateType` hero / materials_and_tools / step_by_step, `templateVersion` "v1", `sourceSections`, `sourceHeadings`, `renderedBy` "omniflow-composer", `language`, `status` planned / rendered, `warnings`, the exact verified article `text` to render; `step_by_step` contracts — v1, and v2 with `layout`, `panelCount` 3, `niche`, `panels[]` `{sectionId, sectionTitle, sectionLanguage, sourceText, imagePrompt}` — were written before the format was withdrawn on 2026-10-29 (replaced by the planned TASK-080 Pinterest Detailed Tutorial Infographic); they are kept and still read, none is created any more). Same text column; no schema migration |
 | media_url      | text nullable            | Generated image URL (Supabase Storage) |
@@ -279,7 +288,11 @@ Inherited through generation ownership.
 (language)
 (created_at DESC)
 (board_id)
+(pinterest_account_id)   -- migration 047
+(pinterest_section_id)   -- migration 047
 ```
+
+Board reference: `pins.board_id` (migration 007) is the structured board reference — TASK-091 reuses it, there is no second `pinterest_board_id` column.
 
 ---
 
@@ -295,6 +308,9 @@ Real Pinterest board entities (TASK-025). `pins.board` remains a free-text field
 | project_id | uuid FK → projects.id   | ON DELETE CASCADE   |
 | user_id    | uuid FK → profiles.id   | ON DELETE CASCADE   |
 | name       | text                    | Board name          |
+| pinterest_account_id | uuid nullable | TASK-091 (migration 047). Composite FK `(pinterest_account_id, project_id)` → `pinterest_accounts (id, project_id)`: the account is always one of the board's own project. Null = legacy board, never linked automatically. NO ACTION on delete (accounts are archived, not deleted) |
+| is_active  | boolean NOT NULL DEFAULT true | TASK-091. Inactive boards are never offered for new Pins nor used by a stream's distribution; existing Pins are unchanged |
+| external_id | text nullable          | TASK-091. Reserved for a future Pinterest API sync; never required |
 | created_at | timestamptz             |                     |
 | updated_at | timestamptz             |                     |
 
@@ -307,21 +323,118 @@ At generation time, each pin's AI-suggested `board` name is matched case-insensi
 ## RLS
 
 ```sql
-user_id = auth.uid()
+USING (user_id = auth.uid())
+-- WITH CHECK hardened by migration 047 (TASK-091):
+WITH CHECK (
+  user_id = auth.uid()
+  AND EXISTS (SELECT 1 FROM projects p WHERE p.id = boards.project_id AND p.user_id = auth.uid())
+  AND (boards.pinterest_account_id IS NULL
+       OR EXISTS (SELECT 1 FROM pinterest_accounts a WHERE a.id = boards.pinterest_account_id AND a.user_id = auth.uid()))
+)
 ```
+
+A board belongs to one account at most. `PATCH /api/boards/[id]` also refuses to move a board to another account (or back to none) while a non-archived Content Stream of another account uses it (`board_in_use_by_other_account`).
 
 ## Indexes
 
 ```sql
 (project_id, name) UNIQUE
 (project_id)
+(pinterest_account_id)   -- migration 047
 ```
+
+---
+
+# pinterest_accounts
+
+TASK-091 (migration `047_add_pinterest_accounts_and_sections.sql`). One Pinterest account of a project, entered by hand — **no password, cookie, token or session is ever stored**; no Pinterest API connection in this version. Hierarchy: `Project → Pinterest Account → Content Stream → Board → Section → Pin`. A project can have several accounts; an account belongs to one project.
+
+## Columns
+
+| Column       | Type                  | Description |
+| ------------ | --------------------- | ----------- |
+| id           | uuid PK               | |
+| project_id   | uuid FK → projects.id | NOT NULL, ON DELETE CASCADE |
+| user_id      | uuid FK → profiles.id | NOT NULL, ON DELETE CASCADE |
+| name         | text                  | NOT NULL, CHECK not blank and ≤ 100 characters |
+| username     | text nullable         | e.g. `@airdryclayprojects` |
+| profile_url  | text nullable         | URL checked by Zod |
+| main_keyword | text nullable         | Main niche / keyword |
+| website_url  | text nullable         | Associated site, URL checked by Zod |
+| language     | text nullable         | Free text (e.g. `en`) |
+| market       | text nullable         | Free text (e.g. `US`) |
+| account_type | text NOT NULL DEFAULT 'business' | CHECK IN ('business', 'personal') |
+| status       | text NOT NULL DEFAULT 'active'   | CHECK IN ('active', 'paused', 'archived'). Archived accounts are never offered for new Pins; the app never deletes an account |
+| notes        | text nullable         | |
+| created_at / updated_at | timestamptz | `updated_at` trigger |
+
+## Constraints
+
+```sql
+UNIQUE (id, project_id)                 -- target of the boards / content_streams composite FKs
+(project_id, lower(name)) UNIQUE        -- no two accounts with the same name in a project
+```
+
+## RLS
+
+```sql
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid() AND EXISTS (SELECT 1 FROM projects p WHERE p.id = project_id AND p.user_id = auth.uid()))
+```
+
+## Indexes
+
+```sql
+(project_id, lower(name)) UNIQUE
+(user_id)
+```
+
+---
+
+# pinterest_board_sections
+
+TASK-091 (migration 047). Sections of a board, managed by hand. A section belongs to one board; a board can have none. Names are kept exactly as typed (only surrounding spaces trimmed).
+
+## Columns
+
+| Column      | Type                | Description |
+| ----------- | ------------------- | ----------- |
+| id          | uuid PK             | |
+| board_id    | uuid FK → boards.id | NOT NULL, ON DELETE CASCADE |
+| user_id     | uuid FK → profiles.id | NOT NULL, ON DELETE CASCADE |
+| name        | text                | NOT NULL, CHECK not blank, ≤ 100 characters, no `/` (Pinterest's Board/Section separator in the CSV). `\` and line breaks refused by Zod |
+| external_id | text nullable       | Reserved for a future Pinterest API sync |
+| is_active   | boolean NOT NULL DEFAULT true | Inactive sections are never offered for new Pins nor used by a stream's distribution |
+| created_at / updated_at | timestamptz | `updated_at` trigger |
+
+## Constraints
+
+```sql
+UNIQUE (id, board_id)                   -- target of content_stream_boards (section_id, board_id)
+(board_id, lower(name)) UNIQUE          -- two sections of one board cannot share a name (case-insensitive)
+```
+
+## RLS
+
+```sql
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid() AND EXISTS (SELECT 1 FROM boards b WHERE b.id = board_id AND b.user_id = auth.uid()))
+```
+
+## Indexes
+
+```sql
+(board_id, lower(name)) UNIQUE
+(user_id)
+```
+
+Legacy: `pins.board_section` free text written before TASK-091 is **not** converted into sections (no backfill); it stays readable and exported.
 
 ---
 
 # content_streams
 
-Topic-pillar grouping under a project (TASK-FIX-039 Phase 2a, discovery in `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md`). A content stream links a project to an optional WordPress category and to one or more Pinterest boards (via `content_stream_boards`), and carries its own publication targets. No `pinterest_accounts` table exists or is planned for the current experiment — a board plays that role directly (see the "1 account = 1 subniche = 1 board" decision in the task doc, §1.3a).
+Topic-pillar grouping under a project (TASK-FIX-039 Phase 2a, discovery in `docs/tasks/TASK-COMMAND-CENTER-PHASE-2.md`). A content stream links a project to an optional WordPress category, to an optional Pinterest account (TASK-091) and to one or more Pinterest destinations — boards, optionally sections (via `content_stream_boards`) — and carries its own publication targets. Until TASK-091 a board played the account's role (§1.3a of the task doc); since migration 047 `pinterest_accounts` exists and a stream can be linked to one — a stream without account is a **legacy** stream and keeps working exactly as before until it is linked by hand.
 
 ## Columns
 
@@ -336,6 +449,7 @@ Topic-pillar grouping under a project (TASK-FIX-039 Phase 2a, discovery in `docs
 | target_articles_per_week   | integer                            | nullable, CHECK >= 0 |
 | target_buffer_days         | integer                            | nullable, CHECK >= 0 |
 | status                     | text                                | NOT NULL DEFAULT 'active', CHECK IN ('active','planned','warming','paused','archived') — `planned` added by migration 036 (TASK-FIX-043) |
+| pinterest_account_id       | uuid nullable                       | TASK-091 (migration 047). Composite FK `(pinterest_account_id, project_id)` → `pinterest_accounts (id, project_id)` (same project). Null = legacy stream. When set, every destination board must belong to this account |
 | created_at                 | timestamptz                        | |
 | updated_at                 | timestamptz                        | |
 
@@ -381,6 +495,10 @@ WITH CHECK (
 )
 ```
 
+Migration 047 (TASK-091) re-creates this policy with one more clause:
+`pinterest_account_id IS NULL OR EXISTS (SELECT 1 FROM pinterest_accounts a WHERE a.id = pinterest_account_id AND a.user_id = auth.uid())`
+(the same-project rule is the composite foreign key).
+
 This guarantees, **at the database level**, that `project_id` resolves to a
 project owned by the caller, and that `wordpress_category_id` (when set)
 resolves to a category owned by the caller **and** belonging to that same
@@ -398,22 +516,42 @@ entirely is still bound by the `WITH CHECK` above.
 (project_id)
 (wordpress_category_id)
 (status)
+(pinterest_account_id)   -- migration 047
 ```
 
 ---
 
 # content_stream_boards
 
-Many-to-many join between `content_streams` and `boards` (TASK-FIX-039 Phase 2a). A stream can technically span several boards; a board can technically belong to several streams — the schema stays flexible N:N on purpose. For the current "1 account = 1 subniche = 1 board" experiment, the future UI will enforce "one board per *active* stream" at the application layer only; this is not a database constraint (a cross-table condition on `content_streams.status` cannot be expressed as a clean partial index/CHECK on this table).
+The Pinterest **destinations** of a Content Stream (TASK-FIX-039 Phase 2a; extended — not duplicated — by TASK-091, migration 047; there is no `content_stream_destinations` table). One row = one board, optionally one of its sections. A stream can use several boards, and the same board with several sections. "One board per *active* stream" stays an application-layer rule (`findBoardOccupant`), not a database constraint.
 
 ## Columns
 
 | Column             | Type                          | Description |
 | ------------------ | ------------------------------ | ------------ |
-| content_stream_id  | uuid FK → content_streams.id  | NOT NULL, ON DELETE CASCADE, part of PK |
-| board_id           | uuid FK → boards.id            | NOT NULL, ON DELETE CASCADE, part of PK |
+| id                 | uuid PK                        | Migration 047 — surrogate key (filled for every existing row before becoming the PK) |
+| content_stream_id  | uuid FK → content_streams.id  | NOT NULL, ON DELETE CASCADE |
+| board_id           | uuid FK → boards.id            | NOT NULL, ON DELETE CASCADE |
+| section_id         | uuid nullable                  | Migration 047. Composite FK `(section_id, board_id)` → `pinterest_board_sections (id, board_id)` ON DELETE CASCADE: a section is always one of the row's own board. Null = the board itself |
 | user_id            | uuid FK → profiles.id          | NOT NULL, ON DELETE CASCADE |
+| is_primary         | boolean NOT NULL DEFAULT false | Migration 047. The stream's primary destination: first Pin of every batch and deterministic fallback. At most one per stream |
+| is_active          | boolean NOT NULL DEFAULT true  | Migration 047. Inactive destinations are kept but never used for new Pins |
+| weight             | integer NOT NULL DEFAULT 1     | Migration 047. CHECK 1–100: share of the stream's Pins (2 / 1 → 2 of 3) |
 | created_at         | timestamptz                    | |
+| updated_at         | timestamptz NOT NULL DEFAULT now() | Migration 047, `updated_at` trigger |
+
+## Constraints (migration 047)
+
+```sql
+PRIMARY KEY (id)                                            -- was (content_stream_id, board_id)
+UNIQUE (content_stream_id, board_id) WHERE section_id IS NULL
+UNIQUE (content_stream_id, board_id, section_id) WHERE section_id IS NOT NULL
+UNIQUE (content_stream_id) WHERE is_primary                 -- one primary per stream
+CHECK (NOT is_primary OR is_active)                         -- the primary is active
+CHECK (weight BETWEEN 1 AND 100)
+```
+
+Backfill (migration 047, non-destructive): every existing row stays and is active with weight 1; the **oldest** row of each stream becomes its primary destination — a single-board stream keeps its board as primary and behaves exactly as before.
 
 ## RLS
 
@@ -451,11 +589,38 @@ still run first, as defense-in-depth and for clearer error messages — the
 `WITH CHECK` above is what actually enforces this, independent of that
 file.
 
+**Migration 047 (TASK-091)** re-creates the policy (same name, same `USING`):
+
+```sql
+WITH CHECK (
+  user_id = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM content_streams cs JOIN boards b ON b.project_id = cs.project_id
+    WHERE cs.id = content_stream_boards.content_stream_id AND b.id = content_stream_boards.board_id
+      AND cs.user_id = auth.uid() AND b.user_id = auth.uid()
+      AND (cs.pinterest_account_id IS NULL OR b.pinterest_account_id = cs.pinterest_account_id)
+  )
+  AND (content_stream_boards.section_id IS NULL OR EXISTS (
+    SELECT 1 FROM pinterest_board_sections s
+    WHERE s.id = content_stream_boards.section_id AND s.board_id = content_stream_boards.board_id AND s.user_id = auth.uid()
+  ))
+)
+```
+
+A stream linked to an account can only use boards of that account; a legacy stream (no account) keeps the former project-only rule. `checkStreamDestinations()` (`lib/queries/pinterest-accounts.ts`) runs the same checks first for clear errors.
+
+Verified on a real Postgres (PGlite) on 2026-11-02 — see TESTING.md (TASK-091).
+
 ## Indexes
 
 ```sql
-(content_stream_id, board_id) PRIMARY KEY
+(id) PRIMARY KEY                                   -- migration 047
+(content_stream_id, board_id) UNIQUE WHERE section_id IS NULL
+(content_stream_id, board_id, section_id) UNIQUE WHERE section_id IS NOT NULL
+(content_stream_id) UNIQUE WHERE is_primary
+(content_stream_id)
 (board_id)
+(section_id)
 (user_id)
 ```
 

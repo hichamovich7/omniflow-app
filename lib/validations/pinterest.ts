@@ -49,6 +49,8 @@ export type BannerTemplate = (typeof BANNER_TEMPLATES)[number];
 export const BOARD_SECTION_FORBIDDEN_CHARS = /[\\/\r\n\x00-\x1F\x7F]/;
 export const BOARD_SECTION_REQUIRES_BOARD_MESSAGE =
   'Select a board before entering a board section.';
+export const STRUCTURED_DESTINATION_MIX_MESSAGE =
+  'Use either a Pinterest account destination or a free-text board, not both.';
 
 const boardSectionSchema = z
   .string()
@@ -91,6 +93,13 @@ const generatePinsBaseSchema = z.object({
   pinsRequested: pinsRequestedSchema,
   board: z.string().trim().max(100, 'Board name is too long').optional(),
   boardSection: boardSectionSchema,
+  // TASK-091: structured destination (Pinterest Account → Content Stream →
+  // Board → Section), resolved server-side. Replaces the free-text board /
+  // section above, which stay for legacy flows (no account yet).
+  pinterestAccountId: z.string().uuid('Invalid Pinterest account ID').optional(),
+  contentStreamId: z.string().uuid('Invalid Content Stream ID').optional(),
+  boardId: z.string().uuid('Invalid board ID').optional(),
+  boardSectionId: z.string().uuid('Invalid board section ID').optional(),
   websiteUrl: z.string().trim().url('Invalid website URL').optional(),
   pinterestUrl: z.string().trim().url('Invalid Pinterest URL').optional(),
   analysisId: z.string().uuid('Invalid analysis ID').optional(),
@@ -296,6 +305,20 @@ export const generatePinsSchema = z.preprocess(
           path: ['boardSection'],
           message: BOARD_SECTION_REQUIRES_BOARD_MESSAGE,
         });
+      }
+      const structured = Boolean(data.pinterestAccountId || data.contentStreamId || data.boardId || data.boardSectionId);
+      if (structured) {
+        if (data.board || data.boardSection) {
+          ctx.addIssue({ code: 'custom', path: ['board'], message: STRUCTURED_DESTINATION_MIX_MESSAGE });
+        }
+        if (!data.pinterestAccountId) {
+          ctx.addIssue({ code: 'custom', path: ['pinterestAccountId'], message: 'Choose a Pinterest account first.' });
+        } else if (!data.contentStreamId && !data.boardId) {
+          ctx.addIssue({ code: 'custom', path: ['contentStreamId'], message: 'Choose a Content Stream or a board for this Pinterest account.' });
+        }
+        if (data.boardSectionId && !data.boardId) {
+          ctx.addIssue({ code: 'custom', path: ['boardSectionId'], message: BOARD_SECTION_REQUIRES_BOARD_MESSAGE });
+        }
       }
       if (data.wordpressArticleId && data.wordpressPost) {
         ctx.addIssue({ code: 'custom', path: ['wordpressPost'], message: ARTICLE_SOURCE_SINGLE_MESSAGE });

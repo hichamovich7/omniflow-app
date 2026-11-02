@@ -45,6 +45,15 @@ import { Label } from '@/components/ui/label';
 import { ReferenceImageUpload } from '@/components/pinterest/reference-image-upload';
 import { ArticleSourceSummary, type ArticleFormSource } from '@/components/social/article-source-summary';
 import { ArticleBoardPicker, type ContentStreamOption } from '@/components/social/article-board-picker';
+import { PinterestDestinationPicker } from '@/components/pinterest/pinterest-destination-picker';
+import {
+  destinationRequestFields,
+  destinationSelectionError,
+  initialDestinationSelection,
+  LEGACY_SELECTION,
+  type DestinationSelection,
+} from '@/lib/pinterest/destination-picker';
+import type { PinterestStructure } from '@/lib/queries/pinterest-accounts';
 import { articlePinterestCreateHref, wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import { DESTINATION_URL_MAX_LENGTH, validateDestinationUrl } from '@/lib/pinterest/destination-url';
 import {
@@ -290,9 +299,16 @@ interface PinFormProps {
   /** Pin source choice (keyword / OmniFlow article / existing WordPress post), shown under the header. */
   sourceChooser?: ReactNode;
   contentStreams?: ContentStreamOption[];
+  /**
+   * TASK-091: accounts / streams / boards / sections of the form's projects.
+   * When given, the Board section becomes the dependent lists Account →
+   * Content Stream → Board → Section, with a Legacy choice that keeps the
+   * former free-text board / section.
+   */
+  pinterestStructure?: PinterestStructure;
 }
 
-export function PinForm({ projects, boards, articleSource, contentStreams = [], sourceChooser }: PinFormProps) {
+export function PinForm({ projects, boards, articleSource, contentStreams = [], sourceChooser, pinterestStructure }: PinFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultProject = projects.find((p) => p.is_default) ?? projects[0];
@@ -313,6 +329,16 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
   const [keyword, setKeyword] = useState(articleSource?.primaryKeyword ?? searchParams.get('keyword') ?? '');
   const [board, setBoard] = useState(articleSource?.suggestedBoardName ?? '');
   const [boardSection, setBoardSection] = useState('');
+  const [destination, setDestination] = useState<DestinationSelection>(() =>
+    pinterestStructure
+      ? initialDestinationSelection(
+          pinterestStructure,
+          articleSource?.projectId ?? searchParams.get('projectId') ?? defaultProject?.id ?? '',
+          articleSource?.suggestedBoardName
+        )
+      : LEGACY_SELECTION
+  );
+  const legacyDestination = destination.mode === 'legacy';
   // TASK-071: saved in pins.link_url as typed; never sent to the AI.
   const [destinationUrl, setDestinationUrl] = useState('');
   const [language, setLanguage] = useState<SupportedLanguage>(
@@ -406,6 +432,7 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
 
   function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
+    if (pinterestStructure) setDestination(initialDestinationSelection(pinterestStructure, nextProjectId));
     const next = projects.find((p) => p.id === nextProjectId);
     if (next?.default_language) {
       setLanguage(next.default_language as SupportedLanguage);
@@ -441,7 +468,8 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
 
   const boardOptions = boards.filter((b) => b.project_id === projectId);
   const boardSectionError =
-    boardSection.trim() && !board.trim() ? BOARD_SECTION_REQUIRES_BOARD_MESSAGE : null;
+    legacyDestination && boardSection.trim() && !board.trim() ? BOARD_SECTION_REQUIRES_BOARD_MESSAGE : null;
+  const destinationError = pinterestStructure ? destinationSelectionError(pinterestStructure, destination) : null;
   const destinationUrlCheck = validateDestinationUrl(destinationUrl);
   const destinationUrlError = destinationUrlCheck.ok ? null : destinationUrlCheck.message;
 
@@ -468,6 +496,11 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       return;
     }
 
+    if (destinationError) {
+      setError(destinationError);
+      return;
+    }
+
     if (destinationUrlError) {
       setError(destinationUrlError);
       document.getElementById('destination-url')?.focus();
@@ -490,8 +523,11 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
       keyword,
       language: languageInherited ? effectiveProjectLanguage : language,
       pinsRequested,
-      board: board.trim() || undefined,
-      boardSection: boardSection.trim() || undefined,
+      // Legacy: free-text board / section. Account mode: ids only — the
+      // server resolves the exact board and section names (TASK-091).
+      board: legacyDestination ? board.trim() || undefined : undefined,
+      boardSection: legacyDestination ? boardSection.trim() || undefined : undefined,
+      ...(destinationRequestFields(destination) ?? {}),
       websiteUrl,
       pinterestUrl,
       analysisId,
@@ -578,6 +614,84 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
     }
     router.push(`/pinterest/${json.data.generationId}`);
   }
+
+  // The former Board fields (free text / article board picker + free-text
+  // section): the only fields when no Pinterest structure is passed, the
+  // "Legacy" choice of the destination picker otherwise.
+  const legacyBoardFields = (
+    <>
+      {articleSource ? (
+        <ArticleBoardPicker
+          boards={boardOptions}
+          contentStreams={contentStreams}
+          board={board}
+          onBoardChange={(name) => {
+            setBoard(name);
+            if (!name) setBoardSection('');
+          }}
+          boardNameSuggestion={articleSource.boardNameSuggestion}
+          disabled={loading}
+        />
+      ) : (
+      <div className="space-y-1.5">
+        <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
+          Board (optional)
+        </Label>
+        <Combobox
+          items={boardOptions.map((b) => b.name)}
+          inputValue={board}
+          onInputValueChange={(value) => setBoard(value)}
+        >
+          <ComboboxInputGroup className="h-11 md:h-10">
+            <ComboboxInput
+              id="board"
+              placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
+              maxLength={100}
+              disabled={loading}
+              aria-describedby="board-help"
+              className="text-sm placeholder:text-muted-foreground/40"
+            />
+            <ComboboxIcon />
+          </ComboboxInputGroup>
+          <ComboboxPopup>
+            <ComboboxEmpty>
+              {board.trim() ? `Create "${board.trim()}"` : 'No boards yet — type to create one'}
+            </ComboboxEmpty>
+            <ComboboxList>
+              {(item) => (
+                <ComboboxItem key={item as string} value={item}>
+                  {item as string}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxPopup>
+        </Combobox>
+      </div>
+      )}
+
+      <div className="space-y-1.5">
+        <Label htmlFor="board-section" className="text-xs font-medium text-muted-foreground">
+          Board section (optional)
+        </Label>
+        <Input
+          id="board-section"
+          placeholder="e.g. Appetizers — leave blank if this board has no section"
+          value={boardSection}
+          onChange={(e) => setBoardSection(e.target.value)}
+          maxLength={100}
+          disabled={loading}
+          aria-describedby="board-section-help"
+          aria-invalid={!!boardSectionError}
+        />
+        <p id="board-section-help" className="text-xs text-muted-foreground">
+          Optional Pinterest section inside the selected board.
+        </p>
+        {boardSectionError && (
+          <p className="text-xs text-destructive">{boardSectionError}</p>
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div className="pt-4 sm:pt-6">
@@ -733,76 +847,18 @@ export function PinForm({ projects, boards, articleSource, contentStreams = [], 
           help="Choose the Pinterest board for these Pins, or leave it blank to decide later."
           helpId="board-help"
         >
-          {articleSource ? (
-            <ArticleBoardPicker
-              boards={boardOptions}
-              contentStreams={contentStreams}
-              board={board}
-              onBoardChange={(name) => {
-                setBoard(name);
-                if (!name) setBoardSection('');
-              }}
-              boardNameSuggestion={articleSource.boardNameSuggestion}
+          {pinterestStructure ? (
+            <PinterestDestinationPicker
+              structure={pinterestStructure}
+              projectId={projectId}
+              value={destination}
+              onChange={setDestination}
               disabled={loading}
+              legacyFields={legacyBoardFields}
             />
           ) : (
-          <div className="space-y-1.5">
-            <Label htmlFor="board" className="text-xs font-medium text-muted-foreground">
-              Board (optional)
-            </Label>
-            <Combobox
-              items={boardOptions.map((b) => b.name)}
-              inputValue={board}
-              onInputValueChange={(value) => setBoard(value)}
-            >
-              <ComboboxInputGroup className="h-11 md:h-10">
-                <ComboboxInput
-                  id="board"
-                  placeholder="e.g. Boho Bathroom Ideas — leave blank to let AI decide"
-                  maxLength={100}
-                  disabled={loading}
-                  aria-describedby="board-help"
-                  className="text-sm placeholder:text-muted-foreground/40"
-                />
-                <ComboboxIcon />
-              </ComboboxInputGroup>
-              <ComboboxPopup>
-                <ComboboxEmpty>
-                  {board.trim() ? `Create "${board.trim()}"` : 'No boards yet — type to create one'}
-                </ComboboxEmpty>
-                <ComboboxList>
-                  {(item) => (
-                    <ComboboxItem key={item as string} value={item}>
-                      {item as string}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxPopup>
-            </Combobox>
-          </div>
+            legacyBoardFields
           )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="board-section" className="text-xs font-medium text-muted-foreground">
-              Board section (optional)
-            </Label>
-            <Input
-              id="board-section"
-              placeholder="e.g. Appetizers — leave blank if this board has no section"
-              value={boardSection}
-              onChange={(e) => setBoardSection(e.target.value)}
-              maxLength={100}
-              disabled={loading}
-              aria-describedby="board-section-help"
-              aria-invalid={!!boardSectionError}
-            />
-            <p id="board-section-help" className="text-xs text-muted-foreground">
-              Optional Pinterest section inside the selected board.
-            </p>
-            {boardSectionError && (
-              <p className="text-xs text-destructive">{boardSectionError}</p>
-            )}
-          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="destination-url" className="text-xs font-medium text-muted-foreground">

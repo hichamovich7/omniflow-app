@@ -88,6 +88,8 @@ export async function createContentStream(
     target_articles_per_week: input.targetArticlesPerWeek ?? null,
     target_buffer_days: input.targetBufferDays ?? null,
     status: input.status ?? 'active',
+    // Only written when chosen: a legacy create keeps working without 047.
+    ...(input.pinterestAccountId ? { pinterest_account_id: input.pinterestAccountId } : {}),
   };
 
   const { data, error } = await supabase.from('content_streams').insert(insertRow).select().single();
@@ -134,6 +136,14 @@ export async function updateContentStream(
   if (patch.targetArticlesPerWeek !== undefined) updateRow.target_articles_per_week = patch.targetArticlesPerWeek;
   if (patch.targetBufferDays !== undefined) updateRow.target_buffer_days = patch.targetBufferDays;
   if (patch.status !== undefined) updateRow.status = patch.status;
+  if (patch.pinterestAccountId !== undefined) updateRow.pinterest_account_id = patch.pinterestAccountId;
+
+  // Only destinations changed (TASK-091): nothing to write on the stream row.
+  if (Object.keys(updateRow).length === 0) {
+    const { data, error } = await supabase.from('content_streams').select('*').eq('id', contentStreamId).single();
+    if (error) throw error;
+    return data as ContentStream;
+  }
 
   const { data, error } = await supabase.from('content_streams').update(updateRow).eq('id', contentStreamId).select().single();
 

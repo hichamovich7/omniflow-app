@@ -18,6 +18,27 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## v3.4.0 — Pinterest accounts, board sections, multi-destination Content Streams and the one-page project workspace — TASK-091 + TASK-092 (2026-11-02)
+
+Migration `047_add_pinterest_accounts_and_sections.sql` applied by hand on Supabase on 2026-11-02 (required before deploying this version).
+
+### One-page project workspace — TASK-092
+
+* The project page now gathers everything on one page, in the validated order: header (Generate Pins, Generate article, Edit Project), five status cards, in-page navigation, then foldable **Brand Profile → WordPress → Niche settings → Pinterest** blocks, with **Needs attention** and **Quick links** on the side (below on a phone).
+* WordPress block: connection, article counts and a Category → Content Stream → Pinterest account → Articles table.
+* Pinterest block: Account → Content Stream → destinations tree; "+ Stream" opens the stream dialog prefilled with the account, all its free boards (first one primary) and a suggested WordPress category; free boards are added to a stream in one click.
+* Needs attention lists boards / streams without account, streams without WordPress category and categories without stream, each with its fix — nothing linked automatically.
+* No migration, no new endpoint (TASK-091 routes reused). The former Content Streams card section is replaced by the Pinterest block.
+
+### Pinterest Accounts, board sections and multi-destination Content Streams — TASK-091
+
+* New hierarchy: **Project → Pinterest Account → Content Stream → Board → Section → Pin**. Migration `047_add_pinterest_accounts_and_sections.sql` (additive, applied by hand on 2026-11-02 — required **before** deploying): `pinterest_accounts` (manual entry — no password, cookie or token), `boards.pinterest_account_id` / `is_active` / `external_id`, `pinterest_board_sections`, `content_streams.pinterest_account_id`, `pins.pinterest_account_id` / `pinterest_section_id`. `content_stream_boards` is extended, not duplicated: `id` key, optional `section_id`, `is_primary` (one per stream, always active), `is_active`, `weight` 1–100; existing links stay, the oldest of each stream becomes primary. RLS: a linked stream can only use its account's boards; a section always belongs to its board.
+* New page **Pinterest → Accounts** (`/pinterest-accounts`): accounts with their details and Streams / Boards / Sections counts, create / edit / archive; boards and sections created, renamed and (de)activated by hand; legacy boards listed apart, never linked automatically.
+* Content Stream dialog: Pinterest account + **Pinterest destinations** (several boards, the same board with several sections, primary, active, weight). Stream cards show the account and destinations; streams without account show "Legacy — no account" and work as before.
+* Pinterest form: the Board block becomes **Pinterest account → Content Stream → Board → Section** (each list filtered by the one above, "+" adds a section on the spot); "Legacy — free board" keeps the former fields. With a stream and Board "Auto", each Pin gets one active destination of the stream — primary first, then by weight, deterministic, never duplicated and with no extra AI request; the model can no longer invent the board in this mode.
+* API: `POST /api/pinterest-accounts`, `PATCH /api/pinterest-accounts/[id]`, `POST /api/board-sections`, `PATCH /api/board-sections/[id]`; `/api/boards` and `/api/content-streams` accept the new fields (the former `boardId` still works); `/api/pinterest/generate` accepts `pinterestAccountId` / `contentStreamId` / `boardId` / `boardSectionId`, all checked before any AI call.
+* CSV unchanged: "Pinterest board" = exact "Board/Section" names; older free-text sections still exported.
+
 ## v3.3.1 — Pinterest: project gallery sections inherit the article's subject — TASK-FIX-090 (2026-11-01)
 
 * Reported on "10 Air-Dry Clay Pumpkin Painting Ideas for Cozy Fall Decor": ideas such as "4. Speckled Stoneware Look" and "6. Cottage-Style Wildflower Details" name a finish, not an object, so their brief never said "pumpkin" and the check stopped on `IMAGE_SUBJECT_MISMATCH`; "floral" was also refused because the article says "wildflowers".

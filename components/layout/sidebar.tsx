@@ -18,6 +18,7 @@ import {
   PenSquare,
   BookOpen,
   Tag,
+  UserRound,
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -82,6 +83,7 @@ const collapsibleGroups: CollapsibleNavGroup[] = [
     label: 'Pinterest',
     items: [
       { href: '/pinterest', label: 'Generate', icon: Sparkles },
+      { href: '/pinterest-accounts', label: 'Accounts', icon: UserRound },
       { href: '/boards', label: 'Boards', icon: LayoutGrid },
       { href: '/history', label: 'History', icon: Clock },
     ],

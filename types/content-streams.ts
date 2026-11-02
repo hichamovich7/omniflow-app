@@ -15,6 +15,8 @@ export interface ContentStream {
   target_articles_per_week: number | null;
   target_buffer_days: number | null;
   status: ContentStreamStatus;
+  /** Migration 047 — null = legacy stream, not linked to a Pinterest account yet. Absent before 047. */
+  pinterest_account_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,16 +31,29 @@ export type ContentStreamInsert = Omit<
   target_articles_per_week?: number | null;
   target_buffer_days?: number | null;
   status?: ContentStreamStatus;
+  pinterest_account_id?: string | null;
 };
 
+/**
+ * content_stream_boards row. Migration 047 added `id`, `section_id`,
+ * `is_primary`, `is_active`, `weight`, `updated_at` (see
+ * ContentStreamDestination in types/pinterest-accounts.ts); they are optional
+ * here so readers written before 047 keep compiling unchanged.
+ */
 export interface ContentStreamBoard {
+  id?: string;
   content_stream_id: string;
   board_id: string;
+  section_id?: string | null;
   user_id: string;
+  is_primary?: boolean;
+  is_active?: boolean;
+  weight?: number;
   created_at: string;
+  updated_at?: string;
 }
 
-export type ContentStreamBoardInsert = Omit<ContentStreamBoard, 'created_at'>;
+export type ContentStreamBoardInsert = Omit<ContentStreamBoard, 'id' | 'created_at' | 'updated_at'>;
 
 /** manual = typed in by the user; external = reported from another publishing tool. */
 export type PublishingActivitySource = 'manual' | 'external';

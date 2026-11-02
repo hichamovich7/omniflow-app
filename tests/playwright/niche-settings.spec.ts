@@ -19,6 +19,9 @@ test.describe('Niche settings (project page, TASK-045)', () => {
     await page.locator('a[href^="/projects/"]').first().click();
     const section = page.getByTestId('niche-settings');
     await expect(section.getByRole('heading', { name: 'Niche settings' })).toBeVisible();
+    // TASK-092: the block is folded by default on the project workspace.
+    const toggle = section.getByRole('button', { name: 'Niche settings' });
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
     return section;
   }
 

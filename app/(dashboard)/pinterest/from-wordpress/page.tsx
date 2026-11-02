@@ -26,6 +26,7 @@ import { wordpressPostSourceSchema } from '@/lib/validations/wordpress-post-sour
 import { wordpressPostPinterestHref } from '@/lib/social/pin-display';
 import { getGenerationWithPins } from '@/lib/queries/generations';
 import { isValidUuid } from '@/lib/utils/uuid';
+import { loadPinterestStructure } from '@/lib/queries/pinterest-accounts';
 import { cn } from '@/lib/utils';
 import { PinterestSourceChooser } from '@/components/pinterest/pinterest-source-chooser';
 import { MediumSummaryPanel } from '@/components/social/medium-summary-panel';
@@ -142,6 +143,9 @@ export default async function PinterestFromWordPressPage({
     redirect('/pinterest');
   }
 
+  // TASK-091: Account → Content Stream → Board → Section lists of the form.
+  const pinterestStructure = await loadPinterestStructure(supabase, [project.id]);
+
   const boardList = boards ?? [];
   const contentStreams: ContentStreamOption[] = (
     (streams ?? []) as Array<{ id: string; name: string; content_stream_boards: Array<{ board_id: string }> | null }>
@@ -188,6 +192,7 @@ export default async function PinterestFromWordPressPage({
         boards={boardList}
         articleSource={formSource}
         contentStreams={contentStreams}
+        pinterestStructure={pinterestStructure}
         sourceChooser={<PinterestSourceChooser active="existing-post" hasWordPressSite />}
       />
       {result?.generation && result.pins.length > 0 && (

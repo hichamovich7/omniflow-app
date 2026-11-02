@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { updateContentStreamSchema } from '@/lib/validations/content-streams';
+import { normalizeStreamDestinations, updateContentStreamSchema } from '@/lib/validations/content-streams';
 import {
   ContentStreamOwnershipError,
   findBoardOccupant,
   getContentStreamBoards,
-  linkBoardToContentStream,
   listBoardOccupants,
-  unlinkBoardFromContentStream,
   updateContentStream,
 } from '@/lib/queries/content-streams';
+import {
+  assertStreamDestinations,
+  getOwnedAccount,
+  PinterestStructureError,
+  syncStreamDestinations,
+} from '@/lib/queries/pinterest-accounts';
+import { destinationsOutsideAccount, legacyBoardDestinations } from '@/lib/pinterest/stream-destinations';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 
@@ -81,22 +86,81 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  // Validated before any write: a rejected board must never leave the
-  // stream's other fields half-updated.
-  if (boardIdProvided && typeof boardId === 'string') {
-    const occupants = await listBoardOccupants(supabase, [boardId]);
-    const occupant = findBoardOccupant(occupants, boardId, id);
-    if (occupant) {
+  if (boardIdProvided && parsed.data.destinations) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Send either boardId or destinations, not both', code: 'invalid_request' } },
+      { status: 400 }
+    );
+  }
+
+  // TASK-091: `destinations` replaces the stream's whole list; the former
+  // `boardId` becomes a single primary destination; neither = unchanged.
+  const destinations = parsed.data.destinations
+    ? normalizeStreamDestinations(parsed.data.destinations)
+    : boardIdProvided
+      ? legacyBoardDestinations(typeof boardId === 'string' ? boardId : null)
+      : undefined;
+
+  // Validated before any write: a rejected account or board must never leave
+  // the stream's other fields half-updated.
+  const accountChanged = parsed.data.pinterestAccountId !== undefined;
+  if (accountChanged || destinations) {
+    try {
+      let accountId: string | null;
+      if (accountChanged) {
+        accountId = parsed.data.pinterestAccountId ?? null;
+        if (accountId) {
+          const account = await getOwnedAccount(supabase, user.id, existingStream.project_id, accountId);
+          if (account.status === 'archived') {
+            throw new PinterestStructureError('account_archived', 'This Pinterest account is archived.');
+          }
+        }
+      } else {
+        const { data: current } = await supabase.from('content_streams').select('pinterest_account_id').eq('id', id).single();
+        accountId = (current as { pinterest_account_id?: string | null } | null)?.pinterest_account_id ?? null;
+      }
+
+      if (destinations) {
+        await assertStreamDestinations(supabase, user.id, existingStream.project_id, accountId, destinations);
+      } else {
+        // Account changed, destinations kept: they must all fit the new account.
+        const currentBoardIds = [...new Set((await getContentStreamBoards(supabase, id)).map((link) => link.board_id))];
+        const { data: boards } = currentBoardIds.length
+          ? await supabase.from('boards').select('id, pinterest_account_id').in('id', currentBoardIds)
+          : { data: [] };
+        if (destinationsOutsideAccount((boards ?? []) as { id: string; pinterest_account_id: string | null }[], accountId).length > 0) {
+          throw new PinterestStructureError(
+            'destination_account_mismatch',
+            'This stream still uses boards of another Pinterest account. Update its boards together with the account.'
+          );
+        }
+      }
+    } catch (err) {
+      if (!(err instanceof PinterestStructureError)) throw err;
       return NextResponse.json<ApiResponse<null>>(
-        {
-          data: null,
-          error: {
-            message: `This board is already used by "${occupant.content_stream_name}". Pick a different board, or archive that stream first.`,
-            code: 'board_taken',
-          },
-        },
-        { status: 409 }
+        { data: null, error: { message: err.message, code: err.code } },
+        { status: 400 }
       );
+    }
+  }
+
+  if (destinations && destinations.length > 0) {
+    const boardIds = [...new Set(destinations.map((destination) => destination.boardId))];
+    const occupants = await listBoardOccupants(supabase, boardIds);
+    for (const candidate of boardIds) {
+      const occupant = findBoardOccupant(occupants, candidate, id);
+      if (occupant) {
+        return NextResponse.json<ApiResponse<null>>(
+          {
+            data: null,
+            error: {
+              message: `This board is already used by "${occupant.content_stream_name}". Pick a different board, or archive that stream first.`,
+              code: 'board_taken',
+            },
+          },
+          { status: 409 }
+        );
+      }
     }
   }
 
@@ -122,22 +186,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // happens to the board link, so it is never presented as a full failure.
   let boardWarning: string | undefined;
 
-  if (boardIdProvided) {
+  if (destinations) {
     try {
-      const currentLinks = await getContentStreamBoards(supabase, id);
-      for (const link of currentLinks) {
-        if (link.board_id !== boardId) {
-          await unlinkBoardFromContentStream(supabase, user.id, id, link.board_id);
-        }
-      }
-      if (typeof boardId === 'string' && !currentLinks.some((link) => link.board_id === boardId)) {
-        await linkBoardToContentStream(supabase, user.id, id, boardId);
-      }
+      await syncStreamDestinations(supabase, user.id, id, destinations);
     } catch (err) {
-      boardWarning =
-        err instanceof ContentStreamOwnershipError
-          ? err.message
-          : 'The content stream was updated, but the board link could not be changed. Try again from Edit.';
+      console.error('PATCH /api/content-streams/[id] — destinations error:', err);
+      boardWarning = 'The content stream was updated, but its boards could not be changed. Try again from Edit.';
     }
   }
 

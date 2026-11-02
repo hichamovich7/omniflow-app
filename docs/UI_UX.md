@@ -57,6 +57,7 @@ Workspace
 Pinterest
   Research
   Generate
+  Accounts   (/pinterest-accounts — TASK-091)
   Boards
   History
 
@@ -243,16 +244,27 @@ Route:
 
 Purpose:
 
-Overview of a single Project: name, niche, default language, Brand Profile (truncated, expandable), WordPress connection status, a Content Streams section (see below), quick stats (Pinterest generations, WordPress articles), and shortcut links to that Project's Pinterest History, WordPress History, and Categories (all pre-filtered to this Project). "Edit Project" links to the existing `/projects/[id]/edit` form.
+**One-page project workspace (TASK-092, mockup validated 2026-11-02).** Everything about a project on one page (`PageContainer` full width):
 
-### Content Streams (TASK-FIX-039 Phase 2a.1)
+1. **Header** (`ResourceHeader`): name, niche / language / Default badges; actions **Generate Pins** (`/pinterest?projectId=`), **Generate article** (`/wordpress/blog-post`), **Edit Project**.
+2. **Health strip** (`data-testid="project-health"`, 5 cards, 1 column on phone, 2 on tablet, 5 on desktop), each an anchor link: Brand Profile (Set / Not set), WordPress (Connected / Not connected, categories · articles), Niche settings (Customized / Recommended), Pinterest (accounts, streams · boards · sections), Needs attention (count). Amber when something needs action.
+3. **In-page navigation** ("Project sections"): Brand Profile · WordPress · Niche settings · Pinterest · Quick links.
+4. Main column — collapsible blocks (`components/projects/collapsible-section.tsx`: `<h2>` holding a toggle button with `aria-expanded`, actions always visible, `scroll-mt` for the anchors), in this order:
+   * **Brand Profile** (open) — the expandable text, "Edit" → the project form.
+   * **WordPress** (open) — Connection card (site link, WordPress user; "Connect WordPress" when none), OmniFlow articles (total, published or scheduled), Pinterest generations; table **Category → Content Stream → Pinterest account → Articles** (`data-testid="wordpress-category-table"`, scrolls horizontally on phone; "No stream" in amber). "Manage categories" → `/wordpress/categories`.
+   * **Niche settings** (folded by default; `data-testid="niche-settings"`) — the existing editor (`NicheSettingsSection embedded`, no own card / title).
+   * **Pinterest** (open, last because it is the longest) — header actions "+ Pinterest account" and "Add content stream". One card per non-archived account (`data-testid="workspace-account"`): name, username · type · keyword · language / market, counts, status, **+ Stream** (dialog prefilled: the account, every free active board of it — not used by another live stream — first one primary, weight 1, and the WordPress category whose name appears in the account's name / keyword), **+ Board**. Inside, each stream (`data-testid="workspace-stream"`): name, Pins / day, WordPress category ("no category" in amber), status, Edit / Archive icons (`Edit "<name>"`, `Archive "<name>"`), destinations (★ primary, "Board / Section", struck through when inactive, ×weight) and **"Free boards of the account"** buttons that add a board in one click (the whole destination list is re-sent to `PATCH /api/content-streams/[id]`). Then "Content Streams without account — Legacy", archived streams folded in a `<details>`, and a link to Pinterest Accounts for sections and account details. Empty project: "No content streams yet" with "+ Pinterest account" and "Add content stream".
+5. Side column (below the blocks on phone):
+   * **Needs attention** (`#needs-attention`) — never fixed automatically, one action each: *Board without account* (→ account buttons, `PATCH /api/boards/[id]`), *Stream without account* (→ account buttons; its legacy boards are attached first, then the stream — refused with the API message if a board belongs to another account), *Stream without WordPress category* (category select + "Link"), *Category without stream* ("Create a stream for it": the stream dialog named after the category and linked to it). No account yet → "Add a Pinterest account first". Empty → "Everything is linked."
+   * **Quick links** — Pinterest History, WordPress History (pre-filtered), Pinterest Accounts, Manage Categories, Boards & CSV export, Command Center.
 
-A card section between "WordPress Connection" and the usage-stats grid — no new tab, no new global navigation entry, since Content Streams belong to one Project.
+Dialogs are shared by the Pinterest block and Needs attention (`components/projects/project-dialogs.tsx`) and remount fresh on each opening. The page itself writes nothing; every change goes through the existing routes.
 
-* Compact cards, one per content stream: name, a status badge (Active/Planned/Warming/Paused/Archived), the linked WordPress category (or "None"), the linked Pinterest board (or "None"), and the three raw targets (Pins / day, Articles / week, Buffer days) — no computed coverage/"missing pins" number is shown yet, since that still depends on real `pins.publish_date` data not wired up until Phase 2d.
-* Empty state: "No content streams yet" with an "Add content stream" button.
-* "Add content stream" / a card's pencil icon open the same compact `Dialog`: Name (required), WordPress Category select ("No WordPress category" + this Project's real categories, by id), Pinterest Board select ("No Pinterest board" + this Project's real boards, by id), Status select (Active, Planned, Warming, Paused, Archived — `Planned` = prepared for later, not started; switch it to Warming or Active when you start), and three number inputs for the targets (empty = unset, negative/decimal rejected before submit).
-* **Board rule**: while the "1 account = 1 board" experiment holds, a board already linked to another non-archived stream shows as a disabled option, labeled "(in use by \<stream name\>)" — archiving that other stream frees the board again. This is enforced server-side too, not just as a disabled option.
+### Content Stream dialog (TASK-FIX-039 Phase 2a.1, TASK-091, TASK-092)
+
+* Opened from the Pinterest block ("Add content stream", "+ Stream" with its prefill, a stream's Edit) and from Needs attention.
+* The dialog (wider, scrolls within 90 dvh on mobile): Name (required), WordPress Category select ("No WordPress category" + this Project's real categories, by id), **Pinterest account** select ("No account (legacy)" + this Project's non-archived accounts), **Pinterest destinations** editor (TASK-091, `data-testid="stream-destinations"`): "Add board" adds a row; each row has a Board select (a linked stream only lists boards of its account; a legacy stream lists every board of the project), a Section select ("No section" + the board's active sections), a "Primary" radio (one per stream — the primary is always active), an "Active" checkbox and a Weight number (1–100), and a remove button. The same board can be added once per section. Changing the account drops the rows whose board belongs to another account. Client checks mirror the API (duplicate board + section, one primary, weight range). Then the Status select (Active, Planned, Warming, Paused, Archived — `Planned` = prepared for later, not started; switch it to Warming or Active when you start), and three number inputs for the targets (empty = unset, negative/decimal rejected before submit).
+* **Board rule**: a board already linked to another non-archived stream is not offered in the destination editor — archiving that other stream frees the board again. This is enforced server-side too (409 `board_taken`), not just in the list.
 * A card's Archive icon opens a light confirmation dialog (`Dialog`, not a full-page navigation) before calling the archive action — never a physical delete.
 * All of it is `sonner` toast-driven (success, warning for a partial create where the stream saved but the board link failed, error), keyboard-focusable, and dark-mode/responsive via the same tokens as the rest of the page.
 
@@ -422,6 +434,19 @@ Yes
 
 ---
 
+### Pinterest destination (TASK-091)
+
+When the form receives the project's Pinterest structure (every Pinterest form page does), the Board block becomes dependent lists (`components/pinterest/pinterest-destination-picker.tsx`, `data-testid="pinterest-destination-picker"`):
+
+1. **Pinterest account** — the project's non-archived accounts, plus "Legacy — free board (no account)".
+2. **Content Stream** — the streams linked to that account, plus "No stream — choose a board".
+3. **Board** — with a stream: "Auto — N active destinations" (each Pin gets one of the stream's active destinations, primary first, by weight) and the stream's active destination boards; without a stream: the account's active boards. A board of another account is never listed.
+4. **Section (optional)** — shown once a board is chosen: "No section" + that board's active sections, and a "+" button ("Add a section to …") that opens the Add section dialog and selects the new section.
+
+A line under the lists explains the choice ("Each Pin gets one board of the stream — primary first, then by weight. No Pin is duplicated on several boards." / "Every Pin goes to this board and section…"). Blocking messages: "Choose a Content Stream or a board.", "This account has no active board yet…", "This Content Stream has no active board…". Default: the account of the article's suggested board when it has one, else the project's first account with its first stream; a project without account starts in Legacy. Changing the project resets the choice. Only ids are sent; names come from the server.
+
+**Legacy** shows exactly the former Board and Board Section fields below — for projects and streams not linked to an account yet.
+
 ### Board
 
 Type:
@@ -429,6 +454,8 @@ Type:
 ```txt
 Text Input (combobox — suggests existing boards for the selected project, or type a new name)
 ```
+
+Legacy mode only when the project has Pinterest accounts (see above).
 
 Required:
 
@@ -635,7 +662,7 @@ The page reuses the Pinterest Generator form (`PinForm` with an `articleSource` 
 
 * Header "Pinterest from article"; a "Source article" card (`components/social/article-source-summary.tsx`): featured image thumbnail, H1, meta title + description, language, keyword, up to 5 SEO keywords, Brand Profile used / not used, a note that the article is only read (never modified) and that a destination URL can be typed below, and "Back to article".
 * Project fixed to the article's project (select disabled). Language: a select, pre-filled with the article's language, in every mode (AI Integrated does not inherit the project language here). Pins: the existing options, default **5**. Keyword pre-filled with the resolved primary keyword (else the H1), editable.
-* Board (`components/social/article-board-picker.tsx`): a "Content Stream (optional)" select (project streams, archived excluded) that filters a "Board" select listing only the project's real boards, plus "No board — AI suggests a name (not created)". No free text, so no board is created. A real board sharing words with the article is pre-selected; otherwise the page shows "No existing board matches this article. Suggested board name: "…". It is not created automatically…". The Content Stream is a filter only (not saved). Board section works as in the normal form.
+* Board: the Pinterest destination lists above (TASK-091); in Legacy mode, `components/social/article-board-picker.tsx`: a "Content Stream (optional)" select (project streams, archived excluded) that filters a "Board" select listing only the project's real boards, plus "No board — AI suggests a name (not created)". No free text, so no board is created. A real board sharing words with the article is pre-selected; otherwise the page shows "No existing board matches this article. Suggested board name: "…". It is not created automatically…". The Content Stream is a filter only (not saved). Board section works as in the normal form.
 * Generation mode and all its options (AI Integrated settings, Photo Only, Legacy Composite, text overlay, reference image) are unchanged. The only URL field is the optional **Destination URL** (TASK-071, see "Destination URL" below); `websiteUrl`, `pinterestUrl` and `analysisId` are never sent.
 * **Visual style** (TASK-078, inside the Generation mode section, article sources only — "Pinterest from article" and "From existing WordPress article"): two toggle cards, **Classic** (default, selected on load — the former behavior) and **Auto variety** ("Each Pin gets a different layout (step-by-step, materials, collage, close-up…) only when the article supports it. The article stays the source."). Sent as `visualStyle`; never shown nor sent on the keyword / Research form. The chosen archetype of each Pin appears as a badge (e.g. "Step-by-step tutorial") on the article result cards next to the source section, on the Pin grid of `/pinterest/[id]` under the diagnostics, and in Pin Details next to the generation mode. Classic Pins and older Pins show no badge.
 * **Visual format** (TASK-079 — the "Visual style" group renamed, same place, article sources only): four toggle cards in a responsive grid (1 column on phones, 2 on small screens, 3 on large): Classic (default), Auto variety ("Each Pin gets a different layout — including Hero and Materials & tools — only when the article supports it. The article stays the source."), **Hero** ("The project photo with the article title added by OmniFlow (a CTA only with a Destination URL).") and **Materials & tools** ("A photo plus the article's own Materials / Ingredients list. Needs a list of at least 3 items."). The former Step-by-step card was withdrawn on 2026-10-29 (replaced by the planned TASK-080 Pinterest Detailed Tutorial Infographic). Choosing one of the last two disables the Generation mode cards, hides the AI Integrated settings and the Legacy Composite options, sends `generationMode: "photo-only"`, and shows the note "This format uses a photo without text: OmniFlow adds the title and lists from the article, so it replaces the generation mode above. If the article does not have what this format needs, nothing is generated and no credit is used." An ineligible article returns the 422 message in the existing error alert.
@@ -1014,6 +1041,19 @@ Compact cards (`components/wordpress/categories-manager.tsx`, `lib/wordpress/cat
 The same category picker (`components/wordpress/category-select.tsx`) is also embedded directly in both generation forms, with its own lightweight "+ New Category" quick-create and a "Manage" shortcut — this page is the fuller standalone view, reachable from the sidebar.
 
 Empty state: no projects yet → prompt to create a project first (a category must belong to a project).
+
+---
+
+# Pinterest Accounts (`/pinterest-accounts`, TASK-091)
+
+Sidebar "Pinterest → Accounts". Header "Pinterest Accounts" + "Project → Pinterest Account → Content Stream → Board → Section. Entered by hand — no Pinterest login." With several projects, a row of project buttons (`?project=`, default project first); no project → empty state with "Create Project". Also linked from a project's Quick Links ("Pinterest Accounts").
+
+* Toolbar: "N accounts · Content Streams are linked to an account in the project page." and "Add account".
+* One card per account (`data-testid="pinterest-account-card"`): name, status badge (Active / Paused / Archived), Business / Personal, then Username, Profile ("Open" link), Main niche, Website, Language / market, "Streams · Boards · Sections" counts, the account's Content Stream names and the notes. Edit (pencil) and Archive / Restore icons — never a delete.
+* "Boards" list inside the card ("Board" button adds one to this account): each board with an "Inactive" badge when needed, Activate / Deactivate (power icon), Edit (name, account, active), and its sections as small buttons (struck through when inactive — click to rename or (de)activate) plus "+ Section".
+* "Boards without an account (legacy)" (dashed card): boards never linked; edit one to attach it to an account — never done automatically.
+* "Archived accounts" at the bottom, same cards with Restore.
+* Dialogs: **Add / Edit Pinterest account** (Name; Username, Profile URL, Main keyword / niche, Website URL, Language, Market, Account type, Status in a 2-column grid on desktop, 1 column on mobile; Notes; "OmniFlow never asks for a Pinterest password, cookie or token."), **Add / Edit board** (exact Pinterest name, account select incl. "No account (legacy)", Active checkbox), **Add / Edit section** (exact name, "No "/"…", Active checkbox when editing). Toasts on success / error; API errors (duplicate name, board used by another account's stream) shown in the dialog.
 
 ---
 

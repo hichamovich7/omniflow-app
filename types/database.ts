@@ -54,6 +54,12 @@ export interface Board {
   project_id: string;
   user_id: string;
   name: string;
+  /** Migration 047 (TASK-091) — null = legacy board, not linked to an account. Absent before 047. */
+  pinterest_account_id?: string | null;
+  /** Migration 047 — inactive boards are never offered for new Pins. */
+  is_active?: boolean;
+  /** Migration 047 — reserved for a future Pinterest API sync. */
+  external_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +90,9 @@ export interface Pin {
   board: string;
   board_id: string | null;
   board_section: string | null;
+  /** Migration 047 (TASK-091): the account / section the Pin was generated for. Null for older Pins. */
+  pinterest_account_id?: string | null;
+  pinterest_section_id?: string | null;
   image_prompt: string;
   image_analysis: string | null;
   media_url: string | null;

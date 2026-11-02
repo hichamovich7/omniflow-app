@@ -116,6 +116,8 @@ Creates one generation request and produces Pinterest content using AI.
 
 `board` is optional. When provided, every generated pin is assigned to that board name (existing board matched case-insensitively, or created) instead of the AI's per-pin suggestion.
 
+**Pinterest account destination (TASK-091).** Instead of `board` / `boardSection`, the request can name a configured destination by ids: `pinterestAccountId` (required in this mode), then `contentStreamId` and / or `boardId`, and `boardSectionId` (needs `boardId`). Mixing them with `board` / `boardSection` → 400 `invalid_request` ("Use either a Pinterest account destination or a free-text board, not both."). Checked **before any AI call or write** (`resolveGenerationDestinations()`, `lib/pinterest/destinations.ts`): the account is the caller's, in the project and not archived; the stream is in the project and linked to that account; the board is in the project, belongs to that account, is active and — with a stream — is one of the stream's active destinations; the section belongs to that board and is active. Any mismatch → 400 with the code `account_not_found`, `account_archived`, `stream_not_found`, `stream_account_mismatch`, `board_not_found`, `board_account_mismatch`, `board_inactive`, `board_not_in_stream`, `section_not_found`, `section_board_mismatch`, `section_inactive`, `no_active_destination` or `destination_required` — no generation row, no AI call, no Pin. Board chosen → every Pin goes to it (and its section). Stream only ("Auto") → each Pin gets **one** active destination of the stream, deterministic smooth weighted round-robin, primary first (first Pin, wins ties — the fallback); inactive boards / sections / rows are skipped; no Pin is duplicated on several boards and the batch size is unchanged. The model's per-Pin board is ignored in this mode and no board or section is ever created; no extra AI request picks a board. Each Pin stores `board` / `board_section` (exact configured names), `board_id`, `pinterest_account_id`, `pinterest_section_id`. Legacy requests (no `pinterestAccountId`) are unchanged and write none of the new columns.
+
 `boardSection` is optional and only meaningful together with `board`. Trimmed; an empty/whitespace-only value is treated as absent. Max 100 characters; rejected (HTTP 400 `invalid_request`) if it contains `/`, `\`, a line break, or another control character — `/` is Pinterest's own Board/Section separator (see the CSV export below). Rejected with the message `Select a board before entering a board section.` when present without `board`. When accepted, every generated pin in the batch stores the same `board_section` value (`pins.board_section`, migration 032) — it is never AI-suggested per pin, same convention as `board` itself.
 
 `websiteUrl`/`pinterestUrl` are optional (TASK-023). Normally carried over silently from a Research result via "Continue to Generate" — recorded on the generation for provenance only, not injected into the AI prompt.
@@ -1930,9 +1932,14 @@ Create a board.
 ```json
 {
   "projectId": "uuid",
-  "name": "Boho Bathroom Ideas"
+  "name": "Boho Bathroom Ideas",
+  "pinterestAccountId": "uuid | null",
+  "isActive": true,
+  "externalId": "string | null"
 }
 ```
+
+TASK-091: `pinterestAccountId`, `isActive`, `externalId` optional. The account must be the caller's, in the same project and not archived (400 `account_forbidden` / `account_archived`).
 
 ## Response
 
@@ -1966,15 +1973,20 @@ Status: NOT IMPLEMENTED. Board listing uses server-side Supabase queries directl
 
 # PATCH /api/boards/[id]
 
-Rename a board.
+Rename a board; since TASK-091 also attach it to a Pinterest account, (de)activate it or set its external id. Only the provided fields are written.
 
 ## Request
 
 ```json
 {
-  "name": "Updated Board Name"
+  "name": "Updated Board Name",
+  "pinterestAccountId": "uuid | null",
+  "isActive": false,
+  "externalId": "string | null"
 }
 ```
+
+`pinterestAccountId` must be an account of the board's own project (400 `account_forbidden`). Moving a board to another account — or back to none — while a non-archived Content Stream of another account still uses it → 409 `board_in_use_by_other_account`.
 
 ## Possible Errors
 
@@ -1985,6 +1997,8 @@ not_found
 forbidden
 invalid_json
 invalid_request
+account_forbidden
+board_in_use_by_other_account
 ```
 
 ---
@@ -2223,6 +2237,103 @@ server_error
 ## Content stream status (`POST /api/content-streams`, `PATCH /api/content-streams/[id]`)
 
 `status` accepts `active`, `planned`, `warming`, `paused`, `archived` (`planned` added by TASK-FIX-043 / migration 036). Any transition is allowed, including `planned → warming` and `planned → active`.
+
+## Pinterest account and destinations (`POST /api/content-streams`, `PATCH /api/content-streams/[id]`) — TASK-091
+
+```json
+{
+  "pinterestAccountId": "uuid | null",
+  "destinations": [
+    { "boardId": "uuid", "sectionId": "uuid | null", "isPrimary": true, "isActive": true, "weight": 2 },
+    { "boardId": "uuid", "sectionId": null, "isActive": true, "weight": 1 }
+  ]
+}
+```
+
+* `pinterestAccountId` — null / absent = legacy stream (not linked). Must be the caller's, in the stream's project, not archived (400 `account_forbidden` / `account_archived`).
+* `destinations` — replaces the stream's whole list (rows kept by board + section keep their id; missing rows removed; the primary flag is cleared first and set last). Absent = unchanged. Max 50. Zod: no duplicate board + section, at most one primary, a primary is active, weight 1–100; without a primary the first active destination becomes primary. Each board must be the caller's, in the project and — for a linked stream — of the stream's account (400 `board_forbidden`, `board_account_mismatch`); each section must belong to its board (400 `section_forbidden`, `section_board_mismatch`). The "one board per active stream" rule still applies per board (409 `board_taken`). All checked before any write.
+* PATCH changing `pinterestAccountId` without `destinations` → 400 `destination_account_mismatch` when a current board belongs to another account.
+* `boardId` (pre-TASK-091 contract) is still accepted: it becomes a single primary active destination (null clears). Sending both `boardId` and `destinations` → 400 `invalid_request`.
+* A destination write failure after the stream itself was saved is reported as `boardWarning` (partial success), as before.
+
+---
+
+# POST /api/pinterest-accounts
+
+TASK-091. Create a Pinterest account in one of the caller's projects. Manual entry only — no password, cookie or token field exists.
+
+## Request
+
+```json
+{
+  "projectId": "uuid",
+  "name": "Air Dry Clay Projects",
+  "username": "@airdryclayprojects",
+  "profileUrl": "https://www.pinterest.com/airdryclayprojects/",
+  "mainKeyword": "air dry clay",
+  "websiteUrl": "https://clayidealab.com",
+  "language": "en",
+  "market": "US",
+  "accountType": "business",
+  "status": "active",
+  "notes": "Pinned daily"
+}
+```
+
+Only `projectId` and `name` are required. `accountType` `business` (default) / `personal`; `status` `active` (default) / `paused` / `archived`. Blank optional fields are stored as null; URLs are validated.
+
+## Response
+
+`201` — `{ "data": { "account": { …pinterest_accounts row } }, "error": null }`
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_json
+invalid_request
+invalid_project
+forbidden
+duplicate_name (409 — same name in the project, case-insensitive)
+server_error
+```
+
+---
+
+# PATCH /api/pinterest-accounts/[id]
+
+TASK-091. Edit any field above except `projectId`. Archive = `{ "status": "archived" }` (restore = `active`). Accounts are never deleted by the app; archiving changes nothing on boards, streams or Pins.
+
+## Possible Errors
+
+```txt
+unauthorized
+invalid_id
+invalid_json
+invalid_request (also: nothing to update)
+not_found
+forbidden
+duplicate_name
+server_error
+```
+
+---
+
+# POST /api/board-sections
+
+TASK-091. Add a section to one of the caller's boards (account page, and "Add section" in the Pinterest form).
+
+```json
+{ "boardId": "uuid", "name": "Pumpkins", "externalId": "string | null" }
+```
+
+Name kept as typed (trimmed), ≤ 100 characters, no `/`, `\` or line break. `201` — `{ "data": { "section": { …row } } }`. Errors: `unauthorized`, `invalid_json`, `invalid_request`, `not_found`, `forbidden`, `duplicate_name` (409 — same name in the board, case-insensitive), `server_error`.
+
+---
+
+# PATCH /api/board-sections/[id]
+
+TASK-091. `{ "name"?: string, "externalId"?: string | null, "isActive"?: boolean }` — rename or (de)activate. Pins keep the section name they were generated with. Errors: as above plus `invalid_id`.
 
 ---
 

@@ -55,7 +55,10 @@ export async function listCommandCenterStreams(supabase: SupabaseClient): Promis
     targetPinsPerDay: row.target_pins_per_day,
     targetBufferDays: row.target_buffer_days,
     targetArticlesPerWeek: row.target_articles_per_week,
-    boards: (row.content_stream_boards ?? []).map((link) => ({ id: link.board_id, name: one(link.boards)?.name ?? 'Board' })),
+    // TASK-091: one board can be linked several times (one row per section) — listed once.
+    boards: (row.content_stream_boards ?? [])
+      .filter((link, index, links) => links.findIndex((other) => other.board_id === link.board_id) === index)
+      .map((link) => ({ id: link.board_id, name: one(link.boards)?.name ?? 'Board' })),
   }));
 }
 

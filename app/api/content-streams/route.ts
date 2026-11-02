@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createContentStreamSchema } from '@/lib/validations/content-streams';
+import { createContentStreamSchema, normalizeStreamDestinations } from '@/lib/validations/content-streams';
 import {
   ContentStreamOwnershipError,
   createContentStream,
   findBoardOccupant,
-  linkBoardToContentStream,
   listBoardOccupants,
 } from '@/lib/queries/content-streams';
+import {
+  assertStreamDestinations,
+  getOwnedAccount,
+  PinterestStructureError,
+  syncStreamDestinations,
+} from '@/lib/queries/pinterest-accounts';
+import { legacyBoardDestinations } from '@/lib/pinterest/stream-destinations';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 
@@ -34,6 +40,8 @@ export async function POST(request: Request) {
     );
   }
 
+  // `boardId` (one board) is the pre-TASK-091 contract, still accepted: it
+  // becomes the stream's single primary destination.
   const { boardId, ...rest } = (body ?? {}) as Record<string, unknown>;
 
   if (boardId !== undefined && boardId !== null && (typeof boardId !== 'string' || !isValidUuid(boardId))) {
@@ -52,22 +60,53 @@ export async function POST(request: Request) {
     );
   }
 
-  // Checked before creating anything: a rejected board must never leave a
-  // half-created content stream behind.
-  if (typeof boardId === 'string') {
-    const occupants = await listBoardOccupants(supabase, [boardId]);
-    const occupant = findBoardOccupant(occupants, boardId);
-    if (occupant) {
-      return NextResponse.json<ApiResponse<null>>(
-        {
-          data: null,
-          error: {
-            message: `This board is already used by "${occupant.content_stream_name}". Pick a different board, or archive that stream first.`,
-            code: 'board_taken',
+  if (typeof boardId === 'string' && parsed.data.destinations) {
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: 'Send either boardId or destinations, not both', code: 'invalid_request' } },
+      { status: 400 }
+    );
+  }
+
+  const destinations = normalizeStreamDestinations(
+    parsed.data.destinations ?? legacyBoardDestinations(typeof boardId === 'string' ? boardId : null)
+  );
+  const accountId = parsed.data.pinterestAccountId ?? null;
+
+  // Everything is checked before creating anything: a rejected account or
+  // destination must never leave a half-created content stream behind.
+  try {
+    if (accountId) {
+      const account = await getOwnedAccount(supabase, user.id, parsed.data.projectId, accountId);
+      if (account.status === 'archived') {
+        throw new PinterestStructureError('account_archived', 'This Pinterest account is archived.');
+      }
+    }
+    await assertStreamDestinations(supabase, user.id, parsed.data.projectId, accountId, destinations);
+  } catch (err) {
+    if (!(err instanceof PinterestStructureError)) throw err;
+    return NextResponse.json<ApiResponse<null>>(
+      { data: null, error: { message: err.message, code: err.code } },
+      { status: 400 }
+    );
+  }
+
+  const boardIds = [...new Set(destinations.map((destination) => destination.boardId))];
+  if (boardIds.length > 0) {
+    const occupants = await listBoardOccupants(supabase, boardIds);
+    for (const id of boardIds) {
+      const occupant = findBoardOccupant(occupants, id);
+      if (occupant) {
+        return NextResponse.json<ApiResponse<null>>(
+          {
+            data: null,
+            error: {
+              message: `This board is already used by "${occupant.content_stream_name}". Pick a different board, or archive that stream first.`,
+              code: 'board_taken',
+            },
           },
-        },
-        { status: 409 }
-      );
+          { status: 409 }
+        );
+      }
     }
   }
 
@@ -95,15 +134,13 @@ export async function POST(request: Request) {
   let boardLinked = false;
   let boardWarning: string | undefined;
 
-  if (typeof boardId === 'string') {
+  if (destinations.length > 0) {
     try {
-      await linkBoardToContentStream(supabase, user.id, contentStream.id, boardId);
+      await syncStreamDestinations(supabase, user.id, contentStream.id, destinations);
       boardLinked = true;
     } catch (err) {
-      boardWarning =
-        err instanceof ContentStreamOwnershipError
-          ? err.message
-          : 'The content stream was created, but the board could not be linked. Open Edit to try again.';
+      console.error('POST /api/content-streams — destinations error:', err);
+      boardWarning = 'The content stream was created, but its boards could not be linked. Open Edit to try again.';
     }
   }
 
