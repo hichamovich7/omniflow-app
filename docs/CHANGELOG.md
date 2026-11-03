@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+## Pinterest — one different project per Pin in project lists — TASK-FIX-096 (2026-11-03, not released)
+
+* **Project ideas articles** (for example "12 Easy Crochet Cardigan Patterns"): OmniFlow now decides which project each Pin is about before the AI writes anything — Pin 1 on project 1, Pin 2 on project 2… — never the introduction, FAQ, general advice or related posts. The AI writes titles, descriptions, angles and keywords, but can no longer pick or change a Pin's project; a Pin that does not keep its project is refused ("Pin 2 is not built from the article project OmniFlow assigned to it"), and two Pins on the same project are still refused.
+* Asking for more Pins than the article has projects now stops right away with a clear message ("This article lists 12 projects, but 13 Pins were requested…") — no AI call, nothing saved, no credit used.
+* Near-duplicate titles are still fixed automatically when they are the only problem. The automatic title fix now also works with text models that reason before answering (it used to get an empty answer and fail).
+* Tips articles, other articles, Keyword and Research Pins are unchanged. No migration.
+
 ## v3.7.0 — Visual readability pass — TASK-095 (2026-11-02)
 
 * **Whole app** (validated mockup): a slightly darker page background so cards stand out, visible card borders, a visible border on every button and input (≥ 3:1), darker secondary text, stronger status badges, an "info" color, and messages with one color and icon per type (info, success, warning, error). Same blue, same font, same layout. Dark mode adjusted the same way.

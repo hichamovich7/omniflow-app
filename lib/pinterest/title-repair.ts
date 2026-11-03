@@ -20,6 +20,30 @@ import type { PinterestAngle } from '@/types/pinterest';
 const REPAIR_TIMEOUT_MS = 30_000;
 const MAX_TITLE_LENGTH = 100;
 const MAX_CANDIDATES = 3;
+// TASK-FIX-096: reasoning text models (e.g. openai/gpt-6-luna) spend part of
+// max_tokens on hidden reasoning — 440 tokens for one Pin left an empty answer
+// ("OpenRouter returned empty response" → provider_error). Only tokens really
+// produced are billed, so the ceiling is generous.
+const REPAIR_BASE_TOKENS = 2000;
+const REPAIR_TOKENS_PER_CANDIDATE = 120;
+
+/** max_tokens of the repair call for `pins` Pins to retitle. */
+export function titleRepairMaxTokens(pins: number): number {
+  return REPAIR_BASE_TOKENS + REPAIR_TOKENS_PER_CANDIDATE * MAX_CANDIDATES * Math.max(1, pins);
+}
+
+export type TitleRepairProviderError = 'empty_response' | 'timeout' | 'http_error' | 'stream_error' | 'other';
+
+/** Fixed category of a failed repair call — safe to log (no message, no content). */
+export function titleRepairProviderError(err: unknown): TitleRepairProviderError {
+  const name = typeof err === 'object' && err !== null ? (err as { name?: unknown }).name : undefined;
+  if (name === 'AbortError' || name === 'TimeoutError') return 'timeout';
+  const message = err instanceof Error ? err.message : '';
+  if (message === 'OpenRouter returned empty response') return 'empty_response';
+  if (message.startsWith('OpenRouter error:')) return 'http_error';
+  if (message.startsWith('OpenRouter stream error')) return 'stream_error';
+  return 'other';
+}
 
 export interface TitleRepairTarget {
   /** 0-based Pin index. */
@@ -234,6 +258,8 @@ export interface TitleRepairResult<T> {
     pins: number;
     parsed: boolean;
     rejected?: TitleRepairRejection | 'provider_error';
+    /** With `provider_error`: the fixed category of the failure. */
+    providerError?: TitleRepairProviderError;
     /** Candidate titles received. */
     candidates?: number;
     /** Pins whose first candidate failed and a later one was kept. */
@@ -261,11 +287,11 @@ export async function repairTitles<T extends { title: string }>(
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      maxTokens: 200 + 80 * MAX_CANDIDATES * targets.length,
+      maxTokens: titleRepairMaxTokens(targets.length),
       timeoutMs: REPAIR_TIMEOUT_MS,
     });
-  } catch {
-    return { pins: null, stats: { pins: targets.length, parsed: false, rejected: 'provider_error' } };
+  } catch (err) {
+    return { pins: null, stats: { pins: targets.length, parsed: false, rejected: 'provider_error', providerError: titleRepairProviderError(err) } };
   }
   const result = parseTitleRepair(raw, targets, context);
   if ('rejected' in result) return { pins: null, stats: { pins: targets.length, parsed: false, rejected: result.rejected } };

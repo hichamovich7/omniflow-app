@@ -43,7 +43,9 @@ export type PinterestSafeguardReason =
   | 'UNGROUNDED_TEXT_ELEMENTS'
   // TASK-083 — numbered listicle batches only.
   | 'LISTICLE_ANGLE_PLAN'
-  | 'LIST_NUMBER_MISSING';
+  | 'LIST_NUMBER_MISSING'
+  // TASK-FIX-096 — project_listicle batches: a Pin does not keep its assigned section.
+  | 'SOURCE_SECTION_MISMATCH';
 
 export type PinterestSafeguardField = 'angle' | 'title' | 'description' | 'keywords' | 'image_prompt' | 'sourceSectionId';
 

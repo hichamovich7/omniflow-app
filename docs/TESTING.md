@@ -1345,6 +1345,26 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Project-gallery section assignment (TASK-FIX-096, 2026-11-03)
+
+Offline, no AI / Vision / image / WordPress / network call. Fixture `tests/fixtures/pinterest/crochet-cardigan-patterns-post.json` = real post 2360 "12 Easy Crochet Cardigan Patterns for Beginners" (read once via the public REST API; production failure `DUPLICATE_SOURCE_SECTION` Pins 1–2 + `DUPLICATE_TITLE` Pin 9). `pinterest-section-assignment.spec.ts` (27):
+
+* Extraction: `project_listicle`, exactly the 12 numbered projects `s3`…`s14` with their titles; intro, "Choose your first cardigan…", the list H2, "How to get a better fit…", FAQ and its questions, closing section never eligible; numbered sub-steps under a project ignored.
+* Assignment: 12 Pins → 12 distinct sections, Pin N on project N; 10 Pins → 10 distinct, spread (1–5, 7–11), identical on two calls; 13 Pins → `ok: false` (12 available).
+* Grounding / prompt: `sectionAssignments` present, `<pin_plan>` lines with id + index + title, no non-project id.
+* Echo check: faithful batch → no section issue; Pin 2 mutated to `s3` → `SOURCE_SECTION_MISMATCH` + `DUPLICATE_SOURCE_SECTION`; two Pins swapped (still distinct) → 2 × `SOURCE_SECTION_MISMATCH`; wrong index alone → mismatch; reworded / translated title echo → accepted; a FAQ id → `MISSING_SOURCE_SECTION`. User message "Pin 2 is not built from the article project OmniFlow assigned to it (project #2).", retryable, no article text. Log line ids and counts only. Schema accepts index as number or digits.
+* Title repair: a lone `DUPLICATE_TITLE` on distinct sections → repair target; with `DUPLICATE_SOURCE_SECTION` or `SOURCE_SECTION_MISMATCH` → no repair.
+* Non-regression: tips_guide (same plan, sections still reused past the count, no duplicate rejection, no assignment), generic_article (same plan, no assignment), Keyword / Research / plain article prompts without `sourceSectionIndex`; tips prompt never gets it.
+* Route `POST /api/pinterest/generate` on the real post: 12 Pins → 201, one text call, 12 Pins saved on `s3`…`s14`, `planned` + `verified` log lines (12 distinct), 0 image calls; 13 Pins → 422 `insufficient_article_sections`, 0 text / Vision / image calls, no DB write at all; the production case (Pin 2 on `s3` + near-duplicate Pin 9) → 422 with both section codes, one text call (no title repair), no `pins` insert, generation `failed`; distinct sections + near-duplicate Pin 9 only → title repair (2nd call), 201, only Pin 9's title changed, sections / descriptions / keywords kept; swapped sections → 422, nothing saved; 10 Pins → 10 distinct sections saved in plan order.
+
+Validation (2026-11-03): spec 27/27; full renderer **1741 passed**; TypeScript OK; ESLint OK except the untracked, unrelated `.claude/hooks/graphify-reminder.js`; production build OK; `git diff --check` OK. AI calls by the agent: 0.
+
+Founder real test 1 (2026-11-03, local `next dev`, post 2360, 12 Pins, no images): log `Section assignment: {"stage":"planned","pins":12,"eligibleSections":12,"sections":["s3",…,"s14"],"distinct":true}`; the text call passed every section check; one `DUPLICATE_TITLE` (Pin 9 vs Pin 1) remained because `Title repair: {"pins":1,"parsed":false,"rejected":"provider_error"}` — the reasoning model `openai/gpt-6-luna` answered empty within the 440-token repair budget. Fixed (`titleRepairMaxTokens()`, 2360 tokens for one Pin; `providerError` category in the log line); 2 more offline tests (budget passed to the call; empty / HTTP / timeout / stream errors categorized). Full renderer **1743 passed**.
+
+Founder real test 2 (2026-11-03, after the repair-budget fix): passed (reported by the founder).
+
+Real check scenario (for later reruns): local `next dev`, founder session, `/pinterest/from-wordpress`, post 2360, 12 Pins, **do not generate images**, no publication / CSV / schedule. Expect `Article kind: project_listicle`, `Section assignment: {"stage":"planned","pins":12,"eligibleSections":12,…,"distinct":true}`, then either 201 with `{"stage":"verified",…,"distinct":true}` or a retryable 422 naming the section checks (never a saved batch with a shared section). 13 Pins must return the `insufficient_article_sections` message without any AI call.
+
 # Visual readability pass (TASK-095, 2026-11-02)
 
 ```txt

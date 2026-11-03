@@ -356,6 +356,14 @@ const pinResponseSchema = z
     image_prompt: z.string(),
     // Article flow only (article-grounded Pins): the planned section id.
     sourceSectionId: z.string().trim().max(20).optional(),
+    // TASK-FIX-096 (project_listicle): echo of the assigned list number and
+    // title. Checked (number) or ignored (title) server-side — never stored.
+    sourceSectionIndex: z
+      .union([z.number(), z.string().trim().regex(/^\d{1,3}$/)])
+      .transform(Number)
+      .pipe(z.number().int().min(1).max(999))
+      .optional(),
+    sourceSectionTitle: z.string().optional(),
     visualFormat: z.enum(['photo', 'text-overlay']),
     overlayText: z.string().max(80).optional(),
     integratedText: z.object({

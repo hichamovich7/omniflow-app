@@ -51,6 +51,7 @@ const RETRYABLE: Record<PinterestSafeguardReason, boolean> = {
   UNGROUNDED_TEXT_ELEMENTS: true,
   LISTICLE_ANGLE_PLAN: true,
   LIST_NUMBER_MISSING: true,
+  SOURCE_SECTION_MISMATCH: true,
 };
 
 const FALLBACK_REASON: Record<PinterestStrategyIssueCode, PinterestSafeguardReason> = {
@@ -140,6 +141,11 @@ function describe(issue: PinterestStrategyIssue, scope: StrategySafeguardScope):
           ? `Pins ${related} and ${(issue.pinIndex ?? 0) + 1} are built from the same article section.`
           : `${pin} reuses an article section already used by another Pin.`,
         action: 'Try again, or request fewer Pins than the article has sections.',
+      };
+    case 'SOURCE_SECTION_MISMATCH':
+      return {
+        message: `${pin} is not built from the article project OmniFlow assigned to it${details[0] ? ` (project #${details[0]})` : ''}.`,
+        action: 'Try again — each Pin must keep its assigned project.',
       };
     case 'IMAGE_SUBJECT_MISMATCH': {
       const subject = issue.subject;

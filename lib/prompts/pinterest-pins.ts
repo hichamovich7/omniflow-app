@@ -44,6 +44,12 @@ interface PromptContext {
    */
   tipsGuide?: boolean;
   /**
+   * TASK-FIX-096: a project gallery whose <pin_plan> fixes one project per
+   * Pin (id, list number, title). Each Pin echoes sourceSectionIndex and
+   * sourceSectionTitle beside sourceSectionId. Absent = former contract.
+   */
+  lockedSections?: boolean;
+  /**
    * "Regenerate text" (TASK-082): the answer carries only title, description
    * and keywords (array) of one Pin — the image fields are not asked for, the
    * image is kept. Absent = full generation contract, unchanged.
@@ -154,7 +160,9 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
     ? `- sourceSectionId: the id of the article section this pin is built from, copied exactly from <pin_plan> (e.g. "s2"). Follow the <pin_plan> assignment in order.
 - image_prompt: a hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). This article gives tips and techniques: the image must clearly represent the tip, action or technique of the pin's assigned section ("Tip, action or technique represented" in its visual brief) — name that action explicitly (for example hands smoothing the clay, filling a crack, testing a color, applying varnish, checking the thickness, letting a piece dry on a rack). Show the hands, tools and material at that stage, described only with the materials, colors and details of that brief; do not invent a finished project the section does not name. Never use anything listed under the brief's Forbidden elements. The setting is limited to a plain neutral surface or backdrop (white, cream, beige, light gray or natural wood), soft natural light and at most one or two text-free props. State the camera angle (${cameraAngles}).`
     : ctx.articleGrounded
-    ? `- sourceSectionId: the id of the article section this pin is built from, copied exactly from <pin_plan> (e.g. "s2"). Follow the <pin_plan> assignment in order.
+    ? `${ctx.lockedSections
+        ? `- sourceSectionId, sourceSectionIndex, sourceSectionTitle: the project OmniFlow assigned to this pin, copied exactly from this pin's own line in <pin_plan> (e.g. "s3", 1, "..."). Pin N always uses line N; never change, swap or reuse an assignment. The pin's title, description and image are about that project only.`
+        : `- sourceSectionId: the id of the article section this pin is built from, copied exactly from <pin_plan> (e.g. "s2"). Follow the <pin_plan> assignment in order.`}
 - image_prompt: a hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). The main subject, front and center, is the exact project of the pin's assigned section ("Pattern or project represented" in its visual brief), described only with the materials, colors, techniques, shape, texture and visual details of that brief. When the brief leaves a detail unspecified, keep it plain instead of inventing one. Never add another project, garment or object type, and never use anything listed under the brief's Forbidden elements. The setting is limited to a plain neutral surface or backdrop (white, cream, beige, light gray or natural wood), soft natural light and at most one or two text-free props. State the camera angle (${cameraAngles}).`
     : `- image_prompt: a vivid, hyper-specific scene description for photorealistic AI image generation (3-5 sentences, plus a closing style clause). Describe exactly what appears in the image: the main subject front and center, its specific setting or environment, 3-5 supporting objects or details that add visual richness, specific materials and textures (e.g. white oak, brushed brass, raw linen, glazed ceramic), a dominant color palette naming 2-3 specific colors, and the camera angle (${cameraAngles}).`;
   const imageVariationRule = ctx.articleGrounded && ctx.tipsGuide
@@ -262,7 +270,7 @@ export function buildPinterestPinsPrompt(ctx: PromptContext) {
       "description": "...",
       "keywords": "keyword1, keyword2, keyword3, ...",
       "board": "...",
-      "image_prompt": "...",${ctx.articleGrounded ? '\n      "sourceSectionId": "s1",' : ''}
+      "image_prompt": "...",${ctx.articleGrounded ? '\n      "sourceSectionId": "s1",' : ''}${ctx.articleGrounded && ctx.lockedSections && !ctx.tipsGuide ? '\n      "sourceSectionIndex": 1,\n      "sourceSectionTitle": "...",' : ''}
       "visualFormat": "photo",
       "overlayText": "...",
       "ctaBannerTemplate": "clean-band"${isAiIntegrated ? `,\n      "integratedText": { ${integratedTextExample} }` : ''}

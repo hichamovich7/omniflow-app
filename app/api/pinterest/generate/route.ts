@@ -69,6 +69,13 @@ import {
   validateListicleBatch,
 } from '@/lib/pinterest/listicle';
 import { classifyArticleKind, type ArticleKind } from '@/lib/pinterest/article-kind';
+import {
+  INSUFFICIENT_ARTICLE_SECTIONS_CODE,
+  insufficientSectionsMessage,
+  listicleProjectSections,
+  planListicleSectionAssignments,
+  sectionAssignmentLogLine,
+} from '@/lib/pinterest/section-assignment';
 import { imagePromptRepairTargets, repairImagePrompts } from '@/lib/pinterest/image-prompt-repair';
 import { repairTitles, titleRepairTargets } from '@/lib/pinterest/title-repair';
 import { LANGUAGE_LABELS } from '@/types/pinterest';
@@ -327,8 +334,28 @@ export async function POST(request: Request) {
   // guide gets AI Integrated images of each tip, never a project check.
   const articleKind: ArticleKind | null = articleSource ? classifyArticleKind(articleSource.context) : null;
   let articleGrounding: ArticleGrounding | null = null;
+  // TASK-FIX-096: a project gallery gets one distinct real project per Pin,
+  // fixed here. More Pins than projects is refused before Vision, the
+  // generation row, the text call or any image call.
+  if (articleSource && articleKind === 'project_listicle') {
+    const assignmentPlan = planListicleSectionAssignments(articleSource.context, pinsRequested);
+    if (!assignmentPlan.ok) {
+      console.warn(`[${PROMPT_ID}] Section assignment refused: ${JSON.stringify({ requested: assignmentPlan.requested, eligibleSections: assignmentPlan.available })}`);
+      return NextResponse.json<ApiResponse<null>>(
+        {
+          data: null,
+          error: {
+            message: insufficientSectionsMessage(assignmentPlan.requested, assignmentPlan.available),
+            code: INSUFFICIENT_ARTICLE_SECTIONS_CODE,
+            retryable: false,
+          },
+        },
+        { status: 422 }
+      );
+    }
+  }
   if (articleSource) {
-    const sectionPlan = planArticlePinSections(articleSource.context, pinsRequested);
+    const sectionPlan = planArticlePinSections(articleSource.context, pinsRequested, { articleKind });
     const { descriptions, stats } = await describeSectionImages(articleSource.context, sectionPlan, {
       analyzeImage,
       allowedHosts: referenceImageHosts(articleSource.siteUrl ?? null),
@@ -343,6 +370,12 @@ export async function POST(request: Request) {
     });
     // Fixed value only: no article content.
     console.log(`[${PROMPT_ID}] Article kind: ${JSON.stringify({ kind: articleKind })}`);
+    if (articleGrounding.sectionAssignments) {
+      // Section ids and counts only: no heading, no article text.
+      console.log(
+        `[${PROMPT_ID}] Section assignment: ${sectionAssignmentLogLine('planned', articleGrounding.sectionPlan, listicleProjectSections(articleSource.context).length)}`
+      );
+    }
   }
 
   let analysisContext: string | null = articleSource
@@ -467,6 +500,7 @@ export async function POST(request: Request) {
       referenceStyleGuidance,
       articleGrounded: Boolean(articleGrounding?.sectionPlan.length),
       tipsGuide: articleKind === 'tips_guide',
+      lockedSections: Boolean(articleGrounding?.sectionAssignments?.length),
       ...(listicleNumber && listicleAnglePlan
         ? {
             listicle: {
@@ -647,6 +681,13 @@ export async function POST(request: Request) {
       return NextResponse.json<ApiResponse<null>>(
         { data: null, error: safeguardError },
         { status: 422 }
+      );
+    }
+
+    if (articleGrounding?.sectionAssignments) {
+      // The accepted batch: each Pin's own section (ids only).
+      console.log(
+        `[${PROMPT_ID}] Section assignment: ${sectionAssignmentLogLine('verified', resolvedPins.map((pin) => pin.sourceSectionId))}`
       );
     }
 

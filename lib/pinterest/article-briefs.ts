@@ -47,6 +47,12 @@ import {
   type OfferedTemplateType,
 } from '@/lib/pinterest/composer/content';
 import { checkTipImage, type ArticleKind } from '@/lib/pinterest/article-kind';
+import {
+  listicleProjectSections,
+  planListicleSectionAssignments,
+  validateSectionAssignments,
+  type ArticleSectionAssignment,
+} from '@/lib/pinterest/section-assignment';
 
 /**
  * Article-grounded Pins (Volet B). Before the text model runs, every Pin is
@@ -158,6 +164,12 @@ export interface ArticleGrounding {
   composerEligibility?: ComposerEligibility;
   /** TASK-FIX-089: the article kind the briefs were built for. Absent = project briefs (former behavior). */
   articleKind?: ArticleKind;
+  /**
+   * TASK-FIX-096: project_listicle only — OmniFlow's fixed section per Pin
+   * slot (id, list number, title). Each Pin must echo its slot's id; the
+   * duplicate-section check always applies. Absent = former behavior.
+   */
+  sectionAssignments?: ArticleSectionAssignment[];
 }
 
 // What the image prompt check looks for. Only claims about the project:
@@ -344,7 +356,20 @@ export function isDescriptiveImageText(text: string, projectName = ''): boolean 
  * with more, subjects are reused in order. Deterministic: same article and
  * count → same plan.
  */
-export function planArticlePinSections(context: WordPressArticleContext, pinsRequested: number): string[] {
+export function planArticlePinSections(
+  context: WordPressArticleContext,
+  pinsRequested: number,
+  options: { articleKind?: ArticleKind | null } = {}
+): string[] {
+  // TASK-FIX-096: a project gallery gets one distinct real project per Pin.
+  // More Pins than projects is refused by the route before any AI call; here
+  // the projects are reused so the (always enforced) duplicate check fails closed.
+  if (options.articleKind === 'project_listicle') {
+    const plan = planListicleSectionAssignments(context, pinsRequested);
+    if (plan.ok) return plan.assignments.map((assignment) => assignment.sourceSectionId);
+    const projects = listicleProjectSections(context);
+    return projects.length ? Array.from({ length: Math.max(0, pinsRequested) }, (_, index) => projects[index % projects.length].id) : [];
+  }
   const subjects = subjectSections(context);
   if (subjects.length === 0 || pinsRequested < 1) return [];
   if (pinsRequested <= subjects.length) {
@@ -636,7 +661,8 @@ export function buildArticleGrounding(
   imageDescriptions: Record<string, SectionImageDescription[]> = {},
   options: { niche?: string | null; visualStyle?: PinterestVisualStyle; articleKind?: ArticleKind } = {}
 ): ArticleGrounding {
-  const sectionPlan = planArticlePinSections(context, pinsRequested);
+  const sectionPlan = planArticlePinSections(context, pinsRequested, { articleKind: options.articleKind });
+  const assignmentPlan = options.articleKind === 'project_listicle' ? planListicleSectionAssignments(context, pinsRequested) : null;
   const evidence = buildArticleEvidence(context, imageDescriptions);
   const subjectCheck = subjectCheckForNiche(options.niche);
   const briefs: Record<string, PinVisualBrief> = {};
@@ -664,6 +690,7 @@ export function buildArticleGrounding(
     ...(archetypes ? { pinArchetypes: archetypes.map((archetype, index) => (pinTemplates?.[index] ? null : archetype)) } : {}),
     ...(eligibility && pinTemplates ? { pinTemplates, composerEligibility: eligibility } : {}),
     ...(options.articleKind ? { articleKind: options.articleKind } : {}),
+    ...(assignmentPlan?.ok ? { sectionAssignments: assignmentPlan.assignments } : {}),
   };
 }
 
@@ -675,7 +702,10 @@ export function sectionTextOf(grounding: ArticleGrounding, sectionId: string, br
 export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
   const assignments = grounding.sectionPlan.map((sectionId, index) => {
     const brief = grounding.briefs[sectionId];
-    const line = `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
+    const assignment = grounding.sectionAssignments?.find((item) => item.sourceSectionId === sectionId);
+    const line = assignment
+      ? `Pin ${index + 1} → sourceSectionId "${sectionId}", sourceSectionIndex ${assignment.sourceSectionIndex}, sourceSectionTitle ${JSON.stringify(assignment.sourceSectionTitle)}`
+      : `Pin ${index + 1} → sourceSectionId "${sectionId}" (${brief?.sourceSection ?? sectionId})`;
     const template = grounding.pinTemplates?.[index];
     if (template) {
       return [
@@ -711,7 +741,9 @@ export function formatPinPlanForPrompt(grounding: ArticleGrounding): string {
   });
   return [
     '<pin_plan>',
-    'Each Pin is built from one real section of the article. Use exactly this assignment, in this order, and copy the id into sourceSectionId:',
+    grounding.sectionAssignments
+      ? 'Each Pin is built from one different project of the article. OmniFlow fixed this assignment: write the Pins in this exact order, and for each Pin copy its sourceSectionId, sourceSectionIndex and sourceSectionTitle exactly as given. Never change, swap or reuse an assignment; Pin N is always about the project on its own line:'
+      : 'Each Pin is built from one real section of the article. Use exactly this assignment, in this order, and copy the id into sourceSectionId:',
     ...assignments,
     '',
     ...briefs,
@@ -818,6 +850,10 @@ function projectSubjectReport(imagePrompt: string, brief: PinVisualBrief): Pinte
 
 export interface GroundedPinCandidate {
   sourceSectionId?: string;
+  /** TASK-FIX-096 (project_listicle): echoed list number of the assigned section. */
+  sourceSectionIndex?: number;
+  /** TASK-FIX-096 (project_listicle): echoed title — informative, never trusted. */
+  sourceSectionTitle?: string;
   image_prompt: string;
 }
 
@@ -832,8 +868,11 @@ export interface GroundedPinCandidate {
 export function validateArticleGroundedPins(pins: GroundedPinCandidate[], grounding: ArticleGrounding): PinterestStrategyIssue[] {
   const issues: PinterestStrategyIssue[] = [];
   const planned = new Set(grounding.sectionPlan);
-  const distinctExpected = new Set(grounding.sectionPlan).size === grounding.sectionPlan.length;
+  // TASK-FIX-096: a project gallery never shares a section, whatever the plan.
+  const distinctExpected =
+    Boolean(grounding.sectionAssignments) || grounding.articleKind === 'project_listicle' || new Set(grounding.sectionPlan).size === grounding.sectionPlan.length;
   const used = new Map<string, number>();
+  if (grounding.sectionAssignments) issues.push(...validateSectionAssignments(pins, grounding.sectionPlan, grounding.sectionAssignments));
 
   pins.forEach((pin, index) => {
     const sectionId = pin.sourceSectionId?.trim();
