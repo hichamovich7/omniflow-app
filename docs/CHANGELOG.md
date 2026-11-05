@@ -18,7 +18,17 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
-## Pinterest — one different project per Pin in project lists — TASK-FIX-096 (2026-11-03, not released)
+## v3.7.1 — GPT Image 2.6 models + one project per Pin in project lists — TASK-FIX-097 + TASK-FIX-096 (2026-11-05)
+
+Patch release: the two sections below (TASK-FIX-097 and TASK-FIX-096, the latter committed in `59ff27b` and released here).
+
+### Images — OpenAI Image 2.6 models — TASK-FIX-097 (2026-11-05)
+
+* **Images with text** (AI-generated design of numbered Pins, AI Integrated Pins such as tips guides, legacy text-overlay Pins) use `AI_IMAGE_MODEL_TEXT` = `openai/gpt-image-2.6-sunburst`; **images without text** (Photo only, the photo of Hero / Materials / Step-by-step Pins, Legacy Composite photos, WordPress images) use `AI_IMAGE_PROVIDER=openrouter` + `AI_IMAGE_MODEL` = `openai/gpt-image-2.6-flare`. The routing already existed and is unchanged; `.env.example` now documents these values.
+* An image model OpenRouter refuses now fails with a clear message naming the model and the HTTP status — one call, no retry, never another model.
+* Article reference photos, the 2:3 format, 1000×1500 output, compression, OmniFlow overlay / Photo only / Legacy Composite and Pins v1/v2 are unchanged. No migration. Founder real test passed locally (2026-11-05): excellent image and text quality with sunburst.
+
+### Pinterest — one different project per Pin in project lists — TASK-FIX-096 (2026-11-03)
 
 * **Project ideas articles** (for example "12 Easy Crochet Cardigan Patterns"): OmniFlow now decides which project each Pin is about before the AI writes anything — Pin 1 on project 1, Pin 2 on project 2… — never the introduction, FAQ, general advice or related posts. The AI writes titles, descriptions, angles and keywords, but can no longer pick or change a Pin's project; a Pin that does not keep its project is refused ("Pin 2 is not built from the article project OmniFlow assigned to it"), and two Pins on the same project are still refused.
 * Asking for more Pins than the article has projects now stops right away with a clear message ("This article lists 12 projects, but 13 Pins were requested…") — no AI call, nothing saved, no credit used.

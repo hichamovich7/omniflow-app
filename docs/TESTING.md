@@ -1345,6 +1345,25 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# OpenAI Image 2.6 model routing (TASK-FIX-097, 2026-11-05)
+
+```bash
+npx playwright test --project=renderer tests/renderer/ai-image-model-routing.spec.ts tests/renderer/ai-image-reference.spec.ts tests/renderer/ai-image-model.spec.ts
+```
+
+Offline (fake `fetch`, placeholder key, no network). `ai-image-model-routing.spec.ts` (13), env `AI_IMAGE_MODEL_TEXT=openai/gpt-image-2.6-sunburst`, `AI_IMAGE_PROVIDER=openrouter`, `AI_IMAGE_MODEL=openai/gpt-image-2.6-flare`: `ai-integrated` / `text-overlay` resolve to sunburst, `photo` / `photo-only` to flare; AI-generated design body = `{ model: sunburst, prompt, aspect_ratio: "2:3", quality: "high", input_references: [1 data URL] }`; Photo only / photo bodies unchanged (`{ model: flare, prompt, size: "1024x1536" }`), legacy text-overlay unchanged (`size`), WordPress `1024x1024` to flare; the provider PNG → existing sanitize + `pinterest-pin` profile = 1000×1500 JPEG; a square image is refused (no crop); unavailable model (HTTP 404, both models) → one POST only, error `OpenRouter image generation failed (model <id>, HTTP 404)`, no other model requested; model absent from the catalog → no paid call; unset `AI_IMAGE_MODEL_TEXT` throws (never AI_IMAGE_MODEL); logs + error never contain the key, the prompt, base64 or `data:image`. Non-regression (Classic, Auto variety, Hero, Photo only, Legacy Composite, `listicle_article_image`, `tips_guide`, Pins v1/v2): full renderer suite.
+
+Validation (2026-11-05): full renderer **1756 passed** (was 1743), TypeScript OK, ESLint OK, production build OK, `git diff --check` OK.
+
+Model check (2026-11-05, free catalog GET): both `openai/gpt-image-2.6-sunburst` and `-flare` are listed with one endpoint (provider OpenAI), `aspect_ratio` incl. 2:3, `quality` auto…max, `input_references` 0–16, passthrough `moderation` / `complexity`; pricing input image $0.000008 / token, input text $0.000005 / token, output image $0.00003 / token (same for both).
+
+Real AI test (2026-11-05, 2 paid image calls, `.env.local` models, run locally through a temporary Playwright spec calling the server functions — `prepareAiDesignReference`, `buildListicleAiDesignPrompt`, `generateImage`, `sanitizeFinalPinterestImage`, `optimizeImage` — deleted afterwards; no app route, no database, no storage, no publication / CSV / schedule / WordPress write; `--retries=0`):
+
+1. **`listicle_article_image` AI-generated design** — reference = public photo of post 2360 (`beginner-crochet-cardigan-dusty-rose.webp`, GET only), title "Easy Crochet Cardigan for Beginners", number "12", CTA "Get the free pattern". Model sunburst, body keys `model, prompt, aspect_ratio (2:3), quality (high), input_references (1)`, HTTP 200 in **39.5 s**, raw 1024×1536 PNG → final **1000×1500** JPEG 409 KB. Review: text exact (badge "12", title on two lines, CTA pill), the same dusty-rose cardigan on the same mannequin and shelves as the reference, nothing added on the subject. Usage 1421 prompt / 1372 image tokens, **cost $0.0513**.
+2. **Image without text (Photo only path)** — model flare, body keys `model, prompt, size (1024x1536)`, HTTP 200 in **8.0 s**, raw 1024×1536 PNG (flare honours `size`) → final **1000×1500** JPEG 350 KB, no text in the image. Usage 64 prompt / 664 image tokens, **cost $0.0202**.
+
+Total ≈ **$0.072**. OpenRouter's image response carries no `model` / `provider` field, so the absence of fallback rests on the request (one fixed model id, one call) and on the single OpenAI endpoint in the catalog. Not tested: the full app route from the browser, and Vercel (its environment must hold the same three variables; one AI design takes ≈ 40 s, and `generate-images` declares no `maxDuration`, so a batch of several AI designs in one request — up to 10 Pins, 3 at a time — depends on the Vercel plan's default function duration).
+
 # Project-gallery section assignment (TASK-FIX-096, 2026-11-03)
 
 Offline, no AI / Vision / image / WordPress / network call. Fixture `tests/fixtures/pinterest/crochet-cardigan-patterns-post.json` = real post 2360 "12 Easy Crochet Cardigan Patterns for Beginners" (read once via the public REST API; production failure `DUPLICATE_SOURCE_SECTION` Pins 1–2 + `DUPLICATE_TITLE` Pin 9). `pinterest-section-assignment.spec.ts` (27):

@@ -300,7 +300,8 @@ export async function generateImage({
       } catch {
         // body wasn't JSON; fall back to the raw text above.
       }
-      throw new Error(`OpenRouter image generation failed: ${message}`);
+      // TASK-FIX-097: name the requested model and the status — the call is never retried or rerouted.
+      throw new Error(`OpenRouter image generation failed (model ${model}, HTTP ${res.status}): ${message}`);
     }
 
     const json = (await res.json()) as OpenRouterImageResponse;
