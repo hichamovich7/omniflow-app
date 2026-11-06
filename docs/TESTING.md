@@ -1345,6 +1345,20 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Numbered Pins share in project galleries (TASK-FIX-098, 2026-11-06)
+
+```bash
+npx playwright test --project=renderer tests/renderer/pinterest-listicle.spec.ts tests/renderer/pinterest-article-kind.spec.ts tests/renderer/pinterest-section-assignment.spec.ts tests/renderer/pinterest-generate-errors.spec.ts
+```
+
+Offline, no AI / Vision / image / WordPress / network call. Rule: about 30 % of the Pins are numbered for project galleries — `numberedPinCount(n, { articleKind: 'project_listicle' })` = `max(1, ceil(n × 0.30))`; any other kind keeps `ceil(n/2)`.
+
+* `pinterest-listicle.spec.ts`: plan for 1, 2, 3, 4, 5, 7, 10, 12, 15, 18, 20 Pins → 1, 1, 1, 2, 2, 3, 3, 4, 5, 6, 6 numbered (rest Curiosity / Discovery / Problem → Solution, Pin 1 always numbered, same plan on every call, no repeated angle below 5 Pins); 12 Pins → numbered slots 1, 4, 7, 10 (Listicle, Article Promise alternating); `tips_guide` / `generic_article` / no kind = the former half plan for 1–20 Pins; `ai-recommends` minimum = the plan's count (4 of 12 pass, 3 of 12 → `LISTICLE_ANGLE_PLAN`). Route (blanket gallery): 3 → 1, 5 → 2, 7 → 3, 10 → 3, **12 → 4 numbered + 8 not**, 15 → 5 — exactly that many titles with the count and `listicle_article_image` contracts, each on its own section; link, board, section unchanged. AI recommends 2 of 7 numbered → 422. Title-repair, TASK-087 and v3.3.0 route cases now run on the gallery plan (4 of 12 visual titles / AI designs).
+* `pinterest-article-kind.spec.ts`: tips guide, 5 Pins → 3 numbered titles (half plan), no `listicle_article_image`; project gallery 3 Pins → 1, 5 Pins → 2 `listicle_article_image` (ai-design).
+* `pinterest-section-assignment.spec.ts` / `pinterest-generate-errors.spec.ts`: fixtures follow the gallery plan; 12 / 10 distinct projects in plan order, section errors and title repair unchanged.
+
+Validation (2026-11-06): full renderer **1773 passed** (was 1756), TypeScript OK, ESLint (touched files) OK, production build OK (compiled-bundle checks pass), `git diff --check` OK. Real check pending: one 12-Pin project gallery → 4 numbered Pins.
+
 # OpenAI Image 2.6 model routing (TASK-FIX-097, 2026-11-05)
 
 ```bash

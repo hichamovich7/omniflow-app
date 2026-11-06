@@ -383,7 +383,8 @@ export async function POST(request: Request) {
     : null;
 
   // TASK-083: an article that states an exact count (H1, else a reliable
-  // numbered list) gets at least half numbered Pins. Balanced: every angle is
+  // numbered list) gets at least half numbered Pins — about 30 % (rounded up,
+  // at least one) in a project gallery (TASK-FIX-098). Balanced: every angle is
   // planned; AI recommends (TASK-FIX-084): only the numbered slots are, the
   // other Pins keep the model's choice. A Manual angle stays the user's
   // choice. Keyword and Research flows never get here.
@@ -391,7 +392,7 @@ export async function POST(request: Request) {
   const listicleNumber = articleSource && listicleStrategy !== 'manual'
     ? detectListicleNumber(articleSource.context)
     : null;
-  const listicleAnglePlan = listicleNumber ? buildListicleAnglePlan(pinsRequested) : null;
+  const listicleAnglePlan = listicleNumber ? buildListicleAnglePlan(pinsRequested, { articleKind }) : null;
   const listicleMode = listicleStrategy === 'ai-recommends' ? 'minimum' : 'exact';
 
   if (analysisId) {

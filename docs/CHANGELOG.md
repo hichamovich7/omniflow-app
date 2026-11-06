@@ -18,6 +18,11 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Pinterest — fewer numbered Pins in project galleries — TASK-FIX-098 (2026-11-06)
+
+* **About 30 % of the Pins are numbered for project galleries** (`project_listicle`), instead of at least half: `max(1, ceil(Pins × 0.30))` — 5 Pins → 2, 10 → 3, 12 → 4 (Pins 1, 4, 7, 10), 15 → 5, 20 → 6. A single Pin is still numbered. The numbered Pins are spread evenly over the batch; the others use Curiosity, Discovery or Problem → Solution without the number. With "AI recommends", the minimum follows the same count.
+* Tips guides and other articles are unchanged (at least half numbered titles, never `listicle_article_image`). Number detection, one distinct section per Pin, the "more Pins than projects" refusal, titles / descriptions / keywords / boards / sections / URLs / UTM / dates, the duplicate and invented-number checks, image generation and AI models are unchanged. No migration.
+
 ## v3.7.1 — GPT Image 2.6 models + one project per Pin in project lists — TASK-FIX-097 + TASK-FIX-096 (2026-11-05)
 
 Patch release: the two sections below (TASK-FIX-097 and TASK-FIX-096, the latter committed in `59ff27b` and released here).

@@ -184,7 +184,7 @@ function describe(issue: PinterestStrategyIssue, scope: StrategySafeguardScope):
       const [expected, ...found] = details;
       return {
         message:
-          'The Pins do not follow the numbered-list plan (half of them Listicle or Article Promise)' +
+          'The Pins do not follow the numbered-list plan (the planned Pins must be Listicle or Article Promise)' +
           (expected ? ` — expected ${expected}${found.length ? `; got ${found.join(', ')}` : ''}.` : '.'),
         action: 'Try again — a new attempt usually follows the plan.',
       };

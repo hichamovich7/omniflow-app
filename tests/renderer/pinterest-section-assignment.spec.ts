@@ -10,6 +10,7 @@ import {
   validateArticleGroundedPins,
 } from '@/lib/pinterest/article-briefs';
 import { classifyArticleKind } from '@/lib/pinterest/article-kind';
+import { buildListicleAnglePlan } from '@/lib/pinterest/listicle';
 import {
   INSUFFICIENT_ARTICLE_SECTIONS_CODE,
   listicleProjectSections,
@@ -377,22 +378,21 @@ const cardiganRequest = (pinsRequested: number) => ({
   wordpressPost: { siteId: SITE_ID, postId: POST.id },
 });
 
-// Listicle plan for 12 Pins (TASK-083): even slots numbered, odd slots rotate.
-const ANGLES = [
-  'listicle', 'curiosity', 'article-promise', 'discovery', 'listicle', 'problem-solution',
-  'article-promise', 'curiosity', 'listicle', 'discovery', 'article-promise', 'problem-solution',
-] as const;
+// Listicle plan of a project gallery (TASK-083, TASK-FIX-098): ~30 % numbered
+// Pins — slots 1, 4, 7, 10 of 12 and 1, 5, 8 of 10 — the others rotate.
+const galleryAngles = (count: number) => buildListicleAnglePlan(count, { articleKind: 'project_listicle' });
+// Every title that can sit on a numbered slot (12 or 10 Pins) carries the count 12.
 const TITLES = [
   '12 Easy Crochet Cardigans to Start With the Everyday One',
   'Why Viv Crochets Keeps Its Simple Cardigan So Calm',
   'Fold a Rectangle Into Your First Cardigan: 12 Patterns',
-  'Pockets That Make a Fireside Cardigan Worth Saving',
+  'Pockets on a Fireside Cardigan, One of 12 to Save',
   'Start With a C2C Square: Cocoon Pick From 12 Patterns',
   'Short Sleeves, Simple Panels and No Shaping Stress',
   'One Polka Crop Among 12 Beginner Cardigan Patterns',
-  'A Hexagon Shape Behind the Elowen Layer',
+  'The Elowen Hexagon Layer Among These 12 Picks',
   'Lace for Beginners: 12 Wearable Cardigan Projects',
-  'Granny Squares Turned Into a Modern Layer',
+  'Granny Squares Become a Modern Layer in This List of 12',
   'Kimono Drape From Squares: 12 Patterns to Try',
   'Thankful Granny Motifs for a Relaxed Fall Layer',
 ];
@@ -402,9 +402,10 @@ const NEAR_DUPLICATE_TITLE = '12 Easy Crochet Cardigans to Start With the Everyd
 function cardiganPlan(options: { sectionIds?: string[]; titles?: string[] } = {}) {
   const ids = options.sectionIds ?? PROJECT_IDS;
   const titles = options.titles ?? TITLES;
+  const angles = galleryAngles(ids.length);
   return JSON.stringify({
     pins: ids.map((sourceSectionId, index) => ({
-      angle: ANGLES[index],
+      angle: angles[index],
       title: titles[index],
       description: `Project ${index + 1} of this beginner cardigan roundup: ${PROJECT_TITLES[index]}. Save this Pin and open the article for the full pattern link.`,
       keywords: `crochet cardigan, beginner crochet, cardigan pattern ${index + 1}`,
@@ -651,13 +652,15 @@ test.describe('POST /api/pinterest/generate — Crochet Cardigans', () => {
     const plan = planListicleSectionAssignments(cardiganContext(), 10);
     if (!plan.ok) throw new Error('plan');
     const ids = plan.assignments.map((item) => item.sourceSectionId);
+    const angles = galleryAngles(10);
     const pins = JSON.parse(cardiganPlan()).pins.slice(0, 10).map((pin: Record<string, unknown>, index: number) => ({
       ...pin,
+      angle: angles[index],
       sourceSectionId: ids[index],
       sourceSectionIndex: plan.assignments[index].sourceSectionIndex,
       sourceSectionTitle: plan.assignments[index].sourceSectionTitle,
     }));
-    // 10 Pins: the plan rotates the odd slots on three angles (TASK-083).
+    // 10 Pins: 3 numbered (TASK-FIX-098), the others rotate on three angles (TASK-083).
     await withRoute([JSON.stringify({ pins })], async (harness) => {
       const response = await harness.post(cardiganRequest(10));
       const body = await response.json();

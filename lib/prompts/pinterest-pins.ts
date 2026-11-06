@@ -57,7 +57,8 @@ interface PromptContext {
   textOnlyRewrite?: boolean;
   /**
    * Numbered listicle article (TASK-083): the count the article states and
-   * the angle of each Pin (at least half Listicle / Article Promise). Absent
+   * the angle of each Pin (at least half Listicle / Article Promise; ~30 %
+   * in a project gallery, TASK-FIX-098). Absent
    * = the existing angle distribution, unchanged.
    */
   listicle?: ListiclePromptPlan;

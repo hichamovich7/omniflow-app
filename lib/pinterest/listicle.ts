@@ -3,12 +3,13 @@ import { isAllowedReferenceImage } from '@/lib/pinterest/article-vision';
 import { resolveSourceAssetKey } from '@/lib/wordpress/media-source';
 import { LISTICLE_CROP_VARIANTS } from '@/lib/pinterest/composer/content';
 import type { PinterestStrategyIssue } from '@/lib/pinterest/strategy';
-import type { PinterestAngle } from '@/types/pinterest';
+import type { ArticleKind, PinterestAngle } from '@/types/pinterest';
 
 /**
  * Number-aware listicle Pins (TASK-083). When an article promises an exact
  * count ("15 Cozy Crochet Blanket Ideas"), at least half of its Pins carry
- * that number in their title (Listicle or Article Promise angle) and are
+ * that number in their title (Listicle or Article Promise angle) — about
+ * 30 % in a project gallery (TASK-FIX-098) — and, in a project gallery, are
  * composed by OmniFlow on a real photo of the article. The number is only
  * ever read from the article — H1 first, then a reliable numbered list —
  * never guessed. Without one, nothing here applies. Pure and offline.
@@ -132,22 +133,41 @@ export function isNumberedAngle(angle: PinterestAngle): boolean {
   return (NUMBERED_ANGLES as readonly PinterestAngle[]).includes(angle);
 }
 
-/** At least half of the batch, rounded up: 3 → 2, 5 → 3, 7 → 4. */
-export function numberedPinCount(pinsRequested: number): number {
-  return Math.ceil(Math.max(0, Math.floor(pinsRequested)) / 2);
+/** TASK-FIX-098: share of numbered Pins in a project gallery (`project_listicle`). */
+export const PROJECT_LISTICLE_NUMBERED_SHARE = 0.3;
+
+interface ListiclePlanOptions {
+  /** The article kind; only `project_listicle` uses the 30 % share. */
+  articleKind?: ArticleKind | null;
 }
 
 /**
- * Numbered Pins on every other slot (Listicle, then Article Promise), the
- * others rotate Curiosity, Discovery, Problem → Solution. Below five Pins no
- * angle repeats, as in the balanced plan.
+ * Numbered Pins of a batch. Project gallery (TASK-FIX-098): about 30 %,
+ * rounded up, at least one — 5 → 2, 10 → 3, 12 → 4, 15 → 5, 20 → 6. Any
+ * other article: at least half, rounded up — 3 → 2, 5 → 3, 7 → 4.
  */
-export function buildListicleAnglePlan(pinsRequested: number): PinterestAngle[] {
+export function numberedPinCount(pinsRequested: number, options: ListiclePlanOptions = {}): number {
   const size = Math.max(0, Math.floor(pinsRequested));
+  if (size === 0) return 0;
+  if (options.articleKind === 'project_listicle') return Math.max(1, Math.ceil(size * PROJECT_LISTICLE_NUMBERED_SHARE));
+  return Math.ceil(size / 2);
+}
+
+/**
+ * Numbered Pins (Listicle, then Article Promise) spread evenly over the
+ * batch, the first Pin always numbered; the others rotate Curiosity,
+ * Discovery, Problem → Solution. At half the batch this is every other slot
+ * (the former plan). Below five Pins no angle repeats, as in the balanced plan.
+ */
+export function buildListicleAnglePlan(pinsRequested: number, options: ListiclePlanOptions = {}): PinterestAngle[] {
+  const size = Math.max(0, Math.floor(pinsRequested));
+  const required = numberedPinCount(size, options);
+  // Slot k at ceil(k · size / required): 0, 2, 4… at half the batch, 0, 3, 6, 9 for 4 of 12.
+  const slots = new Set(Array.from({ length: required }, (_, k) => Math.ceil((k * size) / required)));
   let numbered = 0;
   let other = 0;
   return Array.from({ length: size }, (_, index) =>
-    index % 2 === 0 ? NUMBERED_ANGLES[numbered++ % NUMBERED_ANGLES.length] : OTHER_ANGLES[other++ % OTHER_ANGLES.length]
+    slots.has(index) ? NUMBERED_ANGLES[numbered++ % NUMBERED_ANGLES.length] : OTHER_ANGLES[other++ % OTHER_ANGLES.length]
   );
 }
 
@@ -194,8 +214,9 @@ interface ListiclePinCandidate {
  * exact number in every Listicle / Article Promise title, and no "best /
  * viral / popular" promise the article does not make. Runs instead of the
  * balanced-angle check; every other safeguard still runs. `minimum`
- * (AI recommends, TASK-FIX-084) only requires at least half of the batch
- * on a numbered angle: the other Pins keep the angle the model chose.
+ * (AI recommends, TASK-FIX-084) only requires at least as many numbered
+ * Pins as the plan holds (half the batch; ~30 % in a project gallery,
+ * TASK-FIX-098): the other Pins keep the angle the model chose.
  */
 export function validateListicleBatch(
   pins: ListiclePinCandidate[],
@@ -206,7 +227,7 @@ export function validateListicleBatch(
 ): PinterestStrategyIssue[] {
   const issues: PinterestStrategyIssue[] = [];
   if (options.mode === 'minimum') {
-    const required = numberedPinCount(plan.length);
+    const required = plan.filter(isNumberedAngle).length;
     const numbered = pins.filter((pin) => isNumberedAngle(pin.angle)).length;
     if (pins.length === plan.length && numbered < required) {
       issues.push({

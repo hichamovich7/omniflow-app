@@ -455,6 +455,10 @@ test.describe('POST /api/pinterest/generate — tips guide vs project gallery', 
     expect(run.status, JSON.stringify(run.body.error)).toBe(201);
     expect(JSON.stringify(run.body)).not.toContain('no recognizable project');
     expect(savedPins(run)).toHaveLength(5);
+    // TASK-FIX-098: a tips guide keeps the half plan (3 of 5 numbered titles), never listicle_article_image.
+    expect(plan).toEqual(buildListicleAnglePlan(5, { articleKind: 'tips_guide' }));
+    expect(savedPins(run).filter((row) => isNumberedAngle(JSON.parse(row.image_analysis as string)._pinterestStrategy.angle))).toHaveLength(3);
+    expect(savedPins(run).every((row) => readComposerMetadata(row.image_analysis as string) === null)).toBe(true);
   });
 
   test('a tip Pin showing an invented project → 422 IMAGE_SUBJECT_MISMATCH on the tip, nothing saved, no image call', async () => {
@@ -474,7 +478,8 @@ test.describe('POST /api/pinterest/generate — tips guide vs project gallery', 
 
   test('a real project gallery keeps listicle_article_image on its numbered Pins (unchanged)', async () => {
     const post = wordpressPost(IDEAS_H1, IDEAS_HTML);
-    const plan = buildListicleAnglePlan(3);
+    // TASK-FIX-098: ~30 % numbered in a project gallery → 1 of 3.
+    const plan = buildListicleAnglePlan(3, { articleKind: 'project_listicle' });
     const scene = (heading: string) => `A small green air dry clay ${heading.replace(/^\d+\.\s*/, '').toLowerCase()} on a plain white surface, soft natural light, eye-level view, photorealistic.`;
     const run = await runGenerate(post, { ...articleBody(3), listicleTextTreatment: 'omniflow-overlay' }, modelAnswer(post, plan, scene, { numbered: IDEAS_NUMBERED_TITLES, other: IDEAS_OTHER_TITLES }));
     expect(run.status, JSON.stringify(run.body.error)).toBe(201);
@@ -482,7 +487,7 @@ test.describe('POST /api/pinterest/generate — tips guide vs project gallery', 
     expect(run.prompts[0]).not.toContain('the image must clearly represent the tip, action or technique');
     const rows = savedPins(run);
     const numbered = rows.filter((row) => isNumberedAngle(JSON.parse(row.image_analysis as string)._pinterestStrategy.angle));
-    expect(numbered.length).toBeGreaterThanOrEqual(2);
+    expect(numbered).toHaveLength(1);
     for (const row of numbered) expect(readComposerMetadata(row.image_analysis as string)?.templateType).toBe('listicle_article_image');
     expect(run.imageCalls).toBe(0);
     for (const row of rows) {
@@ -514,14 +519,16 @@ const listicleAnalysis = (extra: Record<string, unknown>) =>
 test.describe('v3.3.0 — AI-generated design by default', () => {
   test('a project gallery with no treatment sent → numbered Pins stored as ai-design (reference = an article photo); tips never get one', async () => {
     const ideas = wordpressPost(IDEAS_H1, IDEAS_HTML);
-    const plan = buildListicleAnglePlan(3);
+    // TASK-FIX-098: the gallery numbers 2 of 5 Pins; the tips guide keeps the half plan.
+    const plan = buildListicleAnglePlan(5, { articleKind: 'project_listicle' });
+    const tipsPlan = buildListicleAnglePlan(3);
     const scene = (heading: string) => `A small green air dry clay ${heading.replace(/^\d+\.\s*/, '').toLowerCase()} on a plain white surface, soft natural light, eye-level view, photorealistic.`;
     const { listicleTextTreatment: _omit, ...body } = articleBody(3);
     void _omit;
-    const run = await runGenerate(ideas, body, modelAnswer(ideas, plan, scene, { numbered: IDEAS_NUMBERED_TITLES, other: IDEAS_OTHER_TITLES }));
+    const run = await runGenerate(ideas, { ...body, pinsRequested: 5 }, modelAnswer(ideas, plan, scene, { numbered: IDEAS_NUMBERED_TITLES, other: IDEAS_OTHER_TITLES }));
     expect(run.status, JSON.stringify(run.body.error)).toBe(201);
     const contracts = savedPins(run).map((row) => readComposerMetadata(row.image_analysis as string)).filter((item) => item !== null);
-    expect(contracts.length).toBeGreaterThanOrEqual(2);
+    expect(contracts).toHaveLength(2);
     for (const contract of contracts) {
       expect(contract).toMatchObject({ templateType: 'listicle_article_image', textTreatment: 'ai-design' });
       expect((contract as { source: { imageUrl: string } }).source.imageUrl).toMatch(/^https:\/\/clay\.example\.test\/wp-content\/uploads\/clay-\d+\.jpg$/);
@@ -529,7 +536,7 @@ test.describe('v3.3.0 — AI-generated design by default', () => {
     expect(run.imageCalls).toBe(0);
 
     const tipsPost = wordpressPost(TIPS_H1, TIPS_HTML);
-    const tips = await runGenerate(tipsPost, body, modelAnswer(tipsPost, plan, sceneFor, { numbered: TIPS_NUMBERED_TITLES, other: TIPS_OTHER_TITLES }));
+    const tips = await runGenerate(tipsPost, body, modelAnswer(tipsPost, tipsPlan, sceneFor, { numbered: TIPS_NUMBERED_TITLES, other: TIPS_OTHER_TITLES }));
     expect(tips.status, JSON.stringify(tips.body.error)).toBe(201);
     expect(savedPins(tips).every((row) => readComposerMetadata(row.image_analysis as string) === null)).toBe(true);
   });

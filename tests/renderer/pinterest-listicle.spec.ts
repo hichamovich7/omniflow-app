@@ -154,6 +154,9 @@ test.describe('Number detection: only a count the article really states', () => 
 // ── Angle plan and validation ────────────────────────────────────────────────
 
 const OTHER: PinterestAngle[] = ['curiosity', 'discovery', 'problem-solution'];
+/** TASK-FIX-098: a project gallery (`project_listicle`) numbers about 30 % of its Pins. */
+const GALLERY = { articleKind: 'project_listicle' } as const;
+const galleryPlan = (pins: number) => buildListicleAnglePlan(pins, GALLERY);
 
 test.describe('Angle plan: at least half Listicle / Article Promise', () => {
   for (const [pins, numbered] of [[1, 1], [3, 2], [4, 2], [5, 3], [7, 4], [10, 5]] as const) {
@@ -167,6 +170,58 @@ test.describe('Angle plan: at least half Listicle / Article Promise', () => {
       if (pins < PINTEREST_ANGLES.length) expect(new Set(plan).size).toBe(pins);
     });
   }
+
+  test('tips_guide and generic_article keep the half plan (unchanged by TASK-FIX-098)', () => {
+    for (const articleKind of ['tips_guide', 'generic_article', null, undefined] as const) {
+      for (const pins of [1, 3, 5, 10, 12, 15, 20]) {
+        expect(numberedPinCount(pins, { articleKind })).toBe(Math.ceil(pins / 2));
+        expect(buildListicleAnglePlan(pins, { articleKind })).toEqual(buildListicleAnglePlan(pins));
+      }
+    }
+  });
+});
+
+test.describe('TASK-FIX-098 — project gallery: about 30 % numbered Pins, rounded up', () => {
+  for (const [pins, numbered] of [[1, 1], [2, 1], [3, 1], [4, 2], [5, 2], [7, 3], [10, 3], [12, 4], [15, 5], [18, 6], [20, 6]] as const) {
+    test(`${pins} Pins → ${numbered} numbered, ${pins - numbered} not numbered`, () => {
+      const plan = galleryPlan(pins);
+      expect(plan).toHaveLength(pins);
+      expect(numberedPinCount(pins, GALLERY)).toBe(numbered);
+      expect(numberedPinCount(pins, GALLERY)).toBe(Math.max(1, Math.ceil(pins * 0.3)));
+      expect(plan.filter(isNumberedAngle)).toHaveLength(numbered);
+      expect(plan.filter((angle) => !isNumberedAngle(angle))).toHaveLength(pins - numbered);
+      expect(plan.filter((angle) => !isNumberedAngle(angle)).every((angle) => OTHER.includes(angle))).toBe(true);
+      // The first Pin is always numbered; the others are spread over the batch.
+      expect(isNumberedAngle(plan[0])).toBe(true);
+      if (pins < PINTEREST_ANGLES.length) expect(new Set(plan).size).toBe(pins);
+      // Deterministic: the same request gives the same plan.
+      expect(galleryPlan(pins)).toEqual(plan);
+    });
+  }
+
+  test('12 Pins: numbered slots 1, 4, 7, 10 (Listicle / Article Promise alternate)', () => {
+    const plan = galleryPlan(12);
+    expect(plan.flatMap((angle, index) => (isNumberedAngle(angle) ? [index + 1] : []))).toEqual([1, 4, 7, 10]);
+    expect(plan.filter(isNumberedAngle)).toEqual(['listicle', 'article-promise', 'listicle', 'article-promise']);
+  });
+
+  test('an empty batch has no numbered Pin', () => {
+    expect(numberedPinCount(0, GALLERY)).toBe(0);
+    expect(galleryPlan(0)).toEqual([]);
+  });
+
+  test('AI recommends ("minimum"): the threshold is the plan count — 4 of 12 pass, 3 of 12 → LISTICLE_ANGLE_PLAN', () => {
+    const plan = galleryPlan(12);
+    const pins = plan.map((angle, index) => ({
+      angle,
+      title: isNumberedAngle(angle) ? `${NUMBERED_TITLES[0]} ${index}` : `Other title ${index}`,
+      description: 'Winter crochet blanket inspiration.',
+    }));
+    expect(validateListicleBatch(pins, plan, '15', EVIDENCE, { mode: 'minimum' }).filter((issue) => issue.reason === 'LISTICLE_ANGLE_PLAN')).toEqual([]);
+    const tooFew = pins.map((pin, index) => (index === 9 ? { ...pin, angle: 'curiosity' as const } : pin));
+    const issues = validateListicleBatch(tooFew, plan, '15', EVIDENCE, { mode: 'minimum' }).filter((issue) => issue.reason === 'LISTICLE_ANGLE_PLAN');
+    expect(issues.map((issue) => issue.details)).toEqual([['listicle + article-promise ≥ 4', 'listicle + article-promise = 3']]);
+  });
 });
 
 interface TestPin {
@@ -517,7 +572,7 @@ function wordpressPost(title: string, count: number) {
 }
 const NO_NUMBER_HTML = `<p>Crochet blankets for cozy evenings.</p><h2>Moss stitch blanket</h2><p>A moss stitch crochet blanket in cream cotton yarn with a soft texture for the sofa.</p><h2>Waffle blanket</h2><p>A waffle crochet blanket in cream cotton yarn with a deep texture for the bed.</p><h2>Ripple blanket</h2><p>A ripple crochet blanket in cream cotton yarn that drapes over the sofa.</p>`;
 
-// Up to 15 Pins: 8 numbered and 7 other titles, all distinct enough for the duplicate-title check.
+// Up to 18 Pins: 8 numbered and 14 other titles, all distinct enough for the duplicate-title check.
 const MORE_NUMBERED = [
   'From Moss Stitch to Popcorn: 15 Blankets in Cream',
   'Pick One of 15 Textured Blankets for the Sofa',
@@ -529,6 +584,14 @@ const MORE_OTHER = [
   'A Practical Guide to Cozy Crochet Blankets',
   'Why Cream Yarn Makes a Blanket Look Calmer',
   'Too Cold on the Sofa? Try a Textured Throw',
+  // TASK-FIX-098: a project gallery has ~70 % non-numbered Pins.
+  'The Stitch Pattern That Gives a Throw Real Depth',
+  'Warm Evenings Start With a Handmade Throw',
+  'How Texture Turns a Plain Throw Into Decor',
+  'Soft Cotton Throws for Lazy Sunday Mornings',
+  'Layer a Knotted Throw Over Your Reading Chair',
+  'What Makes a Crochet Throw Feel Heirloom',
+  'Bring Handmade Warmth to a Minimal Living Room',
 ];
 const CAMERA = ['overhead', 'eye-level', '45-degree', 'close-up', 'wide shot'];
 const BACKDROP = ['white', 'cream linen', 'light gray'];
@@ -684,10 +747,11 @@ const savedPins = (run: GenerateRun) => (run.events.find((event) => event.table 
 const composerOf = (row: Record<string, unknown>) => readComposerMetadata(row.image_analysis as string);
 
 test.describe('POST /api/pinterest/generate — numbered article', () => {
-  for (const [count, pins, numbered] of [[15, 3, 2], [18, 7, 4], [15, 5, 3], [15, 15, 8]] as const) {
+  // TASK-FIX-098: a project gallery numbers ~30 % of its Pins (rounded up).
+  for (const [count, pins, numbered] of [[15, 3, 1], [18, 7, 3], [15, 5, 2], [15, 10, 3], [12, 12, 4], [15, 15, 5]] as const) {
     test(`${count} ideas, ${pins} Pins → ${numbered} numbered titles on article photos; link, board and section unchanged`, async () => {
       const post = wordpressPost(`${count} Cozy Crochet Blanket Ideas for Winter`, count);
-      const plan = buildListicleAnglePlan(pins);
+      const plan = galleryPlan(pins);
       const run = await runGenerate(post, { ...articleBody(pins), board: 'Crochet Blankets', boardSection: 'Winter' }, modelAnswer(post, pins, plan, String(count)));
       expect(run.status, JSON.stringify(run.body.error)).toBe(201);
       expect(run.prompts).toHaveLength(1);
@@ -698,8 +762,12 @@ test.describe('POST /api/pinterest/generate — numbered article', () => {
       expect(run.events.filter((event) => event.table === 'pins')).toHaveLength(1);
       expect(new Set(rows.map((row) => row.title)).size).toBe(pins);
       const numberedRows = rows.filter((row) => new RegExp(`\\b${count}\\b`).test(row.title as string));
-      expect(numberedRows.length).toBeGreaterThanOrEqual(numbered);
-      expect(numberedRows.length / pins).toBeGreaterThanOrEqual(0.5);
+      expect(numberedRows).toHaveLength(numbered);
+      const composed = rows.filter((row) => composerOf(row)?.templateType === 'listicle_article_image');
+      expect(composed).toHaveLength(numbered);
+      expect(rows.length - composed.length).toBe(pins - numbered);
+      // Each numbered Pin is on its own section (TASK-FIX-096 kept).
+      expect(new Set(composed.map((row) => JSON.parse(row.image_analysis as string)._articleSource.sectionId)).size).toBe(numbered);
       const articleImages = new Set([FEATURED, ...Array.from({ length: count }, (_, i) => imageUrl(i + 1))]);
       rows.forEach((row) => {
         const angle = JSON.parse(row.image_analysis as string)._pinterestStrategy.angle as PinterestAngle;
@@ -728,8 +796,8 @@ test.describe('POST /api/pinterest/generate — numbered article', () => {
 
   test('a numbered Pin without the number → 422 LIST_NUMBER_MISSING, nothing saved', async () => {
     const post = wordpressPost('15 Cozy Crochet Blanket Ideas for Winter', 15);
-    const answer = JSON.parse(modelAnswer(post, 3, buildListicleAnglePlan(3), '15'));
-    answer.pins[2].title = 'A Practical Guide to Cozy Crochet Blankets';
+    const answer = JSON.parse(modelAnswer(post, 3, galleryPlan(3), '15'));
+    answer.pins[0].title = 'A Practical Guide to Cozy Crochet Blankets';
     const run = await runGenerate(post, articleBody(3), JSON.stringify(answer));
     expect(run.status).toBe(422);
     expect(run.body.error?.issues?.map((issue) => issue.code)).toContain('LIST_NUMBER_MISSING');
@@ -821,7 +889,7 @@ test.describe('TASK-FIX-084 — the requested Pin count is never proof of a numb
 
   test('a number the article really gives (a list label, the H1 count) still passes', async () => {
     const post = FIFTEEN_POST();
-    const run = await runGenerate(post, articleBody(3), modelAnswer(post, 3, buildListicleAnglePlan(3), '15'));
+    const run = await runGenerate(post, articleBody(3), modelAnswer(post, 3, galleryPlan(3), '15'));
     expect(run.status, JSON.stringify(run.body.error)).toBe(201);
   });
 
@@ -832,10 +900,11 @@ test.describe('TASK-FIX-084 — the requested Pin count is never proof of a numb
 });
 
 test.describe('TASK-FIX-084 — AI Integrated "AI recommends" gets the numbered plan', () => {
-  for (const [pins, numbered] of [[3, 2], [7, 4], [15, 8]] as const) {
+  // TASK-FIX-098: the blanket article is a project gallery → ~30 % numbered.
+  for (const [pins, numbered] of [[3, 1], [7, 3], [15, 5]] as const) {
     test(`"15 ideas", ${pins} Pins → at least ${numbered} titles with 15; the others keep the model's angles; one insert, no duplicate`, async () => {
       const post = FIFTEEN_POST();
-      const run = await runGenerate(post, integratedBody(pins), integratedAnswer(post, buildListicleAnglePlan(pins)));
+      const run = await runGenerate(post, integratedBody(pins), integratedAnswer(post, galleryPlan(pins)));
       expect(run.status, JSON.stringify(run.body.error)).toBe(201);
       expect(run.prompts[0]).toContain('The source article confirms an exact count: 15.');
       expect(run.prompts[0]).toContain(`At least ${numbered} of the ${pins} pins use the "listicle" or "article-promise" angle`);
@@ -860,9 +929,9 @@ test.describe('TASK-FIX-084 — AI Integrated "AI recommends" gets the numbered 
     expect(numberedTitles(run)).toHaveLength(4);
   });
 
-  test('AI recommends: fewer than half numbered (the production run) → 422 LISTICLE_ANGLE_PLAN, nothing saved', async () => {
+  test('AI recommends: fewer numbered Pins than the plan (2 of 7, the plan needs 3) → 422 LISTICLE_ANGLE_PLAN, nothing saved', async () => {
     const post = FIFTEEN_POST();
-    const run = await runGenerate(post, integratedBody(3), integratedAnswer(post, ['listicle', 'curiosity', 'discovery']));
+    const run = await runGenerate(post, integratedBody(7), integratedAnswer(post, ['listicle', 'curiosity', 'discovery', 'article-promise', 'curiosity', 'discovery', 'problem-solution']));
     expect(run.status).toBe(422);
     expect(run.body.error?.issues?.map((issue) => issue.code)).toEqual(['LISTICLE_ANGLE_PLAN']);
     expect(run.events.filter((event) => event.table === 'pins')).toEqual([]);
@@ -877,8 +946,8 @@ test.describe('TASK-FIX-084 — AI Integrated "AI recommends" gets the numbered 
 
   test('Balanced keeps the exact plan', async () => {
     const post = FIFTEEN_POST();
-    const run = await runGenerate(post, integratedBody(3, { ...AI_INTEGRATED_SETTINGS, strategy: 'balanced' }), integratedAnswer(post, buildListicleAnglePlan(3)));
-    expect(run.prompts[0]).toContain('pin 1 = "listicle", pin 2 = "curiosity", pin 3 = "article-promise"');
+    const run = await runGenerate(post, integratedBody(3, { ...AI_INTEGRATED_SETTINGS, strategy: 'balanced' }), integratedAnswer(post, galleryPlan(3)));
+    expect(run.prompts[0]).toContain('pin 1 = "listicle", pin 2 = "curiosity", pin 3 = "discovery"');
     expect(run.status, JSON.stringify(run.body.error)).toBe(201);
   });
 
@@ -1083,7 +1152,7 @@ test.describe('TASK-FIX-085 — title repair in POST /api/pinterest/generate', (
   ] as const) {
     test(`${strategy}, 15 Pins, near-identical titles → one repair, distinct titles, 15 kept, everything else unchanged, one insert, no image call`, async () => {
       const article = post();
-      const plan = buildListicleAnglePlan(15);
+      const plan = galleryPlan(15);
       const first = duplicateAnswer(article, plan, '15', strategy === 'AI recommends');
       const run = await runGenerate(article, { ...body, board: 'Crochet Blankets', boardSection: 'Winter' }, [first, repairAnswer(article, plan, '15')]);
       expect(run.status, JSON.stringify(run.body.error)).toBe(201);
@@ -1142,7 +1211,8 @@ test.describe('TASK-FIX-085 — title repair in POST /api/pinterest/generate', (
   });
 
   const failing: Array<[string, (article: ReturnType<typeof wordpressPost>, plan: PinterestAngle[]) => string, string]> = [
-    ['removes 15 from a numbered Pin', (a, plan) => repairAnswer(a, plan, '15', { 3: 'Crochet Blankets to Save for the Cold Season' }), 'DUPLICATE_TITLE'],
+    // 5 Pins in a project gallery (TASK-FIX-098): Pins 1 and 4 are numbered.
+    ['removes 15 from a numbered Pin', (a, plan) => repairAnswer(a, plan, '15', { 4: 'Crochet Blankets to Save for the Cold Season' }), 'DUPLICATE_TITLE'],
     ['invents a number', (a, plan) => repairAnswer(a, plan, '15', { 2: '40 Crochet Blankets Worth Saving' }), 'DUPLICATE_TITLE'],
     ['adds "viral"', (a, plan) => repairAnswer(a, plan, '15', { 2: 'Viral Crochet Blankets for the Sofa' }), 'DUPLICATE_TITLE'],
     ['adds "best"', (a, plan) => repairAnswer(a, plan, '15', { 2: 'The Best Crochet Blankets for the Sofa' }), 'DUPLICATE_TITLE'],
@@ -1153,8 +1223,8 @@ test.describe('TASK-FIX-085 — title repair in POST /api/pinterest/generate', (
   for (const [name, buildRepair, code] of failing) {
     test(`a repair that ${name} → 422 strategy_safeguard_failed (${code}), one repair only, nothing saved`, async () => {
       const article = post();
-      const plan = buildListicleAnglePlan(3);
-      const run = await runGenerate(article, articleBody(3), [duplicateAnswer(article, plan, '15'), buildRepair(article, plan)]);
+      const plan = galleryPlan(5);
+      const run = await runGenerate(article, articleBody(5), [duplicateAnswer(article, plan, '15'), buildRepair(article, plan)]);
       expect(run.status).toBe(422);
       expect(run.prompts).toHaveLength(2);
       expect(run.body.error?.code).toBe('strategy_safeguard_failed');
@@ -1167,7 +1237,7 @@ test.describe('TASK-FIX-085 — title repair in POST /api/pinterest/generate', (
 
   test('a failed repair: issueCount = issues in the body = the log = the alert; no model text in the logs', async () => {
     const article = post();
-    const plan = buildListicleAnglePlan(15);
+    const plan = galleryPlan(15);
     const run = await runGenerate(article, articleBody(15), [duplicateAnswer(article, plan, '15'), 'not json']);
     expect(run.status).toBe(422);
     const error = run.body.error as unknown as StrategySafeguardError;
@@ -1312,13 +1382,14 @@ test.describe('TASK-FIX-086 — title repair: the related title, the real measur
 });
 
 test.describe('TASK-FIX-086 — the last duplicate in POST /api/pinterest/generate', () => {
-  const plan = buildListicleAnglePlan(12);
+  // A project gallery (TASK-FIX-098): 4 of 12 Pins numbered.
+  const plan = galleryPlan(12);
 
   for (const [strategy, body, integrated] of [
     ['balanced', articleBody(12), false],
     ['AI recommends', integratedBody(12), true],
   ] as const) {
-    test(`${strategy}, 12 Pins, one duplicate left: candidates → 201, 12 distinct titles, ≥ 6 with 12, everything else kept, one insert, no image call`, async () => {
+    test(`${strategy}, 12 Pins, one duplicate left: candidates → 201, 12 distinct titles, ≥ 4 with 12, everything else kept, one insert, no image call`, async () => {
       const article = TWELVE_POST();
       const first = oneDuplicateAnswer(article, plan, 10, REORDERED_12, integrated);
       const run = await runGenerate(article, { ...body, board: 'Crochet Blankets', boardSection: 'Winter' }, [first, candidatesAnswer([[11, [REORDERED_12, DISTINCT_12]]])]);
@@ -1329,7 +1400,7 @@ test.describe('TASK-FIX-086 — the last duplicate in POST /api/pinterest/genera
       expect(rows).toHaveLength(12);
       expect(run.events.filter((event) => event.table === 'pins')).toHaveLength(1);
       expect(new Set(rows.map((row) => row.title)).size).toBe(12);
-      expect(numberedTitles(run, '12').length).toBeGreaterThanOrEqual(6);
+      expect(numberedTitles(run, '12').length).toBeGreaterThanOrEqual(4);
       expect(rows[10].title).toBe(DISTINCT_12);
       const original = pinsOf(first);
       rows.forEach((row, i) => {
@@ -1358,7 +1429,9 @@ test.describe('TASK-FIX-086 — the last duplicate in POST /api/pinterest/genera
   ] as const) {
     test(`no candidate passes (${name}) → 422 DUPLICATE_TITLE Pin 11 → Pin 1, one repair only, nothing saved, no model text logged`, async () => {
       const article = TWELVE_POST();
-      const run = await runGenerate(article, integratedBody(12), [oneDuplicateAnswer(article, plan, 10, REORDERED_12, true), repair]);
+      // AI recommends: numbered Pins may sit anywhere — Pin 11 numbered instead of Pin 10 (still 4 of 12).
+      const pinElevenNumbered = plan.map((angle, i) => (i === 9 ? plan[10] : i === 10 ? plan[9] : angle));
+      const run = await runGenerate(article, integratedBody(12), [oneDuplicateAnswer(article, pinElevenNumbered, 10, REORDERED_12, true), repair]);
       expect(run.status).toBe(422);
       expect(run.prompts).toHaveLength(2);
       const error = run.body.error as unknown as StrategySafeguardError;
@@ -1875,7 +1948,7 @@ test.describe('TASK-087 — rendering: dominant photo, compact panel, safe crop'
 test.describe('TASK-087 — routes', () => {
   test('POST /api/pinterest/generate on a 12-idea article: different visual titles, full titles unchanged, one AI call', async () => {
     const post = wordpressPost('12 Cozy Crochet Blanket Ideas for Winter', 12);
-    const plan = buildListicleAnglePlan(12);
+    const plan = galleryPlan(12);
     const answer = modelAnswer(post, 12, plan, '12');
     const run = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets', boardSection: 'Winter' }, answer);
     expect(run.status, JSON.stringify(run.body.error)).toBe(201);
@@ -1886,8 +1959,9 @@ test.describe('TASK-087 — routes', () => {
       const composer = composerOf(row);
       return composer && isListicleV2(composer) ? [composer] : [];
     });
-    expect(numbered).toHaveLength(6);
-    expect(new Set(numbered.map((item) => item.text.displayTitle)).size).toBe(6);
+    // TASK-FIX-098: 4 of 12 numbered in a project gallery.
+    expect(numbered).toHaveLength(4);
+    expect(new Set(numbered.map((item) => item.text.displayTitle)).size).toBe(4);
     for (const item of numbered) {
       expect(item.text.number).toBe('12');
       expect(item.text.displayTitle).not.toMatch(/\b12\b/);
@@ -1976,7 +2050,7 @@ test.describe('v3.3.0 — AI-generated design by default; stored modes and expli
 
   test('POST /api/pinterest/generate: AI design by default, explicit overlay / Photo only kept, stored on numbered Pins only; texts, link, board unchanged; no image call', async () => {
     const post = wordpressPost('12 Cozy Crochet Blanket Ideas for Winter', 12);
-    const plan = buildListicleAnglePlan(12);
+    const plan = galleryPlan(12);
     const answer = modelAnswer(post, 12, plan, '12');
     const original = pinsOf(answer);
     const byDefault = await runGenerate(post, { ...articleBody(12), board: 'Crochet Blankets' }, answer);
@@ -1988,7 +2062,7 @@ test.describe('v3.3.0 — AI-generated design by default; stored modes and expli
     }
     const contractsOf = (run: GenerateRun) => savedPins(run).map(composerOf).filter((item): item is ListicleV2Metadata => Boolean(item && isListicleV2(item)));
     const aiContracts = contractsOf(byDefault);
-    expect(aiContracts).toHaveLength(6);
+    expect(aiContracts).toHaveLength(4);
     expect(aiContracts.every((item) => item.textTreatment === 'ai-design')).toBe(true);
     expect(contractsOf(overlay).every((item) => item.textTreatment === 'omniflow-overlay')).toBe(true);
     expect(contractsOf(photo).every((item) => item.textTreatment === 'photo-only')).toBe(true);
