@@ -256,7 +256,7 @@ test('failures are explicit: empty or unreadable input never yields a buffer', a
 // --------------------------------------------------------------- storage wiring
 
 test('Pinterest route optimizes before any storage write and stores the real format', () => {
-  const route = read('app/api/pinterest/generate-images/route.ts');
+  const route = (read('app/api/pinterest/generate-images/route.ts') + read('lib/pinterest/pin-image-generation.ts'));
   const optimizeAt = route.indexOf("optimizeImage(imageBuffer, 'pinterest-pin')");
   expect(optimizeAt).toBeGreaterThan(0);
   expect(optimizeAt).toBeLessThan(route.indexOf('getPinImageObjectKey('));

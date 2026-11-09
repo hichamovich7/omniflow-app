@@ -426,14 +426,14 @@ test('.source photos never go to R2: R2 image keys map to the Supabase source pa
   expect(getPinSourceStoragePath(`images/pinterest/${USER}/${GEN}/${PIN}/3.jpg`)).toBe(`${USER}/${PIN}/3.source.png`);
   expect(isR2MediaKey(getPinSourceStoragePath(`images/pinterest/${USER}/${GEN}/${PIN}/3.jpg`))).toBe(false);
 
-  const route = read('app/api/pinterest/generate-images/route.ts');
+  const route = (read('app/api/pinterest/generate-images/route.ts') + read('lib/pinterest/pin-image-generation.ts'));
   expect(route).toMatch(/supabase\.storage\s*\.from\('generated-images'\)\s*\.upload\(sourcePath/);
   const recompose = read('app/api/pinterest/pin-images/recompose/route.ts');
   expect(recompose).toContain('bucket.upload(newSourcePath');
 });
 
 test('Pinterest generation resolves the storage before any paid image call', () => {
-  const route = read('app/api/pinterest/generate-images/route.ts');
+  const route = (read('app/api/pinterest/generate-images/route.ts') + read('lib/pinterest/pin-image-generation.ts'));
   const storageAt = route.indexOf("createMediaStorage(supabase, 'generated-images')");
   expect(storageAt).toBeGreaterThan(0);
   expect(storageAt).toBeLessThan(route.indexOf("image_status: 'processing'"));

@@ -294,6 +294,8 @@ Status: NOT IMPLEMENTED. Replaced by GET /api/generations/[id] (see below).
 
 Generate images for all pins in a generation.
 
+Code (TASK-099): the route keeps the auth, ownership, rate limit, batch, concurrency and `image_status` handling; the per-Pin pipeline (classic, AI Integrated, legacy composite, composer, AI-generated design, storage, `pin_images`) lives in `lib/pinterest/pin-image-generation.ts` (`generatePinImage`), moved unchanged and shared with "Regenerate complete Pins".
+
 ## Description
 
 Batch generates Pinterest-optimized images. Processes up to 10 pins per batch with max 3 concurrent requests. Supports image versioning — each call creates a new version without overwriting existing images. Pins with `visual_format = photo` use OpenAI (gpt-image-1, or `AI_IMAGE_PROVIDER`/`AI_IMAGE_MODEL`); pins with `visual_format = text-overlay` always route through OpenRouter to `AI_IMAGE_MODEL_TEXT` instead, with `overlay_text` rendered explicitly in the prompt (TASK-034).
@@ -1681,18 +1683,35 @@ generation_failed      500
 
 # POST /api/pinterest/pins/[id]/regenerate-text
 
-"Regenerate text" (TASK-076): new **title, description and keywords** for one saved Pin, whatever its source (keyword / Research, OmniFlow article, existing WordPress post). The image is not touched. `maxDuration = 60`. Code: `app/api/pinterest/pins/[id]/regenerate-text/route.ts`, `lib/pinterest/pin-text.ts` (`preparePinTextRegeneration`, `regenerateAndSavePinText`), `lib/pinterest/regenerate-text.ts` (`regeneratePinText`).
+Pin regeneration (TASK-076, TASK-082, **TASK-099**) for one saved Pin, whatever its source (keyword / Research, OmniFlow article, existing WordPress post). Two explicit modes (TASK-099) — both write a **coherent creative package**: new **title, description, keywords and `image_prompt`**, the new prompt written from the new title / description, the Pin's section and its angle, never the stored prompt:
+
+* `text-and-image-prompt` (default, also with no body): **one text AI call, no image call**; the current image (`media_url`, `pin_images`) is kept.
+* `complete`: the same text call, then **at most one image call** made from the new prompt (the Pin's own image mode: classic / AI Integrated / AI-generated design = 1 paid image; a numbered Pin on the article photo = 0 paid images, re-rendered from the photo). Text, prompt and image are written **together**, only once the image is stored. Step-by-step Pins (one image per panel) are refused (422 `multi_image_pin`).
+
+`maxDuration = 120`. Code: `app/api/pinterest/pins/[id]/regenerate-text/route.ts`, `lib/pinterest/pin-text.ts` (`preparePinTextRegeneration`, `regenerateAndSavePinText`, `regenerateCompletePin`, `assertCompleteRegenerationAllowed`), `lib/pinterest/regenerate-text.ts` (`regeneratePinText`, `imagePromptProblem`), `lib/pinterest/pin-image-generation.ts` (`generatePinImage` — the per-Pin pipeline of `POST /api/pinterest/generate-images`, moved unchanged).
+
+## Request
+
+```json
+{ "mode": "text-and-image-prompt" }
+```
+
+`mode`: `"text-and-image-prompt"` (default) or `"complete"` (`regeneratePinTextRequestSchema`, strict — any other key or mode → 400 `invalid_request`; malformed JSON → 400 `invalid_json`; an empty body = the default mode).
 
 ## Description
 
-1. Auth (401), UUID (400). No request body: the source is resolved server-side.
+1. Auth (401), UUID (400), body (400). The source is resolved server-side.
 2. `preparePinTextRegeneration()` (selects only + WordPress GET): the Pin and its generation are the caller's (404 / 403), the project is the caller's (404 / 403). Source from the generation row: `source_type = 'external_wordpress_post'` → the post is read again (`loadWordPressPostPinterestSource`, GET only); `source_wordpress_generation_id` → the OmniFlow article (`loadArticlePinterestSource`, owned + completed); otherwise a keyword generation. An article Pin whose article / post reference is gone → 409 `source_unavailable` (never rewritten from the keyword alone). An article of another project → 400 `project_mismatch`. Context: the generation's keyword and language, project niche + niche settings, the Content Stream of the Pin's board plus the article category's Streams, the Brand Profile (project description), the article context (no URL) and the Pin's stored source section / visual brief.
-3. Rate limit `pinterest/regenerate-pin` (30/hour, trial cap) — **the same bucket** as `POST /api/pinterest/pins/[id]/regenerate`, after the checks.
-4. `regeneratePinText()`: same `buildPinterestPinsPrompt()` (1 Pin, the Pin's mode, AI Integrated settings with the Manual strategy set to the Pin's angle), the instruction to rewrite only the title / description / keywords with the Pin's angle, the other Pins' titles and the current title to differ from. **One** text AI call (`FAST`); the image model, Vision and storage are never called. URLs written by the model are removed (every source). Rejected (nothing written):
-   * **Answer contract (TASK-082):** the prompt asks for a text-only structure (`textOnlyRewrite`): `{"pins":[{"title","description","keywords":[...]}]}`, validated by `regeneratedPinTextResponseSchema` (`lib/validations/pinterest.ts`) — exactly one Pin; `title` (1-100), `description` (1-500), `keywords` required; keywords as an array or a comma string → one trimmed "a, b" string; a ```json fence is tolerated; `angle` / `sourceSectionId` optional (checked when echoed); the generation's image fields (`board`, `image_prompt`, `visualFormat`, overlay / banner / integrated text) tolerated and discarded; any other key → rejected. No automatic second AI call;
+3. `complete` only, **before any AI call and before the rate limit**: a Pin whose mode needs several image calls (`readPinVisualFormat().imageCalls > 1`, Step-by-step) → 422 `multi_image_pin`; the generation's `image_status = 'processing'` → 409 `conflict`; media storage resolved (misconfigured → 500 `storage_unavailable`, never after a paid call).
+4. Rate limit `pinterest/regenerate-pin` (30/hour, trial cap) — **the same bucket** as `POST /api/pinterest/pins/[id]/regenerate`, after the checks. `complete` also takes one slot of `pinterest/generate-images` (20/hour, trial cap) after the text bucket.
+5. `regeneratePinText({ withImagePrompt: true })`: same `buildPinterestPinsPrompt()` (1 Pin, the Pin's mode, AI Integrated settings with the Manual strategy set to the Pin's angle; `tipsGuide` for a `tips_guide` article), the instruction to rewrite the title / description / keywords **and write a brand-new image_prompt** from them (and from the Pin's section in `<pin_plan>`) with the Pin's angle — the stored prompt is **never sent** to the model —, the other Pins' titles and the current title to differ from. A Pin that is **not numbered** in a numbered article (`detectListicleNumber`; numbered = a `listicle_article_image` composer Pin or a Listicle / Article Promise angle) also gets "its image_prompt must not show any number, count, badge or list"; numbered Pins keep the current count rules. **One** text AI call (`FAST`); Vision is never called. URLs written by the model are removed (every source). Rejected (nothing written):
+   * **Answer contract (TASK-099):** `rewriteImagePrompt` structure `{"pins":[{"title","description","keywords":[...],"image_prompt"}]}`, validated by `regeneratedPinPackageResponseSchema` — the TASK-082 text contract (exactly one Pin; `title` 1-100, `description` 1-500, `keywords` array or comma string; `angle` / `sourceSectionId` optional and checked when echoed; other generation fields tolerated and discarded; unknown key rejected) plus a **required** `image_prompt` (1-2000). No automatic second AI call;
+   * **Image prompt (TASK-099, `imagePromptProblem`):** empty after URL removal, the stored prompt reused (normalized match), the replaced title quoted inside it (when the title changed), or — not-numbered Pin — the article's count as a number or a "badge" / "numbered" / "numeral" → 422 `invalid_pin_plan` with `issues[0].field = "image_prompt"`. Never a fallback to the old prompt;
    * provider error → 500 `generation_failed`; unparsable plan, empty text after URL removal, or prompt scaffolding in the output (`<article>`, `pin_plan`, `sourceSectionId`, `image_prompt`, "visual brief"…) → 422 `invalid_pin_plan`;
-   * 422 `strategy_safeguard_failed` (structured, scope "pin"): `ANGLE_MISMATCH`, `UNSUPPORTED_NUMBER` / `UNSUPPORTED_CLAIM` (numbers / claims absent from the keyword and source), `DUPLICATE_TITLE` (vs the other Pins), `MISSING_SOURCE_SECTION` (article Pin that left its stored section), and new `UNGROUNDED_TEXT_ELEMENTS` (article Pins: a material, color, technique, motif or project of the fixed vocabularies — Home Decor: rooms / furniture / colors / materials, English + German — named in the title, description or keywords but absent from the article; `field` = `title` / `description` / `keywords`).
-5. One update of that Pin: `title`, `description`, `keywords` only. Kept: `id`, `generation_id`, `media_url`, `image_prompt`, `image_analysis` (angle, AI Integrated text, article source), `overlay_text`, `link_url`, board / `board_id` / `board_section`, `publish_date`, `visual_format`, banner templates. No new generation, no new image, no other Pin changed, WordPress never written. UTM stay CSV-only.
+   * 422 `strategy_safeguard_failed` (structured, scope "pin"): `ANGLE_MISMATCH`, `UNSUPPORTED_NUMBER` / `UNSUPPORTED_CLAIM` (numbers / claims absent from the keyword and source), `DUPLICATE_TITLE` (vs the other Pins), `MISSING_SOURCE_SECTION` (article Pin that left its stored section), and new `UNGROUNDED_TEXT_ELEMENTS` (article Pins: a material, color, technique, motif or project of the fixed vocabularies — Home Decor: rooms / furniture / colors / materials, English + German — named in the title, description or keywords but absent from the article; `field` = `title` / `description` / `keywords`). TASK-099: the new `image_prompt` also passes the generation's article checks (`validateArticleGroundedPins` on the Pin's stored section, with the article kind `project_listicle` / `tips_guide` / `generic_article` and the section text): `IMAGE_SUBJECT_MISMATCH` (the section's project, the tip of a tips_guide section, the H1 subject), `UNGROUNDED_IMAGE_ELEMENTS`, `DUPLICATE_SOURCE_SECTION` / `MISSING_SOURCE_SECTION` (the stored section is kept).
+6. `text-and-image-prompt`: **one** update of that Pin: `title`, `description`, `keywords`, `image_prompt`.
+   `complete`: `generatePinImage()` with the Pin in memory (new text + prompt) — classic / AI Integrated prompts are built from the new `image_prompt`; a composer Pin keeps its template — then **one** update of the Pin row with `title`, `description`, `keywords`, `image_prompt`, `media_url` (+ the fields the image pipeline already wrote: `title_banner_template`, diagnostics / composer render metadata). Image failure (provider, sanitize, optimize, storage) → nothing written: 502 `image_failed`, message naming the Pin ("… Its previous text and image are kept."). A refused Pin-row update after the image was stored → the new `pin_images` row is deactivated, the previous active image restored, the new file removed, same 502.
+   Kept in both modes: `id`, `generation_id`, `image_analysis` angle / AI Integrated text / article source, `overlay_text`, `link_url` (UTM included), board / `board_id` / `board_section`, `publish_date`, status, `visual_format`. No new generation, no other Pin changed, WordPress never written. UTM stay CSV-only. Logs carry reasons and field names only — never the model's text or the prompt.
 
 ## Response
 
@@ -1710,8 +1729,13 @@ article_not_completed  409
 source_unavailable     409
 WordPress read errors  (same codes as the existing-post flow)
 rate_limited / trial_limit_reached
-invalid_pin_plan       422  (TASK-082: structured — "… The Pin was not modified.", retryable: true, issues[0].field = title | description | keywords | pins)
+invalid_json / invalid_request 400 (TASK-099: body)
+invalid_pin_plan       422  (TASK-082: structured — "… The Pin was not modified.", retryable: true, issues[0].field = title | description | keywords | image_prompt | pins)
 strategy_safeguard_failed 422 (structured: retryable + issues)
+multi_image_pin        422  (TASK-099, complete: Step-by-step Pin — before any AI call)
+conflict               409  (TASK-099, complete: images of this generation are being generated)
+storage_unavailable    500  (TASK-099, complete)
+image_failed           502  (TASK-099, complete: names the Pin; text, prompt and image unchanged)
 generation_failed      500
 ```
 

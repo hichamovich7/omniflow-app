@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Type } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -13,36 +13,57 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import {
+  planCompleteRegeneration,
   requestPinTextRegeneration,
   runBulkPinTextRegeneration,
   type BulkPinTextSummary,
+  type PinRegenerationMode,
 } from '@/lib/pinterest/regenerate-text-client';
 import type { Pin } from '@/types/database';
 
 /**
- * "Regenerate text" for the selected Pins (TASK-082): after a confirmation,
- * the existing one-Pin route is called for each Pin in sequence. A success is
- * saved at once, a failure leaves its Pin unchanged and the batch goes on;
- * the summary can retry only the Pins that were not regenerated. Images,
- * links, boards, sections and dates are never touched.
+ * Regeneration of the selected Pins (TASK-082, TASK-099). The dialog offers
+ * two explicit modes before any call:
+ * - "Regenerate text + image prompts": one text AI generation per Pin (title,
+ *   description, keywords and a new image prompt); no image is generated, the
+ *   current images are kept.
+ * - "Regenerate complete Pins": the same, then one new image per Pin; the
+ *   exact number of paid images is shown first. Step-by-step Pins (one image
+ *   per panel) are excluded.
+ * Each Pin goes through the one-Pin route in sequence; a success is saved at
+ * once, a failure leaves its Pin unchanged and the batch goes on. Links, UTM,
+ * boards, sections, dates and status are never touched.
  */
 
-export const BULK_REGENERATE_TEXT_CONFIRMATION =
-  'This will use one text AI generation per Pin. Images and links will not change. Continue?';
+export const REGENERATION_MODE_LABELS: Record<PinRegenerationMode, string> = {
+  'text-and-image-prompt': 'Regenerate text + image prompts',
+  complete: 'Regenerate complete Pins',
+};
+
+export function textAndPromptsConfirmation(count: number): string {
+  return `One text AI generation per Pin (${count}): new titles, descriptions, keywords and image prompts. No image is generated — the current images are kept.`;
+}
+
+export function completeRegenerationConfirmation(paidImages: number, pinCount: number): string {
+  return `This will generate exactly ${paidImages} paid image${paidImages === 1 ? '' : 's'} for ${pinCount} ${pinCount === 1 ? 'Pin' : 'Pins'}, after one text AI generation per Pin. A Pin whose image fails keeps its previous text and image.`;
+}
 
 export function bulkRegenerateTextLabel(count: number): string {
-  return count > 0 ? `Regenerate text for ${count} ${count === 1 ? 'Pin' : 'Pins'}` : 'Regenerate text';
+  return count > 0 ? `Regenerate ${count} ${count === 1 ? 'Pin' : 'Pins'}` : 'Regenerate Pins';
 }
 
 type Phase =
-  | { kind: 'confirm'; pinIds: string[] }
-  | { kind: 'running'; done: number; total: number }
-  | { kind: 'done'; summary: BulkPinTextSummary };
+  | { kind: 'confirm'; pinIds: string[]; mode: PinRegenerationMode }
+  | { kind: 'running'; done: number; total: number; mode: PinRegenerationMode }
+  | { kind: 'done'; summary: BulkPinTextSummary; mode: PinRegenerationMode };
+
+type DialogPin = Pick<Pin, 'id' | 'title' | 'image_analysis'>;
 
 interface BulkRegenerateTextDialogProps {
   selectedPinIds: Set<string>;
-  pins: Pick<Pin, 'id' | 'title'>[];
+  pins: DialogPin[];
 }
 
 export function BulkRegenerateTextDialog({ selectedPinIds, pins }: BulkRegenerateTextDialogProps) {
@@ -54,19 +75,20 @@ export function BulkRegenerateTextDialog({ selectedPinIds, pins }: BulkRegenerat
   const count = selected.length;
   const running = phase?.kind === 'running';
 
-  async function run(pinIds: string[], previous: BulkPinTextSummary | null) {
+  async function run(pinIds: string[], mode: PinRegenerationMode, previous: BulkPinTextSummary | null) {
     if (inFlight.current || pinIds.length === 0) return;
     inFlight.current = true;
-    setPhase({ kind: 'running', done: 0, total: pinIds.length });
+    setPhase({ kind: 'running', done: 0, total: pinIds.length, mode });
     try {
       const summary = await runBulkPinTextRegeneration(
         pinIds,
-        (pinId) => requestPinTextRegeneration(pinId),
-        (done, total) => setPhase({ kind: 'running', done, total })
+        (pinId) => requestPinTextRegeneration(pinId, fetch, mode),
+        (done, total) => setPhase({ kind: 'running', done, total, mode })
       );
       // A retry keeps the Pins regenerated before it.
       setPhase({
         kind: 'done',
+        mode,
         summary: previous ? { ...summary, succeeded: [...previous.succeeded, ...summary.succeeded] } : summary,
       });
       if (summary.succeeded.length > 0) router.refresh();
@@ -75,36 +97,90 @@ export function BulkRegenerateTextDialog({ selectedPinIds, pins }: BulkRegenerat
     }
   }
 
+  const confirmPins = phase?.kind === 'confirm' ? pins.filter((pin) => phase.pinIds.includes(pin.id)) : [];
+  const completePlan = planCompleteRegeneration(confirmPins);
+  const runIds =
+    phase?.kind === 'confirm'
+      ? phase.mode === 'complete'
+        ? completePlan.eligible.map((pin) => pin.id)
+        : phase.pinIds
+      : [];
+
   return (
     <>
       <Button
         variant="outline"
         size="sm"
-        onClick={() => setPhase({ kind: 'confirm', pinIds: selected })}
+        onClick={() => setPhase({ kind: 'confirm', pinIds: selected, mode: 'text-and-image-prompt' })}
         disabled={count === 0 || running}
         data-testid="bulk-regenerate-text-button"
       >
-        <Type className="mr-1.5 h-3.5 w-3.5" />
+        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
         {bulkRegenerateTextLabel(count)}
       </Button>
       <Dialog open={phase !== null} onOpenChange={(open) => !open && !running && setPhase(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{phase?.kind === 'done' ? 'Text regeneration finished' : bulkRegenerateTextLabel(phase?.kind === 'confirm' ? phase.pinIds.length : count)}</DialogTitle>
-            {phase?.kind === 'confirm' && <DialogDescription>{BULK_REGENERATE_TEXT_CONFIRMATION}</DialogDescription>}
+            <DialogTitle>
+              {phase?.kind === 'done'
+                ? 'Regeneration finished'
+                : bulkRegenerateTextLabel(phase?.kind === 'confirm' ? phase.pinIds.length : count)}
+            </DialogTitle>
+            {phase?.kind === 'confirm' && (
+              <DialogDescription>Choose what to regenerate. Links, UTM, boards, sections and dates never change.</DialogDescription>
+            )}
           </DialogHeader>
+
+          {phase?.kind === 'confirm' && (
+            <div className="space-y-2" role="radiogroup" aria-label="Regeneration mode">
+              {(['text-and-image-prompt', 'complete'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={phase.mode === mode}
+                  onClick={() => setPhase({ ...phase, mode })}
+                  data-testid={`regeneration-mode-${mode}`}
+                  className={cn(
+                    'w-full rounded-md border p-3 text-left text-sm transition-colors',
+                    phase.mode === mode ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                  )}
+                >
+                  <span className="font-medium">{REGENERATION_MODE_LABELS[mode]}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {mode === 'complete'
+                      ? 'New texts and image prompts, then one new image per Pin (paid).'
+                      : 'New titles, descriptions, keywords and image prompts. No image is generated.'}
+                  </span>
+                </button>
+              ))}
+              <p className="text-xs text-muted-foreground" data-testid="bulk-regenerate-confirmation" aria-live="polite">
+                {phase.mode === 'complete'
+                  ? completeRegenerationConfirmation(completePlan.paidImages, completePlan.eligible.length)
+                  : textAndPromptsConfirmation(phase.pinIds.length)}
+              </p>
+              {phase.mode === 'complete' && completePlan.excluded.length > 0 && (
+                <p className="text-xs text-destructive" data-testid="bulk-regenerate-excluded">
+                  {completePlan.excluded.length} Step-by-step {completePlan.excluded.length === 1 ? 'Pin is' : 'Pins are'} excluded
+                  (several images each): {completePlan.excluded.map((pin) => pin.title).join(', ')}. Use “Regenerate text + image prompts” for{' '}
+                  {completePlan.excluded.length === 1 ? 'it' : 'them'}.
+                </p>
+              )}
+            </div>
+          )}
 
           {phase?.kind === 'running' && (
             <div className="space-y-2" aria-live="polite">
               <p className="text-sm">
-                Regenerating text… {Math.min(phase.done + 1, phase.total)} of {phase.total}
+                {phase.mode === 'complete' ? 'Regenerating Pins…' : 'Regenerating text and image prompts…'}{' '}
+                {Math.min(phase.done + 1, phase.total)} of {phase.total}
               </p>
-              <Progress value={phase.done} max={phase.total} aria-label="Text regeneration progress" />
+              <Progress value={phase.done} max={phase.total} aria-label="Regeneration progress" />
               <p className="text-xs text-muted-foreground">Pins are processed one at a time. Keep this window open.</p>
             </div>
           )}
 
-          {phase?.kind === 'done' && <BulkRegenerateTextSummaryView summary={phase.summary} pins={pins} />}
+          {phase?.kind === 'done' && <BulkRegenerateTextSummaryView summary={phase.summary} pins={pins} mode={phase.mode} />}
 
           <DialogFooter className="flex-row gap-2">
             {phase?.kind === 'confirm' && (
@@ -112,8 +188,14 @@ export function BulkRegenerateTextDialog({ selectedPinIds, pins }: BulkRegenerat
                 <Button variant="outline" onClick={() => setPhase(null)}>
                   Cancel
                 </Button>
-                <Button onClick={() => void run(phase.pinIds, null)} data-testid="bulk-regenerate-text-confirm">
-                  Continue
+                <Button
+                  onClick={() => void run(runIds, phase.mode, null)}
+                  disabled={runIds.length === 0}
+                  data-testid="bulk-regenerate-text-confirm"
+                >
+                  {phase.mode === 'complete'
+                    ? `Generate ${completePlan.paidImages} paid image${completePlan.paidImages === 1 ? '' : 's'}`
+                    : 'Continue'}
                 </Button>
               </>
             )}
@@ -122,7 +204,12 @@ export function BulkRegenerateTextDialog({ selectedPinIds, pins }: BulkRegenerat
                 {phase.summary.failed.length + phase.summary.notProcessed.length > 0 && (
                   <Button
                     variant="outline"
-                    onClick={() => void run([...phase.summary.failed, ...phase.summary.notProcessed], phase.summary)}
+                    onClick={() =>
+                      phase.mode === 'complete'
+                        ? // A paid retry is confirmed again with its own count.
+                          setPhase({ kind: 'confirm', pinIds: [...phase.summary.failed, ...phase.summary.notProcessed], mode: 'complete' })
+                        : void run([...phase.summary.failed, ...phase.summary.notProcessed], phase.mode, phase.summary)
+                    }
                     data-testid="bulk-regenerate-text-retry"
                   >
                     Try again for {phase.summary.failed.length + phase.summary.notProcessed.length} not regenerated
@@ -142,9 +229,11 @@ export function BulkRegenerateTextDialog({ selectedPinIds, pins }: BulkRegenerat
 export function BulkRegenerateTextSummaryView({
   summary,
   pins,
+  mode = 'text-and-image-prompt',
 }: {
   summary: BulkPinTextSummary;
   pins: Pick<Pin, 'id' | 'title'>[];
+  mode?: PinRegenerationMode;
 }) {
   const titleOf = (id: string) => pins.find((pin) => pin.id === id)?.title ?? 'Pin';
   const failures = summary.outcomes.filter((outcome) => outcome.status === 'failed');
@@ -178,7 +267,9 @@ export function BulkRegenerateTextSummaryView({
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        Images, links, boards, sections and dates were not changed. Pins that failed keep their previous text.
+        {mode === 'complete'
+          ? 'Links, UTM, boards, sections and dates were not changed. Pins that failed keep their previous text, image prompt and image.'
+          : 'Images, links, boards, sections and dates were not changed. Pins that failed keep their previous text and image prompt.'}
       </p>
     </div>
   );

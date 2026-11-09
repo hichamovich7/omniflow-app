@@ -115,7 +115,12 @@ export type SocialGenerationErrorCode =
   | 'source_unavailable'
   | 'invalid_pin_plan'
   | typeof STRATEGY_SAFEGUARD_ERROR_CODE
-  | 'generation_failed';
+  | 'generation_failed'
+  // TASK-099 "Regenerate complete Pins": a Step-by-step Pin (several image
+  // calls), a generation whose images are being made, a failed new image.
+  | 'multi_image_pin'
+  | 'conflict'
+  | 'image_failed';
 
 const ERROR_STATUS: Record<SocialGenerationErrorCode, number> = {
   not_found: 404,
@@ -126,6 +131,9 @@ const ERROR_STATUS: Record<SocialGenerationErrorCode, number> = {
   invalid_pin_plan: 422,
   [STRATEGY_SAFEGUARD_ERROR_CODE]: 422,
   generation_failed: 500,
+  multi_image_pin: 422,
+  conflict: 409,
+  image_failed: 502,
 };
 
 export class SocialGenerationError extends Error {

@@ -56,6 +56,12 @@ interface PromptContext {
    */
   textOnlyRewrite?: boolean;
   /**
+   * TASK-099 (with textOnlyRewrite): the answer also carries a brand-new
+   * image_prompt written from the new title and description. Absent = the
+   * TASK-082 text-only structure, unchanged.
+   */
+  rewriteImagePrompt?: boolean;
+  /**
    * Numbered listicle article (TASK-083): the count the article states and
    * the angle of each Pin (at least half Listicle / Article Promise; ~30 %
    * in a project gallery, TASK-FIX-098). Absent
@@ -317,7 +323,7 @@ ${imageVariationRule} Never include text, typography, logos, watermarks, or grap
 
 Output format (strict): return exactly one complete, strictly valid JSON object and nothing else. Do not use Markdown or code fences, and do not add explanations, comments, or any text before or after the JSON. Do not use trailing commas. Escape every double quote inside a string value as \\" and never put a raw line break inside a string value. Complete every pin and close every string, array, and object.
 
-${ctx.textOnlyRewrite ? TEXT_ONLY_REWRITE_STRUCTURE : fullStructure}`;
+${ctx.textOnlyRewrite ? (ctx.rewriteImagePrompt ? TEXT_AND_IMAGE_PROMPT_REWRITE_STRUCTURE : TEXT_ONLY_REWRITE_STRUCTURE) : fullStructure}`;
 
   return { system, user };
 }
@@ -333,6 +339,21 @@ Respond with this exact JSON structure:
       "title": "...",
       "description": "...",
       "keywords": ["keyword1", "keyword2", "keyword3"]
+    }
+  ]
+}`;
+
+// TASK-099: "Regenerate text + image prompts" — one coherent creative package.
+const TEXT_AND_IMAGE_PROMPT_REWRITE_STRUCTURE = `This is a rewrite of exactly one existing Pin: its board and on-image text are kept and must not be written. Return title, description, keywords — keywords as a JSON array of strings, without hashtags — and a brand-new image_prompt. Write the image_prompt last, from the new title and description you just wrote (and, when a <pin_plan> is given, from that Pin's section and visual brief), following every image_prompt rule above. Never reuse, copy or paraphrase a previous image description, and never quote the title inside the image_prompt.
+
+Respond with this exact JSON structure:
+{
+  "pins": [
+    {
+      "title": "...",
+      "description": "...",
+      "keywords": ["keyword1", "keyword2", "keyword3"],
+      "image_prompt": "..."
     }
   ]
 }`;

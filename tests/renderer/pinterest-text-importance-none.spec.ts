@@ -259,7 +259,7 @@ test('Legacy Composite and Photo Only are unchanged', () => {
     expect(prompt).not.toContain('Omit headline');
   }
 
-  const legacyRoute = readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8');
+  const legacyRoute = (readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8') + readFileSync('lib/pinterest/pin-image-generation.ts', 'utf8'));
   expect(legacyRoute).toContain("if (generationMode !== 'legacy-composite')");
 });
 

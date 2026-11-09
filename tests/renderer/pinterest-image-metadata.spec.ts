@@ -288,7 +288,9 @@ async function runImageRoute(
   };
 
   const routeKey = require.resolve('@/app/api/pinterest/generate-images/route');
-  const keys = [...Object.keys(fakes).map((specifier) => require.resolve(specifier)), routeKey];
+  // TASK-099: the per-Pin image pipeline the route uses is re-evaluated with the fakes too.
+  const imagePipelineKey = require.resolve('@/lib/pinterest/pin-image-generation');
+  const keys = [...Object.keys(fakes).map((specifier) => require.resolve(specifier)), routeKey, imagePipelineKey];
   const originals = new Map<string, NodeJS.Module | undefined>(keys.map((key) => [key, require.cache[key]]));
   const originalFetch = globalThis.fetch;
   const originalWarn = console.warn;
@@ -311,6 +313,7 @@ async function runImageRoute(
       } as unknown as NodeJS.Module;
     }
     delete require.cache[routeKey];
+    delete require.cache[imagePipelineKey];
 
     globalThis.fetch = (async () => {
       result.fetchCalls += 1;

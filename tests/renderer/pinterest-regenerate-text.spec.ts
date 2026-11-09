@@ -478,7 +478,7 @@ test.describe('Regenerate text — ownership and source', () => {
     expect(fake.writes).toEqual([]);
   });
 
-  test('route: session (401), id, ownership before the shared rate limit, no image model', () => {
+  test('route: session (401), id, ownership before the shared rate limit; image model only in the complete mode', () => {
     const route = read('app/api/pinterest/pins/[id]/regenerate-text/route.ts');
     expect(route).toContain('supabase.auth.getUser()');
     expect(route).toContain("{ message: 'Unauthorized', code: 'unauthorized' }");
@@ -486,15 +486,21 @@ test.describe('Regenerate text — ownership and source', () => {
     expect(route).toContain('isValidUuid(id)');
     expect(route.indexOf('preparePinTextRegeneration(')).toBeLessThan(route.indexOf('checkRateLimit('));
     expect(route.indexOf('checkRateLimit(')).toBeLessThan(route.indexOf('regenerateAndSavePinText('));
+    // TASK-099: the text + image prompts mode returns before any image budget or image call.
+    expect(route.indexOf('{ withImagePrompt: true }')).toBeLessThan(route.indexOf("'pinterest/generate-images'"));
+    expect(route.indexOf("'pinterest/generate-images'")).toBeLessThan(route.indexOf('regenerateCompletePin('));
+    expect(route.indexOf('assertCompleteRegenerationAllowed(')).toBeLessThan(route.indexOf("'pinterest/regenerate-pin'"));
     // Same hourly bucket, limit and trial cap as "Regenerate this Pin".
     expect(route).toContain("'pinterest/regenerate-pin', 30, 3600, {\n      enforceTrialLimit: true,");
     expect(route).toContain('rateLimitErrorResponse(rateLimit)');
     expect(read('app/api/pinterest/pins/[id]/regenerate/route.ts')).toContain("'pinterest/regenerate-pin', 30, 3600");
 
-    for (const file of ['app/api/pinterest/pins/[id]/regenerate-text/route.ts', 'lib/pinterest/regenerate-text.ts']) {
+    // The text step itself never reaches an image model.
+    for (const file of ['lib/pinterest/regenerate-text.ts', 'lib/pinterest/pin-text.ts']) {
       const source = read(file);
       expect(source).not.toMatch(/generateImage|generate-images|pin-image-storage|compositing|analyzeImage/);
     }
+    expect(route).not.toMatch(/generateImage\(|analyzeImage/);
     expect(read('lib/pinterest/regenerate-text.ts')).not.toMatch(/utm|addPinterestUtm|link_url/i);
   });
 });
@@ -504,15 +510,15 @@ test.describe('Regenerate text — interface', () => {
 
   test('button calls the route, shows loading, ignores a second click and explains failures', () => {
     expect(read('lib/pinterest/regenerate-text-client.ts')).toContain(
-      'fetchImpl(`/api/pinterest/pins/${pinId}/regenerate-text`, { method: \'POST\' })'
+      'fetchImpl(`/api/pinterest/pins/${pinId}/regenerate-text`, {'
     );
-    expect(button).toContain('requestPinTextRegeneration(pin.id)');
+    expect(button).toContain("requestPinTextRegeneration(pin.id, fetch, 'text-and-image-prompt')");
     expect(button).toContain('if (inFlight.current) return;');
     expect(button).toContain('inFlight.current = true;');
     expect(button).toContain('loading={loading}');
     expect(button).toContain('disabled={disabled || loading}');
-    expect(button).toContain("toastApiError(result.error, 'Text regeneration failed — the Pin was not modified', () => void regenerateText())");
-    expect(button).toContain('Regenerate text');
+    expect(button).toContain("toastApiError(result.error, 'Regeneration failed — the Pin was not modified', () => void regenerateText())");
+    expect(button).toContain('Regenerate text + prompt');
     // A retryable non-safeguard error (invalid AI text) also offers "Try again".
     expect(read('components/pinterest/strategy-safeguard-alert.tsx')).toContain(
       "error?.retryable && onRetry ? { action: { label: 'Try again', onClick: onRetry } } : undefined"
@@ -790,7 +796,11 @@ test.describe('Regenerate text — TASK-082 bulk', () => {
       return new Response(JSON.stringify({ data: { id: PIN_ID }, error: null }), { status: 200 });
     }) as typeof fetch;
     expect(await requestPinTextRegeneration(PIN_ID, fetchOk)).toMatchObject({ ok: true });
-    expect(requests).toEqual([{ url: `/api/pinterest/pins/${PIN_ID}/regenerate-text`, method: 'POST', body: undefined }]);
+    expect(requests).toEqual([
+      { url: `/api/pinterest/pins/${PIN_ID}/regenerate-text`, method: 'POST', body: JSON.stringify({ mode: 'text-and-image-prompt' }) },
+    ]);
+    await requestPinTextRegeneration(PIN_ID, fetchOk, 'complete');
+    expect(requests[1].body).toBe(JSON.stringify({ mode: 'complete' }));
 
     const fetch422 = (async () =>
       new Response(JSON.stringify({ data: null, error: buildInvalidPinTextError('keywords') }), { status: 422 })) as unknown as typeof fetch;
@@ -802,22 +812,21 @@ test.describe('Regenerate text — TASK-082 bulk', () => {
     expect(await requestPinTextRegeneration(PIN_ID, offline)).toMatchObject({ ok: false, status: 0 });
   });
 
-  test('bulk UI: confirmation before any call, selection bar only, no image generator', () => {
+  test('bulk UI: mode choice and confirmation before any call, selection bar only', () => {
     const dialog = read('components/pinterest/bulk-regenerate-text-dialog.tsx');
-    expect(dialog).toContain("'This will use one text AI generation per Pin. Images and links will not change. Continue?'");
-    // The trigger only opens the confirmation; run() starts from Continue or Try again.
-    expect(dialog).toContain("onClick={() => setPhase({ kind: 'confirm', pinIds: selected })}");
+    // The trigger only opens the confirmation (default: text + image prompts); run() starts from Continue or Try again.
+    expect(dialog).toContain("onClick={() => setPhase({ kind: 'confirm', pinIds: selected, mode: 'text-and-image-prompt' })}");
     expect(dialog).toContain('disabled={count === 0 || running}');
     expect(dialog.match(/void run\(/g)).toHaveLength(2);
-    expect(dialog).toContain('onClick={() => void run(phase.pinIds, null)} data-testid="bulk-regenerate-text-confirm"');
-    expect(dialog).toContain('(pinId) => requestPinTextRegeneration(pinId)');
+    expect(dialog).toContain('onClick={() => void run(runIds, phase.mode, null)}');
+    expect(dialog).toContain('(pinId) => requestPinTextRegeneration(pinId, fetch, mode)');
 
     const workspace = read('components/editorial/editorial-workspace.tsx');
     const bar = workspace.slice(workspace.indexOf('<SelectionActionBar>'), workspace.indexOf('</SelectionActionBar>'));
     expect(bar).toContain('<BulkRegenerateTextDialog selectedPinIds={selectedIds} pins={pins} />');
 
     for (const file of ['components/pinterest/bulk-regenerate-text-dialog.tsx', 'lib/pinterest/regenerate-text-client.ts']) {
-      expect(read(file)).not.toMatch(/generateImage|generate-images|pin-image-storage|link_url|board_section|publish_date/);
+      expect(read(file)).not.toMatch(/generateImage\(|generate-images|pin-image-storage|link_url|board_section|publish_date/);
     }
   });
 });

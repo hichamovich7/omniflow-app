@@ -116,16 +116,16 @@ test.describe('Regenerate text — Pin grid of /pinterest/[id]', () => {
     else delete requireCache[playwrightRuntime];
   });
 
-  test('every card shows a visible "Regenerate text" button, with or without image, any source', async ({ page }) => {
+  test('every card shows a visible "Regenerate text + prompt" button, with or without image, any source', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.setContent(`<!doctype html><html><body>${gridMarkup()}</body></html>`);
 
     const cards = page.getByTestId('pin-card');
     await expect(cards).toHaveCount(PINS.length);
     for (let i = 0; i < PINS.length; i++) {
-      const labeled = cards.nth(i).getByRole('button', { name: 'Regenerate text', exact: true });
+      const labeled = cards.nth(i).getByRole('button', { name: 'Regenerate text + prompt', exact: true });
       await expect(labeled).toBeVisible();
-      await expect(labeled).toHaveText('Regenerate text');
+      await expect(labeled).toHaveText('Regenerate text + prompt');
       await expect(labeled).toBeEnabled();
     }
   });
@@ -136,7 +136,7 @@ test.describe('Regenerate text — Pin grid of /pinterest/[id]', () => {
     const labels = await overlay.locator('button').evaluateAll((buttons) => buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim()));
     const image = labels.findIndex((label) => label?.startsWith('Regenerate image for:'));
     expect(image).toBeGreaterThanOrEqual(0);
-    expect(labels[image + 1]).toBe('Regenerate text for: Keyword Pin with image');
+    expect(labels[image + 1]).toBe('Regenerate text + image prompt for: Keyword Pin with image');
   });
 
   test('mobile width: the labeled button stays visible on every card, with and without image', async ({ page }) => {
@@ -144,7 +144,7 @@ test.describe('Regenerate text — Pin grid of /pinterest/[id]', () => {
     await page.setContent(`<!doctype html><html><body>${gridMarkup()}</body></html>`);
     const cards = page.getByTestId('pin-card');
     for (let i = 0; i < PINS.length; i++) {
-      const labeled = cards.nth(i).getByRole('button', { name: 'Regenerate text', exact: true });
+      const labeled = cards.nth(i).getByRole('button', { name: 'Regenerate text + prompt', exact: true });
       await labeled.scrollIntoViewIfNeeded();
       await expect(labeled).toBeVisible();
     }
@@ -158,14 +158,14 @@ test.describe('Regenerate text — Pin grid of /pinterest/[id]', () => {
 
     await page.setContent(`<!doctype html><html><body>${render([])}</body></html>`);
     await expect(page.getByTestId('bulk-regenerate-text-button')).toBeDisabled();
-    await expect(page.getByTestId('bulk-regenerate-text-button')).toHaveText('Regenerate text');
+    await expect(page.getByTestId('bulk-regenerate-text-button')).toHaveText('Regenerate Pins');
     // Closed confirmation: nothing runs before "Continue".
     await expect(page.getByTestId('bulk-regenerate-text-confirm')).toHaveCount(0);
 
     await page.setContent(`<!doctype html><html><body>${render(PINS.map((p) => p.id))}</body></html>`);
     await expect(page.getByTestId('bulk-regenerate-text-button')).toBeEnabled();
-    await expect(page.getByTestId('bulk-regenerate-text-button')).toHaveText('Regenerate text for 3 Pins');
-    expect(bulkRegenerateTextLabel(1)).toBe('Regenerate text for 1 Pin');
+    await expect(page.getByTestId('bulk-regenerate-text-button')).toHaveText('Regenerate 3 Pins');
+    expect(bulkRegenerateTextLabel(1)).toBe('Regenerate 1 Pin');
   });
 
   test('bulk summary: regenerated, failed, not modified, with the failed Pin and its reason', async ({ page }) => {
@@ -200,7 +200,7 @@ test.describe('Regenerate text — Pin grid of /pinterest/[id]', () => {
 
   test('the button renders its label and the dialog uses the same component', () => {
     const markup = renderToStaticMarkup(withProviders(createElement(RegenerateTextButton, { pin: PINS[0] })));
-    expect(markup).toContain('Regenerate text');
+    expect(markup).toContain('Regenerate text + prompt');
     expect(markup).toContain('data-testid="regenerate-text-button"');
   });
 });

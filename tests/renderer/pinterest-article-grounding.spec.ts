@@ -765,7 +765,7 @@ test.describe('Article photos become text only (Vision option B)', () => {
 test.describe('Safety and compatibility (source level)', () => {
   const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
   const generateRoute = read('app/api/pinterest/generate/route.ts');
-  const imagesRoute = read('app/api/pinterest/generate-images/route.ts');
+  const imagesRoute = (read('app/api/pinterest/generate-images/route.ts') + read('lib/pinterest/pin-image-generation.ts'));
 
   test('an article image is an image-model reference only for an opt-in AI-generated design; images stay 1024x1536 → 1000x1500', () => {
     for (const file of [generateRoute, imagesRoute, read('lib/ai/services/image.ts'), read('lib/pinterest/article-vision.ts')]) {

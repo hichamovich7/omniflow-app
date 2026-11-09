@@ -425,6 +425,24 @@ export const regeneratedPinTextResponseSchema = z
   .object({ pins: z.array(regeneratedPinTextSchema).length(1) })
   .strict();
 
+// TASK-099: "Regenerate text + image prompts" — the same contract plus a new,
+// required image_prompt (never the stored one).
+export const regeneratedPinPackageResponseSchema = z
+  .object({
+    pins: z
+      .array(regeneratedPinTextSchema.extend({ image_prompt: z.string().trim().min(1).max(2000) }).strict())
+      .length(1),
+  })
+  .strict();
+
+/** TASK-099: the two explicit regeneration modes of POST /api/pinterest/pins/[id]/regenerate-text. */
+export const PIN_REGENERATION_MODES = ['text-and-image-prompt', 'complete'] as const;
+export type PinRegenerationMode = (typeof PIN_REGENERATION_MODES)[number];
+
+export const regeneratePinTextRequestSchema = z
+  .object({ mode: z.enum(PIN_REGENERATION_MODES).default('text-and-image-prompt') })
+  .strict();
+
 export type GeneratePinsInput = z.infer<typeof generatePinsSchema>;
 
 // PATCH /api/pinterest/pins/[id] (TASK-044 phase 2): manual edit of a saved

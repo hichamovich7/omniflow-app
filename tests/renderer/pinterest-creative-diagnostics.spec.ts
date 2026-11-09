@@ -138,7 +138,7 @@ test('Batch Review opens the existing Change layout flow', () => {
 });
 
 test('successful generation and recomposition persist diagnostics in existing image_analysis', () => {
-  const generationRoute = readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8');
+  const generationRoute = (readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8') + readFileSync('lib/pinterest/pin-image-generation.ts', 'utf8'));
   const recompositionRoute = readFileSync('app/api/pinterest/pin-images/recompose/route.ts', 'utf8');
 
   expect(generationRoute).toContain('attachPinterestCreativeDiagnostics');

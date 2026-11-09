@@ -196,7 +196,7 @@ test('new modes are isolated while historical formats remain Legacy Composite', 
   expect(generationModeForVisualFormat('photo')).toBe('legacy-composite');
   expect(generationModeForVisualFormat('text-overlay')).toBe('legacy-composite');
 
-  const route = readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8');
+  const route = (readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8') + readFileSync('lib/pinterest/pin-image-generation.ts', 'utf8'));
   expect(route).toContain("if (generationMode !== 'legacy-composite')");
   expect(route).toContain('imageBuffer = await compositeBanner(');
   expect(route).toContain('composeHeadlineWithQualityGate({');
@@ -343,7 +343,7 @@ test('FAST prompt asks for final integrated text only in AI Integrated and drops
 });
 
 test('AI Integrated dispatch happens before any legacy renderer call in the image route', () => {
-  const route = readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8');
+  const route = (readFileSync('app/api/pinterest/generate-images/route.ts', 'utf8') + readFileSync('lib/pinterest/pin-image-generation.ts', 'utf8'));
   const start = route.indexOf("if (generationMode !== 'legacy-composite') {");
   const elseIndex = route.indexOf('} else {', start);
   expect(start).toBeGreaterThan(-1);

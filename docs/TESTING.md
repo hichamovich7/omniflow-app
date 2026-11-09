@@ -1345,6 +1345,25 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Regenerate text + image prompts / complete Pins (TASK-099, 2026-11-08)
+
+```bash
+npx playwright test --project=renderer tests/renderer/pinterest-regenerate-package.spec.ts tests/renderer/pinterest-regenerate-text.spec.ts tests/renderer/pinterest-regenerate-text-ui.spec.ts
+```
+
+Offline, no AI / Vision / WordPress / network call: the text model is an injected stub, the image model a fake `@/lib/ai/engine` module (require cache), Supabase and media storage in-memory fakes recording every write. `pinterest-regenerate-package.spec.ts` (24):
+
+* **Text + image prompts:** one text call; one Pin update with exactly `title, description, keywords, image_prompt`; no `pin_images` write, `media_url` / link (UTM) / board / section / date kept; the other Pin untouched. The prompt asks for a brand-new image_prompt and never contains the stored one. Refused, nothing written: the old prompt reused (also with a trailing dot), the old title quoted in the prompt, a missing / empty / URL-only prompt, a provider error. The text step's sources reference no image model.
+* **Complete:** one text call, exactly one image render from the new prompt (`pinUpdate` = the four text fields); a failed image → `image_failed` naming the Pin, old text / prompt / image kept; an invalid text answer → no image call; a Step-by-step Pin → `multi_image_pin` before any AI call.
+* **Real pipeline (`generatePinImage`):** a photo Pin makes one `generateImage` call whose prompt contains the new prompt and not the old one, one upload, one Pin-row update with `title, description, keywords, image_prompt, media_url`; image model failure → no upload, no row, no Pin write; a refused Pin-row update → the previous image active again, the new file removed, `PinImageError`.
+* **Confirmation:** `planCompleteRegeneration` — classic 1, AI-generated design 1, numbered overlay 0, Step-by-step excluded → "exactly 2 paid images for 3 Pins"; the two mode labels; the confirm button states the count; a paid retry goes back to the confirmation; request schema (default mode, unknown mode / extra key refused); route order (complete checks before the rate limit, image budget before the image call, the text mode never renders).
+* **Article kinds:** project_listicle (section project accepted, another project refused), tips_guide (tip action accepted, a finished object refused `IMAGE_SUBJECT_MISMATCH`, tips instruction in the prompt), generic_article (grounded prompt accepted); a non-numbered Pin gets the "not a numbered Pin" instruction and a prompt with a badge or the article's count is refused; a numbered Pin keeps its numbered title and gets no such instruction.
+* **Logs:** for five failing runs, no log line contains the model's title, prompt or reply, the stored prompt or the system prompt.
+
+The image-route specs now read `app/api/pinterest/generate-images/route.ts` + `lib/pinterest/pin-image-generation.ts` (source checks) and reload the moved module with their fakes (behaviour checks); their assertions are unchanged.
+
+Validation (2026-11-08): full renderer **1797 passed** (was 1773), TypeScript OK, ESLint (touched files) OK, production build OK, `git diff --check` OK. Real check pending (founder): one "Regenerate text + image prompts" (no image call, image kept, prompt changed) and one "Regenerate complete Pins" on a classic Pin (1 paid image).
+
 # Numbered Pins share in project galleries (TASK-FIX-098, 2026-11-06)
 
 ```bash

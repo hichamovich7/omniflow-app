@@ -11,7 +11,7 @@ import type { Pin } from '@/types/database';
 
 interface RegenerateTextButtonProps {
   pin: Pick<Pin, 'id' | 'title'>;
-  /** Called with the saved Pin (new title / description / keywords) after a success. */
+  /** Called with the saved Pin (new title / description / keywords / image prompt) after a success. */
   onRegenerated?: (pin: Pin) => void;
   /** Icon-only (image overlay of the Pin grid) or labeled. */
   iconOnly?: boolean;
@@ -21,10 +21,12 @@ interface RegenerateTextButtonProps {
 }
 
 /**
- * "Regenerate text" (TASK-076): new title, description and keywords for one
- * saved Pin — POST /api/pinterest/pins/[id]/regenerate-text. The image,
- * link, board and schedule are kept. A second click while the request runs
- * is ignored (ref, not only the disabled state, which updates a render late).
+ * "Regenerate text + image prompt" (TASK-076, TASK-099): new title,
+ * description, keywords and image prompt for one saved Pin — POST
+ * /api/pinterest/pins/[id]/regenerate-text, mode "text-and-image-prompt".
+ * No image is generated: the image, link, board and schedule are kept. A
+ * second click while the request runs is ignored (ref, not only the disabled
+ * state, which updates a render late).
  */
 export function RegenerateTextButton({
   pin,
@@ -43,13 +45,13 @@ export function RegenerateTextButton({
     inFlight.current = true;
     setLoading(true);
     try {
-      const result = await requestPinTextRegeneration(pin.id);
+      const result = await requestPinTextRegeneration(pin.id, fetch, 'text-and-image-prompt');
       if (!result.ok) {
         // The Pin is unchanged; the error names what failed and offers "Try again".
-        toastApiError(result.error, 'Text regeneration failed — the Pin was not modified', () => void regenerateText());
+        toastApiError(result.error, 'Regeneration failed — the Pin was not modified', () => void regenerateText());
         return;
       }
-      toast.success('Text regenerated — image, link, board and schedule kept');
+      toast.success('Text and image prompt regenerated — image, link, board and schedule kept');
       onRegenerated?.(result.pin);
       router.refresh();
     } finally {
@@ -70,12 +72,12 @@ export function RegenerateTextButton({
         e.stopPropagation();
         void regenerateText();
       }}
-      aria-label={iconOnly ? `Regenerate text for: ${pin.title}` : undefined}
-      title={iconOnly ? 'Regenerate text' : undefined}
+      aria-label={iconOnly ? `Regenerate text + image prompt for: ${pin.title}` : undefined}
+      title={iconOnly ? 'Regenerate text + image prompt (no image generated)' : undefined}
       data-testid="regenerate-text-button"
     >
       <Type data-icon="inline-start" />
-      {!iconOnly && 'Regenerate text'}
+      {!iconOnly && 'Regenerate text + prompt'}
     </Button>
   );
 }

@@ -699,7 +699,9 @@ async function withFakes(
   logs?: string[]
 ): Promise<void> {
   const routeKey = require.resolve(routeSpecifier);
-  const keys = [...Object.keys(fakes).map((specifier) => require.resolve(specifier)), routeKey];
+  // TASK-099: the per-Pin image pipeline the route uses is re-evaluated with the fakes too.
+  const imagePipelineKey = require.resolve('@/lib/pinterest/pin-image-generation');
+  const keys = [...Object.keys(fakes).map((specifier) => require.resolve(specifier)), routeKey, imagePipelineKey];
   const originals = new Map<string, NodeJS.Module | undefined>(keys.map((key) => [key, require.cache[key]]));
   const originalFetch = globalThis.fetch;
   const originalLog = console.log;
@@ -711,6 +713,7 @@ async function withFakes(
       require.cache[filename] = { id: filename, filename, loaded: true, exports, children: [], paths: [], path: '', parent: null, isPreloading: false, require } as unknown as NodeJS.Module;
     }
     delete require.cache[routeKey];
+    delete require.cache[imagePipelineKey];
     globalThis.fetch = fetchFn ?? ((async () => {
       throw new Error('No network call is allowed in this test');
     }) as typeof fetch);

@@ -2,7 +2,11 @@ import { buildPinterestPinsPrompt, estimateMaxTokens, PROMPT_ID } from '@/lib/pr
 import { buildBrandProfileContext } from '@/lib/brand-profile';
 import { getRoleConfig } from '@/lib/ai/config';
 import { PinterestPlanError, parsePinterestPlanWith } from '@/lib/pinterest/generation-plan';
-import { regeneratedPinTextResponseSchema } from '@/lib/validations/pinterest';
+import { regeneratedPinPackageResponseSchema, regeneratedPinTextResponseSchema } from '@/lib/validations/pinterest';
+import { detectListicleNumber, isNumberedAngle } from '@/lib/pinterest/listicle';
+import { classifyArticleKind } from '@/lib/pinterest/article-kind';
+import { isListicleArticleImage, readComposerMetadata } from '@/lib/pinterest/composer/content';
+import { findSection, stripUrls } from '@/lib/wordpress/article-context';
 import {
   readPinterestStrategyAngle,
   validatePinterestStrategyBatch,
@@ -16,8 +20,10 @@ import {
 } from '@/lib/pinterest/strategy-errors';
 import { generationModeForVisualFormat, readAiIntegratedMetadata } from '@/lib/pinterest/ai-integrated';
 import {
+  articleSectionText,
   buildArticleEvidence,
   findUngroundedTextTerms,
+  validateArticleGroundedPins,
   readArticleSourceMetadata,
   subjectCheckForNiche,
   type ArticleGrounding,
@@ -66,6 +72,11 @@ export interface RegeneratedPinText {
   keywords: string;
 }
 
+/** TASK-099: the coherent creative package — the text plus a brand-new image prompt. */
+export interface RegeneratedPinPackage extends RegeneratedPinText {
+  image_prompt: string;
+}
+
 // Prompt scaffolding that must never reach a saved Pin.
 const PROMPT_LEAK_PATTERN = /<\/?\s*(?:article|pin_plan)\b|\bpin_plan\b|\bsourceSectionId\b|\bimage_prompt\b|\bvisual brief\b|treat everything between|rewrite only the title|text-only rewrite/i;
 
@@ -76,6 +87,37 @@ export function containsPromptLeak(text: string): boolean {
 export const PIN_TEXT_NOT_MODIFIED = 'The Pin was not modified.';
 
 const TEXT_FIELDS = ['title', 'description', 'keywords'] as const;
+const PACKAGE_FIELDS = [...TEXT_FIELDS, 'image_prompt'] as const;
+
+const normalizeForCompare = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+export type ImagePromptProblem = 'empty' | 'reused' | 'stale_title' | 'number_or_badge';
+
+/**
+ * TASK-099: why a regenerated image prompt cannot be used, or null. Checked
+ * on the model's prompt only (never logged): empty, the stored prompt reused,
+ * the replaced title quoted inside it, or — for a Pin that is not numbered —
+ * a badge or the article's global count.
+ */
+export function imagePromptProblem(
+  imagePrompt: string,
+  context: { previousPrompt: string | null; previousTitle: string; newTitle: string; forbiddenNumber: string | null }
+): ImagePromptProblem | null {
+  const prompt = normalizeForCompare(imagePrompt);
+  if (!prompt) return 'empty';
+  if (context.previousPrompt && prompt === normalizeForCompare(context.previousPrompt)) return 'reused';
+  const oldTitle = normalizeForCompare(context.previousTitle);
+  if (oldTitle.length >= 12 && oldTitle !== normalizeForCompare(context.newTitle) && prompt.includes(oldTitle)) {
+    return 'stale_title';
+  }
+  if (context.forbiddenNumber) {
+    const padded = ` ${prompt} `;
+    if (padded.includes(` ${context.forbiddenNumber} `) || /\b(?:badge|numbered|numeral)s?\b/.test(prompt)) {
+      return 'number_or_badge';
+    }
+  }
+  return null;
+}
 
 /**
  * The field a rejected answer got wrong, from the schema issue paths (never
@@ -113,10 +155,19 @@ function invalidPinText(field: string | null): SocialGenerationError {
 }
 
 export async function regeneratePinText(
-  params: { pin: PinTextRegenerationPin; siblingTitles: string[]; source: PinTextRegenerationSource },
+  params: { pin: PinTextRegenerationPin; siblingTitles: string[]; source: PinTextRegenerationSource; withImagePrompt?: false },
   deps: { generateText: GenerateTextFn }
-): Promise<RegeneratedPinText> {
+): Promise<RegeneratedPinText>;
+export async function regeneratePinText(
+  params: { pin: PinTextRegenerationPin; siblingTitles: string[]; source: PinTextRegenerationSource; withImagePrompt: true },
+  deps: { generateText: GenerateTextFn }
+): Promise<RegeneratedPinPackage>;
+export async function regeneratePinText(
+  params: { pin: PinTextRegenerationPin; siblingTitles: string[]; source: PinTextRegenerationSource; withImagePrompt?: boolean },
+  deps: { generateText: GenerateTextFn }
+): Promise<RegeneratedPinText | RegeneratedPinPackage> {
   const { pin, siblingTitles, source } = params;
+  const withImagePrompt = params.withImagePrompt === true;
   const { article, keyword, language } = source;
   const angle = readPinterestStrategyAngle(pin.image_analysis) ?? 'article-promise';
 
@@ -130,6 +181,10 @@ export async function regeneratePinText(
   // Article Pin: its stored section and brief, as in single-Pin regeneration.
   const stored = article ? readArticleSourceMetadata(pin.image_analysis) : null;
   const evidenceLines = article ? [keyword, buildArticleEvidence(article.context), ...(stored?.brief.visualDetails ?? [])] : [];
+  // TASK-099: the image prompt is checked like a generated one — the article
+  // kind (project_listicle / tips_guide / generic_article) and the section text.
+  const articleKind = article && withImagePrompt ? classifyArticleKind(article.context) : null;
+  const section = article && stored && withImagePrompt ? findSection(article.context, stored.sectionId) : null;
   const grounding: ArticleGrounding | null =
     article && stored
       ? {
@@ -140,12 +195,28 @@ export async function regeneratePinText(
           enforceVocabulary: article.context.language === 'en',
           subjectCheck: subjectCheckForNiche(article.niche),
           language: article.context.language,
+          ...(articleKind ? { articleKind } : {}),
+          ...(section
+            ? { sectionTexts: { [stored.sectionId]: [articleSectionText(article.context, section), ...stored.brief.visualDetails].join('\n') } }
+            : {}),
         }
       : null;
 
+  // Numbered Pins keep the article's count rules; any other Pin of a numbered
+  // article must not ask its image for a badge or that count.
+  const listicleNumber = article ? detectListicleNumber(article.context)?.value ?? null : null;
+  const composer = readComposerMetadata(pin.image_analysis);
+  const numberedPin = Boolean(composer && isListicleArticleImage(composer)) || (Boolean(listicleNumber) && isNumberedAngle(angle));
+  const forbiddenNumber = withImagePrompt && listicleNumber && !numberedPin ? listicleNumber : null;
+
   const regenerationContext = [
     article ? buildArticlePinterestContext(article, keyword, grounding) : null,
-    `Rewrite only the title, description and keywords of exactly one existing Pin, using the "${angle}" angle. Its image is kept as it is.`,
+    withImagePrompt
+      ? `Rewrite the title, description, keywords and image_prompt of exactly one existing Pin, using the "${angle}" angle. Write a brand-new image_prompt from the new title and description${grounding ? " and the Pin's section in <pin_plan>" : ''}; the previous image description is discarded and must not be reused.`
+      : `Rewrite only the title, description and keywords of exactly one existing Pin, using the "${angle}" angle. Its image is kept as it is.`,
+    forbiddenNumber
+      ? 'This Pin is not a numbered Pin: its image_prompt must not show any number, count, badge or list, and never the number of ideas of the article.'
+      : null,
     article ? 'Name only materials, colors, techniques, patterns, objects and projects that the article itself mentions.' : null,
     'Never write a URL, domain name or link.',
     siblingTitles.length > 0
@@ -169,7 +240,9 @@ export async function regeneratePinText(
     brandProfile: buildBrandProfileContext(source.brandProfileDescription),
     analysisContext: regenerationContext,
     articleGrounded: Boolean(grounding),
+    tipsGuide: articleKind === 'tips_guide' || undefined,
     textOnlyRewrite: true,
+    rewriteImagePrompt: withImagePrompt || undefined,
   });
 
   let content: string;
@@ -186,16 +259,19 @@ export async function regeneratePinText(
       }),
     });
   } catch (err) {
-    console.error(`[${PROMPT_ID}] Pin text regeneration failed:`, err);
+    // The provider error only — never the prompt or the model's text.
+    console.error(`[${PROMPT_ID}] Pin text regeneration failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     throw new SocialGenerationError('generation_failed', `Text regeneration failed. ${PIN_TEXT_NOT_MODIFIED} Please try again.`);
   }
 
   // Text-only contract (TASK-082): exactly one Pin with title, description
   // and keywords. One AI call only — an invalid answer is never sent back to
   // the model; the user retries by hand.
-  let planned;
+  let planned: { title: string; description: string; keywords: string; angle?: string; sourceSectionId?: string; image_prompt?: unknown };
   try {
-    [planned] = parsePinterestPlanWith(content, regeneratedPinTextResponseSchema).pins;
+    [planned] = withImagePrompt
+      ? parsePinterestPlanWith(content, regeneratedPinPackageResponseSchema).pins
+      : parsePinterestPlanWith(content, regeneratedPinTextResponseSchema).pins;
   } catch (planError) {
     if (!(planError instanceof PinterestPlanError)) throw planError;
     console.error(`[${PROMPT_ID}] Regenerated Pin text plan rejected: ${JSON.stringify(planError.diagnostics())}`);
@@ -203,18 +279,33 @@ export async function regeneratePinText(
   }
 
   // Every source: a URL the model writes anyway is removed, never saved.
-  const next = withoutUrls({ title: planned.title, description: planned.description, keywords: planned.keywords });
-  const emptyField = TEXT_FIELDS.find((field) => !next[field].trim());
-  const leakField = TEXT_FIELDS.find((field) => containsPromptLeak(next[field]));
+  const text = withoutUrls({ title: planned.title, description: planned.description, keywords: planned.keywords });
+  const next = { ...text, image_prompt: withImagePrompt ? stripUrls(String(planned.image_prompt ?? '')).trim() : '' };
+  const checkedFields = withImagePrompt ? PACKAGE_FIELDS : TEXT_FIELDS;
+  const emptyField = checkedFields.find((field) => !next[field].trim());
+  const leakField = checkedFields.find((field) => containsPromptLeak(next[field]));
   if (emptyField || leakField) {
     console.error(
       `[${PROMPT_ID}] Regenerated Pin text rejected: ${emptyField ? `${emptyField} empty after URL removal` : `prompt text in ${leakField}`}`
     );
     throw invalidPinText(emptyField ?? leakField ?? null);
   }
+  if (withImagePrompt) {
+    // Never the stored prompt, never silently: a reused or stale one is refused.
+    const problem = imagePromptProblem(next.image_prompt, {
+      previousPrompt: pin.image_prompt,
+      previousTitle: pin.title,
+      newTitle: next.title,
+      forbiddenNumber,
+    });
+    if (problem) {
+      console.error(`[${PROMPT_ID}] Regenerated image prompt rejected: ${problem}`);
+      throw invalidPinText('image_prompt');
+    }
+  }
 
-  // The kept image prompt stands in for the image (only the text changes).
-  const candidate = { angle, ...next, image_prompt: pin.image_prompt };
+  // Text only: the kept image prompt stands in for the image. Package: the new one.
+  const candidate = { angle, ...next, image_prompt: withImagePrompt ? next.image_prompt : pin.image_prompt };
   const issues: PinterestStrategyIssue[] = [
     // Angle and section are fixed by the stored Pin; an echoed different one is refused.
     ...(planned.angle !== undefined && planned.angle !== angle
@@ -229,6 +320,11 @@ export async function regeneratePinText(
       : []),
     // Keyword + article only: never the prompt, the sibling titles or the replaced title (TASK-FIX-084).
     ...validatePinterestStrategyBatch([candidate], 1, [keyword, ...evidenceLines].join('\n')),
+    // TASK-099: the new image prompt passes the generation's article checks
+    // (section subject, tip of a tips_guide, ungrounded objects).
+    ...(withImagePrompt && grounding && stored
+      ? validateArticleGroundedPins([{ sourceSectionId: stored.sectionId, image_prompt: next.image_prompt }], grounding)
+      : []),
     ...(grounding && planned.sourceSectionId !== undefined && planned.sourceSectionId !== stored?.sectionId
       ? [{
           code: 'unsupported-claim' as const,
@@ -290,5 +386,5 @@ export async function regeneratePinText(
     throw new SocialGenerationError(STRATEGY_SAFEGUARD_ERROR_CODE, safeguard.message, safeguard);
   }
 
-  return next;
+  return withImagePrompt ? next : text;
 }

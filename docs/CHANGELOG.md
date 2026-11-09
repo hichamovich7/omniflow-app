@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Pinterest — regenerate text + image prompts, or complete Pins — TASK-099 (2026-11-08)
+
+* **Regeneration now rewrites the image prompt too.** "Regenerate text + prompt" (one Pin) and "Regenerate text + image prompts" (selection) write new titles, descriptions, keywords **and** a new image prompt that matches them — one text AI generation per Pin, no image generated, the current image is kept. The old prompt is never reused.
+* **New "Regenerate complete Pins"** in the selection dialog: the same, then one new image per Pin made from the new prompt. The dialog shows the exact number of paid images before you confirm; Step-by-step Pins (several images) are left out of this mode. If a Pin's image fails, that Pin keeps its previous text, prompt and image and the message names it.
+* Unchanged: URLs, UTM, boards, sections, dates and publication status; distinct titles, unique sections and the article checks (project lists, tips guides, other articles); numbered Pins keep the article's count, the other Pins never ask for a badge or that count. No migration.
+
 ### Pinterest — fewer numbered Pins in project galleries — TASK-FIX-098 (2026-11-06)
 
 * **About 30 % of the Pins are numbered for project galleries** (`project_listicle`), instead of at least half: `max(1, ceil(Pins × 0.30))` — 5 Pins → 2, 10 → 3, 12 → 4 (Pins 1, 4, 7, 10), 15 → 5, 20 → 6. A single Pin is still numbered. The numbered Pins are spread evenly over the batch; the others use Curiosity, Discovery or Problem → Solution without the number. With "AI recommends", the minimum follows the same count.
