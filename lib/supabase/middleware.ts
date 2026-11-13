@@ -45,6 +45,11 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Cron routes (TASK-100) have no session: each one requires CRON_SECRET itself.
+  if (pathname.startsWith('/api/cron/')) {
+    return supabaseResponse;
+  }
+
   if (!user && isApiRoute) {
     return NextResponse.json(
       { data: null, error: { message: 'Unauthorized', code: 'unauthorized' } },

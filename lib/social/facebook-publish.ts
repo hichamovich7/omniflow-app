@@ -11,8 +11,10 @@ import {
 import { isLockStale, type SocialConnection, type SocialPublication } from '@/lib/social/facebook-publication';
 
 /**
- * Facebook Page publication (TASK-068) — always started by an explicit user
- * click, never automatic, never scheduled.
+ * Facebook Page publication (TASK-068) — started by an explicit user click
+ * ("Publish now"), or by the scheduling queue (TASK-100) for a publication
+ * the person confirmed with a date and time: the queue claims the row, then
+ * runs exactly the same post step below (runClaimedScheduledPost).
  *
  * Order, each step saved before the next one:
  * 1. Row `publishing` (unique per content + Page: a second publication is
@@ -40,7 +42,14 @@ export interface PublishDeps {
   now?: () => Date;
 }
 
-export type PublishConflictCode = 'already_published' | 'in_progress' | 'comment_not_retryable' | 'post_not_retryable';
+export type PublishConflictCode =
+  | 'already_published'
+  | 'in_progress'
+  | 'comment_not_retryable'
+  | 'post_not_retryable'
+  | 'scheduled'
+  | 'already_scheduled'
+  | 'not_scheduled';
 
 export class PublishConflictError extends Error {
   readonly status = 409;
@@ -165,24 +174,32 @@ export interface PublishInput {
 }
 
 /**
+ * The exact text, image and link of a publication, from the saved content —
+ * shared by "Publish now" and "Schedule" (TASK-100) so both send the same post.
+ */
+export function publicationContent(generation: PublishInput['generation'], connection: PublishInput['connection']) {
+  const parts = facebookPartsFromRow(generation);
+  const message = composeFacebookPostMessage(parts);
+  const comment = composeFacebookFirstComment(parts);
+  return {
+    post_message: message,
+    post_image_url: generation.image_url,
+    comment_requested: comment !== null,
+    comment_message: comment,
+    comment_status: comment !== null ? ('pending' as const) : ('not_requested' as const),
+    connection_id: connection.id,
+    external_account_name: connection.external_account_name,
+  };
+}
+
+/**
  * "Publish to Facebook" — first publication, or a new attempt when the
  * previous one left no post. Never publishes a content twice on a Page.
  */
 export async function publishFacebookContent(input: PublishInput, depsIn: PublishDeps): Promise<PublishOutcome> {
   const deps: Required<PublishDeps> = { now: () => new Date(), ...depsIn };
   const { store, now } = deps;
-  const parts = facebookPartsFromRow(input.generation);
-  const message = composeFacebookPostMessage(parts);
-  const comment = composeFacebookFirstComment(parts);
-  const content = {
-    post_message: message,
-    post_image_url: input.generation.image_url,
-    comment_requested: comment !== null,
-    comment_message: comment,
-    comment_status: comment !== null ? ('pending' as const) : ('not_requested' as const),
-    connection_id: input.connection.id,
-    external_account_name: input.connection.external_account_name,
-  };
+  const content = publicationContent(input.generation, input.connection);
 
   const existing = await store.findForGeneration(input.generation.id, input.connection.external_account_id);
   if (!existing) {
@@ -221,7 +238,11 @@ export async function publishFacebookContent(input: PublishInput, depsIn: Publis
         : 'This content is already published on this Page.'
     );
   }
-  return retryFacebookPost(existing, input.pageToken, depsIn, existing.status === 'failed' ? content : null);
+  if (existing.status === 'scheduled') {
+    throw new PublishConflictError('scheduled', 'This post is scheduled. Cancel the schedule first to publish it now.');
+  }
+  // A cancelled schedule never reached Facebook: publishing now sends the current text.
+  return retryFacebookPost(existing, input.pageToken, depsIn, existing.status === 'failed' || existing.status === 'cancelled' ? content : null);
 }
 
 /**
@@ -249,6 +270,13 @@ export async function retryFacebookPost(
   if (publication.status === 'published' || publication.status === 'partial') {
     throw new PublishConflictError('post_not_retryable', 'This post cannot be sent again.');
   }
+  // TASK-100: a scheduled post waits for its time; a cancelled one is only sent by an explicit "Publish now".
+  if (publication.status === 'scheduled') {
+    throw new PublishConflictError('scheduled', 'This post is scheduled. Cancel the schedule first to publish it now.');
+  }
+  if (publication.status === 'cancelled' && !content) {
+    throw new PublishConflictError('post_not_retryable', 'This schedule was cancelled. Use "Publish to Facebook" or schedule it again.');
+  }
 
   const ambiguous = publication.status === 'unknown' || publication.status === 'publishing';
   // An unknown result keeps its exact text: it is what is matched on the Page.
@@ -269,6 +297,19 @@ export async function retryFacebookPost(
       const updated = await store.update(claimed.id, { status: 'unknown', locked_at: null, ...errorPatch(err) });
       return { publication: updated ?? claimed, error: err };
     }
+  }
+  return runPostStep(claimed, pageToken, deps);
+}
+
+/**
+ * Scheduling queue (TASK-100): the row was just claimed (scheduled →
+ * publishing, locked) by the cron run. Same post step as "Publish now":
+ * post → id saved → first comment only after the post exists.
+ */
+export async function runClaimedScheduledPost(claimed: SocialPublication, pageToken: string, depsIn: PublishDeps): Promise<PublishOutcome> {
+  const deps: Required<PublishDeps> = { now: () => new Date(), ...depsIn };
+  if (claimed.status !== 'publishing' || claimed.external_post_id) {
+    throw new PublishConflictError('in_progress', 'This scheduled post is not ready to be published.');
   }
   return runPostStep(claimed, pageToken, deps);
 }

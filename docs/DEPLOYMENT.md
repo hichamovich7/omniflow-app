@@ -175,6 +175,14 @@ SOCIAL_TOKEN_ENCRYPTION_KEY=            # openssl rand -hex 32 — never commit,
 8. **Legal URLs** (App settings → Basic, required before switching the app to Live / App Review): Privacy Policy URL `https://<production domain>/privacy`, Terms of Service URL `https://<production domain>/terms`, User data deletion → "Data deletion instructions URL" `https://<production domain>/data-deletion`. These pages are public (TASK-069); replace the `[…]` operator placeholders in `lib/legal/content.ts` first.
 9. Redeploy, open `/facebook`, "Connect a Facebook Page", then follow TESTING.md "Facebook Pages (TASK-068)" for the real test.
 
+## Facebook scheduling (TASK-100)
+
+1. **Database**: apply migration **048** (`048_add_social_publication_scheduling.sql`, after 046 / 047) in the Supabase SQL Editor.
+2. **Secret**: add `CRON_SECRET` on Vercel (Production, server-side only, ≥ 16 characters — `openssl rand -hex 32`). The scheduler sends it as `Authorization: Bearer …`; without it the route answers 503 and scheduled posts stay scheduled. Never print it in logs or in the crontab output.
+3. **Trigger**: no Vercel cron — `vercel.json` must not declare `/api/cron/facebook-scheduled`. The operator's VPS (Contabo) calls `GET https://<production domain>/api/cron/facebook-scheduled` every 5 minutes with the header `Authorization: Bearer $CRON_SECRET` (secret read from a root-only file, never on the command line of a shared log). The crontab stays **disabled** until the manual test of TESTING.md "Facebook scheduling (TASK-100)" is approved.
+4. Deploy, then enable the VPS crontab only for the approved manual test; follow TESTING.md "Facebook scheduling (TASK-100)".
+5. Rollback: disable the VPS crontab (scheduled rows simply stay `scheduled`; cancel them in the UI). Migration rollback SQL is at the end of 048.
+
 ---
 
 ## Database

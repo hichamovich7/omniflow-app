@@ -68,7 +68,8 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 * **TASK-078** — Pinterest Visual Style "Auto variety" (Phase A: visual archetypes + diversity planner, article Pins only, Classic default): offline tests pass, committed (`0b0f1a8`); controlled real AI test pending founder approval. Phase B (visual reference library, private Supabase bucket, next free migration — 047 is now TASK-091) **planned, not started**.
 * **TASK-077** — Pinterest visual subject contract per section (multilingual concepts, primary subject before accessories, one image_prompt repair): offline tests pass, real AI test on post 2119 passed (5 Pins accepted on the first answer); committed and pushed (75710a9).
 
-* **TASK-068** — Facebook Content Studio + publication on Facebook Pages: offline tests pass, **not committed**; **migration 046 to apply by hand** (after 045), Meta app + env variables to set up, then the real test in TESTING.md (founder approval).
+* **TASK-100** — Facebook scheduling (OmniFlow queue + cron route called every 5 minutes by the operator's VPS — crontab not enabled yet): offline tests pass; migration 048 applied and `CRON_SECRET` set in Vercel Production (founder, 2026-11-13); **not validated in production** — manual test in TESTING.md.
+* **TASK-068** — Facebook Content Studio + publication on Facebook Pages: committed (`a013a15`); production test 2026-11-13 ("Crochet Blog EN" → Page "Crochet Sweater Pattern"): publish now with the WordPress image + first comment with the right article link OK; other TESTING.md steps not recorded; scheduling not validated (TASK-100).
 * **TASK-067** — Home Decor image subject check (no false "does not show the project" rejection on German / English Home Decor articles): offline tests pass, **not committed yet**; manual check with the German article in TESTING.md. Follow-up 2026-10-25 (post 1489, invented "shelves"): the Home Decor `<pin_plan>` now restricts furniture to the section's own and names the article-absent pieces; one live text attempt (7 Pins) passed with 0 issues; committed and pushed (4a78c94). Follow-up 2 (same day, reported again on 1489): Home Decor furniture is now grounded per section, plus one targeted image_prompt repair before the 422; live attempt 0 issues (no repair needed); **not committed**.
 * **TASK-066** — understandable Pinterest strategy-safeguard errors: offline tests pass, committed and pushed (commit "fix(pinterest): explain strategy safeguard failures"); gated browser spec + optional manual check in TESTING.md.
 * **TASK-061 scope:** TASK-049 (R2 — WordPress side), TASK-050 (WebP on WordPress), TASK-FIX-058, TASK-FIX-059, TASK-FIX-060.
@@ -125,8 +126,8 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
   * Pin distribution across the active destinations (rule to be decided at implementation).
   * Scheduler and Pinterest CSV updated to use each Pin's destination (board / section unchanged for single-board streams).
   * Tests: RLS (owner only), migration (existing rows, old streams), UI, scheduler / CSV and backward compatibility; the seven readers above keep working.
-* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook scheduling (after TASK-068 — separate task); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
-* **P2:** storage audit / archiving (read-only orphan audit first); TASK-080 (Pinterest Detailed Tutorial Infographic, after TASK-079 — replaces the withdrawn Step-by-step format); TASK-042; TASK-030; TASK-028 Option 2.
+* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook, in this order: **TASK-100** (scheduling — implemented, ready to test), **TASK-101** (image variants), **TASK-102** (several Pages per project + category suggestion); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
+* **P2:** TASK-103 (optional Facebook draft variants); storage audit / archiving (read-only orphan audit first); TASK-080 (Pinterest Detailed Tutorial Infographic, after TASK-079 — replaces the withdrawn Step-by-step format); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
 
@@ -146,10 +147,10 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 
 # TASK NUMBERING
 
-* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-29: 082 (TASK-082, Pinterest "Regenerate text" fix + bulk; TASK-FIX-081, Auto variety "context is not defined"; TASK-080 Pinterest Detailed Tutorial Infographic — planned) → **next task: 083**. Update 2026-11-01: highest used suffix **091** (TASK-091 Multi-board Content Streams, planned) → **next task: 092**. Update 2026-11-02: highest used suffix **092** (TASK-092 one-page project workspace) → **next task: 093**. Update 2026-11-02 (later): **093** used (attach an existing board) → **next task: 094**. **094** used (deletes in the Pinterest structure) → **next task: 095**. **095** used (visual readability pass) → **next task: 096**. **096** used (TASK-FIX-096, project-gallery section assignment, 2026-11-03) → **next task: 097**. **097** used (TASK-FIX-097, OpenAI Image 2.6 models, 2026-11-05) → **next task: 098**. **098** used (TASK-FIX-098, ~30 % numbered Pins in project galleries, 2026-11-06) → **next task: 099**. **099** used (TASK-099, coherent Pin regeneration, 2026-11-08) → **next task: 100**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
+* **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-29: 082 (TASK-082, Pinterest "Regenerate text" fix + bulk; TASK-FIX-081, Auto variety "context is not defined"; TASK-080 Pinterest Detailed Tutorial Infographic — planned) → **next task: 083**. Update 2026-11-01: highest used suffix **091** (TASK-091 Multi-board Content Streams, planned) → **next task: 092**. Update 2026-11-02: highest used suffix **092** (TASK-092 one-page project workspace) → **next task: 093**. Update 2026-11-02 (later): **093** used (attach an existing board) → **next task: 094**. **094** used (deletes in the Pinterest structure) → **next task: 095**. **095** used (visual readability pass) → **next task: 096**. **096** used (TASK-FIX-096, project-gallery section assignment, 2026-11-03) → **next task: 097**. **097** used (TASK-FIX-097, OpenAI Image 2.6 models, 2026-11-05) → **next task: 098**. **098** used (TASK-FIX-098, ~30 % numbered Pins in project galleries, 2026-11-06) → **next task: 099**. **099** used (TASK-099, coherent Pin regeneration, 2026-11-08) → **next task: 100**. Update 2026-11-13: **100-103** used (Facebook backlog: TASK-100 scheduling, TASK-101 image variants, TASK-102 several Pages per project, TASK-103 draft variants — planned) → **next task: 104**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
-* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **047** (`pinterest_accounts`, `pinterest_board_sections`, `content_stream_boards` destinations — TASK-091) written 2026-11-02, **applied 2026-11-02**; **next free migration: 048** (TASK-078 Phase B, which had planned 047, takes it).
+* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **047** (`pinterest_accounts`, `pinterest_board_sections`, `content_stream_boards` destinations — TASK-091) written 2026-11-02, **applied 2026-11-02**; **048** (`social_publications` scheduling — TASK-100) written 2026-11-13, **not applied yet**; **next free migration: 049** (TASK-078 Phase B, which had planned 047 then 048, takes it).
 
 ---
 
@@ -1242,7 +1243,7 @@ Stripe Working                  ⬚ TASK-012
 
 ## [TASK-068] Facebook Content Studio + publication on Facebook Pages
 
-### Status: READY TO TEST (2026-10-15 — offline tests pass; **not committed**; **migration 046 to apply by hand** after 045; Meta app + environment variables to set up by the founder; real Meta test only with founder approval)
+### Status: PARTIALLY VALIDATED IN PRODUCTION (2026-11-13 — committed `a013a15` on 2026-10-18; immediate publication + first comment checked in production, see "Production test 2026-11-13"; the other steps of the TESTING.md real test are not recorded yet). Follow-ups: TASK-100 (scheduling), TASK-101 (image variants), TASK-102 (several Pages per project), TASK-103 (optional draft variants).
 
 ### Goal
 
@@ -1288,6 +1289,152 @@ New `tests/renderer/facebook-content.spec.ts` (31, offline — Supabase, WordPre
 * `/me/accounts` reads the first 100 Pages.
 * A comment whose creation timed out is matched by exact text among the 50 latest comments.
 * Disconnecting deletes OmniFlow's token only; removing the app on Facebook's side is done by the person.
+
+### Production test 2026-11-13 (founder, manual)
+
+* Project **"Crochet Blog EN"** connected to the Facebook Page **"Crochet Sweater Pattern"**.
+* Immediate publication ("Publish now") of a generated post with the **WordPress article image**: photo post published on the Page.
+* First comment option on: the first comment was published by the Page; the link in it was checked and opens the **right article**.
+* Covered by this test: TESTING.md "Facebook Pages (TASK-068)" steps 1 and 5 (connection, publish now + first comment). Not recorded: steps 2-4 and 6-9 (Verify, URL refusal on edit, no second publication, Main post / No link, disconnect, WordPress article unchanged).
+* **Scheduling is not validated** — implemented offline by TASK-100 (2026-11-13), not tested in production.
+
+---
+
+## [TASK-100] Facebook scheduling — date, time, time zone, reschedule, cancel
+
+### Status: READY TO TEST (2026-11-13 — offline tests pass; migration 048 applied and `CRON_SECRET` set in Vercel Production by the founder; no Vercel cron (`vercel.json` declares none) — the VPS crontab (every 5 minutes) stays disabled until the manual test; **not validated in production** — manual test in TESTING.md "Facebook scheduling (TASK-100)" with founder approval). Replaced the unnumbered "Facebook scheduling (after TASK-068 — separate task)" P1 line.
+
+### Goal
+
+Schedule a reviewed Facebook post on its Page instead of publishing it now: pick the date, time and time zone, then reschedule or cancel it, and see its status and errors. The first comment (article link) is only added once the post is really published.
+
+### Scope
+
+* On `/facebook/[id]`, next to "Publish now": "Schedule" with date, time and time zone (default: the browser's time zone, shown explicitly in the confirmation dialog with the target Page).
+* Reschedule (new date / time / time zone) and Cancel while the post is not published yet.
+* Status and errors visible on `/facebook/[id]` and in the `/facebook` history (scheduled for …, publishing, published, published without comment, failed, cancelled) with OmniFlow's plain-language messages (existing TASK-068 error mapping).
+* First comment: requested only after the post is effectively published (post id saved first, same order as TASK-068). If the comment fails, the existing "Retry comment" retries the comment only — the post is never published again.
+* Mechanism to decide at implementation (Meta native scheduled posts vs an OmniFlow scheduler); both must respect the rule above for the first comment. Any schema change (scheduled time, time zone, `scheduled` / `cancelled` statuses on `social_publications`) takes the next free migration at that time and is documented in DATABASE.md.
+
+### Acceptance criteria
+
+* A post can be scheduled with an explicit date, time and time zone; the confirmation shows the Page and the local time; a past date is refused.
+* A scheduled post can be rescheduled or cancelled before publication; a cancelled post is not published.
+* The status and the last error are shown on the detail page and in the history.
+* The first comment is never created before the post is published; a failed comment can be retried with "Retry comment" without a second post on the Page.
+* Immediate publication (TASK-068, validated 2026-11-13) behaves exactly as before.
+* Offline tests cover time-zone conversion, reschedule / cancel and the post → comment order; real test with founder approval only.
+
+### Out of scope
+
+Pages other than the connected one (TASK-102), recurring schedules, bulk scheduling, Instagram.
+
+### Mechanism chosen (2026-11-13): OmniFlow queue, not Meta native scheduling
+
+Meta docs checked 2026-11-13 (Graph API v25.0, still supported; v27.0 latest): a natively scheduled **photo** post needs a temporary photo deleted by Meta after ~24 h if unpublished; rescheduling a scheduled post is not documented; comments cannot be scheduled; no webhook on publication. A native post would also go out after a disconnect in OmniFlow. So: a `scheduled` row in `social_publications` + a cron route running the unchanged TASK-068 post → comment step (DECISIONS.md 2026-11-13).
+
+### What ships
+
+* **Migration 048** (`supabase/migrations/048_add_social_publication_scheduling.sql`): statuses `scheduled` / `cancelled`, `scheduled_at` (UTC), `scheduled_timezone` (IANA, display), CHECK scheduled ⇒ both set, partial index on due rows. Additive; RLS unchanged; still one Page per project (UNIQUE (project, platform) untouched).
+* `lib/social/schedule-time.ts` (client-safe, Intl only): wall-clock date + time in an explicit zone → UTC; clock-change gap refused; past / < 5 min / > 90 days refused; display helpers.
+* `lib/social/facebook-schedule.ts`: schedule (same `publicationContent()` as Publish now), reschedule, cancel (conditional updates on `scheduled`), cron run (`runDueFacebookSchedules`: claim scheduled → publishing, re-check the row's connection — missing / other Page / other project / expired / revoked / deleted content / Meta not configured → `failed`, nothing sent — then `runClaimedScheduledPost`).
+* `lib/social/facebook-publish.ts`: `publicationContent()` extracted (Publish now unchanged), `runClaimedScheduledPost()`; Publish now / Retry refuse a `scheduled` row; a `cancelled` row is sent only by an explicit Publish now (current text).
+* `lib/queries/social-publications.ts`: `ScheduleStore` (`transition`, `claimScheduled`, owner + status + no-post filters), `listDueScheduledPublications` (cron, service role); `claimPost` also accepts `cancelled`.
+* Endpoints: `POST /api/social/generations/[id]/schedule`, `PATCH /api/social/publications/[id]/schedule`, `POST /api/social/publications/[id]/cancel`, `GET /api/cron/facebook-scheduled` (`CRON_SECRET`, `lib/social/cron-auth.ts`); the proxy lets `/api/cron/` through without a session (`lib/supabase/middleware.ts`); called by an external scheduler (VPS, every 5 minutes), no Vercel cron; `.env.example` `CRON_SECRET`.
+* UI: `/facebook/[id]` Schedule dialog (date, time, time zone, Page + time + UTC before confirmation), Scheduled alert, Reschedule, Cancel schedule, error when the Page changed; `/facebook` history shows the scheduled time.
+* Docs: API, DATABASE, UI_UX, DEPLOYMENT, DECISIONS, TESTING, CHANGELOG, in-app Guide ("Facebook Pages").
+
+### Tests (2026-11-13)
+
+New `tests/renderer/facebook-scheduling.spec.ts` (28, Meta simulated): date / zone, reschedule, cancel, concurrency (3 parallel runs → 1 post), Page disconnected / replaced, comment failure without duplicate, uncertain result, no token in logs, Publish now non-regression. `facebook-content.spec.ts` (31) unchanged and passing. Full renderer **1825/1825**; TypeScript, ESLint (touched files), `git diff --check` pass. No Meta call, no real publication.
+
+### Remaining (founder)
+
+1. ~~Apply migration 048~~ — done by the founder (2026-11-13).
+2. ~~Add `CRON_SECRET` on Vercel Production~~ — done (2026-11-13). Enable the VPS crontab (every 5 minutes, DEPLOYMENT.md "Facebook scheduling") only for the approved manual test.
+3. With founder approval only: manual test in TESTING.md "Facebook scheduling (TASK-100)", then record the results here.
+
+### Known limits
+
+* Precision ≈ 5 minutes (VPS trigger); at most 5 due posts per run (more wait for the next run).
+* A run killed mid-post leaves `publishing`; after 90 s the person sees "Retry", which checks the Page first.
+* The cron never retries a failed comment or an unknown post on its own — "Retry comment" / "Retry" stay manual.
+* To change the text of a scheduled post: cancel, edit, schedule again.
+
+---
+
+## [TASK-101] Facebook image variants for one article
+
+### Status: PLANNED (P1 — documented 2026-11-13, not started; no code, no migration)
+
+### Goal
+
+Let the person choose the image attached to a Facebook draft: keep the WordPress article image (current behavior) or generate several alternative images for the same article, preview them and pick one.
+
+### Scope
+
+* The WordPress article image stays an option (and the default).
+* "Generate image variants" for one article: several alternatives (count to define at implementation), stored with the `facebook-*` media profiles of TASK-050 (currently `planned`) under `images/facebook/`.
+* Preview of every option; selecting one attaches it to the draft (`post_image_url` at publication).
+* Generation never publishes anything on Facebook and never modifies the WordPress article.
+* Independent from draft variants (TASK-103).
+
+### Acceptance criteria
+
+* The WordPress image is always selectable, even after variants were generated.
+* Several variants can be generated for the same article, previewed and one selected for the draft.
+* The selected image is the one sent at publication (immediate or scheduled).
+* No Facebook call and no WordPress write during generation.
+* Credits / rate limits follow the existing image-generation rules (CLAUDE.md credit order once TASK-011 exists).
+
+---
+
+## [TASK-102] Several Facebook Pages per project + Page suggestion by WordPress category
+
+### Status: PLANNED (P1 — documented 2026-11-13, not started; no code). Needs a schema change: today `social_connections` is UNIQUE (project, platform) — one Page per project (TASK-068 decision 6).
+
+### Goal
+
+Connect several Facebook Pages to one project, choose the target Page for each publication, and get a suggested Page from the article's WordPress category (e.g. category "Sweaters" → Page "Crochet Sweater Pattern").
+
+### Scope
+
+* Keep existing connections working unchanged (the current Page becomes one of the project's Pages; e.g. "Crochet Blog EN" → "Crochet Sweater Pattern").
+* Page selector per publication on `/facebook/[id]`.
+* Mapping WordPress category → Facebook Page per project (managed on `/facebook` or the project page), used to pre-select a Page; the person can always change it.
+* The target Page is shown before confirmation (publish now and schedule).
+* Schema change (relax the UNIQUE constraint + category mapping) in the next free migration at implementation time, documented in DATABASE.md; RLS / token protections of migration 046 unchanged.
+
+### Acceptance criteria
+
+* Existing connections and published history still work without reconnecting.
+* Several Pages can be connected to one project; each publication targets the chosen Page.
+* For an article in a mapped category, the mapped Page is pre-selected; without a mapping, no silent choice is made.
+* The confirmation dialog always names the target Page.
+* Ownership checks cover the Page (a person can only publish to their own project's connected Pages).
+
+---
+
+## [TASK-103] Facebook draft variants (optional)
+
+### Status: PLANNED (P2, optional — documented 2026-11-13, not started; no code, no migration)
+
+### Goal
+
+Choose how many Facebook drafts to generate for one article, each with a distinct text and angle.
+
+### Scope
+
+* Count selector on generation (limit to define at implementation); one saved draft per variant in `social_content_generations`.
+* Distinct angles and texts (no near-duplicates), same fact checks as `facebook-post-v1`.
+* Independent from image variants (TASK-101): each draft keeps the default image choice.
+
+### Acceptance criteria
+
+* N drafts are generated and saved for one article; each has a visibly different angle and text.
+* Every draft passes the existing checks (language, numbers, no invented facts, link wording).
+* Nothing is published during generation.
+* Generation limits apply per draft.
 
 ---
 

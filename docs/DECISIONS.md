@@ -1869,6 +1869,26 @@ The founder asked for the basic actions everywhere — create, add, edit, delete
 
 ---
 
+## 2026-11-13 — Facebook scheduling: OmniFlow queue, not Meta native scheduling (TASK-100)
+
+### Context
+
+TASK-100 asks for scheduled Facebook Page posts with reschedule / cancel, the first comment only after the post is really live, no publication to another Page when the Page is disconnected or replaced, and no duplicate. Meta's documentation (checked 2026-11-13, Graph API v25.0 still supported; v27.0 latest): native scheduling exists (`published=false` + `scheduled_publish_time`, 10 minutes to 30 days — 75 days on another page of the docs), but a scheduled **photo** post needs a temporary photo (`temporary=true`) that Meta deletes after about 24 h if not published; rescheduling a scheduled post is not documented; comments cannot be scheduled and nothing is said about commenting before publication; no webhook announces publication (polling `is_published` only).
+
+### Decision Taken
+
+1. OmniFlow's own queue: a `social_publications` row `scheduled` with the UTC instant (migration 048); nothing goes to Facebook before that time.
+2. A cron route (`GET /api/cron/facebook-scheduled`, `CRON_SECRET`, called by an external scheduler (the operator's VPS crontab, every 5 minutes — not enabled yet; no Vercel cron)) claims due rows with a conditional update and runs the **unchanged** TASK-068 post → id saved → comment step.
+3. At run time the row's connection is re-read; another Page, no Page, an expired / revoked access or deleted content → `failed`, nothing sent.
+4. Uncertain results are never resent by the cron: "Retry" / "Retry comment" (TASK-068) check Facebook first.
+5. RULES.md mentions Inngest as the planned job system; this is a single minute cron, not a general job framework — Inngest stays the option for heavy async work.
+
+### Consequences
+
+* Same behavior and checks as Publish now (one code path); cancel and disconnect are always effective.
+* Needs `CRON_SECRET` and the external scheduler; precision is about 5 minutes; at most 5 posts per run (more wait for the next run). Update 2026-11-13: the Vercel cron first planned in `vercel.json` was removed before the first deployment — the operator's VPS calls the route instead.
+* The Page sees a normal post at publication time (not a Meta "scheduled" post in Meta Business Suite).
+
 # Idées futures
 
 Idées non urgentes, non planifiées, à reconsidérer plus tard. Ne pas implémenter sans validation préalable.

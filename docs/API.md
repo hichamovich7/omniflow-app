@@ -1348,6 +1348,22 @@ Retry of the post step (status `failed`, `unknown`, or `publishing` with a lock 
 
 "Retry comment" — the first comment only (post already on Facebook, `comment_status` failed / unknown / stale pending). Body `{ "confirm": true }`. The post is never sent again. An `unknown` comment is first looked up in `GET /{post-id}/comments` (same text, written by the Page). Errors: `409 comment_not_retryable` / `in_progress`.
 
+## POST /api/social/generations/[id]/schedule
+
+"Schedule" (TASK-100). Body `{ "connectionId": uuid, "date": "YYYY-MM-DD", "time": "HH:MM", "timeZone": IANA zone, "confirm": true }` (strict). Same auth, ownership, completed-content, project-Page, connection-status checks and `social/facebook-publish` rate limit as publish; refused when the link is in the first comment and the Page lacks `pages_manage_engagement`. The wall-clock time is converted to UTC in the given zone (`lib/social/schedule-time.ts`); past, < 5 minutes, > 90 days ahead or a time skipped by a clock change → `422 invalid_schedule`. **No Meta call and no token read**: the row is saved `scheduled` with the exact text / image / comment of Publish now (`publicationContent()`), `scheduled_at` (UTC) and `scheduled_timezone`. A `cancelled` row, or a `failed` one without post, is scheduled again with the current text. Response `{ publication, warning: null }`. Errors: `409 already_scheduled` / `post_not_retryable` / `no_page_connected` / `comment_not_allowed`, `503 meta_not_configured`.
+
+## PATCH /api/social/publications/[id]/schedule
+
+"Reschedule" — body `{ "date", "time", "timeZone", "confirm": true }`. Only while `scheduled` (conditional update); refused with `409 page_disconnected` / `page_replaced` / `connection_expired` when the publication's Page is no longer the project's connected Page (never moved to another Page). Errors: `409 not_scheduled` (already claimed by the cron, published or cancelled), `422 invalid_schedule`.
+
+## POST /api/social/publications/[id]/cancel
+
+"Cancel schedule" — body `{ "confirm": true }`. `scheduled` → `cancelled` (conditional update); a cancelled row is never claimed by the cron. `409 not_scheduled` when too late (already publishing).
+
+## GET /api/cron/facebook-scheduled
+
+Facebook scheduling queue (TASK-100), called by an external scheduler (the operator's VPS crontab, every 5 minutes — not enabled yet; no Vercel cron). **Not a user route**: no session (the proxy lets `/api/cron/` through); requires `Authorization: Bearer <CRON_SECRET>` (constant-time compare; missing secret → `503 cron_not_configured`, wrong one → `401`). Service-role client; at most 5 due rows (oldest first), each claimed with a conditional update `scheduled → publishing` (`scheduled_at <= now`), so overlapping runs never publish twice. Before any Meta call the row's connection is re-read (by id + user): missing, other Page, other project, `expired` / `revoked`, deleted content or Meta not configured → `failed` with a plain message, nothing sent. Otherwise the TASK-068 post step runs unchanged: post → id saved → first comment; comment failure → `partial` ("Retry comment"); timeout → `unknown` ("Retry" checks the Page first) — the cron never retries on its own. Response `{ data: { due, ran, blocked, skipped, errors } }`; logs carry counts only.
+
 ## GET /api/social/connections
 
 The caller's connected Facebook Pages — safe columns only (Page id and name, status, granted permissions, dates); the token column is never selected (the session role cannot read it). `503 migration_required` before migration 046.

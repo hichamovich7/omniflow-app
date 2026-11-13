@@ -47,6 +47,29 @@ export function retryFacebookStep<T>(publicationId: string, step: 'post' | 'comm
   return call<T>(`/api/social/publications/${publicationId}/${path}`, post({ confirm: true }), 'The retry could not be completed.');
 }
 
+/** TASK-100 — the wall-clock date + time in an explicit IANA time zone; the server converts it to UTC. */
+export interface FacebookScheduleChoice {
+  date: string;
+  time: string;
+  timeZone: string;
+}
+
+export function scheduleFacebookPost<T>(id: string, connectionId: string, when: FacebookScheduleChoice) {
+  return call<T>(`/api/social/generations/${id}/schedule`, post({ connectionId, ...when, confirm: true }), 'The post could not be scheduled.');
+}
+
+export function rescheduleFacebookPost<T>(publicationId: string, when: FacebookScheduleChoice) {
+  return call<T>(
+    `/api/social/publications/${publicationId}/schedule`,
+    { method: 'PATCH', body: JSON.stringify({ ...when, confirm: true }) },
+    'The post could not be rescheduled.'
+  );
+}
+
+export function cancelFacebookSchedule<T>(publicationId: string) {
+  return call<T>(`/api/social/publications/${publicationId}/cancel`, post({ confirm: true }), 'The schedule could not be cancelled.');
+}
+
 export function listFacebookPages<T>(projectId: string) {
   return call<T>(`/api/social/connections/facebook/pages?projectId=${encodeURIComponent(projectId)}`, { method: 'GET' }, 'Your Facebook Pages could not be listed.');
 }

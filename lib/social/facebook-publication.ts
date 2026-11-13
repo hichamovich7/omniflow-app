@@ -33,7 +33,12 @@ export const SOCIAL_CONNECTION_STATUS_LABELS: Record<SocialConnectionStatus, str
   error: 'Connection error',
 };
 
-export const PUBLICATION_STATUSES = ['publishing', 'published', 'partial', 'failed', 'unknown'] as const;
+/**
+ * `scheduled` / `cancelled` (TASK-100, migration 048): a post waiting for its
+ * time in OmniFlow's own queue, or a schedule cancelled before it ran — in
+ * both cases nothing is on Facebook yet.
+ */
+export const PUBLICATION_STATUSES = ['scheduled', 'cancelled', 'publishing', 'published', 'partial', 'failed', 'unknown'] as const;
 export type PublicationStatus = (typeof PUBLICATION_STATUSES)[number];
 
 export const COMMENT_STATUSES = ['not_requested', 'pending', 'published', 'failed', 'unknown'] as const;
@@ -65,6 +70,10 @@ export interface SocialPublication {
   attempt_count: number;
   comment_attempt_count: number;
   locked_at: string | null;
+  /** UTC instant of a scheduled publication (TASK-100) — absent before migration 048. */
+  scheduled_at?: string | null;
+  /** IANA time zone the person chose (display only — the instant is scheduled_at). */
+  scheduled_timezone?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -80,6 +89,8 @@ export function isLockStale(lockedAt: string | null, now: Date = new Date()): bo
 
 export type FacebookDisplayStatus =
   | 'not_published'
+  | 'scheduled'
+  | 'cancelled'
   | 'publishing'
   | 'published'
   | 'comment_published'
@@ -89,6 +100,8 @@ export type FacebookDisplayStatus =
 
 export const FACEBOOK_DISPLAY_STATUS_LABELS: Record<FacebookDisplayStatus, string> = {
   not_published: 'Not published',
+  scheduled: 'Scheduled',
+  cancelled: 'Schedule cancelled',
   publishing: 'Publishing…',
   published: 'Published',
   comment_published: 'Published + comment',
@@ -112,10 +125,21 @@ export interface PublicationActions {
   canRetryComment: boolean;
   /** The content can still be edited (nothing was, or may have been, posted). */
   canEdit: boolean;
+  /** "Schedule" (TASK-100): nothing on Facebook and no publication running or waiting. */
+  canSchedule: boolean;
+  /** Reschedule / cancel a scheduled publication that has not started yet. */
+  canReschedule: boolean;
+  canCancelSchedule: boolean;
 }
 
 export function publicationActions(publication: SocialPublication | null, now: Date = new Date()): PublicationActions {
-  if (!publication) return { canPublish: true, canRetry: false, canRetryComment: false, canEdit: true };
+  if (!publication) return { canPublish: true, canRetry: false, canRetryComment: false, canEdit: true, canSchedule: true, canReschedule: false, canCancelSchedule: false };
+  if (publication.status === 'scheduled') {
+    return { canPublish: false, canRetry: false, canRetryComment: false, canEdit: false, canSchedule: false, canReschedule: true, canCancelSchedule: true };
+  }
+  if (publication.status === 'cancelled') {
+    return { canPublish: true, canRetry: false, canRetryComment: false, canEdit: true, canSchedule: true, canReschedule: false, canCancelSchedule: false };
+  }
   const stale = isLockStale(publication.locked_at, now);
   const hasPost = Boolean(publication.external_post_id);
   const postStepOpen =
@@ -133,6 +157,9 @@ export function publicationActions(publication: SocialPublication | null, now: D
     // After a failure that left no post the text may still change; an
     // unknown result must keep its exact text (it is matched on Facebook).
     canEdit: !hasPost && publication.status === 'failed',
+    canSchedule: !hasPost && publication.status === 'failed',
+    canReschedule: false,
+    canCancelSchedule: false,
   };
 }
 

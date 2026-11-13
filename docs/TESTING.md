@@ -1345,6 +1345,39 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Facebook scheduling (TASK-100, 2026-11-13)
+
+```bash
+npx playwright test tests/renderer/facebook-scheduling.spec.ts tests/renderer/facebook-content.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/facebook-scheduling.spec.ts` (28) — the Meta Graph API is a fake fetch, `social_publications` an in-memory store with the same conditional updates as Supabase; no Meta call, no database:
+
+* Date / time zone: Europe/Paris winter (+1) and summer (+2), New York, UTC → one UTC instant; a time skipped by a clock change (2027-03-28 02:30 Paris), an impossible date or an unknown zone refused; past, < 5 min and > 90 days refused; request bodies need an explicit zone and `confirm: true`.
+* Schedule stores `scheduled`, the UTC instant + zone and exactly the "Publish now" text / image / comment, with no Graph call; scheduling twice refused; reschedule moves the time (the cron waits for it); cancel → the cron never sends it, even from a stale listing, and "Retry" refuses it; schedule again reuses the row; reschedule / cancel refused once claimed; another user can neither cancel nor claim.
+* Cron: due post → photo post, id saved, then the comment (same calls as Publish now); not due → nothing; three concurrent runs + a later run → exactly one post and one comment; Page disconnected / replaced by another Page / connection expired / content deleted / Meta not configured → `failed` with a clear message and **no** Graph call; comment failure → `partial`, never posted again, "Retry comment" sends the comment only; post timeout → `unknown`, the next run leaves it, "Retry" finds it on the Page and adopts it; no token in any log line.
+* Publish now non-regression: first publication unchanged; a scheduled post cannot be published now (cancel first); after a cancel, "Publish now" sends the current text once; actions of `failed` / `unknown` / `partial` unchanged. `facebook-content.spec.ts` (31, TASK-068) still passes unchanged.
+* Source checks: the schedule store filters on `user_id` + current status + no post; cron secret compared in constant time, `/api/cron/` exempted from the session proxy, `vercel.json` never declares the route (external trigger), `CRON_SECRET` in `.env.example`; routes (auth, ownership, confirmation, rate limit, Page of the project, no token read when scheduling); migration 048; UI fields.
+
+**Manual test (founder approval required — real posts on a test Page; prerequisites: migration 048 applied, `CRON_SECRET` set in Vercel Production, TASK-100 deployed, the VPS crontab (every 5 minutes) enabled for the test; a test project with a connected test Page and two published test articles):**
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | `/facebook/[id]` of a saved post (Link: First comment) → **Schedule** | Dialog shows the Page name + ID, image / text only, "first comment … once the post is live"; date, time and time zone (default = browser zone) | ☐ |
+| 2 | Pick a time in the past, then 2 minutes from now | "in the past" / "at least 5 minutes" — Schedule post disabled | ☐ |
+| 3 | Pick now + 10 min in another zone (e.g. America/New_York) | Preview "Publishes on … (America/New_York) (… UTC)" matches the conversion; **Schedule post** → badge "Scheduled", time shown; text read-only; no post on the Page yet | ☐ |
+| 4 | `/facebook` history | Badge "Scheduled" + the time and zone | ☐ |
+| 5 | **Reschedule** → now + 15 min | New time shown; nothing posted at the old time | ☐ |
+| 6 | Wait for the time (+ ≤ 5 min) and reload | Status "Published + comment"; photo post on the Page without link; first comment by the Page = lead-in + exact permalink; "View on Facebook" opens it; exactly one post | ☐ |
+| 7 | Second article: Schedule (now + 10 min) → **Cancel schedule** | "Schedule cancelled"; nothing on the Page after the time; text editable again; Publish to Facebook / Schedule available | ☐ |
+| 8 | Third: Schedule (now + 10 min), then on `/facebook` **Disconnect Page** | After the time: "Publication failed" — "no longer connected … Nothing was published"; nothing on any Page | ☐ |
+| 9 | Vercel logs of `/api/cron/facebook-scheduled` (calls from the VPS) | Counts only (`due`, `ran`, …) — no token, no text, no Page id; a call without the secret → 401 | ☐ |
+| 10 | Publish now (non-regression) on a new post | Same behavior as the 2026-11-13 production test (TASK-068) | ☐ |
+
+Record the date and results here and in TASKS.md (TASK-100). Scheduling is **not** validated in production until this table is filled.
+
+---
+
 # Regenerate text + image prompts / complete Pins (TASK-099, 2026-11-08)
 
 ```bash

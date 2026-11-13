@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Facebook — schedule Page posts — TASK-100 (2026-11-13)
+
+* **New "Schedule"** on a Facebook post: date, time and an explicit time zone; the dialog shows the target Page and the chosen time (and UTC) before confirmation. Past times, less than 5 minutes ahead and more than 90 days ahead are refused; the instant is stored in UTC.
+* **Reschedule / Cancel schedule** while the post has not started; a cancelled post is never published. Status "Scheduled" / "Schedule cancelled" on the post and in the history.
+* Published by OmniFlow's own queue (cron route called every 5 minutes by an external scheduler, `CRON_SECRET`) with the same flow as "Publish now": post, its Facebook id saved, then the first comment only once the post exists. No duplicate across overlapping runs; a failed comment is retried alone; an uncertain result is checked on the Page before any retry. A disconnected or replaced Page blocks the post with an error — never sent to another Page.
+* Migration **048** (statuses `scheduled` / `cancelled`, `scheduled_at`, `scheduled_timezone`), `CRON_SECRET`; no Vercel cron (`vercel.json` declares none). Publish now unchanged; still one Page per project.
+
 ### Pinterest — regenerate text + image prompts, or complete Pins — TASK-099 (2026-11-08)
 
 * **Regeneration now rewrites the image prompt too.** "Regenerate text + prompt" (one Pin) and "Regenerate text + image prompts" (selection) write new titles, descriptions, keywords **and** a new image prompt that matches them — one text AI generation per Pin, no image generated, the current image is kept. The old prompt is never reused.

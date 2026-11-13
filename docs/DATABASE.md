@@ -27,7 +27,8 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * **Migration 045** (`045_add_social_content_generations.sql`, TASK-063) — written 2026-10-12, **not applied yet**: to apply by hand in the Supabase SQL Editor. Before it, Medium summaries are generated but not saved (warning), and `/medium` shows a "not available yet" notice.
 * **Migration 046** (`046_add_social_connections_and_publications.sql`, TASK-068) — written 2026-10-15, **not applied yet** (needs 045 first): to apply by hand in the Supabase SQL Editor. Before it, Facebook posts are generated but not saved (warning), `/facebook` shows "not available yet" notices, and no Page can be connected.
 * **Migration 047** (`047_add_pinterest_accounts_and_sections.sql`, TASK-091) — written 2026-11-02, **applied by hand on 2026-11-02** (Supabase SQL Editor, one transaction; new columns checked through PostgREST). Required before deploying TASK-091 (v3.4.0): Content Stream saves write the new `content_stream_boards` columns. Before it, pages still load (no account, no section, every stream link read as primary + active). Verified on a real Postgres (PGlite) — see TESTING.md (TASK-091).
-* **Next free migration: 048** (TASK-078 Phase B, which had planned 047, takes the next free number).
+* **Migration 048** (`048_add_social_publication_scheduling.sql`, TASK-100) — written 2026-11-13, **not applied yet** (needs 046): statuses `scheduled` / `cancelled` and columns `scheduled_at`, `scheduled_timezone` on `social_publications`, due index. Before it, "Schedule" fails to save (the CHECK refuses `scheduled`); Publish now is unaffected.
+* **Next free migration: 049** (TASK-078 Phase B, which had planned 047 then 048, takes the next free number).
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -1287,7 +1288,7 @@ One row per (saved content, Facebook Page): the state of each publication step (
 | connection_id | uuid nullable → social_connections(id) ON DELETE SET NULL | Page connection used |
 | platform | text NOT NULL | CHECK `facebook` |
 | external_account_id / external_account_name | text NOT NULL | Page id / name at publication time |
-| status | text NOT NULL DEFAULT `publishing` | CHECK `publishing` / `published` / `partial` (post on Facebook, comment not) / `failed` (Facebook refused, nothing posted) / `unknown` (timeout: may or may not be on Facebook) |
+| status | text NOT NULL DEFAULT `publishing` | CHECK `scheduled` (TASK-100: waiting in OmniFlow's queue, nothing on Facebook) / `cancelled` (schedule cancelled before it ran — never sent) / `publishing` / `published` / `partial` (post on Facebook, comment not) / `failed` (Facebook refused, nothing posted; also a scheduled post blocked by a disconnected / replaced Page) / `unknown` (timeout: may or may not be on Facebook) — `scheduled` / `cancelled` from migration 048 |
 | post_message | text NOT NULL | exact text sent (matched on the Page to settle an `unknown` result) |
 | post_image_url | text nullable | CHECK `https://` — article image sent with the photo post |
 | external_post_id / external_post_url | text nullable | Facebook post id (saved before any comment) / public link (`https://`) |
@@ -1298,6 +1299,8 @@ One row per (saved content, Facebook Page): the state of each publication step (
 | external_comment_id / comment_published_at | | |
 | error_code / error_message / fbtrace_id | text nullable | Meta code, OmniFlow's plain-language message (never Meta's text), Meta trace id |
 | attempt_count / comment_attempt_count | integer ≥ 0 | |
+| scheduled_at | timestamptz nullable | TASK-100 (048): UTC instant of a scheduled publication; required when `status = 'scheduled'`; partial index `social_publications_due_idx` (`WHERE status = 'scheduled'`) |
+| scheduled_timezone | text nullable (1-64) | IANA zone the person chose — display only, the instant is `scheduled_at` |
 | locked_at | timestamptz nullable | set while a step runs; older than 90 s = killed request |
 | created_at / updated_at | timestamptz | `updated_at` trigger |
 

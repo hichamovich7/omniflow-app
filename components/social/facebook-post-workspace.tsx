@@ -3,20 +3,31 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Copy, ExternalLink, Loader2, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
+import { CalendarClock, Copy, ExternalLink, Loader2, RefreshCw, Save, Send, Trash2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  cancelFacebookSchedule,
   deleteSocialContent,
   publishToFacebook,
+  rescheduleFacebookPost,
   retryFacebookStep,
   saveFacebookEdits,
+  scheduleFacebookPost,
 } from '@/components/social/facebook-requests';
+import {
+  availableTimeZones,
+  browserTimeZone,
+  formatScheduledTime,
+  resolveScheduleChoice,
+  utcToZonedParts,
+} from '@/lib/social/schedule-time';
 import {
   allowedLinkPlacements,
   composeFacebookFirstComment,
@@ -65,10 +76,17 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
   const [firstCommentText, setFirstCommentText] = useState(saved.firstCommentText ?? '');
   const [linkPlacement, setLinkPlacement] = useState<FacebookLinkPlacement>(saved.linkPlacement);
   const [publication, setPublication] = useState<SocialPublication | null>(initialPublication);
-  const [busy, setBusy] = useState<'save' | 'publish' | 'retry' | 'retry-comment' | 'delete' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'publish' | 'retry' | 'retry-comment' | 'delete' | 'schedule' | 'cancel' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // TASK-100 — scheduling dialog ("schedule" a new post, or "reschedule" a scheduled one).
+  const [scheduleMode, setScheduleMode] = useState<'schedule' | 'reschedule' | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
+  const [scheduleZone, setScheduleZone] = useState('UTC');
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const placements = allowedLinkPlacements(item.cta_url);
   const actions = publicationActions(publication);
@@ -86,6 +104,15 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
   );
   const connectionUsable = Boolean(connection && connection.status !== 'expired' && connection.status !== 'revoked');
   const canComment = Boolean(connection?.granted_scopes.includes('pages_manage_engagement'));
+  const scheduled = publication?.status === 'scheduled' ? publication : null;
+  // The Page chosen for a scheduled post is no longer the project's Page: it will not be published (never to another Page).
+  const scheduledPageGone = Boolean(scheduled && (!connection || connection.external_account_id !== scheduled.external_account_id));
+  const schedulePageName = scheduleMode === 'reschedule' ? publication?.external_account_name : connection?.external_account_name;
+  const schedulePageId = scheduleMode === 'reschedule' ? publication?.external_account_id : connection?.external_account_id;
+  const scheduleChoice = { date: scheduleDate, time: scheduleTime, timeZone: scheduleZone };
+  const schedulePreview = scheduleDate && scheduleTime ? resolveScheduleChoice(scheduleChoice) : null;
+  const scheduleWithComment = scheduleMode === 'reschedule' ? Boolean(publication?.comment_requested) : comment !== null;
+  const zones = useMemo(() => (scheduleMode ? availableTimeZones(scheduleZone) : []), [scheduleMode, scheduleZone]);
 
   async function save() {
     setBusy('save');
@@ -134,6 +161,60 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
     applyResult(response.data, response.error?.message);
   }
 
+  function openSchedule(mode: 'schedule' | 'reschedule') {
+    const zone = mode === 'reschedule' && publication?.scheduled_timezone ? publication.scheduled_timezone : browserTimeZone();
+    const start = mode === 'reschedule' && publication?.scheduled_at ? publication.scheduled_at : new Date(Date.now() + 60 * 60 * 1000);
+    const parts = utcToZonedParts(start, zone);
+    setScheduleZone(zone);
+    setScheduleDate(parts.date);
+    setScheduleTime(parts.time);
+    setScheduleError(null);
+    setScheduleMode(mode);
+  }
+
+  async function submitSchedule() {
+    if (!scheduleMode) return;
+    const checked = resolveScheduleChoice(scheduleChoice);
+    if (!checked.ok) {
+      setScheduleError(checked.message);
+      return;
+    }
+    setBusy('schedule');
+    setScheduleError(null);
+    const response =
+      scheduleMode === 'reschedule' && publication
+        ? await rescheduleFacebookPost<PublishResult>(publication.id, scheduleChoice)
+        : connection
+          ? await scheduleFacebookPost<PublishResult>(item.id, connection.id, scheduleChoice)
+          : null;
+    setBusy(null);
+    if (!response || !response.data) {
+      setScheduleError(response?.error?.message ?? 'The post could not be scheduled.');
+      return;
+    }
+    setPublication(response.data.publication);
+    setScheduleMode(null);
+    setError(null);
+    toast.success(scheduleMode === 'reschedule' ? 'New time saved.' : 'Post scheduled.');
+    router.refresh();
+  }
+
+  async function cancelSchedule() {
+    if (!publication) return;
+    setBusy('cancel');
+    const response = await cancelFacebookSchedule<PublishResult>(publication.id);
+    setBusy(null);
+    setCancelOpen(false);
+    if (!response.data) {
+      setError(response.error?.message ?? 'The schedule could not be cancelled.');
+      router.refresh();
+      return;
+    }
+    setPublication(response.data.publication);
+    toast.success('Schedule cancelled. Nothing will be published.');
+    router.refresh();
+  }
+
   async function remove() {
     setBusy('delete');
     const response = await deleteSocialContent<{ id: string }>(item.id);
@@ -172,6 +253,11 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
         >
           {FACEBOOK_DISPLAY_STATUS_LABELS[status]}
         </Badge>
+        {scheduled?.scheduled_at && (
+          <span className="text-xs text-muted-foreground" data-testid="facebook-scheduled-time">
+            {formatScheduledTime(scheduled.scheduled_at, scheduled.scheduled_timezone)}
+          </span>
+        )}
         {publication?.comment_requested && (
           <Badge variant={publication.comment_status === 'published' ? 'success' : 'outline'}>
             {publication.comment_status === 'published' ? 'Comment published' : `Comment: ${publication.comment_status.replace('_', ' ')}`}
@@ -345,6 +431,16 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
           </Alert>
         )}
         {publication?.status === 'failed' && publication.error_message && <Alert variant="danger">{publication.error_message}</Alert>}
+        {scheduled?.scheduled_at && (
+          <Alert variant={scheduledPageGone ? 'danger' : 'info'} role="status" data-testid="facebook-schedule-summary">
+            {scheduledPageGone
+              ? `This post was scheduled for the Page "${scheduled.external_account_name}", which is no longer connected to ${projectName}. It will not be published (OmniFlow never posts to another Page). Cancel it, then schedule it again for the connected Page.`
+              : `Scheduled for ${formatScheduledTime(scheduled.scheduled_at, scheduled.scheduled_timezone)} on the Page "${scheduled.external_account_name}". The post is published at that time${scheduled.comment_requested ? ', then the Page adds the article link as the first comment' : ''}. To edit the text, cancel the schedule first.`}
+          </Alert>
+        )}
+        {publication?.status === 'cancelled' && (
+          <p className="text-sm text-muted-foreground">The schedule was cancelled: nothing was published. You can edit, publish now or schedule again.</p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {actions.canPublish && (
@@ -357,6 +453,31 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
             >
               <Send className="mr-1.5 h-3.5 w-3.5" />
               Publish to Facebook
+            </Button>
+          )}
+          {actions.canSchedule && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => openSchedule('schedule')}
+              disabled={!configured || !connectionUsable || dirty || busy !== null || (linkPlacement === 'first_comment' && !canComment)}
+              title={dirty ? 'Save your changes first.' : undefined}
+            >
+              <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+              Schedule
+            </Button>
+          )}
+          {actions.canReschedule && (
+            <Button type="button" size="sm" variant="outline" onClick={() => openSchedule('reschedule')} disabled={busy !== null || scheduledPageGone}>
+              <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+              Reschedule
+            </Button>
+          )}
+          {actions.canCancelSchedule && (
+            <Button type="button" size="sm" variant="outline" onClick={() => setCancelOpen(true)} disabled={busy !== null}>
+              <XCircle className="mr-1.5 h-3.5 w-3.5" />
+              Cancel schedule
             </Button>
           )}
           {actions.canRetry && (
@@ -377,7 +498,7 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Nothing is published without this confirmation. Scheduling is not available yet. The WordPress article is never modified.
+          Nothing is published without your confirmation, now or at the time you schedule. The WordPress article is never modified.
         </p>
       </section>
 
@@ -399,6 +520,81 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
             <Button type="button" onClick={publish} disabled={busy !== null}>
               {busy === 'publish' && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Publish now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={scheduleMode !== null} onOpenChange={(open) => busy === null && !open && setScheduleMode(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{scheduleMode === 'reschedule' ? 'Reschedule the post?' : 'Schedule this post?'}</DialogTitle>
+            <DialogDescription>
+              Page: &quot;{schedulePageName}&quot; (ID {schedulePageId}){item.image_url ? ' · with the article image' : ' · text only'}
+              {scheduleWithComment ? ' · first comment with the article link once the post is live' : ''}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="facebook-schedule-date">Date</Label>
+              <Input id="facebook-schedule-date" type="date" value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="facebook-schedule-time">Time</Label>
+              <Input id="facebook-schedule-time" type="time" value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} required />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="facebook-schedule-zone">Time zone</Label>
+              <select
+                id="facebook-schedule-zone"
+                value={scheduleZone}
+                onChange={(event) => setScheduleZone(event.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
+              >
+                {zones.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="text-sm" data-testid="facebook-schedule-preview" aria-live="polite">
+            {schedulePreview === null
+              ? 'Choose a date and a time.'
+              : schedulePreview.ok
+                ? `Publishes on ${formatScheduledTime(schedulePreview.instant, scheduleZone)} (${schedulePreview.instant.toISOString().replace('T', ' ').slice(0, 16)} UTC).`
+                : schedulePreview.message}
+          </p>
+          {scheduleError && <Alert variant="danger">{scheduleError}</Alert>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setScheduleMode(null)} disabled={busy !== null}>
+              Close
+            </Button>
+            <Button type="button" onClick={submitSchedule} disabled={busy !== null || !schedulePreview?.ok}>
+              {busy === 'schedule' && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {scheduleMode === 'reschedule' ? 'Save new time' : 'Schedule post'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelOpen} onOpenChange={(open) => busy === null && setCancelOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel the schedule?</DialogTitle>
+            <DialogDescription>
+              The post will not be published on &quot;{publication?.external_account_name}&quot;. You can edit it, publish it now or schedule it
+              again afterwards.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCancelOpen(false)} disabled={busy !== null}>
+              Keep the schedule
+            </Button>
+            <Button type="button" variant="destructive" onClick={cancelSchedule} disabled={busy !== null}>
+              {busy === 'cancel' && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Cancel schedule
             </Button>
           </DialogFooter>
         </DialogContent>

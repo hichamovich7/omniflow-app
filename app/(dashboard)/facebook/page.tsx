@@ -23,6 +23,7 @@ import { listSocialConnections } from '@/lib/queries/social-connections';
 import { listPublicationsForGenerations } from '@/lib/queries/social-publications';
 import { contentPreview, parseSocialContentFilters, SOCIAL_CONTENT_PAGE_SIZE } from '@/lib/social/social-content';
 import { FACEBOOK_DISPLAY_STATUS_LABELS, facebookDisplayStatus } from '@/lib/social/facebook-publication';
+import { formatScheduledTime } from '@/lib/social/schedule-time';
 import { getMetaConfig, hasSocialTokenKey } from '@/lib/social/meta/config';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
@@ -116,7 +117,8 @@ export default async function FacebookPage({
         <>
           <ul className="space-y-4" data-testid="facebook-history-list">
             {items.map((item) => {
-              const status = facebookDisplayStatus(publications[item.id] ?? null);
+              const publication = publications[item.id] ?? null;
+              const status = facebookDisplayStatus(publication);
               return (
                 <li key={item.id} className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
                   <div className="flex gap-4">
@@ -150,6 +152,11 @@ export default async function FacebookPage({
                         >
                           {FACEBOOK_DISPLAY_STATUS_LABELS[status]}
                         </Badge>
+                        {status === 'scheduled' && publication?.scheduled_at && (
+                          <span className="text-xs text-muted-foreground" data-testid="facebook-history-scheduled-time">
+                            {formatScheduledTime(publication.scheduled_at, publication.scheduled_timezone)}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">{contentPreview(item.content_markdown)}</p>
                       <SocialContentMeta item={item} />
