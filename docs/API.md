@@ -1342,7 +1342,7 @@ Response: `{ "publication": SocialPublication (without locked_at), "warning": st
 
 ## POST /api/social/publications/[id]/retry
 
-Retry of the post step (status `failed`, `unknown`, or `publishing` with a lock older than 90 s). Body `{ "confirm": true }`. Same auth, rate limit and connection checks (the publication's own connection, same Page). An `unknown` / interrupted attempt first reads `GET /{page-id}/published_posts` (since the attempt − 5 min) and adopts a post with the exact same text — it is **never posted twice**; if Facebook cannot be read the row stays `unknown`. A `failed` attempt is sent again (with the current, possibly edited, text). Errors: `409 already_published` / `in_progress`, as above.
+Retry of the post step (status `failed`, `unknown`, or `publishing` with a lock older than 90 s). Body `{ "confirm": true }`. Same auth, rate limit and connection checks (the publication's own connection, same Page). An `unknown` / interrupted attempt first reads `GET /{page-id}/published_posts` (since the attempt − 5 min) and adopts a post with the exact same text — it is **never posted twice**; if no post matches (`error_code` `post_not_found`, the response `warning` explains it) or Facebook cannot be read, the row stays `unknown` and nothing is posted (TASK-100 fix, 2026-11-15 — before, a post not found was sent again). A `failed` attempt is sent again (with the current, possibly edited, text). Errors: `409 already_published` / `in_progress`, as above.
 
 ## POST /api/social/publications/[id]/retry-comment
 

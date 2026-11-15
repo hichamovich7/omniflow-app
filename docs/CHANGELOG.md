@@ -18,6 +18,12 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Facebook — scheduled post without first comment (TASK-100 production fix, 2026-11-15)
+
+* **Fixed:** a scheduled post published by the cron stopped right after the post was created — its Facebook id was not saved and the first comment never sent (the row stayed "Publishing…"). The default clock now applies even when none is given.
+* **Safer "Retry"** after an uncertain result: OmniFlow only looks for the post on the Page; found → linked, then the first comment; not found or Page unreadable → stays "Result being checked", **nothing is posted again**. A refused post ("failed") is still sent again; the first "Publish now" is unchanged.
+* Tests: 5 new offline tests (cron without clock, failure after the post, Retry and Retry comment without duplicates). Not deployed yet.
+
 ### Facebook — schedule Page posts — TASK-100 (2026-11-13)
 
 * **New "Schedule"** on a Facebook post: date, time and an explicit time zone; the dialog shows the target Page and the chosen time (and UTC) before confirmation. Past times, less than 5 minutes ahead and more than 90 days ahead are refused; the instant is stored in UTC.

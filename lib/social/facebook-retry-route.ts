@@ -66,7 +66,7 @@ export async function handleFacebookRetry(request: Request, id: string, step: 'p
     const outcome = step === 'comment' ? await retryFacebookComment(publication, pageToken, deps) : await retryFacebookPost(publication, pageToken, deps);
     await recordConnectionError(admin, connection, outcome.error);
     return NextResponse.json<ApiResponse<{ publication: PublicationResponse; warning: string | null }>>({
-      data: { publication: publicationResponse(outcome.publication), warning: outcome.error?.message ?? null },
+      data: { publication: publicationResponse(outcome.publication), warning: outcome.error?.message ?? outcome.warning ?? null },
       error: null,
     });
   } catch (err) {

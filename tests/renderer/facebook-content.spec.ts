@@ -646,7 +646,7 @@ test.describe('Publication flow', () => {
     expect(lookup.calls.some((c) => c.url.endsWith('/photos'))).toBe(false);
   });
 
-  test('21. timeout → unknown; Retry posts again only when the Page does not have it', async () => {
+  test('21. timeout → unknown; Retry never posts again when the Page does not have it (TASK-100 fix)', async () => {
     const memory = memoryStore();
     const first = await publishFacebookContent(
       { generation: facebookRow(), connection: CONNECTION, pageToken: PAGE_TOKEN },
@@ -654,8 +654,10 @@ test.describe('Publication flow', () => {
     );
     const graph = fakeGraph([[new RegExp(`/${PAGE_ID}/published_posts$`), 'GET', () => json({ data: [] })], ok.photo, ok.permalink, ok.comment]);
     const retried = await retryFacebookPost(first.publication, PAGE_TOKEN, { graph: graph.client, store: memory.store });
-    expect(retried.publication.status).toBe('published');
-    expect(graph.calls.filter((c) => c.url.endsWith('/photos'))).toHaveLength(1);
+    // The first send may still have reached Facebook: stay unknown, nothing posted.
+    expect(retried.publication).toMatchObject({ status: 'unknown', external_post_id: null, error_code: 'post_not_found' });
+    expect(retried.warning).toMatch(/not found on your Page/);
+    expect(graph.calls.filter((c) => c.url.endsWith('/photos'))).toHaveLength(0);
   });
 
   test('23-24. expired token or deleted Page: failed with a clear message, no comment', async () => {

@@ -68,7 +68,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 * **TASK-078** — Pinterest Visual Style "Auto variety" (Phase A: visual archetypes + diversity planner, article Pins only, Classic default): offline tests pass, committed (`0b0f1a8`); controlled real AI test pending founder approval. Phase B (visual reference library, private Supabase bucket, next free migration — 047 is now TASK-091) **planned, not started**.
 * **TASK-077** — Pinterest visual subject contract per section (multilingual concepts, primary subject before accessories, one image_prompt repair): offline tests pass, real AI test on post 2119 passed (5 Pins accepted on the first answer); committed and pushed (75710a9).
 
-* **TASK-100** — Facebook scheduling (OmniFlow queue + cron route called every 5 minutes by the operator's VPS — crontab not enabled yet): offline tests pass; migration 048 applied and `CRON_SECRET` set in Vercel Production (founder, 2026-11-13); **not validated in production** — manual test in TESTING.md.
+* **TASK-100** — Facebook scheduling (OmniFlow queue + cron route called every 5 minutes by the operator's VPS): deployed `250be4e`; **scheduled publication observed in production** (the cron created the post on the Page), but a bug stopped the run before the post id was saved — no first comment, row stuck `publishing`. Fix (default clock + lookup-only Retry) passes offline, **not committed / deployed**; VPS crontab disabled again; **first comment and recovery still to validate in production** — manual test in TESTING.md.
 * **TASK-068** — Facebook Content Studio + publication on Facebook Pages: committed (`a013a15`); production test 2026-11-13 ("Crochet Blog EN" → Page "Crochet Sweater Pattern"): publish now with the WordPress image + first comment with the right article link OK; other TESTING.md steps not recorded; scheduling not validated (TASK-100).
 * **TASK-067** — Home Decor image subject check (no false "does not show the project" rejection on German / English Home Decor articles): offline tests pass, **not committed yet**; manual check with the German article in TESTING.md. Follow-up 2026-10-25 (post 1489, invented "shelves"): the Home Decor `<pin_plan>` now restricts furniture to the section's own and names the article-absent pieces; one live text attempt (7 Pins) passed with 0 issues; committed and pushed (4a78c94). Follow-up 2 (same day, reported again on 1489): Home Decor furniture is now grounded per section, plus one targeted image_prompt repair before the 422; live attempt 0 issues (no repair needed); **not committed**.
 * **TASK-066** — understandable Pinterest strategy-safeguard errors: offline tests pass, committed and pushed (commit "fix(pinterest): explain strategy safeguard failures"); gated browser spec + optional manual check in TESTING.md.
@@ -1302,7 +1302,7 @@ New `tests/renderer/facebook-content.spec.ts` (31, offline — Supabase, WordPre
 
 ## [TASK-100] Facebook scheduling — date, time, time zone, reschedule, cancel
 
-### Status: READY TO TEST (2026-11-13 — offline tests pass; migration 048 applied and `CRON_SECRET` set in Vercel Production by the founder; no Vercel cron (`vercel.json` declares none) — the VPS crontab (every 5 minutes) stays disabled until the manual test; **not validated in production** — manual test in TESTING.md "Facebook scheduling (TASK-100)" with founder approval). Replaced the unnumbered "Facebook scheduling (after TASK-068 — separate task)" P1 line.
+### Status: FIX READY TO TEST (2026-11-15 — deployed `250be4e` on 2026-11-13; **scheduled publication observed in production**: the cron created the photo post, visible on the Page, then failed before saving its id — see "Production incident" below. Fix passes offline, **not committed / deployed**; the VPS crontab stays disabled until the fix is deployed; **first comment and recovery not validated in production** — manual test in TESTING.md "Facebook scheduling (TASK-100)" with founder approval). Replaced the unnumbered "Facebook scheduling (after TASK-068 — separate task)" P1 line.
 
 ### Goal
 
@@ -1348,8 +1348,22 @@ Meta docs checked 2026-11-13 (Graph API v25.0, still supported; v27.0 latest): a
 
 New `tests/renderer/facebook-scheduling.spec.ts` (28, Meta simulated): date / zone, reschedule, cancel, concurrency (3 parallel runs → 1 post), Page disconnected / replaced, comment failure without duplicate, uncertain result, no token in logs, Publish now non-regression. `facebook-content.spec.ts` (31) unchanged and passing. Full renderer **1825/1825**; TypeScript, ESLint (touched files), `git diff --check` pass. No Meta call, no real publication.
 
+### Production incident (reported 2026-11-15) and fix
+
+* **Observed:** the cron run claimed the due row and sent `POST /{page}/photos` (the post is on the Page), then `GET` of the permalink, then a `TypeError`; no `POST /comments`. The route answered 200 with `due: 1, ran: 0, errors: 1`. In OmniFlow the row stays "Publishing…", comment pending.
+* **Cause (confirmed in the code):** the cron route passes no clock; `runOne` forwarded `now: undefined`, and `{ now: () => new Date(), ...depsIn }` in `facebook-publish.ts` let that undefined override the default → `now()` threw in `adoptPost` **before** the post id was saved. Publish now / Retry were not affected (their routes pass no `now` key). The tests always injected a clock, so they missed it.
+* **Fix (`lib/social/facebook-publish.ts`):**
+  * `withDefaults()` applies the default clock even when `now` is explicitly undefined, in the 4 entry points (`publishFacebookContent`, `retryFacebookPost`, `runClaimedScheduledPost`, `retryFacebookComment`); an injected clock is kept.
+  * `runPostStep`: only the Facebook create call is inside the error handler; once the post exists nothing can mark the row `failed` (which would allow a new post).
+  * `retryFacebookPost` on an uncertain row (`unknown`, or `publishing` with a stale lock): **lookup only** — exact-text match on the Page → id adopted, then the comment; not found → stays `unknown` (`error_code` `post_not_found`, plain-language warning), lookup failed → stays `unknown`; **never a second `POST /photos`**. A `failed` row (Facebook refused) is still sent again; the first Publish now (no attempt yet) is unchanged.
+  * Routes `publish` and `retry` return that warning (`lib/social/facebook-retry-route.ts`, `app/api/social/generations/[id]/publish/route.ts`).
+* **Behavior change (TASK-068):** "Retry" after a timeout whose post is not found no longer posts again — the person checks the Page and tries later, or asks support to link the post.
+* **Tests:** `facebook-scheduling.spec.ts` 28 → **33** (cron without `now` and with `now: undefined` → id saved, 1 `POST /photos`, 1 `POST /comments`; the 4 entry points with `now: undefined` + injected clock kept; failure after the Facebook post before the id is saved → next cron runs and Retry never post again, whether the lookup finds nothing, fails or finds the post; Retry comment on a recovered row → 0 post, an existing comment is not sent again). `facebook-content.spec.ts` (31): test 21 updated to the new rule. With the old code, 3 of the new tests fail. Full renderer **1830/1830**; TypeScript, ESLint (touched files), `git diff --check` pass. No Meta call.
+* **Production row of the incident:** not modified. Recovery (link the confirmed Facebook id, then "Retry comment" only) is a separate manual step with founder approval — never "Retry" on that row before it.
+
 ### Remaining (founder)
 
+0. Commit + deploy the incident fix; recover the stuck row (link the confirmed id, then "Retry comment"); only then re-enable the VPS crontab for the manual test.
 1. ~~Apply migration 048~~ — done by the founder (2026-11-13).
 2. ~~Add `CRON_SECRET` on Vercel Production~~ — done (2026-11-13). Enable the VPS crontab (every 5 minutes, DEPLOYMENT.md "Facebook scheduling") only for the approved manual test.
 3. With founder approval only: manual test in TESTING.md "Facebook scheduling (TASK-100)", then record the results here.
@@ -1357,7 +1371,7 @@ New `tests/renderer/facebook-scheduling.spec.ts` (28, Meta simulated): date / zo
 ### Known limits
 
 * Precision ≈ 5 minutes (VPS trigger); at most 5 due posts per run (more wait for the next run).
-* A run killed mid-post leaves `publishing`; after 90 s the person sees "Retry", which checks the Page first.
+* A run killed mid-post leaves `publishing`; after 90 s the person sees "Retry", which only looks the post up on the Page (exact text): found → adopted; not found or unreadable → `unknown`, nothing posted. A post that really exists but is not found (text changed by Facebook, outside the window / 25 latest posts) needs a manual link by support.
 * The cron never retries a failed comment or an unknown post on its own — "Retry comment" / "Retry" stay manual.
 * To change the text of a scheduled post: cancel, edit, schedule again.
 

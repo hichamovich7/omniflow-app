@@ -79,7 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
     await recordConnectionError(admin, connection, outcome.error);
     return NextResponse.json<ApiResponse<{ publication: PublicationResponse; warning: string | null }>>({
-      data: { publication: publicationResponse(outcome.publication), warning: outcome.error?.message ?? null },
+      data: { publication: publicationResponse(outcome.publication), warning: outcome.error?.message ?? outcome.warning ?? null },
       error: null,
     });
   } catch (err) {

@@ -42,6 +42,16 @@ export interface PublishDeps {
   now?: () => Date;
 }
 
+/**
+ * The default clock applies even when a caller passes `now: undefined`
+ * explicitly (TASK-100 incident: the cron route had no clock, and a spread
+ * `{ now: default, ...depsIn }` let that undefined override the default).
+ * An injected clock is kept as is.
+ */
+function withDefaults(depsIn: PublishDeps): Required<PublishDeps> {
+  return { graph: depsIn.graph, store: depsIn.store, now: depsIn.now ?? (() => new Date()) };
+}
+
 export type PublishConflictCode =
   | 'already_published'
   | 'in_progress'
@@ -66,7 +76,12 @@ export interface PublishOutcome {
   publication: SocialPublication;
   /** The Facebook error of the last step that failed — null when everything succeeded. */
   error: MetaApiError | null;
+  /** A plain-language notice when nothing failed but nothing was sent either (post not found on the Page). */
+  warning?: string;
 }
+
+export const POST_NOT_FOUND_MESSAGE =
+  'Facebook did not confirm this post and it was not found on your Page. Nothing was sent again, to avoid a duplicate. Check your Page: a new post can take a few minutes to appear — try "Retry" later. If the post is on your Page but still not found, contact support.';
 
 const RECONCILE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -99,11 +114,11 @@ async function findExistingComment(graph: FacebookGraph, pageToken: string, publ
 
 async function runPostStep(publication: SocialPublication, pageToken: string, deps: Required<PublishDeps>): Promise<PublishOutcome> {
   const { graph, store } = deps;
+  let postId: string;
   try {
-    const { postId } = publication.post_image_url
+    ({ postId } = publication.post_image_url
       ? await graph.createPhotoPost(pageToken, publication.external_account_id, { imageUrl: publication.post_image_url, caption: publication.post_message })
-      : await graph.createFeedPost(pageToken, publication.external_account_id, { message: publication.post_message });
-    return adoptPost(publication, postId, pageToken, deps);
+      : await graph.createFeedPost(pageToken, publication.external_account_id, { message: publication.post_message }));
   } catch (err) {
     if (!(err instanceof MetaApiError)) throw err;
     logMetaError('post', err);
@@ -114,6 +129,10 @@ async function runPostStep(publication: SocialPublication, pageToken: string, de
     });
     return { publication: updated ?? publication, error: err };
   }
+  // The post exists on Facebook from here on: nothing below may mark the row
+  // failed (which would allow a new post). An unexpected error leaves it
+  // `publishing`; "Retry" then only looks the post up, never posts again.
+  return adoptPost(publication, postId, pageToken, deps);
 }
 
 /** Saves the post id (before anything else), then runs the comment step when requested. */
@@ -197,7 +216,7 @@ export function publicationContent(generation: PublishInput['generation'], conne
  * previous one left no post. Never publishes a content twice on a Page.
  */
 export async function publishFacebookContent(input: PublishInput, depsIn: PublishDeps): Promise<PublishOutcome> {
-  const deps: Required<PublishDeps> = { now: () => new Date(), ...depsIn };
+  const deps = withDefaults(depsIn);
   const { store, now } = deps;
   const content = publicationContent(input.generation, input.connection);
 
@@ -248,8 +267,10 @@ export async function publishFacebookContent(input: PublishInput, depsIn: Publis
 /**
  * "Retry" of the post step. A failed attempt (Facebook refused it) is sent
  * again, with the current text when `content` is given. An unknown result or
- * a killed request is first looked up on the Page: found → adopted, not
- * posted again.
+ * a killed request (`publishing`, stale lock) may already be on the Page: it
+ * is only looked up — found by its exact text → adopted; not found, or the
+ * lookup failed → stays `unknown`, and nothing is posted (TASK-100 fix: a
+ * post created before its id was saved is never sent twice).
  */
 export async function retryFacebookPost(
   publication: SocialPublication,
@@ -257,7 +278,7 @@ export async function retryFacebookPost(
   depsIn: PublishDeps,
   content: Partial<SocialPublication> | null = null
 ): Promise<PublishOutcome> {
-  const deps: Required<PublishDeps> = { now: () => new Date(), ...depsIn };
+  const deps = withDefaults(depsIn);
   const { graph, store, now } = deps;
   const current = now();
 
@@ -297,6 +318,15 @@ export async function retryFacebookPost(
       const updated = await store.update(claimed.id, { status: 'unknown', locked_at: null, ...errorPatch(err) });
       return { publication: updated ?? claimed, error: err };
     }
+    // Not found: the first send may still have reached Facebook — never send it again.
+    const updated = await store.update(claimed.id, {
+      status: 'unknown',
+      locked_at: null,
+      error_code: 'post_not_found',
+      error_message: POST_NOT_FOUND_MESSAGE,
+      fbtrace_id: null,
+    });
+    return { publication: updated ?? claimed, error: null, warning: POST_NOT_FOUND_MESSAGE };
   }
   return runPostStep(claimed, pageToken, deps);
 }
@@ -307,7 +337,7 @@ export async function retryFacebookPost(
  * post → id saved → first comment only after the post exists.
  */
 export async function runClaimedScheduledPost(claimed: SocialPublication, pageToken: string, depsIn: PublishDeps): Promise<PublishOutcome> {
-  const deps: Required<PublishDeps> = { now: () => new Date(), ...depsIn };
+  const deps = withDefaults(depsIn);
   if (claimed.status !== 'publishing' || claimed.external_post_id) {
     throw new PublishConflictError('in_progress', 'This scheduled post is not ready to be published.');
   }
@@ -316,7 +346,7 @@ export async function runClaimedScheduledPost(claimed: SocialPublication, pageTo
 
 /** "Retry comment" — the first comment only; the post is never published again. */
 export async function retryFacebookComment(publication: SocialPublication, pageToken: string, depsIn: PublishDeps): Promise<PublishOutcome> {
-  const deps: Required<PublishDeps> = { now: () => new Date(), ...depsIn };
+  const deps = withDefaults(depsIn);
   const { graph, store, now } = deps;
   if (!publication.external_post_id || !publication.comment_requested || publication.comment_status === 'published') {
     throw new PublishConflictError('comment_not_retryable', 'There is no first comment to retry for this post.');

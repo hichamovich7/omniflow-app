@@ -4,10 +4,12 @@ import { expect, test } from 'playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { MetaGraphClient } from '@/lib/social/meta/graph-client';
 import {
+  POST_NOT_FOUND_MESSAGE,
   publicationContent,
   publishFacebookContent,
   retryFacebookComment,
   retryFacebookPost,
+  runClaimedScheduledPost,
 } from '@/lib/social/facebook-publish';
 import {
   cancelFacebookSchedule,
@@ -506,6 +508,193 @@ test.describe('Cron run', () => {
     for (const line of lines) {
       expect(line).not.toContain(PAGE_TOKEN);
       expect(line).not.toContain(APP_SECRET);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TASK-100 production incident: the cron route passed no clock, and
+// `now: undefined` overrode the default → TypeError after POST /photos, before
+// the post id was saved; the row stayed `publishing` with the comment pending.
+
+const lookupHandler = (data: Array<{ id: string; message: string }>): [RegExp, string, GraphHandler] => [
+  new RegExp(`/${PAGE_ID}/published_posts$`),
+  'GET',
+  () => json({ data: data.map((post) => ({ ...post, created_time: '2026-11-13T11:00:10+0000' })) }),
+];
+const lookupFails: [RegExp, string, GraphHandler] = [new RegExp(`/${PAGE_ID}/published_posts$`), 'GET', () => json({ error: { code: 10, message: 'no permission' } }, 403)];
+const commentPosts = (graph: ReturnType<typeof fakeGraph>) => graph.calls.filter((c) => c.method === 'POST' && c.url.includes('/comments'));
+/** Due for the real clock too (the runs below use no injected clock). */
+const overdue = (db: ReturnType<typeof memoryDb>, id: string) => {
+  db.rows.get(id)!.scheduled_at = '2000-01-01T00:00:00.000Z';
+};
+
+/** A store whose first save of the post id fails — the post already exists on Facebook. */
+function failingFirstPostSave(store: PublicationStore): PublicationStore {
+  let failed = false;
+  return {
+    ...store,
+    async update(id, patch) {
+      if (!failed && patch.external_post_id) {
+        failed = true;
+        throw new Error('database unavailable');
+      }
+      return store.update(id, patch);
+    },
+  };
+}
+
+test.describe('Production incident — default clock, no resend after an uncertain post', () => {
+  test('cron without `now`: id saved, exactly one POST /photos and one POST /comments', async () => {
+    const { db, row } = await scheduled();
+    overdue(db, row.id);
+    const graph = fakeGraph([ok.photo, ok.permalink, ok.comment]);
+    const withoutClock: DueRunDeps = { ...cronDeps(db, graph, AFTER) };
+    delete withoutClock.now;
+    expect('now' in withoutClock).toBe(false);
+    expect(await runDueFacebookSchedules(withoutClock)).toEqual([{ id: row.id, result: 'ran', status: 'published' }]);
+    expect(db.rows.get(row.id)).toMatchObject({ status: 'published', external_post_id: POST_ID, comment_status: 'published', locked_at: null });
+    expect(db.rows.get(row.id)?.published_at).toEqual(expect.any(String));
+    expect(graph.posts()).toHaveLength(1);
+    expect(commentPosts(graph)).toHaveLength(1);
+  });
+
+  test('cron with `now: undefined` explicitly: same result, no TypeError', async () => {
+    const { db, row } = await scheduled();
+    overdue(db, row.id);
+    const graph = fakeGraph([ok.photo, ok.permalink, ok.comment]);
+    expect(await runDueFacebookSchedules({ ...cronDeps(db, graph, AFTER), now: undefined })).toEqual([{ id: row.id, result: 'ran', status: 'published' }]);
+    expect(db.rows.get(row.id)).toMatchObject({ status: 'published', external_post_id: POST_ID, comment_status: 'published' });
+    expect(graph.posts()).toHaveLength(1);
+    expect(commentPosts(graph)).toHaveLength(1);
+  });
+
+  test('the four entry points accept `now: undefined`; an injected clock is kept', async () => {
+    // runClaimedScheduledPost — injected clock kept.
+    const { db, row } = await scheduled();
+    const claimed = (await db.schedules(USER).claimScheduled(row.id, AFTER, { attempt_count: 1 }))!;
+    const injected = await runClaimedScheduledPost(claimed, PAGE_TOKEN, {
+      graph: fakeGraph([ok.photo, ok.permalink, ok.comment]).client,
+      store: db.publications(USER),
+      now: () => AFTER,
+    });
+    expect(injected.publication).toMatchObject({ status: 'published', published_at: AFTER.toISOString(), comment_published_at: AFTER.toISOString() });
+
+    // runClaimedScheduledPost — explicit undefined → real clock.
+    const second = await scheduled();
+    const claimed2 = (await second.db.schedules(USER).claimScheduled(second.row.id, AFTER, { attempt_count: 1 }))!;
+    const real = await runClaimedScheduledPost(claimed2, PAGE_TOKEN, {
+      graph: fakeGraph([ok.photo, ok.permalink, ok.comment]).client,
+      store: second.db.publications(USER),
+      now: undefined,
+    });
+    expect(real.publication).toMatchObject({ status: 'published', external_post_id: POST_ID });
+    expect(real.publication.published_at).not.toBe(AFTER.toISOString());
+
+    // publishFacebookContent (Publish now) with explicit undefined.
+    const now = await publishFacebookContent(
+      { generation: generation(), connection: CONNECTION_REF, pageToken: PAGE_TOKEN },
+      { graph: fakeGraph([ok.photo, ok.permalink, ok.comment]).client, store: memoryDb().publications(USER), now: undefined }
+    );
+    expect(now.publication).toMatchObject({ status: 'published', comment_status: 'published' });
+
+    // retryFacebookPost (refused → sent again) and retryFacebookComment with explicit undefined.
+    const failedDb = memoryDb();
+    const refused = await publishFacebookContent(
+      { generation: generation(), connection: CONNECTION_REF, pageToken: PAGE_TOKEN },
+      { graph: fakeGraph([[/\/photos$/, 'POST', () => json({ error: { code: 368, message: 'blocked' } }, 400)]]).client, store: failedDb.publications(USER) }
+    );
+    expect(refused.publication.status).toBe('failed');
+    const commentFails = fakeGraph([ok.photo, ok.permalink, [/\/comments$/, 'POST', () => json({ error: { code: 200, message: 'nope' } }, 403)]]);
+    const partial = await retryFacebookPost(refused.publication, PAGE_TOKEN, { graph: commentFails.client, store: failedDb.publications(USER), now: undefined });
+    expect(partial.publication).toMatchObject({ status: 'partial', comment_status: 'failed', external_post_id: POST_ID });
+    const comment = await retryFacebookComment(partial.publication, PAGE_TOKEN, { graph: fakeGraph([ok.comment]).client, store: failedDb.publications(USER), now: undefined });
+    expect(comment.publication).toMatchObject({ status: 'published', comment_status: 'published' });
+  });
+
+  test('failure after the Facebook post, before the id is saved: neither the next cron run nor Retry posts it again', async () => {
+    for (const lookup of ['not_found', 'lookup_fails', 'found'] as const) {
+      const { db, row } = await scheduled();
+      const first = fakeGraph([ok.photo, ok.permalink, ok.comment]);
+      const deps = cronDeps(db, first, AFTER);
+      const results = await runDueFacebookSchedules({
+        ...deps,
+        storesFor: (userId) => ({ ...deps.storesFor(userId), publications: failingFirstPostSave(db.publications(userId)) }),
+      });
+      expect(results).toEqual([{ id: row.id, result: 'error' }]);
+      const stuck = { ...db.rows.get(row.id)! };
+      expect(stuck).toMatchObject({ status: 'publishing', external_post_id: null, comment_status: 'pending', locked_at: AFTER.toISOString() });
+      expect(first.posts()).toHaveLength(1);
+      expect(commentPosts(first)).toHaveLength(0);
+
+      // Next cron runs: the row is no longer `scheduled` — nothing is sent.
+      const later = fakeGraph([ok.photo, ok.permalink, ok.comment]);
+      expect(await runDueFacebookSchedules(cronDeps(db, later, new Date('2026-11-13T11:05:30Z')))).toEqual([]);
+      expect(later.calls).toHaveLength(0);
+
+      // Before the stale delay "Retry" is refused; after it, it only looks the post up.
+      const early = new Date('2026-11-13T11:01:00Z');
+      expect(publicationActions(stuck, early).canRetry).toBe(false);
+      await expect(retryFacebookPost({ ...stuck }, PAGE_TOKEN, { graph: later.client, store: db.publications(USER), now: () => early })).rejects.toMatchObject({
+        code: 'in_progress',
+      });
+      const retryAt = new Date('2026-11-13T11:06:00Z');
+      expect(publicationActions(stuck, retryAt)).toMatchObject({ canRetry: true, canRetryComment: false });
+
+      const handler = lookup === 'lookup_fails' ? lookupFails : lookupHandler(lookup === 'found' ? [{ id: POST_ID, message: stuck.post_message }] : []);
+      const retry = fakeGraph([handler, ok.photo, ok.permalink, ok.comment]);
+      const outcome = await retryFacebookPost({ ...stuck }, PAGE_TOKEN, { graph: retry.client, store: db.publications(USER), now: () => retryAt });
+      expect(retry.posts()).toHaveLength(0);
+      if (lookup === 'found') {
+        expect(outcome.publication).toMatchObject({ status: 'published', external_post_id: POST_ID, comment_status: 'published' });
+        expect(commentPosts(retry)).toHaveLength(1);
+        continue;
+      }
+      expect(outcome.publication).toMatchObject({ status: 'unknown', external_post_id: null, locked_at: null });
+      expect(commentPosts(retry)).toHaveLength(0);
+      if (lookup === 'not_found') {
+        expect(outcome).toMatchObject({ error: null, warning: POST_NOT_FOUND_MESSAGE });
+        expect(outcome.publication.error_code).toBe('post_not_found');
+      } else {
+        expect(outcome.error).not.toBeNull();
+      }
+      // Retrying again, and "Publish now" on the same content, still never post.
+      const again = fakeGraph([lookupHandler([]), ok.photo, ok.permalink, ok.comment]);
+      await retryFacebookPost({ ...db.rows.get(row.id)! }, PAGE_TOKEN, { graph: again.client, store: db.publications(USER), now: () => new Date('2026-11-13T11:10:00Z') });
+      await publishFacebookContent({ generation: generation(), connection: CONNECTION_REF, pageToken: PAGE_TOKEN }, { graph: again.client, store: db.publications(USER) });
+      expect(again.posts()).toHaveLength(0);
+      expect(db.rows.get(row.id)?.status).toBe('unknown');
+    }
+  });
+
+  test('Retry comment on a recovered row (id linked, comment unknown): zero post; an existing comment is not sent again', async () => {
+    for (const present of [true, false]) {
+      const { db, row } = await scheduled();
+      // State after the recovery procedure: confirmed id linked, comment still to check.
+      Object.assign(db.rows.get(row.id)!, {
+        status: 'partial',
+        external_post_id: POST_ID,
+        external_post_url: `https://www.facebook.com/${POST_ID}`,
+        published_at: AFTER.toISOString(),
+        comment_status: 'unknown',
+        locked_at: null,
+      });
+      const recovered = { ...db.rows.get(row.id)! };
+      expect(publicationActions(recovered, AFTER)).toMatchObject({ canRetry: false, canRetryComment: true, canPublish: false });
+      await expect(retryFacebookPost(recovered, PAGE_TOKEN, { graph: fakeGraph([ok.photo]).client, store: db.publications(USER) })).rejects.toMatchObject({
+        code: 'already_published',
+      });
+
+      const graph = fakeGraph([
+        [new RegExp(`/${POST_ID}/comments$`), 'GET', () => json({ data: present ? [{ id: `${POST_ID}_c9`, message: recovered.comment_message, from: { id: PAGE_ID } }] : [] })],
+        ok.comment,
+        ok.photo,
+      ]);
+      const outcome = await retryFacebookComment(recovered, PAGE_TOKEN, { graph: graph.client, store: db.publications(USER) });
+      expect(outcome.publication).toMatchObject({ status: 'published', comment_status: 'published', external_post_id: POST_ID });
+      expect(outcome.publication.external_comment_id).toBe(present ? `${POST_ID}_c9` : `${POST_ID}_c1`);
+      expect(graph.posts()).toHaveLength(0);
+      expect(commentPosts(graph)).toHaveLength(present ? 0 : 1);
     }
   });
 });
