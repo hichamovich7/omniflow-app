@@ -80,3 +80,18 @@ export const facebookRescheduleSchema = z
 
 /** POST /api/social/publications/[id]/cancel. */
 export const facebookCancelScheduleSchema = facebookRetrySchema;
+
+/** POST /api/social/generations/[id]/image-variants (TASK-101) — 1 to 3 image calls, explicitly confirmed. */
+export const facebookImageVariantsSchema = z
+  .object({
+    count: z.number().int().min(1, 'Choose between 1 and 3 images').max(3, 'Choose between 1 and 3 images'),
+    confirm: z.literal(true, { message: 'Confirm the image generation first' }),
+  })
+  .strict();
+
+/** PATCH /api/social/generations/[id]/image (TASK-101) — a variant of this draft, or null for the WordPress image. */
+export const facebookImageSelectionSchema = z
+  .object({
+    variantId: z.string().uuid('Invalid image').nullable(),
+  })
+  .strict();

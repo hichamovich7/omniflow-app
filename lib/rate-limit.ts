@@ -106,6 +106,36 @@ export async function checkRateLimit(
   };
 }
 
+/**
+ * Reserves `units` units of the trial cap at once (TASK-101: 1 unit per image
+ * call of a request), all or nothing, before any paid call. Atomic in the
+ * database (reserve_trial_usage, migration 050): concurrent requests can
+ * never go past the cap together. Same admin / bypass short-circuits as
+ * checkRateLimit(). Fails closed: if the reservation cannot be checked,
+ * nothing is generated ('unavailable').
+ */
+export async function reserveTrialUnits(
+  userId: string,
+  userEmail: string,
+  units: number
+): Promise<'reserved' | 'trial_limit' | 'unavailable'> {
+  if (userEmail && userEmail === process.env.ADMIN_EMAIL) return 'reserved';
+  const supabase = await createClient();
+  const { data: bypassed, error: bypassError } = await supabase.rpc('is_rate_limit_bypassed');
+  if (!bypassError && bypassed) return 'reserved';
+
+  const { data, error } = await supabase.rpc('reserve_trial_usage', {
+    p_user_id: userId,
+    p_units: units,
+    p_limit: getTrialGenerationLimit(),
+  });
+  if (error) {
+    console.error(`Trial reservation failed: ${(error as { code?: string }).code ?? 'unknown'}`);
+    return 'unavailable';
+  }
+  return data === null ? 'trial_limit' : 'reserved';
+}
+
 /** Shared 429/403 response for a rejected checkRateLimit() result — keeps the
  * error shape/status/message identical across every call site. */
 export function rateLimitErrorResponse(result: RateLimitResult): NextResponse<ApiResponse<null>> {

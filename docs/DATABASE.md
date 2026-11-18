@@ -28,7 +28,8 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * **Migration 046** (`046_add_social_connections_and_publications.sql`, TASK-068) — written 2026-10-15, **not applied yet** (needs 045 first): to apply by hand in the Supabase SQL Editor. Before it, Facebook posts are generated but not saved (warning), `/facebook` shows "not available yet" notices, and no Page can be connected.
 * **Migration 047** (`047_add_pinterest_accounts_and_sections.sql`, TASK-091) — written 2026-11-02, **applied by hand on 2026-11-02** (Supabase SQL Editor, one transaction; new columns checked through PostgREST). Required before deploying TASK-091 (v3.4.0): Content Stream saves write the new `content_stream_boards` columns. Before it, pages still load (no account, no section, every stream link read as primary + active). Verified on a real Postgres (PGlite) — see TESTING.md (TASK-091).
 * **Migration 048** (`048_add_social_publication_scheduling.sql`, TASK-100) — written 2026-11-13, **not applied yet** (needs 046): statuses `scheduled` / `cancelled` and columns `scheduled_at`, `scheduled_timezone` on `social_publications`, due index. Before it, "Schedule" fails to save (the CHECK refuses `scheduled`); Publish now is unaffected.
-* **Next free migration: 049** (TASK-078 Phase B, which had planned 047 then 048, takes the next free number).
+* **Migration 050** (`050_add_facebook_image_variants.sql`, TASK-101) — written 2026-11-15, **applied by the founder (reported 2026-11-18)** (needs 045 / 046): table `social_content_image_variants` (RLS), columns `source_image_url`, `source_image_alt`, `selected_image_variant_id` on `social_content_generations` (backfill of `source_image_*` from the current image of existing Facebook drafts — `image_url` itself is never rewritten), function `reserve_trial_usage()`. Before it, `/facebook/[id]` shows "Image variants are not available yet" and both TASK-101 routes fail cleanly; Publish now / Schedule are unaffected.
+* **049 stays reserved for TASK-078 Phase B** (reference library). **Next free migration after 050: 051.**
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -1222,9 +1223,12 @@ Saved social content (TASK-063, migration 045). **Medium** summaries (`POST /api
 | first_comment_text | text nullable | Facebook (046): lead-in of the first comment; the permalink is added after it by code — never a URL |
 | link_placement | text nullable | Facebook (046): CHECK `first_comment` / `main_post` / `none`; CHECK `social_content_link_needs_url` — anything but `none` needs `cta_url` |
 | content_stream_id | uuid nullable → content_streams(id) ON DELETE SET NULL | Facebook (046): Content Stream of the article's category used as context |
+| source_image_url | text nullable | Facebook (050, TASK-101): CHECK `https://` — the WordPress article image the draft was created with, kept apart from `image_url` so "WordPress image" can always be restored. Backfilled from `image_url` for existing Facebook drafts; for newer rows filled the first time a variant is chosen |
+| source_image_alt | text nullable | Facebook (050): alt text of that image |
+| selected_image_variant_id | uuid nullable → social_content_image_variants(id) ON DELETE SET NULL | Facebook (050): the variant currently in `image_url`; NULL = the WordPress image (or none) |
 | created_at / updated_at | timestamptz NOT NULL DEFAULT now() | `updated_at` trigger (`update_updated_at_column`) |
 
-For Facebook, `content_markdown` holds the plain post text (no URL) and `content_html` a read-only HTML preview of it; `title` is the source article title. The published text is composed by code: post + call to action (+ permalink when `main_post`); the first comment is `first_comment_text` + permalink (`first_comment`).
+For Facebook, `image_url` is **the selected image** — the one Publish now and Schedule send (`publicationContent()` → `social_publications.post_image_url`); it is the WordPress image by default and a generated variant only after an explicit selection (TASK-101). For Facebook, `content_markdown` holds the plain post text (no URL) and `content_html` a read-only HTML preview of it; `title` is the source article title. The published text is composed by code: post + call to action (+ permalink when `main_post`); the first comment is `first_comment_text` + permalink (`first_comment`).
 
 No secret, token or credential of any external service is stored here (no Medium token; Facebook tokens live encrypted in `social_connections`).
 
@@ -1239,6 +1243,45 @@ No secret, token or credential of any external service is stored here (no Medium
 ## Deletion
 
 Deleting a saved item (`DELETE /api/social/generations/[id]`) deletes only that row. Deleting a source article / site / Pinterest generation keeps the saved content (sources set to NULL; Regenerate is then disabled). Deleting the project deletes its saved content (CASCADE, like `generations`). A Facebook post already published stays on Facebook; its `social_publications` row is kept (content id set to NULL).
+
+---
+
+# social_content_image_variants
+
+Status: Active (migration 050, TASK-101) — applied by the founder (reported 2026-11-18).
+
+Generated alternative images of one Facebook draft (successful ones only). Generating never changes the draft's image; only `PATCH /api/social/generations/[id]/image` does. Nothing here is sent to Facebook or WordPress.
+
+## Columns
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK DEFAULT gen_random_uuid() | |
+| user_id | uuid NOT NULL → profiles(id) ON DELETE CASCADE | owner |
+| social_content_generation_id | uuid NOT NULL → social_content_generations(id) ON DELETE CASCADE | the draft |
+| batch_id | uuid NOT NULL | one "Generate image variants" request (1 to 3 images); UNIQUE (batch_id, position) |
+| position | smallint NOT NULL, 1-3 | order in the batch |
+| angle | text NOT NULL | `hero` / `lifestyle` / `detail` (`FACEBOOK_VARIANT_ANGLES`) |
+| prompt | text NOT NULL | exact image prompt (title + plain excerpt of the draft, no URL, no visual reference) |
+| image_url | text NOT NULL | CHECK `https://` — public URL of the stored JPEG |
+| image_alt | text nullable | the draft title |
+| storage_key | text NOT NULL | R2 `images/facebook/<user>/<draft>/<batch>-<n>.jpg`, or Supabase `generated-images` `<user>/facebook/<draft>/<batch>-<n>.jpg` |
+| media_profile | text NOT NULL DEFAULT `facebook-feed-portrait` | 4:5 JPEG, 1024x1280 (TASK-050 profile, active since TASK-101) |
+| width / height | integer nullable, > 0 | stored size |
+| image_model | text nullable | model resolved for the IMAGE role at generation time |
+| created_at | timestamptz NOT NULL DEFAULT now() | |
+
+## RLS
+
+`Users read own image variants` (SELECT, `user_id = auth.uid()`), `Users insert own image variants` (INSERT, `WITH CHECK user_id = auth.uid()` **and** the draft is the caller's own `facebook` row), `Users delete own image variants` (DELETE). No UPDATE policy: a variant never changes. `GRANT SELECT, INSERT, DELETE` to `authenticated`. Queries (`lib/queries/facebook-image-variants.ts`) also filter on `user_id`. The route checks that a selected variant belongs to the draft **and** the user (the `selected_image_variant_id` FK alone does not check ownership).
+
+## Indexes
+
+`(social_content_generation_id, created_at DESC)`, `user_id`.
+
+## Deletion
+
+Deleting the draft deletes its variants (CASCADE). Stored files are not removed automatically in V1.
 
 ---
 
@@ -1340,6 +1383,10 @@ increment_rate_limit(p_user_id uuid, p_endpoint text, p_window_start timestamptz
 ```
 
 Upserts the counter row for `(user_id, endpoint, window_start)` and returns the new count.
+
+### Related: reserve_trial_usage(p_user_id uuid, p_units integer, p_limit integer) RETURNS integer
+
+Migration 050 (TASK-101). Reserves `p_units` (1-3) units of `profiles.total_generations_used` **all or nothing**: `UPDATE … SET total = total + p_units WHERE id = p_user_id AND total + p_units <= p_limit RETURNING total`; returns the new total, or NULL when the reservation would pass the cap (nothing counted). Concurrent calls for the same user are serialized on the profile row and the WHERE is re-checked, so two requests can never exceed the cap together. Not `SECURITY DEFINER` (caller's RLS, like `increment_trial_usage`). Called by `reserveTrialUnits()` (`lib/rate-limit.ts`) — 1 unit per image call launched — which fails **closed** (no generation when the reservation cannot be checked).
 
 ### Related: increment_trial_usage(p_user_id uuid) RETURNS integer
 
@@ -1498,6 +1545,8 @@ generated-images/user-id/pin-id/2.png
 ```
 
 Path pattern: `{user_id}/{pin_id}/{version}.png`. Each version is stored separately to support image versioning.
+
+Facebook image variants (TASK-101) with the Supabase provider: `{user_id}/facebook/{draft_id}/{batch_id}-{n}.jpg` (with R2: `images/facebook/…`, see below).
 
 ---
 

@@ -94,3 +94,13 @@ export function deleteSocialContent<T>(id: string) {
 export function facebookConnectHref(projectId: string, business = false): string {
   return `/api/social/connections/facebook/oauth/start?projectId=${encodeURIComponent(projectId)}${business ? '&business=1' : ''}`;
 }
+
+/** TASK-101 — 1 to 3 image variants for a draft (each image = 1 generation call). Never publishes anything. */
+export function generateFacebookImageVariants<T>(id: string, count: number) {
+  return call<T>(`/api/social/generations/${id}/image-variants`, post({ count, confirm: true }), 'The images could not be generated.');
+}
+
+/** TASK-101 — choose a variant of this draft, or `null` to go back to the WordPress image. */
+export function selectFacebookImage<T>(id: string, variantId: string | null) {
+  return call<T>(`/api/social/generations/${id}/image`, { method: 'PATCH', body: JSON.stringify({ variantId }) }, 'The image could not be changed.');
+}

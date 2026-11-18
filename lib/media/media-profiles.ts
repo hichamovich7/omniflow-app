@@ -5,9 +5,11 @@ import type { MediaChannel } from '@/lib/storage/keys';
  * quality are defined. Routes and components never hard-code them.
  *
  * Only `active` profiles may be used by optimizeImage(). `planned` profiles
- * (Facebook, Instagram, TikTok / Reels) are configuration only: no pipeline
- * produces them yet, and one image is stored per use — never a set of
- * variants "just in case".
+ * (Instagram, TikTok / Reels, the other Facebook formats) are configuration
+ * only: no pipeline produces them yet, and one image is stored per use —
+ * never a set of variants "just in case". `facebook-feed-portrait` is active
+ * since TASK-101: only for the 1 to 3 variants the person explicitly asks
+ * for on a Facebook draft.
  */
 
 export type MediaPlatform = 'pinterest' | 'wordpress' | 'facebook' | 'instagram' | 'tiktok' | 'reels';
@@ -133,8 +135,23 @@ export const MEDIA_PROFILES: Record<MediaProfileId, MediaProfile> = {
     storageChannel: 'wordpress',
   },
 
+  'facebook-feed-portrait': {
+    id: 'facebook-feed-portrait',
+    platform: 'facebook',
+    purpose: 'Feed, vertical 4:5 (TASK-101 image variants)',
+    status: 'active',
+    // Provider images are 1024x1536 (2:3): a centred crop to 4:5, no
+    // enlargement (the prompt keeps the subject centred, with margins).
+    resize: { mode: 'exact', width: 1024, height: 1280, fit: 'cover', maxAspectDeviation: 0.17 },
+    ...jpeg,
+    quality: 88,
+    minQuality: 72,
+    maxBytes: 4 * MB,
+    transparency: { mode: 'flatten', background: WHITE },
+    storageChannel: 'facebookImage',
+  },
+
   // --------------------------------------------- planned (configuration only)
-  'facebook-feed-portrait': planned('facebook-feed-portrait', 'facebook', 'Feed, vertical', 1080, 1359, 'facebookImage'),
   'facebook-feed-square': planned('facebook-feed-square', 'facebook', 'Feed, square', 1080, 1080, 'facebookImage'),
   'facebook-story': planned('facebook-story', 'facebook', 'Story', 1080, 1920, 'facebookImage'),
   'facebook-cover': planned('facebook-cover', 'facebook', 'Page cover', 851, 315, 'facebookImage'),

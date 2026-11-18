@@ -1904,3 +1904,24 @@ Système de sélection Platform → Output Preset (dimensions, aspect ratio, saf
 Pour la suppression d'articles WordPress (et potentiellement d'autres ressources comme les générations Pinterest), une corbeille temporaire — soft-delete avec un flag/timestamp, purge réelle après 15 jours — offrirait un filet de sécurité contre une suppression accidentelle, en plus de la confirmation stricte déjà en place (saisie du titre exact).
 
 **Statut** : différée, pas implémentée. La purge automatique après 15 jours nécessite une tâche planifiée (cron) côté serveur — Vercel Cron existe mais requiert le plan Pro, pas encore souscrit/déployé à ce stade du projet. Construire une corbeille sans purge automatique reviendrait à accumuler indéfiniment des lignes "supprimées" (et leurs fichiers Storage) sans mécanisme de nettoyage, ce qui n'est pas mieux qu'un DELETE définitif immédiat mal assumé. À reconsidérer une fois qu'une vraie infrastructure de planification (Vercel Cron sur plan Pro, ou Inngest — déjà réservé dans `.env.local` mais non connecté, voir décision 2026-07-18 sur le pipeline WordPress) sera réellement disponible.
+
+---
+
+## Facebook image variants: separate table, selected image in `image_url`, all-or-nothing quota (TASK-101, 2026-11-15)
+
+### Context
+
+TASK-101 lets the person generate 1 to 3 alternative images for a Facebook draft and choose one, while the WordPress image stays the default and always selectable.
+
+### Decision Taken
+
+* `social_content_generations.image_url` stays the selected image, so Publish now and Schedule (TASK-068 / TASK-100) are unchanged; the WordPress image is kept in `source_image_url`, the current variant in `selected_image_variant_id` (migration 050). Variants live in their own table `social_content_image_variants` with RLS.
+* Quota: 1 trial unit per image call launched, reserved **all or nothing** before the first call by `reserve_trial_usage()` (atomic UPDATE … WHERE), so concurrent requests cannot pass the cap. Unlike `checkRateLimit()` (fail open), the reservation **fails closed**: paid image calls are never made when the quota cannot be checked.
+* Format: `facebook-feed-portrait` activated as 4:5 JPEG **1024x1280** (centred crop of the 1024x1536 provider output) — the planned 1080x1359 would have required enlarging the 1024-px-wide image, which the optimiser never does.
+* No visual reference in V1; 3 fixed angles (hero, lifestyle, detail).
+
+### Consequences
+
+* Migration 050 is required before the feature works (the page shows a notice otherwise).
+* A failed image still counts (the call was launched); the person sees the result per image.
+* The image cannot change while the post is scheduled, publishing, published or partial.

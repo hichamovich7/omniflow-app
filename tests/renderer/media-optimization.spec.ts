@@ -142,7 +142,6 @@ test('active profiles: Pinterest 1000x1500 JPEG q88, WordPress ≤1600 WebP q85 
 
 test('future profiles are configured but planned', () => {
   const expected: Record<string, [string, number, number, string]> = {
-    'facebook-feed-portrait': ['facebook', 1080, 1359, 'facebookImage'],
     'facebook-feed-square': ['facebook', 1080, 1080, 'facebookImage'],
     'facebook-story': ['facebook', 1080, 1920, 'facebookImage'],
     'facebook-cover': ['facebook', 851, 315, 'facebookImage'],
@@ -156,13 +155,14 @@ test('future profiles are configured but planned', () => {
     const profile = getMediaProfile(id as MediaProfileId);
     expect(profile, id).toMatchObject({ platform, status: 'planned', resize: { mode: 'exact', width, height }, storageChannel: channel });
   }
-  expect(listMediaProfiles('active').map((p) => p.id)).toEqual(['pinterest-pin', 'wordpress-article', 'wordpress-article-jpeg']);
+  // TASK-101: facebook-feed-portrait is active (explicit image variants only).
+  expect(listMediaProfiles('active').map((p) => p.id)).toEqual(['pinterest-pin', 'wordpress-article', 'wordpress-article-jpeg', 'facebook-feed-portrait']);
   expect(MEDIA_PROFILE_IDS).toHaveLength(12);
   expect(r2MediaKey('instagramImage', USER, 'c1', 'a.jpg')).toBe(`images/instagram/${USER}/c1/a.jpg`);
 });
 
 test('planned profiles cannot be produced — no Facebook / Instagram / TikTok variant is created', async () => {
-  await expect(optimizeImage(PIN_PNG, 'facebook-feed-portrait')).rejects.toThrow(/planned, not active/);
+  await expect(optimizeImage(PIN_PNG, 'facebook-feed-square')).rejects.toThrow(/planned, not active/);
   await expect(optimizeImage(PIN_PNG, 'tiktok-vertical')).rejects.toBeInstanceOf(ImageOptimizationError);
 
   // Only active profile ids are referenced outside lib/media, and only once per use.
@@ -175,7 +175,8 @@ test('planned profiles cannot be produced — no Facebook / Instagram / TikTok v
     [...readFileSync(file, 'utf8').matchAll(/optimizeImage\([^,]+,\s*'([a-z-]+)'/g)].map((m) => m[1])
   );
   // Pinterest: generated Pin, recomposed Pin, composed Pin (TASK-079), AI-designed numbered Pin (TASK-088).
-  expect(calls.sort()).toEqual(['pinterest-pin', 'pinterest-pin', 'pinterest-pin', 'pinterest-pin', 'wordpress-article']);
+  // Facebook: the explicit image variants of a draft (TASK-101).
+  expect(calls.sort()).toEqual(['facebook-feed-portrait', 'pinterest-pin', 'pinterest-pin', 'pinterest-pin', 'pinterest-pin', 'wordpress-article']);
 });
 
 // -------------------------------------------------------------- optimization

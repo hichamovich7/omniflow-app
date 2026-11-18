@@ -48,6 +48,8 @@ import {
   type SocialPublication,
 } from '@/lib/social/facebook-publication';
 import { cn } from '@/lib/utils';
+import { FacebookImageVariants } from '@/components/social/facebook-image-variants';
+import { imageChangeLocked, type FacebookImageVariant } from '@/lib/social/facebook-image-variants';
 
 const EDIT_LIMITS = { post: 3000, callToAction: 160, firstCommentText: 160 } as const;
 
@@ -58,6 +60,9 @@ interface FacebookPostWorkspaceProps {
   /** The Facebook Page connected to the content's project — null when none. */
   connection: SocialConnection | null;
   configured: boolean;
+  /** TASK-101 — image variants of this draft (newest first) and whether migration 050 is applied. */
+  imageVariants?: FacebookImageVariant[];
+  imageVariantsUnavailable?: boolean;
 }
 
 type PublishResult = { publication: SocialPublication; warning: string | null };
@@ -68,7 +73,15 @@ type PublishResult = { publication: SocialPublication; warning: string | null };
  * exactly what will be posted. After a partial publication only "Retry
  * comment" is offered — the post itself is never sent twice.
  */
-export function FacebookPostWorkspace({ item, projectName, publication: initialPublication, connection, configured }: FacebookPostWorkspaceProps) {
+export function FacebookPostWorkspace({
+  item,
+  projectName,
+  publication: initialPublication,
+  connection,
+  configured,
+  imageVariants = [],
+  imageVariantsUnavailable = false,
+}: FacebookPostWorkspaceProps) {
   const router = useRouter();
   const saved = facebookPartsFromRow(item);
   const [post, setPost] = useState(saved.post);
@@ -365,9 +378,10 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
               // eslint-disable-next-line @next/next/no-img-element
               <img src={item.image_url} alt={item.image_alt ?? ''} className="max-h-72 w-full rounded-lg border border-border/60 object-cover" loading="lazy" />
             ) : (
-              <p className="text-xs text-muted-foreground">No article image: the post is published as text only.</p>
+              <p className="text-xs text-muted-foreground">No image: the post is published as text only.</p>
             )}
           </div>
+          <FacebookImageVariants item={item} variants={imageVariants} unavailable={imageVariantsUnavailable} locked={imageChangeLocked(publication)} />
           {comment && (
             <div className="rounded-xl border border-border bg-background p-3" data-testid="facebook-comment-preview">
               <p className="text-xs font-medium text-muted-foreground">First comment by the Page</p>
@@ -508,7 +522,7 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
             <DialogTitle>Publish to Facebook?</DialogTitle>
             <DialogDescription>
               This post will be published now on the Facebook Page &quot;{connection?.external_account_name}&quot;
-              {item.image_url ? ' with the article image' : ' as text only'}
+              {item.image_url ? (item.selected_image_variant_id ? ' with the selected image' : ' with the article image') : ' as text only'}
               {comment ? ', then the Page will add the article link as the first comment.' : '.'}
             </DialogDescription>
           </DialogHeader>
@@ -530,7 +544,7 @@ export function FacebookPostWorkspace({ item, projectName, publication: initialP
           <DialogHeader>
             <DialogTitle>{scheduleMode === 'reschedule' ? 'Reschedule the post?' : 'Schedule this post?'}</DialogTitle>
             <DialogDescription>
-              Page: &quot;{schedulePageName}&quot; (ID {schedulePageId}){item.image_url ? ' · with the article image' : ' · text only'}
+              Page: &quot;{schedulePageName}&quot; (ID {schedulePageId}){item.image_url ? (item.selected_image_variant_id ? ' · with the selected image' : ' · with the article image') : ' · text only'}
               {scheduleWithComment ? ' · first comment with the article link once the post is live' : ''}.
             </DialogDescription>
           </DialogHeader>

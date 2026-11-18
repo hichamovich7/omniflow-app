@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Facebook — image variants for a draft — TASK-101 (2026-11-15)
+
+* **New "Post image"** on a Facebook post: the WordPress article image stays the default; **Generate image variants** creates 1, 2 or 3 new vertical (4:5) images from the post's title and text (hero shot, lifestyle scene, close-up detail). The dialog shows how many image calls will be counted before you confirm.
+* Preview every option and click **Use this image**; you can always go back to the WordPress image. Generating never changes the post image and never publishes anything; Publish now and Schedule send the image you chose.
+* Quota: 1 unit per image call, reserved before any call (concurrent requests cannot pass the limit); if one image fails, the others are kept and the result says which one failed. Locked while the post is scheduled, being published or on Facebook.
+* Migration **050** (`social_content_image_variants`, `source_image_url`, `selected_image_variant_id`, `reserve_trial_usage()`) — applied in production. Media profile `facebook-feed-portrait` now active (4:5 JPEG 1024x1280).
+
 ### Facebook — scheduled post without first comment (TASK-100 production fix, 2026-11-15)
 
 * **Fixed:** a scheduled post published by the cron stopped right after the post was created — its Facebook id was not saved and the first comment never sent (the row stayed "Publishing…"). The default clock now applies even when none is given.

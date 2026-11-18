@@ -126,7 +126,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
   * Pin distribution across the active destinations (rule to be decided at implementation).
   * Scheduler and Pinterest CSV updated to use each Pin's destination (board / section unchanged for single-board streams).
   * Tests: RLS (owner only), migration (existing rows, old streams), UI, scheduler / CSV and backward compatibility; the seven readers above keep working.
-* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook, in this order: **TASK-100** (scheduling — partially validated in production 2026-11-15), **TASK-101** (image variants), **TASK-102** (several Pages per project + category suggestion); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
+* **P1:** WordPress publish monitoring (view / alert for `uncertain`, `failed`, stuck `publishing`; scheduled-post check) — to be numbered when started; Facebook, in this order: **TASK-100** (scheduling — partially validated in production 2026-11-15), **TASK-101** (image variants — implemented 2026-11-15, migration 050 applied by the founder (reported 2026-11-18), manual test pending), **TASK-102** (several Pages per project + category suggestion); TASK-043 (edit Board section on existing Pins); TASK-065 (Pinterest CSV export tracking per Pin — documented only); TASK-011 Credits System (before any public opening).
 * **P2:** TASK-103 (optional Facebook draft variants); storage audit / archiving (read-only orphan audit first); TASK-080 (Pinterest Detailed Tutorial Infographic, after TASK-079 — replaces the withdrawn Step-by-step format); TASK-042; TASK-030; TASK-028 Option 2.
 
 ### Blocked
@@ -150,7 +150,7 @@ Verified against `git log` (all work is committed and pushed to `main`), the liv
 * **One counter for both namespaces** (rule already stated for TASK-041, below): a new task takes the next suffix free in **both** `TASK-NNN` and `TASK-FIX-NNN`. Highest used suffix on 2026-10-29: 082 (TASK-082, Pinterest "Regenerate text" fix + bulk; TASK-FIX-081, Auto variety "context is not defined"; TASK-080 Pinterest Detailed Tutorial Infographic — planned) → **next task: 083**. Update 2026-11-01: highest used suffix **091** (TASK-091 Multi-board Content Streams, planned) → **next task: 092**. Update 2026-11-02: highest used suffix **092** (TASK-092 one-page project workspace) → **next task: 093**. Update 2026-11-02 (later): **093** used (attach an existing board) → **next task: 094**. **094** used (deletes in the Pinterest structure) → **next task: 095**. **095** used (visual readability pass) → **next task: 096**. **096** used (TASK-FIX-096, project-gallery section assignment, 2026-11-03) → **next task: 097**. **097** used (TASK-FIX-097, OpenAI Image 2.6 models, 2026-11-05) → **next task: 098**. **098** used (TASK-FIX-098, ~30 % numbered Pins in project galleries, 2026-11-06) → **next task: 099**. **099** used (TASK-099, coherent Pin regeneration, 2026-11-08) → **next task: 100**. Update 2026-11-13: **100-103** used (Facebook backlog: TASK-100 scheduling, TASK-101 image variants, TASK-102 several Pages per project, TASK-103 draft variants — planned) → **next task: 104**. TASK-078 Phase B (reference library) keeps the TASK-078 number.
 * **Known collisions, kept as is** (renaming would break commit messages and code comments): TASK-045 / TASK-FIX-045, TASK-046 / TASK-FIX-046, TASK-047 / TASK-FIX-047, TASK-048 / TASK-FIX-048, TASK-049 / TASK-FIX-049, TASK-050 / TASK-FIX-050, TASK-051 / TASK-FIX-051. Always cite them with their full prefix.
 * **TASK-038 alias:** commit `964bcc7` ("lifetime trial usage cap (TASK-038)") is **TASK-FIX-015**. TASK-038 was also the provisional number of TASK-041 (renumbered, see TASK-041). No task is tracked as TASK-038.
-* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **047** (`pinterest_accounts`, `pinterest_board_sections`, `content_stream_boards` destinations — TASK-091) written 2026-11-02, **applied 2026-11-02**; **048** (`social_publications` scheduling — TASK-100) written 2026-11-13, **not applied yet**; **next free migration: 049** (TASK-078 Phase B, which had planned 047 then 048, takes it).
+* **Migrations:** 001-044 exist, numbered without gap or duplicate, and are applied (tables / columns / buckets verified 2026-10-11); **045** (`social_content_generations`, TASK-063) written 2026-10-12, **not applied yet**; **046** (`social_connections`, `social_publications`, Facebook columns — TASK-068) written 2026-10-15, **not applied yet**; **047** (`pinterest_accounts`, `pinterest_board_sections`, `content_stream_boards` destinations — TASK-091) written 2026-11-02, **applied 2026-11-02**; **048** (`social_publications` scheduling — TASK-100) written 2026-11-13, applied by the founder 2026-11-13; **049 reserved for TASK-078 Phase B**; **050** (Facebook image variants — TASK-101) written 2026-11-15, applied by the founder (reported 2026-11-18); **next free migration: 051**.
 
 ---
 
@@ -1386,7 +1386,34 @@ New `tests/renderer/facebook-scheduling.spec.ts` (28, Meta simulated): date / zo
 
 ## [TASK-101] Facebook image variants for one article
 
-### Status: PLANNED (P1 — documented 2026-11-13, not started; no code, no migration)
+### Status: READY TO TEST (2026-11-15 — implemented, offline tests pass; migration 050 applied by the founder (reported 2026-11-18); committed and pushed 2026-11-18; **manual test pending** — no real AI / Meta call made yet)
+
+### What ships (2026-11-15)
+
+* **Migration 050** (`supabase/migrations/050_add_facebook_image_variants.sql` — 049 stays reserved for TASK-078): table `social_content_image_variants` (RLS: own rows; insert only on the caller's own Facebook draft; no update), columns `source_image_url` / `source_image_alt` (WordPress image kept apart, backfilled for existing Facebook drafts — their `image_url` is never rewritten) and `selected_image_variant_id` on `social_content_generations`; function `reserve_trial_usage()` (atomic all-or-nothing reservation of N trial units).
+* `image_url` stays **the selected image**: Publish now and Schedule send it (`publicationContent()`); TASK-100 flow unchanged.
+* `lib/social/facebook-image-variants.ts` (client-safe core, injected deps): 3 distinct angles (hero, lifestyle, detail), prompt from the title + plain excerpt (no URL, no reference image in V1), `generateFacebookImageVariants()` (lock check → quota reservation → parallel calls → partial failure kept), `selectFacebookImage()` (variant of this draft and user only; back to WordPress), `imageChangeLocked()` (`scheduled` / `publishing` / `published` / `partial`).
+* `lib/social/facebook-variant-storage.ts`: `facebook-feed-portrait` (now **active**: 4:5 JPEG 1024x1280, centred crop of the 1024x1536 provider image) under `images/facebook/` (R2) or `generated-images` (Supabase).
+* `lib/rate-limit.ts` `reserveTrialUnits()` (1 unit per image call launched, admin / bypass short-circuits, fails closed); `lib/queries/facebook-image-variants.ts` (user-filtered store).
+* Endpoints: `POST /api/social/generations/[id]/image-variants`, `PATCH /api/social/generations/[id]/image` (`lib/social/facebook-image-variants-route.ts`); Zod schemas in `lib/validations/facebook.ts`.
+* UI: "Post image" block on `/facebook/[id]` (`components/social/facebook-image-variants.tsx`) — preview, selection, back to WordPress, generation dialog with the number of image calls before confirmation.
+* Docs: DATABASE, API, UI_UX, DECISIONS, TESTING, CHANGELOG, in-app Guide ("Facebook Pages").
+
+### Tests (2026-11-15)
+
+New `tests/renderer/facebook-image-variants.spec.ts` (18, AI / storage / Meta simulated, no network): WordPress default without AI call; 1-3 distinct angles, quota reserved once before any call, image unchanged after generation, no network; invalid count; partial failure; quota refused / unreadable → 0 call; two concurrent requests cannot pass the cap; select / switch / back to WordPress (old draft, new draft, text-only draft); variant of another draft / user refused, another user's draft not found; locked statuses; Publish now and the scheduled run send the selected image; 2:3 → 4:5 JPEG storage keys; route / migration / UI source checks. `media-optimization.spec.ts` (20) updated (facebook-feed-portrait active). Targeted Facebook + media suites **102/102** (image variants 18, media 20, scheduling 33, content 31); full renderer **1848/1848**; TypeScript, ESLint (touched files), `git diff --check` pass. No real AI, storage or Meta call.
+
+### Remaining (founder)
+
+1. ~~Apply migration 050~~ — applied by the founder (reported 2026-11-18); never replay it.
+2. ~~Commit + deploy~~ (2026-11-18); then the manual test in TESTING.md "Facebook image variants (TASK-101)" (real image calls count toward the trial quota).
+
+### Known limits (V1)
+
+* No visual reference (the WordPress image is not sent to the model); angles are fixed (hero, lifestyle, detail).
+* A failed image still counts as 1 unit (the call was launched).
+* Stored variant files are not deleted when a draft is deleted (rows are, by CASCADE).
+* `unknown` / `failed` / `cancelled` publications do not lock the image (only the four statuses above).
 
 ### Goal
 

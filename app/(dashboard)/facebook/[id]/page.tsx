@@ -7,6 +7,7 @@ import { FacebookPostWorkspace } from '@/components/social/facebook-post-workspa
 import { getSocialContentGeneration } from '@/lib/queries/social-content';
 import { getProjectFacebookConnection } from '@/lib/queries/social-connections';
 import { listPublicationsForGenerations } from '@/lib/queries/social-publications';
+import { listImageVariants } from '@/lib/queries/facebook-image-variants';
 import { getMetaConfig, hasSocialTokenKey } from '@/lib/social/meta/config';
 import { isValidUuid } from '@/lib/utils/uuid';
 
@@ -28,9 +29,10 @@ export default async function FacebookPostPage({ params }: { params: Promise<{ i
   const item = await getSocialContentGeneration(supabase, user.id, id);
   if (!item || item.platform !== 'facebook') notFound();
 
-  const [connection, publications] = await Promise.all([
+  const [connection, publications, imageVariants] = await Promise.all([
     getProjectFacebookConnection(supabase, user.id, item.project_id),
     listPublicationsForGenerations(supabase, user.id, [item.id]),
+    listImageVariants(supabase, user.id, item.id),
   ]);
 
   return (
@@ -44,6 +46,8 @@ export default async function FacebookPostPage({ params }: { params: Promise<{ i
           publication={publications[item.id] ?? null}
           connection={connection}
           configured={Boolean(getMetaConfig()) && hasSocialTokenKey()}
+          imageVariants={imageVariants.variants}
+          imageVariantsUnavailable={imageVariants.unavailable}
         />
       </div>
     </PageContainer>

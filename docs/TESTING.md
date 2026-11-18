@@ -1345,6 +1345,47 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Facebook image variants (TASK-101, 2026-11-15)
+
+```bash
+npx playwright test tests/renderer/facebook-image-variants.spec.ts tests/renderer/media-optimization.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/facebook-image-variants.spec.ts` (18) — the image model, the storage and the Meta Graph API are fakes, drafts and variants an in-memory store with the same ownership filters; `fetch` is replaced by a guard that fails on any network call:
+
+* Default: a new draft keeps the WordPress image; the draft flow has no image-generation path; "WordPress image" on an unchanged draft writes nothing.
+* Generation: 1-3 distinct angles (hero, lifestyle, detail), prompt with title + text, no URL, "No text"; size 1024x1536; quota reserved **once, for all calls, before the first one**; the draft's image unchanged; 0 network call. Count 0 / 4 / 1.5 refused before the quota; strict body with `confirm: true`.
+* Partial failure: image 2 fails → variants 1 and 3 kept, failure reported, 3 units used.
+* Quota: not enough units → `403 trial_limit`, unreadable → `503 quota_unavailable`, **0** image call; two concurrent requests of 2 with 2 units left → one runs, one refused, 2 calls total (same rule as `reserve_trial_usage`).
+* Selection: variant → `image_url` = variant, WordPress image kept in `source_image_url`; another variant; back to WordPress restores the exact URL + alt (old draft, draft created after 050, text-only draft).
+* Access: a variant of another draft or another user, or an unknown id → `variant_not_found`; another user's draft → not found (no quota, no call); the other user's store cannot insert on / update the draft; Medium row → not found.
+* Lock: `scheduled` / `publishing` / `published` / `partial` → generation and selection refused, 0 reservation, 0 call, 0 write; `failed` / `cancelled` / `unknown` not locked.
+* Sent image: Publish now → `POST /photos` `url` = selected variant; Schedule stores it and the scheduled run sends it; back to WordPress → WordPress image sent.
+* Storage: a 1024x1536 PNG → 1024x1280 JPEG; key `images/facebook/<user>/<draft>/<batch>-<n>.jpg` (R2) / `<user>/facebook/<draft>/<batch>-<n>.jpg` (Supabase).
+* Source checks: routes (auth, uuid, Zod, user-filtered draft and store, rate limit before generation, no Meta / WordPress / `social_publications`), migration 050 (table, RLS, grant, backfill without rewriting `image_url`, reservation function, no 049 file), UI strings.
+
+`media-optimization.spec.ts`: `facebook-feed-portrait` is now active (explicit variants only); `facebook-feed-square` checked as still planned.
+
+**Results 2026-11-15:** image variants 18/18, media 20/20, Facebook scheduling 33/33, Facebook content 31/31 (102/102); full renderer 1848/1848; TypeScript, ESLint (touched files), `git diff --check` pass. No real AI, storage or Meta call.
+
+**Manual test (founder approval required — real image calls count toward the trial quota; prerequisites: migration 050 applied, TASK-101 deployed, a saved Facebook draft not scheduled / published):**
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | **No cost, no publication** — open `/facebook/[id]` of an existing draft with a WordPress image | "Post image": WordPress image (default) marked "Used for the post"; preview = the same image; no variant; trial counter unchanged (opening the page makes no AI call) | ☐ |
+| 2 | **Generate image variants** → keep **1** | Dialog shows "This makes 1 image generation call (1 unit …)"; Cancel closes without any call | ☐ |
+| 3 | Confirm 1 (only after step 1 passed) | One 4:5 image appears (Hero shot); result line "1 of 1 image generated … The post image did not change."; preview still shows the WordPress image; trial counter +1 | ☐ |
+| 4 | **Use this image** on a variant | Preview shows the variant; reload keeps it; the variant is marked "Used for the post" | ☐ |
+| 5 | **Use this image** on "WordPress image (default)" | Preview shows the WordPress image again (same URL) | ☐ |
+| 6 | Choose a variant, then **Publish to Facebook** on a test Page | Dialog "with the selected image"; the post on the Page has the variant image | ☐ |
+| 7 | Another draft: choose a variant, **Schedule** | Scheduled post uses the variant at its time; while scheduled, Generate / Use this image are disabled with the locked message | ☐ |
+| 8 | Trial account with 1 unit left → Generate 2 | Refused "Trial limit reached…" before any image is generated; counter unchanged | ☐ |
+| 9 | Vercel logs of the image-variants route | No prompt, URL or token in logs — only `[facebook images] variant N facebook-feed-portrait …` sizes and error class names | ☐ |
+
+Record the date and results here and in TASKS.md (TASK-101).
+
+---
+
 # Facebook scheduling (TASK-100, 2026-11-13)
 
 ```bash

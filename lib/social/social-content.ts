@@ -62,6 +62,12 @@ export interface SocialContentGeneration {
   first_comment_text?: string | null;
   link_placement?: FacebookLinkPlacement | null;
   content_stream_id?: string | null;
+  // Facebook image variants (TASK-101, migration 050) — absent before the migration.
+  /** The WordPress article image the draft was created with (image_url is the selected one). */
+  source_image_url?: string | null;
+  source_image_alt?: string | null;
+  /** The variant currently in image_url — null = the WordPress image (or none). */
+  selected_image_variant_id?: string | null;
   created_at: string;
   updated_at: string;
 }
