@@ -8,6 +8,8 @@ import { getSocialContentGeneration } from '@/lib/queries/social-content';
 import { getProjectFacebookConnection } from '@/lib/queries/social-connections';
 import { listPublicationsForGenerations } from '@/lib/queries/social-publications';
 import { listImageVariants } from '@/lib/queries/facebook-image-variants';
+import { listArticleFacebookPosts } from '@/lib/queries/facebook-article-posts';
+import { FacebookArticlePosts } from '@/components/social/facebook-article-posts';
 import { getMetaConfig, hasSocialTokenKey } from '@/lib/social/meta/config';
 import { isValidUuid } from '@/lib/utils/uuid';
 
@@ -29,11 +31,18 @@ export default async function FacebookPostPage({ params }: { params: Promise<{ i
   const item = await getSocialContentGeneration(supabase, user.id, id);
   if (!item || item.platform !== 'facebook') notFound();
 
-  const [connection, publications, imageVariants] = await Promise.all([
+  const [connection, imageVariants, articlePosts] = await Promise.all([
     getProjectFacebookConnection(supabase, user.id, item.project_id),
-    listPublicationsForGenerations(supabase, user.id, [item.id]),
-    listImageVariants(supabase, user.id, item.id),
+    listImageVariants(supabase, user.id, item.id, item.origin_image_variant_id ?? null),
+    // TASK-101 extension / TASK-103: every Facebook post of the same article.
+    listArticleFacebookPosts(supabase, user.id, item),
   ]);
+  const posts = articlePosts.some((post) => post.id === item.id) ? articlePosts : [item, ...articlePosts];
+  const publications = await listPublicationsForGenerations(
+    supabase,
+    user.id,
+    posts.map((post) => post.id)
+  );
 
   return (
     <PageContainer>
@@ -49,6 +58,7 @@ export default async function FacebookPostPage({ params }: { params: Promise<{ i
           imageVariants={imageVariants.variants}
           imageVariantsUnavailable={imageVariants.unavailable}
         />
+        <FacebookArticlePosts currentId={item.id} posts={posts} publications={publications} />
       </div>
     </PageContainer>
   );

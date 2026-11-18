@@ -29,7 +29,9 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * **Migration 047** (`047_add_pinterest_accounts_and_sections.sql`, TASK-091) — written 2026-11-02, **applied by hand on 2026-11-02** (Supabase SQL Editor, one transaction; new columns checked through PostgREST). Required before deploying TASK-091 (v3.4.0): Content Stream saves write the new `content_stream_boards` columns. Before it, pages still load (no account, no section, every stream link read as primary + active). Verified on a real Postgres (PGlite) — see TESTING.md (TASK-091).
 * **Migration 048** (`048_add_social_publication_scheduling.sql`, TASK-100) — written 2026-11-13, **not applied yet** (needs 046): statuses `scheduled` / `cancelled` and columns `scheduled_at`, `scheduled_timezone` on `social_publications`, due index. Before it, "Schedule" fails to save (the CHECK refuses `scheduled`); Publish now is unaffected.
 * **Migration 050** (`050_add_facebook_image_variants.sql`, TASK-101) — written 2026-11-15, **applied by the founder (reported 2026-11-18)** (needs 045 / 046): table `social_content_image_variants` (RLS), columns `source_image_url`, `source_image_alt`, `selected_image_variant_id` on `social_content_generations` (backfill of `source_image_*` from the current image of existing Facebook drafts — `image_url` itself is never rewritten), function `reserve_trial_usage()`. Before it, `/facebook/[id]` shows "Image variants are not available yet" and both TASK-101 routes fail cleanly; Publish now / Schedule are unaffected.
-* **049 stays reserved for TASK-078 Phase B** (reference library). **Next free migration after 050: 051.**
+* **Migration 051** (`051_add_facebook_derived_drafts.sql`, TASK-101 extension / TASK-103) — written 2026-11-18, **applied by the founder (reported 2026-11-18) — never replay or modify it** (needs 050): columns `derived_from_generation_id`, `origin_image_variant_id`, `visual_angle`, `creation_request_id` on `social_content_generations`, partial UNIQUE index `(user_id, creation_request_id)`, ownership trigger `check_social_content_image_refs`. 050 is not modified.
+* **Migration 052** (`052_add_social_draft_creation_requests.sql`, TASK-101 extension / TASK-103) — written 2026-11-18, **applied by the founder (reported 2026-11-18) — never replay or modify it** (needs 051): table `social_draft_creation_requests` (atomic reservation of a creation request id before the quota and any AI call; RLS). Before it, "Create new post with this image" answers `503 migration_required` (fails closed: nothing generated); everything else is unaffected.
+* **049 stays reserved for TASK-078 Phase B** (reference library). **Next free migration: 053.**
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -1225,12 +1227,18 @@ Saved social content (TASK-063, migration 045). **Medium** summaries (`POST /api
 | content_stream_id | uuid nullable → content_streams(id) ON DELETE SET NULL | Facebook (046): Content Stream of the article's category used as context |
 | source_image_url | text nullable | Facebook (050, TASK-101): CHECK `https://` — the WordPress article image the draft was created with, kept apart from `image_url` so "WordPress image" can always be restored. Backfilled from `image_url` for existing Facebook drafts; for newer rows filled the first time a variant is chosen |
 | source_image_alt | text nullable | Facebook (050): alt text of that image |
-| selected_image_variant_id | uuid nullable → social_content_image_variants(id) ON DELETE SET NULL | Facebook (050): the variant currently in `image_url`; NULL = the WordPress image (or none) |
+| selected_image_variant_id | uuid nullable → social_content_image_variants(id) ON DELETE SET NULL | Facebook (050): the variant currently in `image_url`; NULL = the WordPress image (or none). Since 051 it may be the `origin_image_variant_id` (a variant of the original draft) |
+| derived_from_generation_id | uuid nullable → social_content_generations(id) ON DELETE SET NULL | Facebook (051): the draft whose image was reused by "Create new post with this image"; same article source columns and project |
+| origin_image_variant_id | uuid nullable → social_content_image_variants(id) ON DELETE SET NULL | Facebook (051): the reused variant (it stays on its original draft — never moved or copied); NULL = the WordPress image or an ordinary draft |
+| visual_angle | text nullable | Facebook (051): CHECK `wordpress` / `hero` / `lifestyle` / `detail` — the angle the text was written for |
+| creation_request_id | uuid nullable | Facebook (051): idempotency key of the creation request; partial UNIQUE `(user_id, creation_request_id)` — a repeated request returns the draft already created |
 | created_at / updated_at | timestamptz NOT NULL DEFAULT now() | `updated_at` trigger (`update_updated_at_column`) |
 
 For Facebook, `image_url` is **the selected image** — the one Publish now and Schedule send (`publicationContent()` → `social_publications.post_image_url`); it is the WordPress image by default and a generated variant only after an explicit selection (TASK-101). For Facebook, `content_markdown` holds the plain post text (no URL) and `content_html` a read-only HTML preview of it; `title` is the source article title. The published text is composed by code: post + call to action (+ permalink when `main_post`); the first comment is `first_comment_text` + permalink (`first_comment`).
 
 No secret, token or credential of any external service is stored here (no Medium token; Facebook tokens live encrypted in `social_connections`).
+
+**Article → drafts → publications (051):** several Facebook drafts may share one article (same `source_*` columns); each has its own text, image and at most one publication per Page (`social_publications` UNIQUE (draft, Page), 046 — unchanged), so two drafts of the same article can both be published on the same Page while retrying one draft never posts twice. Trigger `check_social_content_image_refs` (BEFORE INSERT / UPDATE OF the three image reference columns, SECURITY INVOKER): `derived_from_generation_id` must be a Facebook draft of the same user, `origin_image_variant_id` and `selected_image_variant_id` variants of the same user (else `42501`).
 
 ## RLS
 
@@ -1282,6 +1290,28 @@ Generated alternative images of one Facebook draft (successful ones only). Gener
 ## Deletion
 
 Deleting the draft deletes its variants (CASCADE). Stored files are not removed automatically in V1.
+
+---
+
+# social_draft_creation_requests
+
+Status: Active (migration 052, TASK-101 extension / TASK-103) — applied by the founder (reported 2026-11-18) — never replay or modify it.
+
+Atomic reservation of a "Create new post with this image" request, taken **before** the quota is counted and before any AI call, so two identical requests at the same time produce at most one billed text generation and one draft.
+
+| Column | Type | Notes |
+|---|---|---|
+| user_id | uuid NOT NULL → profiles(id) ON DELETE CASCADE | PRIMARY KEY (user_id, request_id) — the INSERT is the lock |
+| request_id | uuid NOT NULL | generated once per confirmation by the UI |
+| parent_generation_id | uuid NOT NULL → social_content_generations(id) ON DELETE CASCADE | the draft the image comes from; the same id for another draft → `409 request_reused` |
+| variant_id | uuid nullable → social_content_image_variants(id) ON DELETE SET NULL | NULL = WordPress image |
+| status | text NOT NULL DEFAULT `pending` | CHECK `pending` (reserved; once the quota is counted the id is consumed and stays `pending` until `completed` — never resumed) / `completed` (draft created) / `failed` (released before anything was consumed — quota refused — the id may be retried) |
+| generation_id | uuid nullable → social_content_generations(id) ON DELETE SET NULL | the created draft; required when `completed` |
+| created_at / updated_at | timestamptz NOT NULL DEFAULT now() | a `pending` row older than 120 s (`DRAFT_REQUEST_STALE_MS`) is reported `request_expired` — never taken over (its AI call may still run or be billed) |
+
+Take-over of a `failed` row only: ONE conditional UPDATE (`status = 'failed'`), re-checked under the row lock — two take-overs cannot both succeed. A request id is billed at most once: a save error after a successful AI call is retried in place (up to 3 inserts, no new AI call) and the id stays consumed. Any other reservation error fails closed (no generation).
+
+RLS `Users access own draft creation requests` (FOR ALL): `user_id = auth.uid()`; WITH CHECK also requires the parent (and the generated draft) to be the caller's own Facebook rows. `GRANT SELECT, INSERT, UPDATE` to `authenticated`. Queries (`supabaseDraftRequestStore`, `lib/queries/facebook-article-posts.ts`) also filter on `user_id`.
 
 ---
 

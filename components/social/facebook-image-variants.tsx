@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, ImagePlus, Loader2 } from 'lucide-react';
+import { Check, FilePlus2, ImagePlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { generateFacebookImageVariants, selectFacebookImage } from '@/components/social/facebook-requests';
+import { createFacebookPostFromImage, generateFacebookImageVariants, selectFacebookImage } from '@/components/social/facebook-requests';
 import {
   FACEBOOK_IMAGE_VARIANT_MAX,
   FACEBOOK_VARIANT_ANGLES,
@@ -16,6 +17,7 @@ import {
   type FacebookImageVariant,
   type GenerateVariantsResult,
 } from '@/lib/social/facebook-image-variants';
+import { DERIVED_POST_COST_TEXT } from '@/lib/social/facebook-article-posts';
 import type { SocialContentGeneration } from '@/lib/social/social-content';
 import { cn } from '@/lib/utils';
 
@@ -24,14 +26,23 @@ interface FacebookImageVariantsProps {
   variants: FacebookImageVariant[];
   /** Migration 050 not applied: the feature is hidden behind a notice. */
   unavailable: boolean;
-  /** The post is scheduled, being published or on Facebook: the image cannot change. */
+  /** The post is scheduled, being published or on Facebook: its own image cannot change. */
   locked: boolean;
+}
+
+type DerivedResult = { draft: SocialContentGeneration; reused: boolean };
+
+/** One id per confirmation: a double click or a network retry sends the same id (no duplicate post). */
+function newRequestId(): string {
+  return globalThis.crypto.randomUUID();
 }
 
 /**
  * Image of a Facebook draft (TASK-101): the WordPress article image (default)
  * or one of the variants the person explicitly generated. Generating never
- * changes the selected image and never publishes anything.
+ * changes the selected image and never publishes anything — it stays
+ * possible on a published or scheduled post. Every image can start a new,
+ * independent post of the same article ("Create new post with this image").
  */
 export function FacebookImageVariants({ item, variants: initialVariants, unavailable, locked }: FacebookImageVariantsProps) {
   const router = useRouter();
@@ -39,9 +50,12 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
   const [selectedId, setSelectedId] = useState<string | null>(item.selected_image_variant_id ?? null);
   const [count, setCount] = useState(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [busy, setBusy] = useState<'generate' | string | null>(null);
+  const [busy, setBusy] = useState<'generate' | 'derive' | string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  // "Create new post with this image" dialog.
+  const [derive, setDerive] = useState<{ variantId: string | null; label: string; requestId: string } | null>(null);
+  const [created, setCreated] = useState<{ id: string; label: string; reused: boolean } | null>(null);
   const wordpress = wordpressImageOf(item);
 
   if (unavailable) {
@@ -63,11 +77,11 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
       setError(response.error?.message ?? 'The images could not be generated.');
       return;
     }
-    const { variants: created, failures, unitsUsed } = response.data;
-    setVariants((current) => [...created, ...current]);
-    const summary = `${created.length} of ${unitsUsed} image${unitsUsed > 1 ? 's' : ''} generated (${unitsUsed} image call${unitsUsed > 1 ? 's' : ''} counted). The post image did not change.`;
+    const { variants: generated, failures, unitsUsed } = response.data;
+    setVariants((current) => [...generated, ...current]);
+    const summary = `${generated.length} of ${unitsUsed} image${unitsUsed > 1 ? 's' : ''} generated (${unitsUsed} image call${unitsUsed > 1 ? 's' : ''} counted). The post image did not change.`;
     setResult(failures.length ? `${summary} Failed: ${failures.map((f) => `#${f.position} ${f.angle}`).join(', ')}.` : summary);
-    if (created.length) toast.success('Image variants ready — choose one to use it.');
+    if (generated.length) toast.success('Image variants ready.');
     else toast.error('No image could be generated.');
   }
 
@@ -85,7 +99,24 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
     router.refresh();
   }
 
-  const option = (key: string, url: string | null, label: string, active: boolean, onUse: () => void, testId: string) => (
+  async function createPost() {
+    if (!derive || busy) return;
+    const { variantId, label, requestId } = derive;
+    setBusy('derive');
+    setError(null);
+    const response = await createFacebookPostFromImage<DerivedResult>(item.id, variantId, requestId);
+    setBusy(null);
+    setDerive(null);
+    if (!response.data) {
+      setError(response.error?.message ?? 'The new post could not be written.');
+      return;
+    }
+    setCreated({ id: response.data.draft.id, label, reused: response.data.reused });
+    toast.success(response.data.reused ? 'This post was already created.' : 'New draft created — nothing was published.');
+    router.refresh();
+  }
+
+  const option = (key: string, url: string | null, label: string, active: boolean, onUse: () => void, variantId: string | null, testId: string) => (
     <div key={key} className={cn('space-y-2 rounded-lg border p-2', active ? 'border-primary ring-1 ring-primary' : 'border-border/60')} data-testid={testId}>
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -96,12 +127,26 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
       <p className="text-xs font-medium">{label}</p>
       {active ? (
         <p className="flex items-center gap-1 text-xs text-primary">
-          <Check className="h-3.5 w-3.5" /> Used for the post
+          <Check className="h-3.5 w-3.5" /> Used for this post
         </p>
       ) : (
         <Button type="button" size="sm" variant="outline" className="w-full" disabled={locked || busy !== null} onClick={onUse}>
           {busy === key ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Use this image
+        </Button>
+      )}
+      {url && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="w-full"
+          disabled={busy !== null}
+          onClick={() => setDerive({ variantId, label, requestId: newRequestId() })}
+          data-testid="facebook-create-post-from-image"
+        >
+          <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
+          Create new post with this image
         </Button>
       )}
     </div>
@@ -113,7 +158,7 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
         <h3 id="facebook-image-title" className="text-sm font-semibold">
           Post image
         </h3>
-        <Button type="button" size="sm" variant="outline" disabled={locked || busy !== null} onClick={() => setConfirmOpen(true)}>
+        <Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => setConfirmOpen(true)}>
           {busy === 'generate' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1.5 h-3.5 w-3.5" />}
           Generate image variants
         </Button>
@@ -125,18 +170,21 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
           {result}
         </Alert>
       )}
+      {created && (
+        <Alert variant="success" role="status" data-testid="facebook-derived-post-created">
+          {created.reused ? 'This post had already been created' : 'New draft created'} with the image &quot;{created.label}&quot;. Nothing was published.{' '}
+          <Link href={`/facebook/${created.id}`} className="font-medium underline">
+            Open the new post
+          </Link>
+        </Alert>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {option('wordpress', wordpress.url, 'WordPress image (default)', selectedId === null, () => choose(null), 'facebook-image-option-wordpress')}
-        {variants.map((variant) =>
-          option(
-            variant.id,
-            variant.image_url,
-            FACEBOOK_VARIANT_ANGLES.find((angle) => angle.id === variant.angle)?.label ?? 'Variant',
-            selectedId === variant.id,
-            () => choose(variant.id),
-            'facebook-image-option-variant'
-          )
-        )}
+        {option('wordpress', wordpress.url, 'WordPress image (default)', selectedId === null, () => choose(null), null, 'facebook-image-option-wordpress')}
+        {variants.map((variant) => {
+          const angle = FACEBOOK_VARIANT_ANGLES.find((a) => a.id === variant.angle)?.label ?? 'Variant';
+          const label = variant.social_content_generation_id === item.id ? angle : `${angle} (from the earlier post)`;
+          return option(variant.id, variant.image_url, label, selectedId === variant.id, () => choose(variant.id), variant.id, 'facebook-image-option-variant');
+        })}
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -145,7 +193,7 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
             <DialogTitle>Generate image variants</DialogTitle>
             <DialogDescription>
               New vertical (4:5) images for this post, from its title and text. Generating does not change the post image and publishes
-              nothing — you choose afterwards.
+              nothing — even when the post is already published or scheduled.
             </DialogDescription>
           </DialogHeader>
           <fieldset className="space-y-2">
@@ -169,6 +217,31 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
             </Button>
             <Button type="button" onClick={generate}>
               Generate {count} image{count > 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={derive !== null} onOpenChange={(open) => (!open && busy !== 'derive' ? setDerive(null) : undefined)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create a new post with this image?</DialogTitle>
+            <DialogDescription>
+              A new, separate draft for the same article: its own text, call to action and first comment, written from the article for the image
+              &quot;{derive?.label}&quot;. This post stays exactly as it is{locked ? ' (it is already published or scheduled)' : ''}. Nothing is published or
+              scheduled — you review the new draft first.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm" data-testid="facebook-derived-post-cost">
+            {DERIVED_POST_COST_TEXT}
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={busy === 'derive'} onClick={() => setDerive(null)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={busy === 'derive'} onClick={createPost}>
+              {busy === 'derive' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+              Write the new post
             </Button>
           </DialogFooter>
         </DialogContent>

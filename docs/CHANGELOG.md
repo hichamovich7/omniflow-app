@@ -18,6 +18,14 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Facebook — a new post from each image — TASK-101 extension / TASK-103 (2026-11-18)
+
+* **New "Create new post with this image"** on every image of a Facebook post (the WordPress image and the generated variants), even when the post is already published or scheduled: OmniFlow writes a new, separate draft of the same article — its own text, call to action and first comment, written from the article for that image's angle and different from the earlier posts. The image is reused: no image generation. The dialog shows the cost before you confirm (1 text generation, counted like "Generate Facebook post").
+* The original post never changes. Each draft is edited, published or scheduled on its own; several posts of one article can go to the same Page, and retrying one post never posts it twice. A double click creates one post only.
+* **Generate image variants** is now available on published or scheduled posts too (it never changes them).
+* History: **Group by article** on `/facebook`, and "Posts from this article" on each post — image, text, Page, date, status and Facebook link.
+* Migration **051** (`derived_from_generation_id`, `origin_image_variant_id`, `visual_angle`, `creation_request_id`, ownership trigger) — applied. Migration **052** (`social_draft_creation_requests`: the request is reserved before any quota or AI call — two identical clicks cost one text generation at most; the second shows "This post is still being written…"; one request is never charged twice, even after a timeout or a save error) — applied.
+
 ### Facebook — image variants for a draft — TASK-101 (2026-11-15)
 
 * **New "Post image"** on a Facebook post: the WordPress article image stays the default; **Generate image variants** creates 1, 2 or 3 new vertical (4:5) images from the post's title and text (hero shot, lifestyle scene, close-up detail). The dialog shows how many image calls will be counted before you confirm.

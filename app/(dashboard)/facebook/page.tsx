@@ -13,6 +13,7 @@ import { MediumHistoryFilters } from '@/components/social/medium-history-filters
 import { SocialContentMeta } from '@/components/social/social-content-meta';
 import { NewFacebookPost } from '@/components/social/new-facebook-post';
 import { FacebookConnections } from '@/components/social/facebook-connections';
+import { facebookStatusBadgeVariant, PublicationFacts } from '@/components/social/facebook-article-posts';
 import {
   listMediumArticleOptions,
   listMediumPinterestOptions,
@@ -24,6 +25,8 @@ import { listPublicationsForGenerations } from '@/lib/queries/social-publication
 import { contentPreview, parseSocialContentFilters, SOCIAL_CONTENT_PAGE_SIZE } from '@/lib/social/social-content';
 import { FACEBOOK_DISPLAY_STATUS_LABELS, facebookDisplayStatus } from '@/lib/social/facebook-publication';
 import { formatScheduledTime } from '@/lib/social/schedule-time';
+import { groupByArticle, VISUAL_ANGLE_LABELS } from '@/lib/social/facebook-article-posts';
+import type { SocialContentListItem } from '@/lib/queries/social-content';
 import { getMetaConfig, hasSocialTokenKey } from '@/lib/social/meta/config';
 import { isValidUuid } from '@/lib/utils/uuid';
 import { cn } from '@/lib/utils';
@@ -64,6 +67,62 @@ export default async function FacebookPage({
   const totalPages = Math.max(1, Math.ceil(total / SOCIAL_CONTENT_PAGE_SIZE));
   const hasFilters = Boolean(filters.project || filters.source || filters.period || filters.status);
   const connectStatus = params.connect === 'select' || params.connect === 'error' ? params.connect : null;
+  // TASK-101 extension / TASK-103: the history can be grouped by article (several posts per article).
+  const grouped = params.group === 'article';
+  const toggleParams = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[0] !== 'group')
+  );
+  if (!grouped) toggleParams.set('group', 'article');
+  const toggleHref = `/facebook${toggleParams.size ? `?${toggleParams.toString()}` : ''}`;
+
+  const card = (item: SocialContentListItem, headingLevel: 'h3' | 'h4') => {
+    const publication = publications[item.id] ?? null;
+    const status = facebookDisplayStatus(publication);
+    const Heading = headingLevel;
+    return (
+      <li key={item.id} className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
+        <div className="flex gap-4">
+          {item.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.image_url}
+              alt={item.image_alt ?? ''}
+              className="hidden h-20 w-28 shrink-0 rounded-lg border border-border/60 object-cover sm:block"
+              loading="lazy"
+            />
+          )}
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Heading className="text-base font-semibold">
+                <Link href={`/facebook/${item.id}`} className="hover:underline">
+                  {item.title}
+                </Link>
+              </Heading>
+              <Badge variant={facebookStatusBadgeVariant(status)} data-testid="facebook-history-status">
+                {FACEBOOK_DISPLAY_STATUS_LABELS[status]}
+              </Badge>
+              {item.visual_angle && <Badge variant="outline">{VISUAL_ANGLE_LABELS[item.visual_angle]}</Badge>}
+              {status === 'scheduled' && publication?.scheduled_at && (
+                <span className="text-xs text-muted-foreground" data-testid="facebook-history-scheduled-time">
+                  {formatScheduledTime(publication.scheduled_at, publication.scheduled_timezone)}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">{contentPreview(item.content_markdown)}</p>
+            <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-testid="facebook-history-publication">
+              <PublicationFacts publication={publication} />
+            </p>
+            <SocialContentMeta item={item} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <Link href={`/facebook/${item.id}`} className={cn(buttonVariants({ size: 'sm' }))}>
+            Open
+          </Link>
+        </div>
+      </li>
+    );
+  };
 
   return (
     <PageContainer>
@@ -93,7 +152,12 @@ export default async function FacebookPage({
 
       <NewFacebookPost articles={articleOptions} sites={siteOptions} pinterest={pinterestOptions} />
 
-      <h2 className="text-base font-semibold">History</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold">History</h2>
+        <Link href={toggleHref} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))} data-testid="facebook-history-group-toggle">
+          {grouped ? 'Show as a list' : 'Group by article'}
+        </Link>
+      </div>
       <MediumHistoryFilters projects={projects ?? []} basePath="/facebook" />
 
       {items.length === 0 ? (
@@ -115,62 +179,22 @@ export default async function FacebookPage({
         </EmptyState>
       ) : (
         <>
-          <ul className="space-y-4" data-testid="facebook-history-list">
-            {items.map((item) => {
-              const publication = publications[item.id] ?? null;
-              const status = facebookDisplayStatus(publication);
-              return (
-                <li key={item.id} className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-5">
-                  <div className="flex gap-4">
-                    {item.image_url && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.image_url}
-                        alt={item.image_alt ?? ''}
-                        className="hidden h-20 w-28 shrink-0 rounded-lg border border-border/60 object-cover sm:block"
-                        loading="lazy"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-semibold">
-                          <Link href={`/facebook/${item.id}`} className="hover:underline">
-                            {item.title}
-                          </Link>
-                        </h3>
-                        <Badge
-                          variant={
-                            status === 'published' || status === 'comment_published'
-                              ? 'success'
-                              : status === 'failed'
-                                ? 'danger'
-                                : status === 'partial' || status === 'unknown'
-                                  ? 'warning'
-                                  : 'outline'
-                          }
-                          data-testid="facebook-history-status"
-                        >
-                          {FACEBOOK_DISPLAY_STATUS_LABELS[status]}
-                        </Badge>
-                        {status === 'scheduled' && publication?.scheduled_at && (
-                          <span className="text-xs text-muted-foreground" data-testid="facebook-history-scheduled-time">
-                            {formatScheduledTime(publication.scheduled_at, publication.scheduled_timezone)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{contentPreview(item.content_markdown)}</p>
-                      <SocialContentMeta item={item} />
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <Link href={`/facebook/${item.id}`} className={cn(buttonVariants({ size: 'sm' }))}>
-                      Open
-                    </Link>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          {grouped ? (
+            <div className="space-y-6" data-testid="facebook-history-groups">
+              {groupByArticle(items).map((group) => (
+                <section key={group.key} className="space-y-3" data-testid="facebook-history-group">
+                  <h3 className="text-sm font-semibold">
+                    {group.title} <span className="font-normal text-muted-foreground">· {group.items.length} post{group.items.length > 1 ? 's' : ''}</span>
+                  </h3>
+                  <ul className="space-y-4">{group.items.map((item) => card(item, 'h4'))}</ul>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-4" data-testid="facebook-history-list">
+              {items.map((item) => card(item, 'h3'))}
+            </ul>
+          )}
           <Pagination basePath="/facebook" currentPage={filters.page} totalPages={totalPages} searchParams={params} />
         </>
       )}

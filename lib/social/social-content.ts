@@ -68,6 +68,15 @@ export interface SocialContentGeneration {
   source_image_alt?: string | null;
   /** The variant currently in image_url — null = the WordPress image (or none). */
   selected_image_variant_id?: string | null;
+  // Posts created from an image (TASK-101 extension / TASK-103, migration 051) — absent before it.
+  /** The draft whose image was reused to create this one. */
+  derived_from_generation_id?: string | null;
+  /** The reused variant — null = the WordPress image (or an ordinary draft). */
+  origin_image_variant_id?: string | null;
+  /** The visual angle the text was written for. */
+  visual_angle?: 'wordpress' | 'hero' | 'lifestyle' | 'detail' | null;
+  /** Idempotency key of the creation request (a repeated request returns this draft). */
+  creation_request_id?: string | null;
   created_at: string;
   updated_at: string;
 }

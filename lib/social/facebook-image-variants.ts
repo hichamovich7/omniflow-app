@@ -9,13 +9,16 @@ import type { SocialPublication } from '@/lib/social/facebook-publication';
  *
  * Rules:
  * - Generating never changes the selected image; only selectFacebookImage().
+ *   It stays possible on a published or scheduled post (the new images can
+ *   start new posts — lib/social/facebook-derived-posts.ts), whose content is
+ *   never touched.
  * - Nothing here calls Meta or WordPress, or writes `social_publications`.
  * - The trial quota is reserved (1 unit per image call, all or nothing)
  *   before the first paid call.
  * - Partial failure: the successful variants are kept and returned with the
  *   failed positions.
- * - Generation and selection are refused while the post is scheduled,
- *   being published or already on Facebook.
+ * - Selection is refused while the post is scheduled, being published or
+ *   already on Facebook.
  *
  * Client-safe: type-only imports; the server wiring (AI, optimisation,
  * storage, database) is injected by the routes.
@@ -34,6 +37,9 @@ export interface VariantAngle {
   label: string;
   direction: string;
 }
+
+/** The angle a post's text is written for: one of the variant angles, or the article's own image. */
+export type FacebookVisualAngle = 'wordpress' | VariantAngle['id'];
 
 /** Distinct visual angles, used in this order (1 → hero, 2 → + lifestyle, 3 → + detail). */
 export const FACEBOOK_VARIANT_ANGLES: readonly VariantAngle[] = [
@@ -94,7 +100,7 @@ export const IMAGE_VARIANT_ERROR_STATUS: Record<ImageVariantErrorCode, number> =
 };
 
 export const IMAGE_LOCKED_MESSAGE =
-  'This post is scheduled, being published or already on Facebook: its image can no longer be changed. Cancel the schedule first to change it.';
+  'This post is scheduled, being published or already on Facebook: its image can no longer be changed (cancel the schedule first). You can still generate images and create a new post with any of them.';
 
 export class ImageVariantError extends Error {
   readonly status: number;
@@ -108,7 +114,7 @@ export class ImageVariantError extends Error {
   }
 }
 
-/** True when the draft's image must not change (generation and selection refused). */
+/** True when the draft's image must not change (selection refused; generation stays possible). */
 export function imageChangeLocked(publication: Pick<SocialPublication, 'status'> | null): boolean {
   return Boolean(publication && IMAGE_LOCKED_STATUSES.includes(publication.status));
 }
@@ -174,7 +180,8 @@ export interface GenerateVariantsDeps {
 export type DraftForVariants = Pick<
   SocialContentGeneration,
   'id' | 'user_id' | 'platform' | 'title' | 'content_markdown' | 'image_url' | 'image_alt' | 'source_image_url' | 'source_image_alt' | 'selected_image_variant_id'
->;
+> &
+  Partial<Pick<SocialContentGeneration, 'origin_image_variant_id'>>;
 
 export interface VariantFailure {
   position: number;
@@ -200,12 +207,13 @@ export async function generateFacebookImageVariants(
   input: { draft: DraftForVariants | null; publication: Pick<SocialPublication, 'status'> | null; count: number },
   deps: GenerateVariantsDeps
 ): Promise<GenerateVariantsResult> {
-  const { draft, publication, count } = input;
+  // `publication` is not a reason to refuse: generating never changes the post
+  // (published, scheduled or not) — only an explicit selection does.
+  const { draft, count } = input;
   assertDraft(draft);
   if (!Number.isInteger(count) || count < 1 || count > FACEBOOK_IMAGE_VARIANT_MAX) {
     throw new ImageVariantError('invalid_count', `Choose between 1 and ${FACEBOOK_IMAGE_VARIANT_MAX} images.`);
   }
-  if (imageChangeLocked(publication)) throw new ImageVariantError('image_locked', IMAGE_LOCKED_MESSAGE);
 
   // Quota first: nothing is generated unless every call of the request is counted.
   const reservation = await deps.reserveUnits(count);
@@ -282,7 +290,7 @@ export async function selectFacebookImage(
     patch = { image_url: draft.source_image_url ?? null, image_alt: draft.source_image_alt ?? null, selected_image_variant_id: null };
   } else {
     const variant = await deps.store.getVariant(variantId);
-    if (!variant || variant.user_id !== draft.user_id || variant.social_content_generation_id !== draft.id) {
+    if (!variant || !variantUsableBy(variant, draft)) {
       throw new ImageVariantError('variant_not_found', 'This image does not belong to this post.');
     }
     if (current === variant.id) return draft;
@@ -299,9 +307,24 @@ export async function selectFacebookImage(
   return updated;
 }
 
+/**
+ * A variant this draft may use: its own, or — for a post created from an
+ * image (TASK-101 / TASK-103) — the variant it was created with. Always of
+ * the same user.
+ */
+export function variantUsableBy(
+  variant: Pick<FacebookImageVariant, 'id' | 'user_id' | 'social_content_generation_id'>,
+  draft: Pick<DraftForVariants, 'id' | 'user_id' | 'origin_image_variant_id'>
+): boolean {
+  if (variant.user_id !== draft.user_id) return false;
+  return variant.social_content_generation_id === draft.id || (Boolean(draft.origin_image_variant_id) && variant.id === draft.origin_image_variant_id);
+}
+
 /** The WordPress image of a draft (what "Use the WordPress image" restores). */
-export function wordpressImageOf(draft: Pick<DraftForVariants, 'image_url' | 'image_alt' | 'source_image_url' | 'source_image_alt' | 'selected_image_variant_id'>) {
-  return draft.selected_image_variant_id
+export function wordpressImageOf(
+  draft: Pick<DraftForVariants, 'image_url' | 'image_alt' | 'source_image_url' | 'source_image_alt' | 'selected_image_variant_id' | 'origin_image_variant_id'>
+) {
+  return draft.selected_image_variant_id || draft.origin_image_variant_id
     ? { url: draft.source_image_url ?? null, alt: draft.source_image_alt ?? null }
     : { url: draft.image_url, alt: draft.image_alt };
 }

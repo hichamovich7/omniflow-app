@@ -1925,3 +1925,25 @@ TASK-101 lets the person generate 1 to 3 alternative images for a Facebook draft
 * Migration 050 is required before the feature works (the page shows a notice otherwise).
 * A failed image still counts (the call was launched); the person sees the result per image.
 * The image cannot change while the post is scheduled, publishing, published or partial.
+
+---
+
+## A new Facebook post from an existing image: new draft row, image by reference, request id (TASK-101 extension / TASK-103, 2026-11-18)
+
+### Context
+
+A Facebook post published with the WordPress image can have generated variants; each image should be able to start a new, independent post of the same article, without touching what was already published or scheduled.
+
+### Decision Taken
+
+* A new post is a **new row** in `social_content_generations` (same project and article source), never a change of the original draft. Article → drafts → publications stay distinct: `social_publications` keeps UNIQUE (draft, Page), so several drafts of one article can be published on the same Page and a retry of one draft never posts twice.
+* The image is reused **by reference** (`image_url` + `origin_image_variant_id`): no image call, no file copy; the variant stays on its original draft. The new draft may select that origin variant (`variantUsableBy`).
+* The text is written again **from the article** (re-read) for the image's visual angle, with the earlier posts of the article as `<previous_posts>` and a distinctness check — not a copy of the earlier text. Existing text limits apply (1 unit per request).
+* Idempotency by a **request id** generated once per confirmation (partial UNIQUE `(user_id, creation_request_id)`), checked before the quota and the AI call.
+* Ownership checked in the route and by a database trigger on the image reference columns (migration 051; 050 unchanged).
+* Generating images is allowed on a published or scheduled post (it never changes it); selecting an image stays locked there.
+
+### Consequences
+
+* Migration 051 is required for the new action (503 otherwise).
+* Update 2026-11-18 (before the first push): the request id is **reserved atomically before the quota and any AI call** (`social_draft_creation_requests`, migration 052 — 051 is applied and not modified), so two simultaneous identical requests cost at most one text generation; the second is told the post is still being written. Without 052 the action fails closed (503). A request id is billed at most once: released only when nothing was consumed (quota refused); a `pending` reservation is never taken over (stale → `request_expired`) because nothing proves the first AI call has stopped; a save error after a successful AI call is retried in place without a new AI call.

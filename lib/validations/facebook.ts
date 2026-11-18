@@ -89,6 +89,20 @@ export const facebookImageVariantsSchema = z
   })
   .strict();
 
+/**
+ * POST /api/social/generations/[id]/derived-posts (TASK-101 extension /
+ * TASK-103) — a new post with an existing image of this draft (`null` = its
+ * WordPress image). `requestId` is generated once per confirmation: a
+ * repeated request returns the post already created.
+ */
+export const facebookDerivedPostSchema = z
+  .object({
+    variantId: z.string().uuid('Invalid image').nullable(),
+    requestId: z.string().uuid('Invalid request'),
+    confirm: z.literal(true, { message: 'Confirm the new post first' }),
+  })
+  .strict();
+
 /** PATCH /api/social/generations/[id]/image (TASK-101) — a variant of this draft, or null for the WordPress image. */
 export const facebookImageSelectionSchema = z
   .object({

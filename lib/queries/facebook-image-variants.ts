@@ -42,17 +42,23 @@ export function supabaseVariantStore(supabase: SupabaseClient, userId: string): 
   };
 }
 
-/** The draft's variants, newest batch first. `unavailable` when migration 050 is not applied. */
+/**
+ * The draft's variants, newest batch first — plus, for a post created from
+ * an image (migration 051), the variant it was created with (it stays on its
+ * original draft). `unavailable` when migration 050 is not applied.
+ */
 export async function listImageVariants(
   supabase: SupabaseClient,
   userId: string,
-  generationId: string
+  generationId: string,
+  originVariantId: string | null = null
 ): Promise<{ variants: FacebookImageVariant[]; unavailable: boolean }> {
-  const { data, error } = await supabase
-    .from('social_content_image_variants')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('social_content_generation_id', generationId)
+  const base = supabase.from('social_content_image_variants').select('*').eq('user_id', userId);
+  const scoped =
+    originVariantId && /^[0-9a-f-]{36}$/i.test(originVariantId)
+      ? base.or(`social_content_generation_id.eq.${generationId},id.eq.${originVariantId}`)
+      : base.eq('social_content_generation_id', generationId);
+  const { data, error } = await scoped
     .order('created_at', { ascending: false })
     .order('position', { ascending: true })
     .limit(30);

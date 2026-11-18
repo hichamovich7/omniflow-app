@@ -1345,6 +1345,41 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Facebook posts from an image (TASK-101 extension / TASK-103, 2026-11-18)
+
+```bash
+npx playwright test tests/renderer/facebook-derived-posts.spec.ts tests/renderer/facebook-image-variants.spec.ts tests/renderer/facebook-scheduling.spec.ts tests/renderer/facebook-content.spec.ts --project=renderer --reporter=list
+```
+
+Offline, `tests/renderer/facebook-derived-posts.spec.ts` (21) — the article is read through a fake Supabase + fake WordPress fetch (same loaders as "Generate Facebook post"), the AI is a fake that writes for the angle it is asked, drafts / variants / publications are in memory, Meta is a fake Graph client; the deps contain no image model:
+
+* Two existing images (Hero shot, Lifestyle scene) of a **published** post → two independent drafts: distinct texts, CTAs and first comments, angles `hero` / `lifestyle`, `image_url` = the variant, same project / article, `derived_from_generation_id` = the original; the article re-read twice; prompts carry the angle and `<previous_posts>` (the original, then the first new post); **0 image call**; the original draft, its publication and its variants byte-identical.
+* The WordPress image can start a post (`visual_angle` wordpress); a text-only draft → `no_image`. A new post can go back to the WordPress image, re-select the variant it came from (which stays on the original draft) and start yet another post from it.
+* History: the 3 posts grouped under one article key, the other article apart. The hero draft is published on the **same Page** as the original (its variant is the `POST /photos` url); publishing it again → conflict, 1 photo post; the lifestyle draft is scheduled on its own (TASK-100 unchanged); the original publication unchanged.
+* Repeated requests: same request id twice → same draft, 1 quota check, 1 AI write, 1 insert. **Two identical requests at the same time**: the first reserves the id and is held while writing; the second gets `409 request_in_progress` (explicit message) **before** the quota and the AI (quota 1, write 1); once the first finishes, the same id returns its draft — one draft, one billed text generation. Five identical requests at once → exactly one passes the reservation. Quota refused → the id is released (`failed`, nothing consumed) and the same request can be retried. **After 120 s a still-running request is never taken over**: the late identical request gets `409 request_expired`, no second quota unit and no second AI call, and the slow first call still saves its draft. An AI error consumes the id (`in_progress`, then `expired` — never a new AI call). **Save error after a successful AI call**: retried in place (2 transient errors → saved, 1 AI call, 3 inserts); if it keeps failing → `save_failed`, the id stays consumed and the same request never calls the AI again. An id used for another draft → `409 request_reused`; a new id → a new post on purpose.
+* Ownership: another user (draft not loaded, or user mismatch) → not found; a variant of another user, of another draft or unknown → `variant_not_found` — all before quota and AI. Quota refused → no article read, no AI, no insert; deleted source → refused before the quota.
+* Generator: without options the TASK-068 prompt is unchanged; with options it adds the angle and the earlier posts (URLs stripped); a near-copy is sent back once and the distinct answer accepted.
+* Source checks: route (auth, uuid, Zod, own draft, `social/facebook-post` limits with the trial cap; no image, Meta or `social_publications`), the core checks the request id before the quota and the quota before the article read; migration 051 (columns, partial UNIQUE index, trigger, no 049 file, **050 byte-identical to the committed version**); migration 052 (reservation table, PRIMARY KEY (user_id, request_id), status CHECK, RLS; **051 and 052 pinned by their SHA-256** — both applied, they must not change); only a `failed` reservation is taken over, a stale `pending` one answers `expired`, `failRequest` only before the article read / AI call; the reservation is called before the quota and the AI; the Supabase store's INSERT-then-conditional-UPDATE and fail-closed path; UI labels, cost text, request id per confirmation, generation allowed when locked, history toggle, "Posts from this article".
+
+`facebook-image-variants.spec.ts`: the lock rule now refuses selection only (generation allowed on scheduled / publishing / published / partial, post unchanged); the "draft flow has no image path" check accepts the type import of the visual angles.
+
+**Results 2026-11-18 (offline, final — billed-once rule):** `facebook-derived-posts.spec.ts` 21/21; full renderer **1869/1869**; TypeScript, `next build`, ESLint, `git diff --check` pass. Previous run (atomic reservation): 18/18; full renderer **1866/1866** on the rerun (pinterest-composer included; the earlier run had 1 render failure in `pinterest-composer.spec.ts` that passed alone). Earlier run: Facebook + media + Studio suites 147/147 before the new file; full renderer 1862/1863 — the one failure (`pinterest-composer.spec.ts` "older Step-by-step v2 Pins … render") passes alone (42/42) and touches no changed file (rendering under full-suite load); TypeScript, ESLint (touched files), `next build`, `git diff --check` pass. No real AI call, publication or schedule made by the agent; the manual test is done by the founder after the deployment.
+
+**Real validation (founder, after the deployment — migrations 051 and 052 applied 2026-11-18; 2 text generations; no image generation, no publication, no schedule):**
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | Open the published post of the real case (two variants: Hero shot, Lifestyle scene) | Status Published; "Post image": WordPress image used, the two variants; "Use this image" disabled; "Create new post with this image" on the three cards | ☐ |
+| 2 | **Create new post with this image** on "Hero shot" → read the dialog → **Write the new post** | Cost line shown before confirmation; success "New draft created … Open the new post"; trial counter +1; no image generated | ☐ |
+| 3 | Same on "Lifestyle scene" | Second draft; trial counter +1 | ☐ |
+| 4 | Open both new drafts, reload | Persisted; images = Hero / Lifestyle; texts, CTA and first comment clearly different from each other and from the original; not published | ☐ |
+| 5 | Back on the original post | Content, image, publication and Facebook link unchanged; "Posts from this article (3)" lists the 3 posts | ☐ |
+| 6 | `/facebook` → **Group by article** | The 3 posts under one article heading with Page / date / status / link | ☐ |
+
+Record the date and results here and in TASKS.md (TASK-101 extension). Steps that publish or schedule the new drafts are out of this validation.
+
+---
+
 # Facebook image variants (TASK-101, 2026-11-15)
 
 ```bash

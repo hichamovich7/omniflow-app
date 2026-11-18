@@ -104,3 +104,12 @@ export function generateFacebookImageVariants<T>(id: string, count: number) {
 export function selectFacebookImage<T>(id: string, variantId: string | null) {
   return call<T>(`/api/social/generations/${id}/image`, { method: 'PATCH', body: JSON.stringify({ variantId }) }, 'The image could not be changed.');
 }
+
+/**
+ * TASK-101 extension / TASK-103 — a new, separate draft of the same article with an existing image
+ * (`null` = the WordPress image). One text generation; no image call; never publishes.
+ * `requestId` is created once per confirmation, so a repeated request returns the same draft.
+ */
+export function createFacebookPostFromImage<T>(id: string, variantId: string | null, requestId: string) {
+  return call<T>(`/api/social/generations/${id}/derived-posts`, post({ variantId, requestId, confirm: true }), 'The new post could not be written.');
+}

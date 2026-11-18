@@ -225,7 +225,8 @@ test.describe('Default: the WordPress image, no AI call', () => {
     expect(publicationContent(draft, CONNECTION).post_image_url).toBe(WP_IMAGE);
     // Creating / editing a Facebook draft has no image generation path.
     for (const file of ['lib/social/facebook-post.ts', 'app/api/social/facebook-post/route.ts', 'app/api/social/generations/[id]/route.ts']) {
-      expect(read(file), file).not.toMatch(/generateImage|image-variants/);
+      // (a type import of the visual angles is fine: no generation code path)
+      expect(read(file), file).not.toMatch(/generateImage|generateFacebookImageVariants|image-variants-route/);
     }
   });
 
@@ -437,20 +438,23 @@ test.describe('Access control', () => {
 });
 
 test.describe('Locked once the post is engaged', () => {
-  test('scheduled / publishing / published / partial: generation and selection refused, nothing called', async () => {
+  test('scheduled / publishing / published / partial: selection refused; generation allowed and never changes the post', async () => {
     for (const status of ['scheduled', 'publishing', 'published', 'partial'] as const) {
       const db = memory();
       const { deps, calls, reservations } = fakeDeps(db);
       expect(imageChangeLocked(publication(status))).toBe(true);
-      await expect(
-        generateFacebookImageVariants({ draft: db.drafts.get(DRAFT)!, publication: publication(status), count: 1 }, deps)
-      ).rejects.toMatchObject({ code: 'image_locked', status: 409 });
-      await expect(
-        selectFacebookImage({ draft: db.drafts.get(DRAFT)!, publication: publication(status), variantId: null }, { store: db.store(USER) })
-      ).rejects.toMatchObject({ code: 'image_locked' });
-      expect(reservations).toEqual([]);
-      expect(calls).toHaveLength(0);
+      // Selection: refused, nothing written.
+      const variants = await generateFacebookImageVariants({ draft: db.drafts.get(DRAFT)!, publication: publication(status), count: 1 }, deps);
+      for (const variantId of [null, variants.variants[0].id]) {
+        await expect(
+          selectFacebookImage({ draft: db.drafts.get(DRAFT)!, publication: publication(status), variantId }, { store: db.store(USER) })
+        ).rejects.toMatchObject({ code: 'image_locked', status: 409 });
+      }
+      // Generation (extension of TASK-101): allowed — new images for new posts; the post itself is untouched.
+      expect(reservations).toEqual([1]);
+      expect(calls).toHaveLength(1);
       expect(db.draftUpdates).toHaveLength(0);
+      expect(db.drafts.get(DRAFT)).toMatchObject({ image_url: WP_IMAGE, selected_image_variant_id: null });
     }
     for (const status of ['failed', 'cancelled', 'unknown'] as const) expect(imageChangeLocked(publication(status))).toBe(false);
     expect(imageChangeLocked(null)).toBe(false);
