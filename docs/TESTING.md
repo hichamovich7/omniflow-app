@@ -1360,7 +1360,7 @@ Offline, `tests/renderer/facebook-scheduling.spec.ts` (33) — the Meta Graph AP
 * Publish now non-regression: first publication unchanged; a scheduled post cannot be published now (cancel first); after a cancel, "Publish now" sends the current text once; actions of `failed` / `unknown` / `partial` unchanged. `facebook-content.spec.ts` (31, TASK-068) passes; its test 21 now expects "Retry" of a timed-out post not found on the Page to stay `unknown` without posting again (was: post again).
 * Source checks: the schedule store filters on `user_id` + current status + no post; cron secret compared in constant time, `/api/cron/` exempted from the session proxy, `vercel.json` never declares the route (external trigger), `CRON_SECRET` in `.env.example`; routes (auth, ownership, confirmation, rate limit, Page of the project, no token read when scheduling); migration 048; UI fields.
 
-**Manual test (founder approval required — real posts on a test Page; prerequisites: migration 048 applied, `CRON_SECRET` set in Vercel Production, TASK-100 deployed, the VPS crontab (every 5 minutes) enabled for the test; a test project with a connected test Page and two published test articles):**
+**Manual test (founder approval required — real posts on a test Page; prerequisites: migration 048 applied, `CRON_SECRET` set in Vercel Production, TASK-100 deployed (with the incident fix `def5492`), `service_role` needs `SELECT` and `UPDATE` on `public.social_publications` (the cron lists due rows and claims / updates them with the service-role client); granted by hand in production on 2026-11-15 — **no migration versions these grants**, the VPS crontab (every 5 minutes) enabled for the test; a test project with a connected test Page and two published test articles):**
 
 | # | Step | Expected | Result |
 |---|---|---|---|
@@ -1376,7 +1376,9 @@ Offline, `tests/renderer/facebook-scheduling.spec.ts` (33) — the Meta Graph AP
 | 10 | Publish now (non-regression) on a new post | Same behavior as the 2026-11-13 production test (TASK-068) | ☐ |
 | 11 | Recovery of the incident row (after the fix is deployed; id linked by hand, see TASKS.md TASK-100) → **Retry comment** | Comment checked first: already there → adopted, not sent again; absent → exactly one first comment; no second post on the Page | ☐ |
 
-**Observed in production (reported 2026-11-15, before the fix):** the scheduled post was created by the cron and is visible on the Page (step 6, post part); the run then failed before saving the post id (no first comment, row stuck "Publishing…"). Step 6 (comment) and step 11 stay to validate after the fix is deployed.
+**Observed in production (reported 2026-11-15, before the fix):** the scheduled post was created by the cron and is visible on the Page (step 6, post part); the run then failed before saving the post id (no first comment, row stuck "Publishing…").
+
+**Production test 2026-11-15 (after `def5492`):** real scheduled publication **succeeded** — the post was published on the Page by the cron at its time (step 6, post part ✅). Step 6 first comment with the exact link and "exactly one post": **not recorded as explicitly checked** — tick them only after an explicit check. Step 11 (recovery of the incident post via "Retry comment"): **not tested**. Steps 1-5 and 7-10: not recorded. Prerequisite found during the test: `service_role` `SELECT` + `UPDATE` on `public.social_publications`, granted by hand in production (no migration versions it).
 
 Record the date and results here and in TASKS.md (TASK-100). Scheduling is **not** validated in production until this table is filled.
 
