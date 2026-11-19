@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
-import { getSocialConnection } from '@/lib/queries/social-connections';
 import { getSocialPublication, supabaseScheduleStore } from '@/lib/queries/social-publications';
 import { facebookCancelScheduleSchema, facebookRescheduleSchema } from '@/lib/validations/facebook';
 import { PublishConflictError } from '@/lib/social/facebook-publish';
@@ -13,7 +12,7 @@ import {
   ScheduleValidationError,
 } from '@/lib/social/facebook-schedule';
 import { resolveScheduleChoice } from '@/lib/social/schedule-time';
-import { jsonError, publicationResponse, type PublicationResponse } from '@/lib/social/facebook-server';
+import { jsonError, publicationConnection, publicationResponse, type PublicationResponse } from '@/lib/social/facebook-server';
 import { isValidUuid } from '@/lib/utils/uuid';
 import type { ApiResponse } from '@/types/api';
 
@@ -58,7 +57,8 @@ export async function handleFacebookScheduleChange(request: Request, id: string,
       if (!parsed.success) return jsonError(400, 'invalid_request', parsed.error.issues[0].message);
       const when = resolveScheduleChoice(parsed.data);
       if (!when.ok) return jsonError(422, 'invalid_schedule', when.message);
-      const connection = publication.connection_id ? await getSocialConnection(supabase, user.id, publication.connection_id) : null;
+      // TASK-102: the scheduled row's own Page (same Page reconnected in the same project is linked again — never another Page).
+      const connection = await publicationConnection(supabase, user.id, publication);
       const problem = scheduledConnectionProblem(publication, connection);
       if (problem) return jsonError(409, problem, SCHEDULE_ERROR_MESSAGES[problem]);
       updated = await rescheduleFacebookPublication(publication, { scheduledAt: when.instant, timeZone: parsed.data.timeZone }, { store });

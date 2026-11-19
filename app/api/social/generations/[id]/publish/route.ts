@@ -12,6 +12,7 @@ import {
   jsonError,
   loadPageToken,
   META_NOT_CONFIGURED_MESSAGE,
+  otherPageConflictResponse,
   publicationResponse,
   recordConnectionError,
   socialAdminClient,
@@ -25,7 +26,9 @@ export const maxDuration = 60;
 
 /**
  * "Publish to Facebook" (TASK-068) — manual, confirmed by the user, on the
- * Facebook Page connected to the content's project. Publishes the post, saves
+ * Facebook Page the person chose among the project's connected Pages
+ * (TASK-102: `connectionId` must be a connection of the caller AND of the
+ * content's project). Publishes the post, saves
  * its id, then (link in first comment) the comment. Never twice on the same
  * Page: an existing publication is refused, or retried without duplicate.
  * Separate rate limit (no AI cost, no trial cap). The WordPress article is
@@ -61,6 +64,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!connection || connection.project_id !== generation.project_id) {
     return jsonError(409, 'no_page_connected', 'Connect and select a Facebook Page for this project before publishing.');
   }
+  // TASK-102: the Page chosen by the person, a connected Page of THIS project (checked above); one draft → one Page.
+  const otherPage = await otherPageConflictResponse(supabase, user.id, generation.id, connection.external_account_id);
+  if (otherPage) return otherPage;
   if (connection.status === 'expired' || connection.status === 'revoked') {
     return jsonError(409, `connection_${connection.status}`, CONNECTION_UNUSABLE_MESSAGES[connection.status]);
   }

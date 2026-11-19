@@ -1330,7 +1330,7 @@ Edits a saved Facebook post before publication. Body (strict): `{ "post": string
 "Publish to Facebook" — manual, after a confirmation dialog. Body (strict): `{ "connectionId": uuid, "confirm": true }`. `maxDuration` 60 s.
 
 1. Auth, UUID, Zod (`400`). Rate limit `social/facebook-publish` 20 / hour (separate from generation; no trial cap — no AI cost).
-2. The content must be the caller's Facebook row, `completed` (`404` / `422 not_publishable`). The connection must be the caller's and belong to the content's project (`409 no_page_connected`), not `expired` / `revoked` (`409 connection_expired` / `connection_revoked`). Meta configured (`503 meta_not_configured`). Token decrypted on the server (`409 connection_expired` when unreadable).
+2. The content must be the caller's Facebook row, `completed` (`404` / `422 not_publishable`). The connection is the **Page the person chose** (TASK-102: any connected Page of the project): it must be the caller's and belong to the content's project (`409 no_page_connected`), not `expired` / `revoked` (`409 connection_expired` / `connection_revoked`). One draft → one Page: `409 other_page_publication` (message names the Page and points to "Create new post with this image" — the UI shows it with a link to that action) while the draft is scheduled, publishing, published, partially published or unknown on another Page (a cancelled schedule or a failure without post does not block); `500 publications_unreadable` when that cannot be checked (fails closed). Meta configured (`503 meta_not_configured`). Token decrypted on the server (`409 connection_expired` when unreadable).
 3. `publishFacebookContent()` (`lib/social/facebook-publish.ts`):
    * a `social_publications` row `publishing` is inserted (UNIQUE content + Page — a concurrent click gets `409 in_progress`; an existing published / partial row `409 already_published`; an existing failed row is retried);
    * the post: `POST /{page-id}/photos` (`url` = article image, `caption` = message) when there is an image, else `POST /{page-id}/feed` (`message`). Message = post + CTA (+ permalink when `main_post`). Its id (and `GET /{post-id}?fields=permalink_url`) is saved **before** anything else (`published`);
@@ -1342,15 +1342,15 @@ Response: `{ "publication": SocialPublication (without locked_at), "warning": st
 
 ## POST /api/social/publications/[id]/retry
 
-Retry of the post step (status `failed`, `unknown`, or `publishing` with a lock older than 90 s). Body `{ "confirm": true }`. Same auth, rate limit and connection checks (the publication's own connection, same Page). An `unknown` / interrupted attempt first reads `GET /{page-id}/published_posts` (since the attempt − 5 min) and adopts a post with the exact same text — it is **never posted twice**; if no post matches (`error_code` `post_not_found`, the response `warning` explains it) or Facebook cannot be read, the row stays `unknown` and nothing is posted (TASK-100 fix, 2026-11-15 — before, a post not found was sent again). A `failed` attempt is sent again (with the current, possibly edited, text). Errors: `409 already_published` / `in_progress`, as above.
+Retry of the post step (status `failed`, `unknown`, or `publishing` with a lock older than 90 s). Body `{ "confirm": true }`. Same auth, rate limit and connection checks (the publication's own connection, same Page — TASK-102: never another Page of the project; when its connection was deleted and the **same** Page was reconnected in the same project, the row is linked to the new connection first; otherwise `409 no_page_connected`). An `unknown` / interrupted attempt first reads `GET /{page-id}/published_posts` (since the attempt − 5 min) and adopts a post with the exact same text — it is **never posted twice**; if no post matches (`error_code` `post_not_found`, the response `warning` explains it) or Facebook cannot be read, the row stays `unknown` and nothing is posted (TASK-100 fix, 2026-11-15 — before, a post not found was sent again). A `failed` attempt is sent again (with the current, possibly edited, text). Errors: `409 already_published` / `in_progress`, as above.
 
 ## POST /api/social/publications/[id]/retry-comment
 
-"Retry comment" — the first comment only (post already on Facebook, `comment_status` failed / unknown / stale pending). Body `{ "confirm": true }`. The post is never sent again. An `unknown` comment is first looked up in `GET /{post-id}/comments` (same text, written by the Page). Errors: `409 comment_not_retryable` / `in_progress`.
+"Retry comment" — the first comment only (post already on Facebook, `comment_status` failed / unknown / stale pending). Body `{ "confirm": true }`. Always on the publication's own Page (same rule as Retry). The post is never sent again. An `unknown` comment is first looked up in `GET /{post-id}/comments` (same text, written by the Page). Errors: `409 comment_not_retryable` / `in_progress`.
 
 ## POST /api/social/generations/[id]/schedule
 
-"Schedule" (TASK-100). Body `{ "connectionId": uuid, "date": "YYYY-MM-DD", "time": "HH:MM", "timeZone": IANA zone, "confirm": true }` (strict). Same auth, ownership, completed-content, project-Page, connection-status checks and `social/facebook-publish` rate limit as publish; refused when the link is in the first comment and the Page lacks `pages_manage_engagement`. The wall-clock time is converted to UTC in the given zone (`lib/social/schedule-time.ts`); past, < 5 minutes, > 90 days ahead or a time skipped by a clock change → `422 invalid_schedule`. **No Meta call and no token read**: the row is saved `scheduled` with the exact text / image / comment of Publish now (`publicationContent()`), `scheduled_at` (UTC) and `scheduled_timezone`. A `cancelled` row, or a `failed` one without post, is scheduled again with the current text. Response `{ publication, warning: null }`. Errors: `409 already_scheduled` / `post_not_retryable` / `no_page_connected` / `comment_not_allowed`, `503 meta_not_configured`.
+"Schedule" (TASK-100). Body `{ "connectionId": uuid, "date": "YYYY-MM-DD", "time": "HH:MM", "timeZone": IANA zone, "confirm": true }` (strict). Same auth, ownership, completed-content, project-Page (the chosen Page of the project), one-Page-per-draft (`409 other_page_publication`), connection-status checks and `social/facebook-publish` rate limit as publish; the chosen Page is frozen on the row (`external_account_id`, `connection_id`) — a later change of the project's category → Page suggestion never moves it; refused when the link is in the first comment and the Page lacks `pages_manage_engagement`. The wall-clock time is converted to UTC in the given zone (`lib/social/schedule-time.ts`); past, < 5 minutes, > 90 days ahead or a time skipped by a clock change → `422 invalid_schedule`. **No Meta call and no token read**: the row is saved `scheduled` with the exact text / image / comment of Publish now (`publicationContent()`), `scheduled_at` (UTC) and `scheduled_timezone`. A `cancelled` row, or a `failed` one without post, is scheduled again with the current text. Response `{ publication, warning: null }`. Errors: `409 already_scheduled` / `post_not_retryable` / `no_page_connected` / `comment_not_allowed`, `503 meta_not_configured`.
 
 ## POST /api/social/generations/[id]/image-variants
 
@@ -1366,7 +1366,7 @@ Choose the draft's image (TASK-101). Body `{ "variantId": uuid | null }` (strict
 
 ## PATCH /api/social/publications/[id]/schedule
 
-"Reschedule" — body `{ "date", "time", "timeZone", "confirm": true }`. Only while `scheduled` (conditional update); refused with `409 page_disconnected` / `page_replaced` / `connection_expired` when the publication's Page is no longer the project's connected Page (never moved to another Page). Errors: `409 not_scheduled` (already claimed by the cron, published or cancelled), `422 invalid_schedule`.
+"Reschedule" — body `{ "date", "time", "timeZone", "confirm": true }`. Only while `scheduled` (conditional update); refused with `409 page_disconnected` / `page_replaced` / `connection_expired` when the publication's Page is no longer connected to the project (never moved to another Page). TASK-102: when the Page was disconnected then reconnected (same Page, same project), Reschedule is the explicit confirmation that links the row to the new connection; the cron then publishes it on that Page. Errors: `409 not_scheduled` (already claimed by the cron, published or cancelled), `422 invalid_schedule`.
 
 ## POST /api/social/publications/[id]/cancel
 
@@ -1394,7 +1394,7 @@ Pages the person manages (`GET /me/accounts`, with the pending cookie's user tok
 
 ## POST /api/social/connections/facebook/select
 
-Body (strict): `{ "projectId": uuid, "pageId": digits }`. Project ownership (`404`), pending cookie (`409 selection_expired`). The Pages are read again on the server; the Page must be in the list (`404 page_not_found`) with `CREATE_CONTENT` (`403 page_not_publishable`). Only that Page's token is stored, encrypted (`SOCIAL_TOKEN_ENCRYPTION_KEY`), with the service-role client (upsert on project + platform — one Page per project; a new choice replaces the previous one). The pending cookie is cleared; the user token is discarded. Returns the safe connection row.
+Body (strict): `{ "projectId": uuid, "pageId": digits }`. Project ownership (`404`), pending cookie (`409 selection_expired`). The Pages are read again on the server; the Page must be in the list (`404 page_not_found`) with `CREATE_CONTENT` (`403 page_not_publishable`). Only that Page's token is stored, encrypted (`SOCIAL_TOKEN_ENCRYPTION_KEY`), with the service-role client (TASK-102, migration 053: upsert on project + platform + Page — a new Page is added next to the project's other Pages; a Page already connected to the project is refreshed in place: same id, new token, status `active`, no duplicate). `500 save_failed` when the row cannot be written (e.g. migration 053 not applied). The pending cookie is cleared; the user token is discarded. Returns the safe connection row.
 
 ## POST /api/social/connections/[id]/verify
 
@@ -1402,7 +1402,7 @@ One read `GET /{page-id}?fields=id,name` with the stored Page token. Saves the s
 
 ## DELETE /api/social/connections/[id]
 
-"Disconnect Page": deletes the caller's connection and its encrypted token (`404 not_found` otherwise). Posts already on Facebook stay there; publication records keep their history (`connection_id` set to NULL). Removing OmniFlow's access on Facebook's side is done by the person in their Facebook settings.
+"Disconnect Page": deletes the caller's connection (one Page — the project's other Pages stay connected) and its encrypted token (`404 not_found` otherwise). Scheduled posts of that Page are not sent while it is disconnected (blocked `page_disconnected` at their time) — never on another Page. Posts already on Facebook stay there; publication records keep their history (`connection_id` set to NULL). Removing OmniFlow's access on Facebook's side is done by the person in their Facebook settings.
 
 ---
 
@@ -1925,6 +1925,32 @@ forbidden
 invalid_json
 invalid_request
 ```
+
+---
+
+# PUT /api/projects/[id]/facebook-page-categories
+
+Suggested Facebook Page per WordPress category of the project (TASK-102, migration 053). Only a suggestion for the Page selector on `/facebook/[id]`: no publication, schedule or Meta call reads it, and an existing publication or schedule keeps its own Page.
+
+## Request
+
+```json
+{ "categoryId": "uuid", "pageId": "1234567890" }
+```
+
+Strict (Zod `facebookPageCategorySchema`, `lib/validations/facebook.ts`). `pageId: null` removes the suggestion of that category.
+
+## Checks
+
+Auth (`401`), valid project id (`400 invalid_id`), the caller's project (`404 not_found`), a category of **that** project owned by the caller (`404 category_not_found`), a Facebook Page connected to **that** project (`409 page_not_connected`). Upsert on (project, category) — one suggested Page per category. RLS re-checks the same rules (`lib/queries/facebook-page-mappings.ts`).
+
+## Response
+
+```json
+{ "data": { "mapping": { "id": "uuid", "project_id": "uuid", "wordpress_category_id": "uuid", "external_account_id": "1234567890" } }, "error": null }
+```
+
+`mapping: null` after a removal. Errors also `503 migration_required` (053 not applied), `500 save_failed`. Never a token.
 
 ---
 

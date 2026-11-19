@@ -31,7 +31,8 @@ export async function listSocialConnections(
     .from('social_connections')
     .select(SAFE_CONNECTION_COLUMNS)
     .eq('user_id', userId)
-    .eq('platform', 'facebook');
+    .eq('platform', 'facebook')
+    .order('external_account_name', { ascending: true });
   if (error) return { connections: [], unavailable: MISSING_TABLE_CODES.has((error as { code?: string }).code ?? '') };
   return { connections: (data ?? []) as unknown as SocialConnection[], unavailable: false };
 }
@@ -46,10 +47,29 @@ export async function getSocialConnection(supabase: SupabaseClient, userId: stri
   return (data as unknown as SocialConnection | null) ?? null;
 }
 
-export async function getProjectFacebookConnection(
+/** Every Facebook Page connected to a project (TASK-102: several per project), by name. */
+export async function listProjectFacebookConnections(
   supabase: SupabaseClient,
   userId: string,
   projectId: string
+): Promise<SocialConnection[]> {
+  const { data, error } = await supabase
+    .from('social_connections')
+    .select(SAFE_CONNECTION_COLUMNS)
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .eq('platform', 'facebook')
+    .order('external_account_name', { ascending: true });
+  if (error) return [];
+  return (data ?? []) as unknown as SocialConnection[];
+}
+
+/** The connection of one Page in one project (TASK-102) — used to find the same Page again after a reconnect. */
+export async function findProjectPageConnection(
+  supabase: SupabaseClient,
+  userId: string,
+  projectId: string,
+  pageId: string
 ): Promise<SocialConnection | null> {
   const { data } = await supabase
     .from('social_connections')
@@ -57,6 +77,7 @@ export async function getProjectFacebookConnection(
     .eq('project_id', projectId)
     .eq('user_id', userId)
     .eq('platform', 'facebook')
+    .eq('external_account_id', pageId)
     .maybeSingle();
   return (data as unknown as SocialConnection | null) ?? null;
 }
@@ -81,7 +102,12 @@ export interface SaveFacebookPageInput {
   now: Date;
 }
 
-/** One Page per project: connecting again replaces the previous Page and token. */
+/**
+ * One row per (project, Page) — TASK-102, migration 053. Connecting a Page
+ * already connected to the project refreshes that same row (same id, new
+ * token, status back to active): no duplicate. Another Page adds a row and
+ * never replaces the project's other Pages.
+ */
 export async function saveFacebookPageConnection(admin: SupabaseClient, input: SaveFacebookPageInput): Promise<SocialConnection | null> {
   const { data, error } = await admin
     .from('social_connections')
@@ -100,7 +126,7 @@ export async function saveFacebookPageConnection(admin: SupabaseClient, input: S
         last_verified_at: input.now.toISOString(),
         last_error_code: null,
       },
-      { onConflict: 'project_id,platform' }
+      { onConflict: 'project_id,platform,external_account_id' }
     )
     .select(SAFE_CONNECTION_COLUMNS)
     .single();
@@ -109,7 +135,7 @@ export async function saveFacebookPageConnection(admin: SupabaseClient, input: S
     return null;
   }
   const row = data as unknown as SocialConnection;
-  // The upsert key is the project; a project of another user can never be written (checked before, re-checked here).
+  // The upsert key is the project + Page; a project of another user can never be written (checked before, re-checked here).
   return row.user_id === input.userId ? row : null;
 }
 

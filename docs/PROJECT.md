@@ -362,7 +362,7 @@ WordPress (Implemented — generator TASK-028 / TASK-037, publishing TASK-035, S
 ↓
 Medium summary (Implemented — TASK-062: copy / download only, no Medium API, no automatic publishing)
 ↓
-Facebook Pages (Implemented — TASK-068: Page post generated from the article, manual publication to a connected Facebook Page, optional first-comment link; no profile, no group, no scheduling)
+Facebook Pages (Implemented — TASK-068: Page post generated from the article, manual publication to a connected Facebook Page, optional first-comment link; no profile, no group. Scheduling: TASK-100. Several Pages per project with one chosen Page per publication and a Page suggested by WordPress category: TASK-102, migration 053 — publishing on several Pages in one action is TASK-104, planned)
 ↓
 Instagram, Reels, TikTok (Coming soon — Social Content Studio), LinkedIn (Future)
 ```

@@ -17,7 +17,9 @@ import type { ApiResponse } from '@/types/api';
  * browser); the Page must be one the person manages with the CREATE_CONTENT
  * task. Only that Page's token is stored, encrypted with
  * SOCIAL_TOKEN_ENCRYPTION_KEY; the user token is discarded with the cookie.
- * One Page per project: a new choice replaces the previous one.
+ * Several Pages per project (TASK-102, migration 053): a new Page is added
+ * next to the others; choosing a Page already connected to the project
+ * refreshes that same connection (reconnect — no duplicate, same id).
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
     grantedScopes: pending.grantedScopes,
     now: new Date(),
   });
-  if (!connection) return jsonError(500, 'save_failed', 'The Facebook Page could not be saved. Check that migration 046 is applied, then try again.');
+  if (!connection) return jsonError(500, 'save_failed', 'The Facebook Page could not be saved. Check that migrations 046 and 053 are applied, then try again.');
 
   const response = NextResponse.json<ApiResponse<SocialConnection>>({ data: connection, error: null });
   response.cookies.set(PENDING_CONNECTION_COOKIE, '', oauthCookieOptions(0));

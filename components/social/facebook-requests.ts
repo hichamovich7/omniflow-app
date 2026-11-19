@@ -113,3 +113,12 @@ export function selectFacebookImage<T>(id: string, variantId: string | null) {
 export function createFacebookPostFromImage<T>(id: string, variantId: string | null, requestId: string) {
   return call<T>(`/api/social/generations/${id}/derived-posts`, post({ variantId, requestId, confirm: true }), 'The new post could not be written.');
 }
+
+/** TASK-102 — suggested Page of a WordPress category of the project (`null` removes the suggestion). Never changes a publication. */
+export function saveFacebookPageCategory<T>(projectId: string, categoryId: string, pageId: string | null) {
+  return call<T>(
+    `/api/projects/${projectId}/facebook-page-categories`,
+    { method: 'PUT', body: JSON.stringify({ categoryId, pageId }) },
+    'The suggested Page could not be saved.'
+  );
+}

@@ -5,7 +5,14 @@ import { getMetaConfig, hasSocialTokenKey } from '@/lib/social/meta/config';
 import { MetaGraphClient } from '@/lib/social/meta/graph-client';
 import { MetaApiError } from '@/lib/social/meta/errors';
 import { decryptSocialToken } from '@/lib/social/meta/token-crypto';
-import { readEncryptedConnectionToken, updateConnectionStatus } from '@/lib/queries/social-connections';
+import {
+  findProjectPageConnection,
+  getSocialConnection,
+  readEncryptedConnectionToken,
+  updateConnectionStatus,
+} from '@/lib/queries/social-connections';
+import { listPublicationsForGeneration, supabasePublicationStore } from '@/lib/queries/social-publications';
+import { OTHER_PAGE_PUBLICATION_CODE, otherPageConflictMessage, otherPagePublication, resolvePublicationConnection } from '@/lib/social/facebook-pages';
 import type { SocialConnection, SocialPublication } from '@/lib/social/facebook-publication';
 import type { ApiResponse } from '@/types/api';
 
@@ -74,3 +81,34 @@ export const CONNECTION_UNUSABLE_MESSAGES: Record<Exclude<SocialConnection['stat
   revoked: 'Access to the Facebook Page was removed. Reconnect the Page, then try again.',
   error: 'The Facebook Page could not be reached last time. Check it with "Verify" or reconnect it, then try again.',
 };
+
+/**
+ * TASK-102 — one draft targets one Page: refuses to publish / schedule a
+ * draft on `pageId` while it is published, scheduled or running on another
+ * Page of the project. Fails closed when the rows cannot be read.
+ */
+export async function otherPageConflictResponse(supabase: SupabaseClient, userId: string, generationId: string, pageId: string) {
+  const rows = await listPublicationsForGeneration(supabase, userId, generationId);
+  if (rows === null) return jsonError(500, 'publications_unreadable', 'The publications of this post could not be checked. Please try again.');
+  const blocking = otherPagePublication(rows, pageId);
+  return blocking ? jsonError(409, OTHER_PAGE_PUBLICATION_CODE, otherPageConflictMessage(blocking)) : null;
+}
+
+/**
+ * TASK-102 — the connection of a publication's own Page (caller's session,
+ * user_id filters). After a disconnect + reconnect of the SAME Page in the
+ * same project, the row is linked again to the new connection; another Page
+ * is never used.
+ */
+export async function publicationConnection(supabase: SupabaseClient, userId: string, publication: SocialPublication): Promise<SocialConnection | null> {
+  const { connection, relinked } = await resolvePublicationConnection(publication, {
+    byId: (id) => getSocialConnection(supabase, userId, id),
+    byProjectPage: (projectId, pageId) => findProjectPageConnection(supabase, userId, projectId, pageId),
+  });
+  if (connection && relinked) {
+    const updated = await supabasePublicationStore(supabase, userId).update(publication.id, { connection_id: connection.id });
+    if (!updated) return null;
+    publication.connection_id = connection.id;
+  }
+  return connection;
+}

@@ -50,6 +50,13 @@ import {
 import { cn } from '@/lib/utils';
 import { FacebookImageVariants } from '@/components/social/facebook-image-variants';
 import { imageChangeLocked, type FacebookImageVariant } from '@/lib/social/facebook-image-variants';
+import {
+  connectionForPage,
+  FACEBOOK_PAGE_SUGGESTION_MESSAGES,
+  OTHER_PAGE_PUBLICATION_CODE,
+  publicationHoldsPage,
+  type FacebookPageSuggestion,
+} from '@/lib/social/facebook-pages';
 
 const EDIT_LIMITS = { post: 3000, callToAction: 160, firstCommentText: 160 } as const;
 
@@ -57,8 +64,10 @@ interface FacebookPostWorkspaceProps {
   item: SocialContentGeneration;
   projectName: string;
   publication: SocialPublication | null;
-  /** The Facebook Page connected to the content's project — null when none. */
-  connection: SocialConnection | null;
+  /** TASK-102 — every Facebook Page connected to the content's project (none, one or several). */
+  connections: SocialConnection[];
+  /** TASK-102 — the Page to pre-select (only Page of the project, or the Page mapped to the article's category). */
+  suggestion: FacebookPageSuggestion;
   configured: boolean;
   /** TASK-101 — image variants of this draft (newest first) and whether migration 050 is applied. */
   imageVariants?: FacebookImageVariant[];
@@ -72,12 +81,18 @@ type PublishResult = { publication: SocialPublication; warning: string | null };
  * manual: "Publish to Facebook" opens a confirmation showing the Page and
  * exactly what will be posted. After a partial publication only "Retry
  * comment" is offered — the post itself is never sent twice.
+ *
+ * TASK-102: the target Page is chosen explicitly among the project's Pages
+ * (pre-selected only when unambiguous). Once a publication holds a Page
+ * (scheduled, publishing, published, partial, unknown), that Page is frozen:
+ * Retry, Retry comment and Reschedule always use it — never another Page.
  */
 export function FacebookPostWorkspace({
   item,
   projectName,
   publication: initialPublication,
-  connection,
+  connections,
+  suggestion,
   configured,
   imageVariants = [],
   imageVariantsUnavailable = false,
@@ -100,6 +115,12 @@ export function FacebookPostWorkspace({
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleZone, setScheduleZone] = useState('UTC');
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  // TASK-102 — server refusal `other_page_publication` (the draft already holds another Page), shown with its way out.
+  const [otherPageRefusal, setOtherPageRefusal] = useState<string | null>(null);
+  // TASK-102 — the Page chosen for "Publish now" / "Schedule" (a connection id of this project).
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(
+    () => connectionForPage(connections, initialPublication?.external_account_id)?.id ?? suggestion.connectionId
+  );
 
   const placements = allowedLinkPlacements(item.cta_url);
   const actions = publicationActions(publication);
@@ -115,13 +136,32 @@ export function FacebookPostWorkspace({
       linkPlacement !== saved.linkPlacement,
     [post, callToAction, firstCommentText, linkPlacement, saved.post, saved.callToAction, saved.firstCommentText, saved.linkPlacement]
   );
-  const connectionUsable = Boolean(connection && connection.status !== 'expired' && connection.status !== 'revoked');
+  const usable = (candidate: SocialConnection | null) => Boolean(candidate && candidate.status !== 'expired' && candidate.status !== 'revoked');
+  // The publication's own Page (Retry, Retry comment, Reschedule) — found by Page id, never another Page.
+  const publicationPage = connectionForPage(connections, publication?.external_account_id);
+  const pageLocked = Boolean(publication && publicationHoldsPage(publication));
+  // The target of "Publish now" / "Schedule": the frozen Page of the publication, or the Page chosen here.
+  const connection = pageLocked ? publicationPage : (connections.find((candidate) => candidate.id === selectedConnectionId) ?? null);
+  const connectionUsable = usable(connection);
+  const publicationPageUsable = usable(publicationPage);
   const canComment = Boolean(connection?.granted_scopes.includes('pages_manage_engagement'));
   const scheduled = publication?.status === 'scheduled' ? publication : null;
-  // The Page chosen for a scheduled post is no longer the project's Page: it will not be published (never to another Page).
-  const scheduledPageGone = Boolean(scheduled && (!connection || connection.external_account_id !== scheduled.external_account_id));
+  // The Page chosen for a scheduled post is not connected to the project any more: it will not be published (never to another Page).
+  const scheduledPageGone = Boolean(scheduled && !publicationPage);
+  // The same Page was disconnected then reconnected: the post waits for an explicit confirmation ("Reschedule").
+  const scheduledNeedsConfirmation = Boolean(scheduled && publicationPage && !scheduled.connection_id);
   const schedulePageName = scheduleMode === 'reschedule' ? publication?.external_account_name : connection?.external_account_name;
   const schedulePageId = scheduleMode === 'reschedule' ? publication?.external_account_id : connection?.external_account_id;
+  const suggestionMessage =
+    !pageLocked && connections.length > 1
+      ? suggestion.reason === 'category'
+        ? selectedConnectionId === suggestion.connectionId
+          ? FACEBOOK_PAGE_SUGGESTION_MESSAGES.category
+          : null
+        : selectedConnectionId
+          ? null
+          : FACEBOOK_PAGE_SUGGESTION_MESSAGES[suggestion.reason]
+      : null;
   const scheduleChoice = { date: scheduleDate, time: scheduleTime, timeZone: scheduleZone };
   const schedulePreview = scheduleDate && scheduleTime ? resolveScheduleChoice(scheduleChoice) : null;
   const scheduleWithComment = scheduleMode === 'reschedule' ? Boolean(publication?.comment_requested) : comment !== null;
@@ -162,6 +202,12 @@ export function FacebookPostWorkspace({
     const response = await publishToFacebook<PublishResult>(item.id, connection.id);
     setBusy(null);
     setConfirmOpen(false);
+    if (response.error?.code === OTHER_PAGE_PUBLICATION_CODE) {
+      setOtherPageRefusal(response.error.message);
+      router.refresh();
+      return;
+    }
+    setOtherPageRefusal(null);
     applyResult(response.data, response.error?.message);
   }
 
@@ -201,10 +247,17 @@ export function FacebookPostWorkspace({
           ? await scheduleFacebookPost<PublishResult>(item.id, connection.id, scheduleChoice)
           : null;
     setBusy(null);
+    if (response?.error?.code === OTHER_PAGE_PUBLICATION_CODE) {
+      setScheduleMode(null);
+      setOtherPageRefusal(response.error.message);
+      router.refresh();
+      return;
+    }
     if (!response || !response.data) {
       setScheduleError(response?.error?.message ?? 'The post could not be scheduled.');
       return;
     }
+    setOtherPageRefusal(null);
     setPublication(response.data.publication);
     setScheduleMode(null);
     setError(null);
@@ -284,6 +337,17 @@ export function FacebookPostWorkspace({
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {otherPageRefusal && (
+        <Alert variant="warning" role="alert" data-testid="facebook-other-page-refusal">
+          <p className="font-medium">Nothing was published: this post already has its Page.</p>
+          <p className="mt-1">{otherPageRefusal}</p>
+          <p className="mt-1">
+            One post goes to one Page, so OmniFlow never sends the same post to a second Page. To publish this article on another Page,
+            create a new post from one of its images, then choose the other Page on that new post.
+          </p>
+          <OtherPageLink />
+        </Alert>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="facebook-edit-title" className="space-y-4 rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
@@ -372,7 +436,9 @@ export function FacebookPostWorkspace({
             Preview
           </h2>
           <div className="space-y-3 rounded-xl border border-border bg-background p-4" data-testid="facebook-post-preview">
-            <p className="text-xs font-medium text-muted-foreground">{connection?.external_account_name ?? 'Your Facebook Page'}</p>
+            <p className="text-xs font-medium text-muted-foreground" data-testid="facebook-preview-page">
+              {connection?.external_account_name ?? (pageLocked ? publication?.external_account_name : null) ?? 'Choose a Facebook Page'}
+            </p>
             <p className="whitespace-pre-line break-words text-sm">{message}</p>
             {item.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -403,11 +469,66 @@ export function FacebookPostWorkspace({
           <Alert variant="warning" role="status">
             Facebook publishing is not configured on this server yet. You can still copy the post text.
           </Alert>
-        ) : !connection ? (
+        ) : connections.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No Facebook Page is connected to {projectName}.{' '}
             <Link href="/facebook" className="font-medium text-primary hover:underline">
               Connect a Facebook Page
+            </Link>
+          </p>
+        ) : !pageLocked ? (
+          <fieldset className="space-y-2" data-testid="facebook-page-selector">
+            <legend className="text-sm font-medium">Facebook Page</legend>
+            {connections.map((candidate) => (
+              <label
+                key={candidate.id}
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border p-2.5 text-sm',
+                  selectedConnectionId === candidate.id ? 'border-primary bg-selected' : 'border-border'
+                )}
+              >
+                <input
+                  type="radio"
+                  name="facebook-target-page"
+                  value={candidate.id}
+                  checked={selectedConnectionId === candidate.id}
+                  onChange={() => setSelectedConnectionId(candidate.id)}
+                  disabled={busy !== null}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{candidate.external_account_name}</span>{' '}
+                  <span className="text-xs text-muted-foreground">(ID {candidate.external_account_id})</span>
+                </span>
+                <span className={cn('text-xs', usable(candidate) ? 'text-muted-foreground' : 'text-warning')}>
+                  {SOCIAL_CONNECTION_STATUS_LABELS[candidate.status]}
+                </span>
+              </label>
+            ))}
+            {suggestionMessage && (
+              <p className="text-xs text-muted-foreground" data-testid="facebook-page-suggestion">
+                {suggestionMessage}
+              </p>
+            )}
+            {connection && !connectionUsable && (
+              <p className="text-xs text-warning">
+                This Page must be reconnected before publishing.{' '}
+                <Link href="/facebook" className="font-medium text-primary hover:underline">
+                  Reconnect
+                </Link>
+              </p>
+            )}
+            {publication && !pageLocked && publication.external_account_id !== connection?.external_account_id && (
+              <p className="text-xs text-muted-foreground">
+                The last attempt was for the Page &quot;{publication.external_account_name}&quot;; nothing was published there.
+              </p>
+            )}
+          </fieldset>
+        ) : !connection ? (
+          <p className="text-sm text-warning" data-testid="facebook-locked-page">
+            Page: <span className="font-medium">{publication?.external_account_name}</span> (ID {publication?.external_account_id}) is no
+            longer connected to {projectName}. OmniFlow never uses another Page for this post.{' '}
+            <Link href="/facebook" className="font-medium text-primary hover:underline">
+              Reconnect this Page
             </Link>
           </p>
         ) : (
@@ -424,6 +545,13 @@ export function FacebookPostWorkspace({
                 </Link>
               </>
             )}
+          </p>
+        )}
+
+        {pageLocked && connections.length > 1 && (
+          <p className="text-xs text-muted-foreground" data-testid="facebook-one-page-note">
+            This post stays on its Page. To publish the article on another Page, use{' '}
+            <OtherPageLink inline />.
           </p>
         )}
 
@@ -446,10 +574,12 @@ export function FacebookPostWorkspace({
         )}
         {publication?.status === 'failed' && publication.error_message && <Alert variant="danger">{publication.error_message}</Alert>}
         {scheduled?.scheduled_at && (
-          <Alert variant={scheduledPageGone ? 'danger' : 'info'} role="status" data-testid="facebook-schedule-summary">
+          <Alert variant={scheduledPageGone ? 'danger' : scheduledNeedsConfirmation ? 'warning' : 'info'} role="status" data-testid="facebook-schedule-summary">
             {scheduledPageGone
-              ? `This post was scheduled for the Page "${scheduled.external_account_name}", which is no longer connected to ${projectName}. It will not be published (OmniFlow never posts to another Page). Cancel it, then schedule it again for the connected Page.`
-              : `Scheduled for ${formatScheduledTime(scheduled.scheduled_at, scheduled.scheduled_timezone)} on the Page "${scheduled.external_account_name}". The post is published at that time${scheduled.comment_requested ? ', then the Page adds the article link as the first comment' : ''}. To edit the text, cancel the schedule first.`}
+              ? `This post was scheduled for the Page "${scheduled.external_account_name}", which is no longer connected to ${projectName}. It will not be published (OmniFlow never posts to another Page). Reconnect that Page, or cancel the schedule and choose another Page.`
+              : scheduledNeedsConfirmation
+                ? `The Page "${scheduled.external_account_name}" was disconnected after this post was scheduled, then connected again. It will not be published unless you confirm it: use "Reschedule" to keep it on this Page, or cancel it.`
+                : `Scheduled for ${formatScheduledTime(scheduled.scheduled_at, scheduled.scheduled_timezone)} on the Page "${scheduled.external_account_name}". The post is published at that time${scheduled.comment_requested ? ', then the Page adds the article link as the first comment' : ''}. To edit the text, cancel the schedule first.`}
           </Alert>
         )}
         {publication?.status === 'cancelled' && (
@@ -462,8 +592,8 @@ export function FacebookPostWorkspace({
               type="button"
               size="sm"
               onClick={() => setConfirmOpen(true)}
-              disabled={!configured || !connectionUsable || dirty || busy !== null || (linkPlacement === 'first_comment' && !canComment)}
-              title={dirty ? 'Save your changes first.' : undefined}
+              disabled={!configured || !connection || !connectionUsable || dirty || busy !== null || (linkPlacement === 'first_comment' && !canComment)}
+              title={dirty ? 'Save your changes first.' : !connection ? 'Choose a Facebook Page first.' : undefined}
             >
               <Send className="mr-1.5 h-3.5 w-3.5" />
               Publish to Facebook
@@ -475,8 +605,8 @@ export function FacebookPostWorkspace({
               size="sm"
               variant="outline"
               onClick={() => openSchedule('schedule')}
-              disabled={!configured || !connectionUsable || dirty || busy !== null || (linkPlacement === 'first_comment' && !canComment)}
-              title={dirty ? 'Save your changes first.' : undefined}
+              disabled={!configured || !connection || !connectionUsable || dirty || busy !== null || (linkPlacement === 'first_comment' && !canComment)}
+              title={dirty ? 'Save your changes first.' : !connection ? 'Choose a Facebook Page first.' : undefined}
             >
               <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
               Schedule
@@ -495,13 +625,13 @@ export function FacebookPostWorkspace({
             </Button>
           )}
           {actions.canRetry && (
-            <Button type="button" size="sm" onClick={() => retry('post')} disabled={!configured || !connectionUsable || dirty || busy !== null}>
+            <Button type="button" size="sm" onClick={() => retry('post')} disabled={!configured || !publicationPageUsable || dirty || busy !== null}>
               {busy === 'retry' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
               Retry
             </Button>
           )}
           {actions.canRetryComment && (
-            <Button type="button" size="sm" onClick={() => retry('comment')} disabled={!configured || !connectionUsable || busy !== null}>
+            <Button type="button" size="sm" onClick={() => retry('comment')} disabled={!configured || !publicationPageUsable || busy !== null}>
               {busy === 'retry-comment' ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
               Retry comment
             </Button>
@@ -521,7 +651,8 @@ export function FacebookPostWorkspace({
           <DialogHeader>
             <DialogTitle>Publish to Facebook?</DialogTitle>
             <DialogDescription>
-              This post will be published now on the Facebook Page &quot;{connection?.external_account_name}&quot;
+              This post will be published now on the Facebook Page &quot;{connection?.external_account_name}&quot; (ID{' '}
+              {connection?.external_account_id})
               {item.image_url ? (item.selected_image_variant_id ? ' with the selected image' : ' with the article image') : ' as text only'}
               {comment ? ', then the Page will add the article link as the first comment.' : '.'}
             </DialogDescription>
@@ -641,5 +772,18 @@ export function FacebookPostWorkspace({
         </Link>
       </p>
     </div>
+  );
+}
+
+/** TASK-102 — the way out of "one post → one Page": "Create new post with this image" in the "Post image" block. */
+function OtherPageLink({ inline = false }: { inline?: boolean }) {
+  return (
+    <a
+      href="#facebook-post-image"
+      className={inline ? 'font-medium text-primary hover:underline' : cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-2')}
+      data-testid="facebook-other-page-create-post"
+    >
+      Create new post with this image
+    </a>
   );
 }

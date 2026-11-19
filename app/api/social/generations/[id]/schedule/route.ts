@@ -13,6 +13,7 @@ import {
   CONNECTION_UNUSABLE_MESSAGES,
   jsonError,
   META_NOT_CONFIGURED_MESSAGE,
+  otherPageConflictResponse,
   publicationResponse,
   type PublicationResponse,
 } from '@/lib/social/facebook-server';
@@ -59,6 +60,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!connection || connection.project_id !== generation.project_id) {
     return jsonError(409, 'no_page_connected', 'Connect and select a Facebook Page for this project before scheduling.');
   }
+  // TASK-102: the Page chosen by the person, a connected Page of THIS project (checked above); one draft → one Page.
+  const otherPage = await otherPageConflictResponse(supabase, user.id, generation.id, connection.external_account_id);
+  if (otherPage) return otherPage;
   if (connection.status === 'expired' || connection.status === 'revoked') {
     return jsonError(409, `connection_${connection.status}`, CONNECTION_UNUSABLE_MESSAGES[connection.status]);
   }

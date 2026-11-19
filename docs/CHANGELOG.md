@@ -18,6 +18,16 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Facebook — several Pages per project — TASK-102 (2026-11-19)
+
+* **Several Facebook Pages per project**: "Add another Page" connects one more Page without replacing the others; each Page has its own Verify / Reconnect / Disconnect; reconnecting a Page refreshes it (no duplicate). Existing connections keep working unchanged.
+* **Choose the Page before Publish now / Schedule** on `/facebook/[id]`: pre-selected only when the project has one Page or the article's WordPress category is mapped to exactly one Page; ambiguous or unmapped → the person chooses. The preview, the confirmation dialogs and the history name the Page.
+* **Suggested Page per WordPress category** in the project page ("Facebook Pages" section, `PUT /api/projects/[id]/facebook-page-categories`). A suggestion never moves a scheduled or published post.
+* **Frozen target Page**: Retry, Retry comment, Reschedule and the cron always use the publication's own Page. One draft targets one Page (`409 other_page_publication`); publishing on several Pages at once is TASK-104 (planned). A disconnected Page is reported, never replaced by another Page; after reconnecting the same Page, user actions continue on it (a scheduled post needs "Reschedule" as explicit confirmation).
+* **Migration 053** (`053_add_facebook_multiple_pages.sql`, applied by the founder 2026-11-19 — together with 054): UNIQUE (project_id, platform, external_account_id) on `social_connections` instead of (project_id, platform); new table `facebook_page_category_mappings` (RLS). 049 stays reserved; 046-052 untouched.
+* Tests: new `facebook-multi-pages.spec.ts` (17, Meta simulated). Docs: DATABASE, API, UI_UX, DECISIONS, TESTING (+ real test checklist), TASKS, in-app Guide.
+* Follow-up before deployment: the "one post → one Page" refusal (`other_page_publication`) is explained on the post page with a **Create new post with this image** link; **migration 054** versions the cron's `service_role` rights (`SELECT, UPDATE` on `social_publications`, granted by hand in production after the TASK-100 incident — nothing else); rights check added to the deployment test; offline PGlite check of 053 + 054 (`tests/sql/053-054-facebook-pages-grants.verify.mjs`); TASK-104 now states: same content on several Pages without text regeneration or AI quota, independent publication / status / retries per Page.
+
 ### Facebook — clearer "Post image" block — TASK-101 / TASK-103 UI (2026-11-19)
 
 * Same-size cards (4:5 image, title up to 2 lines, actions at the bottom) in a grid that follows the panel width: no button overflows its card any more, even with long titles.

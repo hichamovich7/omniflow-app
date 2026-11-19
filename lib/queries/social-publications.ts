@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { PUBLICATION_STALE_LOCK_MS, type PublicationStatus, type SocialPublication } from '@/lib/social/facebook-publication';
+import { currentPublication } from '@/lib/social/facebook-pages';
 
 /**
  * social_publications (migration 046, TASK-068) — the caller's own session,
@@ -154,7 +155,13 @@ export async function getSocialPublication(supabase: SupabaseClient, userId: str
   return (data as SocialPublication | null) ?? null;
 }
 
-/** Latest publication of each saved content (history list and detail page). Missing table → empty. */
+/**
+ * The publication shown for each saved content (history list and detail
+ * page). TASK-102: a draft may have rows on several Pages (e.g. a cancelled
+ * schedule on one Page, then a publication on another); the row that holds a
+ * Page wins, else the most recently updated one (`currentPublication`).
+ * Missing table → empty.
+ */
 export async function listPublicationsForGenerations(
   supabase: SupabaseClient,
   userId: string,
@@ -168,11 +175,28 @@ export async function listPublicationsForGenerations(
     .in('social_content_generation_id', generationIds)
     .order('created_at', { ascending: false });
   if (error || !data) return {};
-  const byGeneration: Record<string, SocialPublication> = {};
+  const rowsByGeneration = new Map<string, SocialPublication[]>();
   for (const row of data as SocialPublication[]) {
-    if (row.social_content_generation_id && !byGeneration[row.social_content_generation_id]) {
-      byGeneration[row.social_content_generation_id] = row;
-    }
+    if (!row.social_content_generation_id) continue;
+    const rows = rowsByGeneration.get(row.social_content_generation_id) ?? [];
+    rows.push(row);
+    rowsByGeneration.set(row.social_content_generation_id, rows);
+  }
+  const byGeneration: Record<string, SocialPublication> = {};
+  for (const [generationId, rows] of rowsByGeneration) {
+    const current = currentPublication(rows);
+    if (current) byGeneration[generationId] = current;
   }
   return byGeneration;
+}
+
+/** Every publication row of one saved content, on every Page (TASK-102 — one-Page-per-draft check). Null when unreadable (callers fail closed). */
+export async function listPublicationsForGeneration(supabase: SupabaseClient, userId: string, generationId: string): Promise<SocialPublication[] | null> {
+  const { data, error } = await supabase
+    .from('social_publications')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('social_content_generation_id', generationId);
+  if (error || !data) return null;
+  return data as SocialPublication[];
 }

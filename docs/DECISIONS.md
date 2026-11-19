@@ -1947,3 +1947,27 @@ A Facebook post published with the WordPress image can have generated variants; 
 
 * Migration 051 is required for the new action (503 otherwise).
 * Update 2026-11-18 (before the first push): the request id is **reserved atomically before the quota and any AI call** (`social_draft_creation_requests`, migration 052 — 051 is applied and not modified), so two simultaneous identical requests cost at most one text generation; the second is told the post is still being written. Without 052 the action fails closed (503). A request id is billed at most once: released only when nothing was consumed (quota refused); a `pending` reservation is never taken over (stale → `request_expired`) because nothing proves the first AI call has stopped; a save error after a successful AI call is retried in place without a new AI call.
+
+---
+
+## 2026-11-19 — Several Facebook Pages per project, one target Page per publication (TASK-102)
+
+### Context
+
+TASK-068 decision 6 allowed one Facebook Page per project (UNIQUE (project, platform) in migration 046). The founder needs several Pages for one project (e.g. "Crochet Blog EN" → "Crochet Sweater Pattern" and other Pages) and a Page suggested from the article's WordPress category — without ever sending a post, a retry or a scheduled post to a Page the person did not confirm.
+
+### Decision
+
+1. Migration 053 replaces UNIQUE (project_id, platform) by UNIQUE (project_id, platform, external_account_id) on `social_connections`. Existing rows are kept as they are (same id, same token). Connecting a Page already connected refreshes that row; another Page adds a row and never replaces the others.
+2. The target Page is an **explicit choice** before Publish now / Schedule. It is pre-selected only when unambiguous: the project's only Page, or the single connected Page mapped to the draft's categories. Ambiguous or no mapping → nothing pre-selected.
+3. "WordPress category → Page" lives in `facebook_page_category_mappings` (migration 053), keyed by **Page id** (not connection id) so it survives a reconnect. It is only a suggestion: publication, scheduling, the cron and retries never read it.
+4. The Page is **frozen on the publication row** (`external_account_id`) at confirmation; Retry, Retry comment, Reschedule and the cron always use it. A changed suggestion never redirects a scheduled post.
+5. **One draft → one Page** in TASK-102: a second Page is refused while a row of the draft holds a Page (scheduled, publishing, published, partial, unknown). A cancelled schedule or a failure without post does not hold its Page. Publishing on several Pages in one action is a separate task (TASK-104). Another post for another Page = "Create new post with this image".
+6. Disconnect + reconnect of the **same** Page: user actions (Retry, Retry comment, Reschedule) link the row to the new connection (same Page, same project, same user only). The cron does not: a scheduled row whose connection was deleted is blocked (`page_disconnected`) unless the person confirmed it again with Reschedule — a disconnect still stops a scheduled post (TASK-100 rule).
+
+### Consequences
+
+* Migration 053 must be applied right before the deployment (connect / reconnect fails cleanly in between; other actions are unaffected).
+* Draft categories come from the OmniFlow article and the saved Content Stream; an existing WordPress post without a Content Stream gets no suggestion (choice required when the project has several Pages).
+* `listPublicationsForGenerations()` shows the row holding a Page (else the most recently updated), since a draft may now have a cancelled row on one Page and a publication on another.
+* Follow-up 2026-11-19 (founder): the one-Page-per-draft scope is confirmed for TASK-102; the refusal is explained in the UI with a link to "Create new post with this image". TASK-104 (several Pages in one action) must reuse the same saved content — no text regeneration, no AI quota — with an independent publication, status and retries per Page. The cron's `service_role` rights on `social_publications` are versioned by migration 054 (SELECT, UPDATE only).

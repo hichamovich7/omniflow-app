@@ -182,6 +182,40 @@ SOCIAL_TOKEN_ENCRYPTION_KEY=            # openssl rand -hex 32 — never commit,
 3. **Trigger**: no Vercel cron — `vercel.json` must not declare `/api/cron/facebook-scheduled`. The operator's VPS (Contabo) calls `GET https://<production domain>/api/cron/facebook-scheduled` every 5 minutes with the header `Authorization: Bearer $CRON_SECRET` (secret read from a root-only file, never on the command line of a shared log). The crontab stays **disabled** until the manual test of TESTING.md "Facebook scheduling (TASK-100)" is approved.
 4. Deploy, then enable the VPS crontab only for the approved manual test; follow TESTING.md "Facebook scheduling (TASK-100)".
 5. Rollback: disable the VPS crontab (scheduled rows simply stay `scheduled`; cancel them in the UI). Migration rollback SQL is at the end of 048.
+6. **Rights of the cron** (incident 2026-11-15): `service_role` needs `SELECT` and `UPDATE` on `public.social_publications`. Granted by hand in production on 2026-11-15; versioned since 2026-11-19 by migration **054** (`054_grant_service_role_social_publications.sql`, exactly these two rights). Check them with the query of "Several Facebook Pages per project (TASK-102)" below.
+
+## Several Facebook Pages per project (TASK-102) — exact order
+
+1. **Migration 054** (`054_grant_service_role_social_publications.sql`) — `GRANT SELECT, UPDATE ON public.social_publications TO service_role`. Independent of TASK-102 and of the deployment: in production it changes nothing (the rights were granted by hand on 2026-11-15; GRANT is idempotent); in a new environment it gives the cron its rights. Run the rights check below: both `true`.
+2. **Pre-check 053** (read-only query below): the only UNIQUE constraint of `social_connections` is `social_connections_project_platform_key`. If the name differs, stop (053 would fail atomically on `DROP CONSTRAINT`, nothing changed).
+3. **Migration 053** (`053_add_facebook_multiple_pages.sql`). From this moment until step 4, with the code currently deployed: **connecting or reconnecting a Facebook Page fails** (the old select route upserts `ON CONFLICT (project_id, platform)`, a key that no longer exists → Postgres "no unique or exclusion constraint matching the ON CONFLICT specification" → the route answers `500 save_failed`, nothing is written, the existing connection and its token are untouched). Nothing else changes: the old code reads one connection per project with `maybeSingle()`, which stays true because no second Page can be added before step 4; Publish now, Schedule, Reschedule, Cancel, the cron, Retry and Retry comment use the connection id / the row's Page and are unaffected; existing connections keep their id and token, existing publications keep their `connection_id`. Run the post-053 check.
+4. **Deploy TASK-102 immediately after 053** (do not connect / reconnect a Page between 3 and 4).
+5. With founder approval only: TESTING.md "Several Facebook Pages per project (TASK-102)" (real test checklist, step 0 = the rights check).
+
+Reverse order (code before 053) is not recommended: connecting / reconnecting fails the same way (the new upsert key does not exist yet), the project page shows "Category suggestions are not available yet (migration 053 not applied)", detail pages still work (suggestion from the connections only).
+
+Rollback: redeploy the previous code, then (only if no project has 2+ Pages) `ALTER TABLE social_connections DROP CONSTRAINT social_connections_project_platform_account_key; ALTER TABLE social_connections ADD CONSTRAINT social_connections_project_platform_key UNIQUE (project_id, platform); DROP TABLE facebook_page_category_mappings;` — with 2+ Pages in a project, disconnect the extra Pages first. 054 is never rolled back (the cron needs it).
+
+```sql
+-- Pre-check (read-only), BEFORE 053: must return exactly one row, the 046 key.
+SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
+WHERE conrelid = 'public.social_connections'::regclass AND contype = 'u';
+-- expected: social_connections_project_platform_key | UNIQUE (project_id, platform)
+
+-- Rights check (read-only), AFTER 054 (also usable before it in production, where the rights were granted by hand):
+SELECT
+  has_table_privilege('service_role', 'public.social_publications', 'SELECT') AS service_select,  -- expected true
+  has_table_privilege('service_role', 'public.social_publications', 'UPDATE') AS service_update;  -- expected true
+SELECT privilege_type FROM information_schema.role_table_grants
+WHERE grantee = 'service_role' AND table_schema = 'public' AND table_name = 'social_publications'
+ORDER BY privilege_type;  -- expected: at least SELECT and UPDATE (054 adds nothing else)
+
+-- Check AFTER 053:
+SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
+WHERE conrelid = 'public.social_connections'::regclass AND contype = 'u';
+-- expected: social_connections_project_platform_account_key | UNIQUE (project_id, platform, external_account_id)
+SELECT to_regclass('public.facebook_page_category_mappings');  -- expected: facebook_page_category_mappings
+```
 
 ---
 

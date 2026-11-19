@@ -130,7 +130,7 @@ export class ScheduleValidationError extends Error {
 export const SCHEDULE_ERROR_MESSAGES = {
   page_disconnected: 'The Facebook Page of this scheduled post is no longer connected to the project. Nothing was published. Reconnect the Page, then schedule the post again.',
   page_replaced:
-    'Another Facebook Page is now connected to this project. Nothing was published: OmniFlow never sends a post to a different Page. Schedule it again for the connected Page.',
+    'The connection of this scheduled post now points to another Facebook Page. Nothing was published: OmniFlow never sends a post to a different Page. Schedule it again on the Page you choose.',
   connection_expired: 'The Facebook connection expired before the scheduled time. Nothing was published. Reconnect the Page, then schedule the post again.',
   connection_revoked: 'Access to the Facebook Page was removed before the scheduled time. Nothing was published. Reconnect the Page, then schedule the post again.',
   content_deleted: 'The saved content of this scheduled post was deleted. Nothing was published.',

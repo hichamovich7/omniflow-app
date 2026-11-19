@@ -31,7 +31,9 @@ Checked read-only on 2026-10-11 (PostgREST schema + Storage bucket list, no writ
 * **Migration 050** (`050_add_facebook_image_variants.sql`, TASK-101) — written 2026-11-15, **applied by the founder (reported 2026-11-18)** (needs 045 / 046): table `social_content_image_variants` (RLS), columns `source_image_url`, `source_image_alt`, `selected_image_variant_id` on `social_content_generations` (backfill of `source_image_*` from the current image of existing Facebook drafts — `image_url` itself is never rewritten), function `reserve_trial_usage()`. Before it, `/facebook/[id]` shows "Image variants are not available yet" and both TASK-101 routes fail cleanly; Publish now / Schedule are unaffected.
 * **Migration 051** (`051_add_facebook_derived_drafts.sql`, TASK-101 extension / TASK-103) — written 2026-11-18, **applied by the founder (reported 2026-11-18) — never replay or modify it** (needs 050): columns `derived_from_generation_id`, `origin_image_variant_id`, `visual_angle`, `creation_request_id` on `social_content_generations`, partial UNIQUE index `(user_id, creation_request_id)`, ownership trigger `check_social_content_image_refs`. 050 is not modified.
 * **Migration 052** (`052_add_social_draft_creation_requests.sql`, TASK-101 extension / TASK-103) — written 2026-11-18, **applied by the founder (reported 2026-11-18) — never replay or modify it** (needs 051): table `social_draft_creation_requests` (atomic reservation of a creation request id before the quota and any AI call; RLS). Before it, "Create new post with this image" answers `503 migration_required` (fails closed: nothing generated); everything else is unaffected.
-* **049 stays reserved for TASK-078 Phase B** (reference library). **Next free migration: 053.**
+* **Migration 053** (`053_add_facebook_multiple_pages.sql`, TASK-102) — written 2026-11-19, **applied by the founder in the Supabase SQL Editor (reported 2026-11-19) — never replay or modify it**; checked 2026-11-19: read-only through PostgREST by the agent (table / columns / FK, service_role SELECT) and by the founder with the DEPLOYMENT.md SQL queries (UNIQUE key, service_role UPDATE) (needs 046 and the WordPress categories of 016): replaces `social_connections_project_platform_key` UNIQUE (project_id, platform) by `social_connections_project_platform_account_key` UNIQUE (project_id, platform, external_account_id) — several Pages per project, existing rows unchanged — and creates `facebook_page_category_mappings` (RLS). **Apply it right before deploying TASK-102** (exact order and checks: DEPLOYMENT.md "Several Facebook Pages per project (TASK-102)"). Between 053 and the deployment, with the old code: connecting / reconnecting a Page fails (`500 save_failed` — its upsert `ON CONFLICT (project_id, platform)` has no matching constraint any more; nothing written, existing connections untouched); everything else (Publish now, Schedule, Reschedule, Cancel, the cron, Retry, Retry comment, reading the project's connection) is unaffected. The new code before 053 fails the same way on connect only. Verified on PGlite (`tests/sql/053-054-facebook-pages-grants.verify.mjs`).
+* **Migration 054** (`054_grant_service_role_social_publications.sql`, TASK-100 follow-up) — written 2026-11-19, **applied by the founder in the Supabase SQL Editor (reported 2026-11-19) — never replay or modify it**; checked 2026-11-19: read-only through PostgREST by the agent (table / columns / FK, service_role SELECT) and by the founder with the DEPLOYMENT.md SQL queries (UNIQUE key, service_role UPDATE) (needs 046): `GRANT SELECT, UPDATE ON public.social_publications TO service_role` — exactly the two rights the scheduling cron needs (list due rows, claim / update them), granted by hand in production on 2026-11-15 after the incident; nothing else (no INSERT / DELETE / ALL, no other role or table), 046 and 048 not modified. Idempotent: no change in production, required in any new environment. Verified on PGlite (`tests/sql/053-054-facebook-pages-grants.verify.mjs`).
+* **049 stays reserved for TASK-078 Phase B** (reference library). **Next free migration: 055.**
 * Migrations are applied by hand in the Supabase SQL Editor (the agent has no DDL access); new ones must be recorded here once applied.
 
 ---
@@ -90,8 +92,10 @@ profiles
         wordpress_generations / wordpress_sites / generations, ON DELETE SET NULL;
         content_stream_id → content_streams, migration 046)
   │     └── social_publications (TASK-068, migration 046; UNIQUE content + Page; SET NULL on delete)
-  └── social_connections (TASK-068, migration 046; one Facebook Page per project; encrypted token,
-        not readable by the session role)
+  └── social_connections (TASK-068, migration 046; several Facebook Pages per project since 053 —
+        UNIQUE project + platform + Page; encrypted token, not readable by the session role)
+  └── facebook_page_category_mappings (TASK-102, migration 053; project → wordpress_categories →
+        suggested Page id; UNIQUE project + category; suggestion only, never read by publication)
 ```
 
 ```
@@ -1317,7 +1321,7 @@ RLS `Users access own draft creation requests` (FOR ALL): `user_id = auth.uid()`
 
 # social_connections
 
-Connected social accounts (TASK-068, migration 046). MVP: one **Facebook Page** per project (never a personal profile or a group). Generic on purpose — Instagram / TikTok / others reuse it later with a new `platform` value.
+Connected social accounts (TASK-068, migration 046). **Facebook Pages** only (never a personal profile or a group); one Page per project until migration 053, **several Pages per project since TASK-102** — one row per (project, platform, Page). Generic on purpose — Instagram / TikTok / others reuse it later with a new `platform` value.
 
 ## Columns
 
@@ -1325,7 +1329,7 @@ Connected social accounts (TASK-068, migration 046). MVP: one **Facebook Page** 
 |--------|------|-------|
 | id | uuid PK | |
 | user_id | uuid NOT NULL → profiles(id) ON DELETE CASCADE | owner |
-| project_id | uuid NOT NULL → projects(id) ON DELETE CASCADE | UNIQUE with `platform` — one Page per project |
+| project_id | uuid NOT NULL → projects(id) ON DELETE CASCADE | UNIQUE (project_id, platform, external_account_id) since 053 (was UNIQUE (project_id, platform) in 046) — several Pages per project, each Page once |
 | platform | text NOT NULL | CHECK `facebook` |
 | account_type | text NOT NULL | CHECK `facebook_page` |
 | external_account_id | text NOT NULL | Facebook Page id (digits only, CHECK) |
@@ -1344,6 +1348,38 @@ Connected social accounts (TASK-068, migration 046). MVP: one **Facebook Page** 
 * Writes and the only token read use the service-role client (`lib/supabase/admin.ts`) in `lib/queries/social-connections.ts`, called only after the route checked ownership with the caller's session, and always filtered on the connection / project **and** `user_id`.
 * RLS: `Users read own social connections` (SELECT) and `Users delete own social connections` (DELETE), both `user_id = auth.uid()`. No INSERT / UPDATE policy for `authenticated`.
 * Rotating `SOCIAL_TOKEN_ENCRYPTION_KEY` invalidates every stored token: users reconnect their Page.
+
+## Several Pages per project (TASK-102, migration 053)
+
+* Connecting a Page upserts on `(project_id, platform, external_account_id)`: a new Page adds a row next to the project's other Pages; the same Page connected again (reconnect) updates its row — same `id`, new token, `status` back to `active`, no duplicate. Connections created before 053 are kept as they are.
+* Disconnecting deletes one row only (the other Pages stay). Publications keep their history (`connection_id` SET NULL, `external_account_id` / `external_account_name` kept).
+* RLS, column privileges and service-role-only writes are unchanged.
+
+---
+
+# facebook_page_category_mappings
+
+"WordPress category → suggested Facebook Page" per project (TASK-102, migration 053). Only pre-selects the Page on a Facebook draft (`suggestFacebookPage()`, `lib/social/facebook-pages.ts`): with exactly one connected Page mapped to the draft's categories it is pre-selected; several candidate Pages (ambiguous) or none → the person chooses; a project with a single Page always pre-selects it. **Never read by Publish now, Schedule, the cron, Retry or Retry comment**: the target Page is frozen on `social_publications` when the person confirms, so changing a mapping never redirects a scheduled or published post.
+
+## Columns
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id | uuid NOT NULL → profiles(id) ON DELETE CASCADE | owner |
+| project_id | uuid NOT NULL → projects(id) ON DELETE CASCADE | |
+| wordpress_category_id | uuid NOT NULL → wordpress_categories(id) ON DELETE CASCADE | OmniFlow category of the project (mapped to WordPress terms by `wp_category_id`) |
+| external_account_id | text NOT NULL | Facebook Page id (digits, CHECK) — by Page id, not connection id, so a disconnect + reconnect of the same Page keeps the mapping; while the Page is not connected the mapping suggests nothing |
+| created_at / updated_at | timestamptz | `updated_at` trigger |
+
+## Constraints / RLS
+
+* `UNIQUE (project_id, wordpress_category_id)` — one suggested Page per category.
+* `Users access own Facebook page category mappings` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` also requires the project, the category **of that same project** and a Facebook connection of that same project for this Page id, all owned by the caller (columns qualified with the table name inside the subqueries). `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`; queries (`lib/queries/facebook-page-mappings.ts`) also filter on `user_id` and re-check project, category and Page before writing.
+
+## Draft categories
+
+Read-only, at display time (`facebookDraftCategoryIds()`): the `category_id` of the draft's OmniFlow article (`wordpress_articles`), plus the `wordpress_category_id` of the Content Stream saved with the draft (`content_stream_id`, the stream of the article's category at generation time). An existing WordPress post without a Content Stream has no stored category: no suggestion.
 
 ---
 
@@ -1381,9 +1417,11 @@ One row per (saved content, Facebook Page): the state of each publication step (
 
 `UNIQUE (social_content_generation_id, external_account_id)` — the same content can never be published twice on the same Page; retries reuse the row. Steps are claimed by conditional UPDATEs (`lib/queries/social-publications.ts`), so two clicks never run the same step.
 
+TASK-102 (no schema change here): the Page of a row is frozen — `external_account_id` never changes; Retry, Retry comment, Reschedule and the cron always use that Page. One draft targets one Page: the publish / schedule routes refuse a second Page while a row of the draft holds one (`scheduled`, `publishing`, `published`, `partial`, `unknown`, or any row with `external_post_id`) — a `cancelled` row or a `failed` row without post does not. After a disconnect + reconnect of the **same** Page in the same project, a user action (Retry, Retry comment, Reschedule) links the row again (`connection_id` = the new connection); the cron never does it on its own (a scheduled row whose connection was deleted is blocked `page_disconnected` until the person confirms with Reschedule). The publication shown for a draft is the row holding a Page, else the most recently updated one (`currentPublication()`).
+
 ## RLS
 
-`Users access own social publications` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` also requires the project, the content and the connection to belong to the caller. `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`. Queries also filter on `user_id`.
+`Users access own social publications` (FOR ALL): `USING (user_id = auth.uid())`; `WITH CHECK` also requires the project, the content and the connection to belong to the caller. `GRANT SELECT, INSERT, UPDATE, DELETE` to `authenticated`. Queries also filter on `user_id`. `GRANT SELECT, UPDATE` to `service_role` (migration 054 — the scheduling cron; granted by hand in production on 2026-11-15, versioned by 054).
 
 ---
 

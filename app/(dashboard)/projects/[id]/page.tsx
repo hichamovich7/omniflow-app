@@ -22,6 +22,9 @@ import {
 } from '@/components/projects/project-pinterest-section';
 import { ProjectTodoPanel } from '@/components/projects/project-todo-panel';
 import { NicheSettingsSection } from '@/components/projects/niche-settings-section';
+import { FacebookPageCategoriesSection } from '@/components/projects/facebook-page-categories-section';
+import { listProjectFacebookConnections } from '@/lib/queries/social-connections';
+import { listFacebookPageCategoryMappings } from '@/lib/queries/facebook-page-mappings';
 import { parseNicheSettings } from '@/lib/niche/settings';
 import { PageContainer } from '@/components/ui/page-container';
 import { ResourceHeader } from '@/components/shared/resource-header';
@@ -61,6 +64,11 @@ export default async function ProjectDetailPage({
     listWordPressCategories(supabase, project.id),
     // TASK-091: accounts, boards (+ sections) and stream destinations in one read.
     loadPinterestStructure(supabase, [project.id]),
+  ]);
+  // TASK-102: the project's Facebook Pages and the suggested Page per WordPress category (safe columns only, never a token).
+  const [facebookConnections, facebookMappings] = await Promise.all([
+    listProjectFacebookConnections(supabase, project.user_id, project.id),
+    listFacebookPageCategoryMappings(supabase, project.user_id, project.id),
   ]);
 
   const wpGenerationIds = (wpGenerations ?? []).map((g) => g.id);
@@ -193,6 +201,7 @@ export default async function ProjectDetailPage({
     { href: '#brand', label: 'Brand Profile' },
     { href: '#wordpress', label: 'WordPress' },
     { href: '#niche', label: 'Niche settings' },
+    { href: '#facebook', label: 'Facebook' },
     { href: '#pinterest', label: 'Pinterest' },
     { href: '#quick-links', label: 'Quick links' },
   ];
@@ -386,6 +395,22 @@ export default async function ProjectDetailPage({
                 categories={categoryOptions}
                 boards={boardOptions}
                 embedded
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              id="facebook"
+              title="Facebook Pages"
+              description="Pages connected to this project and the suggested Page per WordPress category"
+              defaultOpen={facebookConnections.length > 1}
+              testId="project-facebook-pages"
+            >
+              <FacebookPageCategoriesSection
+                projectId={project.id}
+                pages={facebookConnections.map((c) => ({ pageId: c.external_account_id, name: c.external_account_name }))}
+                categories={categoryOptions}
+                mappings={facebookMappings.mappings}
+                unavailable={facebookMappings.unavailable}
               />
             </CollapsibleSection>
 

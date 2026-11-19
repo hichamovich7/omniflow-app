@@ -109,3 +109,11 @@ export const facebookImageSelectionSchema = z
     variantId: z.string().uuid('Invalid image').nullable(),
   })
   .strict();
+
+/** PUT /api/projects/[id]/facebook-page-categories (TASK-102) — `pageId: null` removes the suggestion. */
+export const facebookPageCategorySchema = z
+  .object({
+    categoryId: z.string().uuid('Invalid category'),
+    pageId: z.string().regex(/^\d{1,32}$/, 'Invalid Facebook Page').nullable(),
+  })
+  .strict();

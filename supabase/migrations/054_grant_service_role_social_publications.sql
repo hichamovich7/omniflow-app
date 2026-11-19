@@ -1,0 +1,22 @@
+-- ============================================
+-- OmniFlow Migration 054
+-- TASK-100 follow-up: version the service_role privileges on
+-- public.social_publications
+-- ============================================
+-- (049 stays reserved for TASK-078 Phase B; 046-053 are never modified or
+-- replayed.)
+--
+-- The Facebook scheduling cron (GET /api/cron/facebook-scheduled, TASK-100)
+-- uses the service-role client: it lists the due rows (SELECT) and claims /
+-- updates them (UPDATE), always filtered by each row's own user_id. Migration
+-- 046 granted social_publications to `authenticated` only; after the
+-- 2026-11-15 production incident these two privileges were granted BY HAND in
+-- production. This migration only versions them, so a new environment gets
+-- the same rights.
+--
+-- Exactly SELECT and UPDATE — nothing else (no INSERT, no DELETE, no ALL, no
+-- other role, no other table). GRANT is idempotent: re-applying it where the
+-- rights already exist (production) changes nothing. RLS, policies and the
+-- `authenticated` grants of 046 are unchanged.
+
+GRANT SELECT, UPDATE ON public.social_publications TO service_role;

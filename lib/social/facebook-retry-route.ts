@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit, rateLimitErrorResponse } from '@/lib/rate-limit';
-import { getSocialConnection } from '@/lib/queries/social-connections';
 import { getSocialPublication, supabasePublicationStore } from '@/lib/queries/social-publications';
 import { facebookRetrySchema } from '@/lib/validations/facebook';
 import { PublishConflictError, retryFacebookComment, retryFacebookPost } from '@/lib/social/facebook-publish';
@@ -11,6 +10,7 @@ import {
   jsonError,
   loadPageToken,
   META_NOT_CONFIGURED_MESSAGE,
+  publicationConnection,
   publicationResponse,
   recordConnectionError,
   socialAdminClient,
@@ -22,7 +22,9 @@ import type { ApiResponse } from '@/types/api';
 /**
  * Shared handler of POST /api/social/publications/[id]/retry (post step) and
  * /retry-comment (first comment only) — TASK-068. Uses the publication's own
- * Page connection; never posts a second time what Facebook already has.
+ * Page (TASK-102: never another Page of the project, even if the project's
+ * suggestion or default changed); never posts a second time what Facebook
+ * already has.
  */
 export async function handleFacebookRetry(request: Request, id: string, step: 'post' | 'comment') {
   const supabase = await createClient();
@@ -47,7 +49,8 @@ export async function handleFacebookRetry(request: Request, id: string, step: 'p
   const publication = await getSocialPublication(supabase, user.id, id);
   if (!publication) return jsonError(404, 'not_found', 'Publication not found');
 
-  const connection = publication.connection_id ? await getSocialConnection(supabase, user.id, publication.connection_id) : null;
+  // TASK-102: always the publication's own Page — its connection, or the same Page reconnected in the same project; never another Page.
+  const connection = await publicationConnection(supabase, user.id, publication);
   if (!connection || connection.external_account_id !== publication.external_account_id) {
     return jsonError(409, 'no_page_connected', 'The Facebook Page of this publication is no longer connected. Reconnect it, then try again.');
   }

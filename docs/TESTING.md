@@ -1345,6 +1345,50 @@ Validation (2026-10-28): targeted specs 188/188 (grounding 50, subject contract 
 
 Not covered: Pinterest performance — inspiration stays "Style reference only — performance not verified"; no Pinterest metrics exist (no table, no migration).
 
+# Several Facebook Pages per project (TASK-102, 2026-11-19)
+
+```bash
+npx playwright test tests/renderer/facebook-multi-pages.spec.ts --project=renderer --reporter=list
+npx playwright test tests/renderer/facebook-content.spec.ts tests/renderer/facebook-scheduling.spec.ts tests/renderer/facebook-image-variants.spec.ts tests/renderer/facebook-derived-posts.spec.ts --project=renderer
+```
+
+Offline, `tests/renderer/facebook-multi-pages.spec.ts` (17) — Supabase is an in-memory query builder with the unique keys of 046 / 053 (an upsert on a key that does not exist fails like Postgres `42P10`), publications an in-memory store with the same conditional rules, Meta a fake fetch behind the real `MetaGraphClient` (post id built from the Page in the URL, so every call shows its Page). No Meta call, no database, no AI:
+
+* Connections: a second Page is added, the first kept; reconnecting a Page (after `expired`) keeps its id, refreshes the token and status, no duplicate; a pre-053 single-Page row is listed, pre-selected (`only_page`) and keeps its id when reconnected; migration 053 source (new key, mapping table, RLS columns qualified with the table name, no token grant, no data change) and `git status`: only 053 is new in `supabase/migrations`, 049 absent, 046 untouched.
+* Ownership: another user's / project's connection never returned (`getSocialConnection`, `findProjectPageConnection`, `listProjectFacebookConnections`); `resolvePublicationConnection` refuses another Page, another project or user, and falls back only to the same Page in the same project; mapping writes refused for another user's project (`not_found`), a category of another project (`category_not_found`), a Page connected to another project (`page_not_connected`); one suggestion per category (replace, clear); strict Zod body; route source checks (publish / schedule check the chosen connection's project and call `otherPageConflictResponse`; retry / reschedule use `publicationConnection`; cron unchanged; no token helper in the new files; client components import no server module).
+* Publish now on Page B (two Pages connected): one `POST /{B}/photos`, one `POST /{B}_…/comments`, no call on Page A; row frozen on B. Schedule on B then cron: post + comment on B only.
+* One draft → one Page: scheduled / publishing / unknown / published / partial on A block B; cancelled / failed without post do not; same Page never blocks; `currentPublication` shows the row holding a Page.
+* Suggestion: no Page, only Page, mapped category, no mapping, ambiguous (two categories → two Pages), two categories → same Page, mapping to a disconnected Page ignored; draft categories from the OmniFlow article and the Content Stream (other user's stream ignored).
+* Changing the mapping after scheduling: the suggestion changes, the scheduled row keeps Page B, the cron posts on B.
+* Disconnect / reconnect: scheduled Page disconnected → cron `blocked page_disconnected`, **0** Graph call (Page A never used), row kept with Page B; reconnected before the time → the cron still finds no connection until **Reschedule** links the row again, then posts on B; partial publication + disconnect → no connection resolved (A never offered), reconnect → **Retry comment** adds the comment on the existing B post, **0** new post.
+
+**Results 2026-11-19:** `facebook-multi-pages.spec.ts` 17/17 (18/18 after the 2026-11-19 follow-up: migration 054 source check + refusal UI checks); Facebook + Social Content + media suites 207/207 (208/208 after the follow-up — TypeScript, ESLint on the touched files and `git diff --check` pass again; PGlite check 35/35) (content, scheduling, image variants, derived posts, Studio, history, WordPress social content, media optimisation — unchanged and passing); full renderer **1886/1886**; TypeScript (`npx tsc --noEmit`), ESLint on the touched files, `next build`, `git diff --check` pass. No Meta call, no AI call, no real publication or schedule; migration 053 not applied (offline only).
+
+**Live SQL check of 053 + 054 (offline, real Postgres via PGlite — no Supabase, no network call):** `tests/sql/053-054-facebook-pages-grants.verify.mjs` (run as described in its header). Builds 045 / 046 / 048 on stubs, then checks: before 053 the old `ON CONFLICT (project_id, platform)` works and the new key fails; 053 applies; legacy connection kept (same id, token) with its publication; after 053 the old key fails (`no unique or exclusion constraint matching the ON CONFLICT specification`), a second Page is added, the same Page again is refreshed in place (same id), the same Page twice in a project is refused, the same Page in another project is allowed; mapping RLS: own project + category + connected Page OK, one Page per category, category of another project / Page not connected to the project / another user → refused, invisible to another user; token column still unreadable; 054: before it no service_role right (fresh environment), applied twice (idempotent), then service_role SELECT and UPDATE = true, INSERT / DELETE / TRUNCATE / REFERENCES / TRIGGER = false, grant list exactly `SELECT,UPDATE`, `authenticated` grants unchanged, anon nothing. **Result 2026-11-19: 35/35 PASS.**
+
+**Real test checklist (founder approval required — real posts on test Pages; prerequisites: migrations 054 and 053 applied (done by the founder 2026-11-19), TASK-102 deployed, two test Facebook Pages you manage). Status 2026-11-19: not started — no step recorded yet.**
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 0 | **Deployment rights check** — SQL Editor, the read-only queries of DEPLOYMENT.md "Several Facebook Pages per project (TASK-102)" | `service_select` = true, `service_update` = true; grants of `service_role` on `social_publications` include SELECT and UPDATE; UNIQUE key = `social_connections_project_platform_account_key`; `facebook_page_category_mappings` exists | ☐ |
+| 1 | Before anything: `/facebook` | The existing connection ("Crochet Blog EN" → "Crochet Sweater Pattern") is still listed and Connected; history unchanged | ☐ |
+| 2 | **Add another Page** on the test project → select the second test Page | "Facebook Page added…"; both Pages listed, each with Verify / Reconnect / Disconnect | ☐ |
+| 3 | **Reconnect** the first Page (select it again in the picker) | "…reconnected…"; still exactly two Pages, no duplicate | ☐ |
+| 4 | Project page → **Facebook Pages** → map one category to Page 2 | "Suggested Page saved." | ☐ |
+| 5 | Open a draft of an article in that category | Page 2 pre-selected + "Suggested from the article category"; preview shows Page 2; choose Page 1 by hand → preview follows | ☐ |
+| 6 | Draft without mapping (project with 2 Pages) | Nothing pre-selected, "Choose the Page for this post."; Publish / Schedule disabled until a Page is chosen | ☐ |
+| 7 | **Publish now** on Page 2 | Dialog names Page 2 + ID; post and first comment on Page 2 only; history card shows Page "…2" | ☐ |
+| 7b | Same post: try to publish it on Page 1 (second tab still showing the selector, or after the publication) | Nothing published; amber alert "Nothing was published: this post already has its Page." + explanation + **Create new post with this image** (scrolls to "Post image"); on a post that holds its Page, the note "This post stays on its Page… use Create new post with this image" | ☐ |
+| 8 | **Schedule** another draft on Page 1 (+10 min), then change the category mapping to Page 2 | Scheduled card still names Page 1; at the time the post + comment appear on Page 1 only | ☐ |
+| 9 | Schedule a draft on Page 2, **Disconnect** Page 2 before the time | Detail page: danger alert; at the time nothing is posted anywhere; status failed "…no longer connected…" | ☐ |
+| 10 | Reconnect Page 2; on a scheduled (still future) post of Page 2 that lost its connection: **Reschedule** | Amber alert before; after Reschedule the post goes out on Page 2 at the new time | ☐ |
+| 11 | A partial post (comment failed) → **Retry comment** | Comment added on the same post, same Page; no second post | ☐ |
+| 12 | Network tab / URLs | No token anywhere | ☐ |
+
+Record the date, Page ids and results here and in TASKS.md (TASK-102). Delete the test posts afterwards if wanted.
+
+---
+
 # Facebook posts from an image (TASK-101 extension / TASK-103, 2026-11-18)
 
 ```bash
@@ -1455,7 +1499,7 @@ Offline, `tests/renderer/facebook-scheduling.spec.ts` (33) — the Meta Graph AP
 * Publish now non-regression: first publication unchanged; a scheduled post cannot be published now (cancel first); after a cancel, "Publish now" sends the current text once; actions of `failed` / `unknown` / `partial` unchanged. `facebook-content.spec.ts` (31, TASK-068) passes; its test 21 now expects "Retry" of a timed-out post not found on the Page to stay `unknown` without posting again (was: post again).
 * Source checks: the schedule store filters on `user_id` + current status + no post; cron secret compared in constant time, `/api/cron/` exempted from the session proxy, `vercel.json` never declares the route (external trigger), `CRON_SECRET` in `.env.example`; routes (auth, ownership, confirmation, rate limit, Page of the project, no token read when scheduling); migration 048; UI fields.
 
-**Manual test (founder approval required — real posts on a test Page; prerequisites: migration 048 applied, `CRON_SECRET` set in Vercel Production, TASK-100 deployed (with the incident fix `def5492`), `service_role` needs `SELECT` and `UPDATE` on `public.social_publications` (the cron lists due rows and claims / updates them with the service-role client); granted by hand in production on 2026-11-15 — **no migration versions these grants**, the VPS crontab (every 5 minutes) enabled for the test; a test project with a connected test Page and two published test articles):**
+**Manual test (founder approval required — real posts on a test Page; prerequisites: migration 048 applied, `CRON_SECRET` set in Vercel Production, TASK-100 deployed (with the incident fix `def5492`), `service_role` needs `SELECT` and `UPDATE` on `public.social_publications` (the cron lists due rows and claims / updates them with the service-role client); granted by hand in production on 2026-11-15 — versioned since 2026-11-19 by migration **054** (check: DEPLOYMENT.md), the VPS crontab (every 5 minutes) enabled for the test; a test project with a connected test Page and two published test articles):**
 
 | # | Step | Expected | Result |
 |---|---|---|---|

@@ -5,7 +5,9 @@ import { ResourceHeader } from '@/components/shared/resource-header';
 import { SocialContentMeta } from '@/components/social/social-content-meta';
 import { FacebookPostWorkspace } from '@/components/social/facebook-post-workspace';
 import { getSocialContentGeneration } from '@/lib/queries/social-content';
-import { getProjectFacebookConnection } from '@/lib/queries/social-connections';
+import { listProjectFacebookConnections } from '@/lib/queries/social-connections';
+import { facebookDraftCategoryIds, listFacebookPageCategoryMappings } from '@/lib/queries/facebook-page-mappings';
+import { suggestFacebookPage } from '@/lib/social/facebook-pages';
 import { listPublicationsForGenerations } from '@/lib/queries/social-publications';
 import { listImageVariants } from '@/lib/queries/facebook-image-variants';
 import { listArticleFacebookPosts } from '@/lib/queries/facebook-article-posts';
@@ -15,7 +17,9 @@ import { isValidUuid } from '@/lib/utils/uuid';
 
 /**
  * One saved Facebook post (TASK-068): source, edit, preview, publication to
- * the project's connected Facebook Page and its status. Only the caller's
+ * the Facebook Page chosen among the project's connected Pages (TASK-102:
+ * pre-selected when the project has one Page or the article's category is
+ * mapped to one Page) and its status. Only the caller's
  * own rows; the access token is never read here.
  */
 export default async function FacebookPostPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,13 +35,17 @@ export default async function FacebookPostPage({ params }: { params: Promise<{ i
   const item = await getSocialContentGeneration(supabase, user.id, id);
   if (!item || item.platform !== 'facebook') notFound();
 
-  const [connection, imageVariants, articlePosts] = await Promise.all([
-    getProjectFacebookConnection(supabase, user.id, item.project_id),
+  const [connections, mappings, categoryIds, imageVariants, articlePosts] = await Promise.all([
+    listProjectFacebookConnections(supabase, user.id, item.project_id),
+    listFacebookPageCategoryMappings(supabase, user.id, item.project_id),
+    facebookDraftCategoryIds(supabase, user.id, item),
     listImageVariants(supabase, user.id, item.id, item.origin_image_variant_id ?? null),
     // TASK-101 extension / TASK-103: every Facebook post of the same article.
     listArticleFacebookPosts(supabase, user.id, item),
   ]);
   const posts = articlePosts.some((post) => post.id === item.id) ? articlePosts : [item, ...articlePosts];
+  // A suggestion only pre-selects the Page; the person confirms it, and an existing publication keeps its own Page.
+  const suggestion = suggestFacebookPage({ connections, mappings: mappings.mappings, categoryIds });
   const publications = await listPublicationsForGenerations(
     supabase,
     user.id,
@@ -53,7 +61,8 @@ export default async function FacebookPostPage({ params }: { params: Promise<{ i
           item={item}
           projectName={item.projects?.name ?? 'this project'}
           publication={publications[item.id] ?? null}
-          connection={connection}
+          connections={connections}
+          suggestion={suggestion}
           configured={Boolean(getMetaConfig()) && hasSocialTokenKey()}
           imageVariants={imageVariants.variants}
           imageVariantsUnavailable={imageVariants.unavailable}

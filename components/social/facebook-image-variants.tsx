@@ -214,7 +214,7 @@ export function FacebookImageVariants({ item, variants: initialVariants, unavail
   const imageCount = variants.length + 1;
 
   return (
-    <section aria-labelledby="facebook-image-title" className="space-y-3 border-t border-border/60 pt-4" data-testid="facebook-image-variants">
+    <section id="facebook-post-image" aria-labelledby="facebook-image-title" className="scroll-mt-20 space-y-3 border-t border-border/60 pt-4" data-testid="facebook-image-variants">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-48 space-y-0.5">
           <h3 id="facebook-image-title" className="text-sm font-semibold">
