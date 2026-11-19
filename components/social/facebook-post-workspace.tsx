@@ -381,7 +381,7 @@ export function FacebookPostWorkspace({
               <p className="text-xs text-muted-foreground">No image: the post is published as text only.</p>
             )}
           </div>
-          <FacebookImageVariants item={item} variants={imageVariants} unavailable={imageVariantsUnavailable} locked={imageChangeLocked(publication)} />
+          <FacebookImageVariants item={item} variants={imageVariants} unavailable={imageVariantsUnavailable} locked={imageChangeLocked(publication)} publicationStatus={publication?.status ?? null} />
           {comment && (
             <div className="rounded-xl border border-border bg-background p-3" data-testid="facebook-comment-preview">
               <p className="text-xs font-medium text-muted-foreground">First comment by the Page</p>

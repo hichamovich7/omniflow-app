@@ -1378,6 +1378,25 @@ Offline, `tests/renderer/facebook-derived-posts.spec.ts` (21) — the article is
 
 Record the date and results here and in TASKS.md (TASK-101 extension). Steps that publish or schedule the new drafts are out of this validation.
 
+**Founder report 2026-11-19:** a new draft was created successfully from an existing image (step 2 or 3 — the per-step results were not reported). Publishing or scheduling that new draft is **not validated**. Reported UI problems (button overflow, inconsistent card sizes, unclear hierarchy) → redesign below. After the redesign, step 1 reads: "Use this image" **hidden** on a locked post, **Create new post** on the three cards, "Selected image" badge on the WordPress image.
+
+## "Post image" redesign (UI only, 2026-11-19)
+
+Automated: the four Facebook suites above (103/103 — the source checks keep the labels "Create new post with this image" (accessible name), "Generate image variants" (dialog title), "Use this image", `disabled={locked || busy !== null}`, `disabled={busy !== null} onClick={() => setConfirmOpen(true)}`, `requestId: newRequestId()`); `npx tsc --noEmit`; ESLint on the touched files; `git diff --check`.
+
+Visual (agent, 2026-11-19): static harness (same classes and theme tokens, scratch file, not committed) at 375 / 768 / 1440 px, panel width as in `/facebook/[id]`, states draft / scheduled / publishing / published, one long title: no element wider than its card, no horizontal page scroll (before: 9–10 overflowing elements at 375 and 1440 px — "Create new post with this image" wider than the card).
+
+Manual (founder, after deploy — no generation, no publication needed):
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 1 | Draft post, 1440 px | 2-column card grid in the Preview card; equal cards; buttons inside the cards; "Selected image" badge + border on the image in use; **Use this image** (outline) above blue **Create new post** | ☐ |
+| 2 | Same at 768 and 375 px (DevTools) | 1–3 columns depending on the width; no horizontal scroll; buttons ≥ 44 px on a phone | ☐ |
+| 3 | Tab through the block | Visible focus ring on Generate images, Use this image, Create new post, Open the new post | ☐ |
+| 4 | Scheduled post | Lock line mentions cancelling the schedule; no Use this image; Create new post present | ☐ |
+| 5 | Published post | Lock line "already on Facebook" — no cancel suggestion; no Use this image | ☐ |
+| 6 | Click **Create new post** → **Cancel** | Same cost dialog as before; nothing created | ☐ |
+
 ---
 
 # Facebook image variants (TASK-101, 2026-11-15)

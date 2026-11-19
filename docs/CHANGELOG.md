@@ -18,6 +18,13 @@ No registrar cambios menores de formato o comentarios.
 
 # [Unreleased]
 
+### Facebook — clearer "Post image" block — TASK-101 / TASK-103 UI (2026-11-19)
+
+* Same-size cards (4:5 image, title up to 2 lines, actions at the bottom) in a grid that follows the panel width: no button overflows its card any more, even with long titles.
+* Each image has a blue full-width **Create new post** button; **Use this image** (outlined) appears only while the image can still be changed. The image in use is outlined and marked **Selected image** with a check.
+* **Generate images** sits apart in the block header. The lock message now depends on the status: scheduled (cancel the schedule to change the image), being published, or already on Facebook (no cancel suggestion).
+* Display only: no API, quota, AI, storage, publication or scheduling change.
+
 ### Facebook — a new post from each image — TASK-101 extension / TASK-103 (2026-11-18)
 
 * **New "Create new post with this image"** on every image of a Facebook post (the WordPress image and the generated variants), even when the post is already published or scheduled: OmniFlow writes a new, separate draft of the same article — its own text, call to action and first comment, written from the article for that image's angle and different from the earlier posts. The image is reused: no image generation. The dialog shows the cost before you confirm (1 text generation, counted like "Generate Facebook post").
